@@ -1293,6 +1293,7 @@ window.__KG_BUILTIN = {
   async function sendMessage() {
     const text = input.value.trim();
     if (!text || isSending) return;
+    window.__kgPopClear?.(); // you've moved on: the full text stays in the chat
 
     input.value = "";
     addMessage("user", text);
@@ -1308,6 +1309,7 @@ window.__KG_BUILTIN = {
       const r = await postChat(withActivity(conversation, "kaguya"), ameContext(), "kaguya");
       if (r.reply) {
         addMessage("ame", r.reply);
+        window.__kgPop?.("k", r.reply);
         conversation.push({ role: "assistant", content: r.reply });
         saveConversation();
         window.__kgAfterReply?.("kaguya", text, r.reply);
@@ -1802,11 +1804,50 @@ window.__KG_BUILTIN = {
   }
   new MutationObserver(layoutBubbles).observe(bubble, { attributes: true, attributeFilter: ["class"] });
   new MutationObserver(layoutBubbles).observe(ibubble, { attributes: true, attributeFilter: ["class"] });
-  const kShow = showBubble; showBubble = function (t, typing) { bubble._at = Date.now(); kShow(t, typing); layoutBubbles(); };
-  function iBubble(text) {
-    ibubble.textContent = text; ibubble._at = Date.now(); ibubble.classList.add("show"); layoutBubbles();
-    clearTimeout(ibt); ibt = setTimeout(() => ibubble.classList.remove("show"), 5500 + text.length * 45);
+  // Speech pop-ups wait their turn: long messages are split, and each piece stays up long enough to read.
+  const POP = { q: [], busy: false };
+  function popSplit(text) {
+    const out = []; let cur = "";
+    const parts = String(text).replace(/\s*\n+\s*/g, " ").match(/[^.!?]+[.!?]*["')\]]*\s*/g) || [String(text)];
+    for (let s of parts) {
+      s = s.trim(); if (!s) continue;
+      while (s.length > 150) { const cut = s.lastIndexOf(" ", 150); const at = cut > 60 ? cut : 150; if (cur) { out.push(cur); cur = ""; } out.push(s.slice(0, at).trim()); s = s.slice(at).trim(); }
+      if (cur && (cur + " " + s).length > 150) { out.push(cur); cur = s; } else cur = cur ? cur + " " + s : s;
+    }
+    if (cur) out.push(cur);
+    return out;
   }
+  const popTime = t => Math.max(2600, Math.min(10000, 1400 + t.length * 52)); // about 19 characters a second, plus a moment to look over
+  function popShow(who, text) {
+    const el = who === "k" ? bubble : ibubble;
+    clearTimeout(who === "k" ? bt : ibt);
+    el.textContent = text; el.classList.remove("typing"); el._at = Date.now(); el.classList.add("show"); layoutBubbles();
+  }
+  function popPump() {
+    if (POP.busy || !POP.q.length) return;
+    if (document.hidden) return; // the rest waits until you're back on the page
+    POP.busy = true;
+    const [who, text] = POP.q.shift(), el = who === "k" ? bubble : ibubble;
+    popShow(who, text);
+    setTimeout(() => {
+      // the same speaker carrying on keeps the bubble up, so it reads as one voice
+      if (!POP.q.length || POP.q[0][0] !== who) el.classList.remove("show");
+      setTimeout(() => { POP.busy = false; popPump(); }, 280);
+    }, popTime(text));
+  }
+  function popAdd(who, text) {
+    if (muted || !text) return;
+    for (const piece of popSplit(text)) POP.q.push([who, piece]);
+    popPump();
+  }
+  document.addEventListener("visibilitychange", popPump);
+  window.__kgPop = popAdd;
+  window.__kgPopClear = () => { POP.q.length = 0; };
+  const kShow = showBubble; showBubble = function (t, typing) {
+    if (typing) { if (!POP.busy) { bubble._at = Date.now(); kShow(t, true); layoutBubbles(); } return; }
+    popAdd("k", t);
+  };
+  function iBubble(text) { popAdd("i", text); }
   // Speech bubbles flip to the left edge when a companion is dragged near it.
   function kgSide() {
     requestAnimationFrame(() => {
@@ -1836,6 +1877,7 @@ window.__KG_BUILTIN = {
 
   async function iSend(preset, image) {
     const text = (preset || iinput.value).trim(); if (!text || iSending) return;
+    POP.q.length = 0; // you've moved on: the full text stays in the chat
     if (!iOpen) iOpenChat();
     iinput.value = ""; iAdd("user", (image ? "📷 " : "") + text); iconv.push({ role: "user", content: text }); saveI();
     iSending = true; isend.disabled = true; face(talkFace(text));
@@ -1843,7 +1885,7 @@ window.__KG_BUILTIN = {
     try {
       const r = await postChat(withActivity(iconv, "iroha"), ameContext(), "iroha", image ? 45000 : 15000, image);
       typing.remove();
-      if (r.reply) { iAdd("ame", r.reply); iconv.push({ role: "assistant", content: r.reply }); saveI(); face(talkFace(r.reply), 8000); window.__kgAfterReply?.("iroha", text, r.reply); }
+      if (r.reply) { iAdd("ame", r.reply); popAdd("i", r.reply); iconv.push({ role: "assistant", content: r.reply }); saveI(); face(talkFace(r.reply), 8000); window.__kgAfterReply?.("iroha", text, r.reply); }
       else { iAdd("ame", failLine("iroha", r, text)); face("stern", 4000); }
     } finally { typing.remove(); iSending = false; isend.disabled = false; }
   }
@@ -2135,9 +2177,9 @@ window.__KG_BUILTIN = {
     conversation.push({ role: "assistant", content: tag("kaguya") }); saveConversation();
     iconv.push({ role: "assistant", content: tag("iroha") }); saveI();
     if (isOpen) addMessage("ame", tag("kaguya"));
-    else if (iOpen) iAdd("ame", tag("iroha"));
-    else if (speaker === "kaguya") { showBubble(text); widget.classList.add("unread"); }
-    else iBubble(text);
+    if (iOpen) iAdd("ame", tag("iroha"));
+    if (!isOpen && speaker === "kaguya") widget.classList.add("unread");
+    popAdd(speaker === "kaguya" ? "k" : "i", text);
     if (speaker === "iroha") face(talkFace(text), 5000); else mood("talk");
   }
   let talking = false;
@@ -6415,7 +6457,21 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
     const s = p.c.style, set = (k, v) => s.setProperty(k, v, 'important');
     set('position', 'fixed'); set('left', r.x + 'px'); set('top', r.y + 'px'); set('right', 'auto'); set('bottom', 'auto'); set('width', r.w + 'px'); set('height', r.h + 'px'); set('max-width', 'none');
   }
-  function layout() {
+  // with a chat open, its pop-up sits beside the chat rather than on top of it; if there's no room, the chat already shows the words
+  const POPW = 240;
+  function bubbles() {
+    for (const p of WHO) {
+      const el = p.w.querySelector('[role="status"]'); if (!el) continue;
+      const s = el.style, clear = () => { for (const k of ['position', 'left', 'top', 'right', 'bottom', 'display', 'margin-bottom']) s.removeProperty(k); };
+      if (!isOpen(p)) { clear(); continue; }
+      const c = p.c.getBoundingClientRect(), left = c.left >= POPW + 16 ? c.left - POPW - 10 : innerWidth - c.right >= POPW + 16 ? c.right + 10 : null;
+      if (left === null || phone()) { clear(); s.setProperty('display', 'none', 'important'); continue; }
+      s.removeProperty('display');
+      for (const [k, v] of [['position', 'fixed'], ['left', left + 'px'], ['top', Math.max(8, c.bottom - 150) + 'px'], ['right', 'auto'], ['bottom', 'auto'], ['margin-bottom', '0']]) s.setProperty(k, v, 'important');
+    }
+  }
+  function layout() { place(); bubbles(); }
+  function place() {
     const b = bounds(), open = order.filter(isOpen);
     if (phone()) {
       // one sheet above the pair: there's no room for two side by side
