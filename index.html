@@ -1571,7 +1571,7 @@ window.__KG_BUILTIN = {
   }
   // draggable Ame
   const PK = "ame-pos-v1"; let dg = null, moved = false, rev = [], lastDx = 0;
-  const place = (x, y) => { const w = widget.offsetWidth || 140, h = widget.offsetHeight || 140; x = Math.max(0, Math.min(innerWidth - w, x)); y = Math.max(isOpen ? 470 : 0, Math.min(innerHeight - h, y)); Object.assign(widget.style, { left: x + "px", top: y + "px", right: "auto", bottom: "auto" }); if (typeof kgSide === "function") kgSide(); return [x, y]; };
+  const place = (x, y) => { const w = widget.offsetWidth || 140, h = widget.offsetHeight || 140; x = Math.max(0, Math.min(innerWidth - w, x)); y = Math.max(0, Math.min(innerHeight - h, y)); Object.assign(widget.style, { left: x + "px", top: y + "px", right: "auto", bottom: "auto" }); if (typeof kgSide === "function") kgSide(); return [x, y]; };
   try { const p = JSON.parse(localStorage.getItem(PK) || "null"); if (p) place(p.x, p.y); } catch (e) {}
   gif.addEventListener("pointerdown", e => { if (e.button) return; const r = widget.getBoundingClientRect(); dg = { ox: e.clientX - r.left, oy: e.clientY - r.top, sx: e.clientX, sy: e.clientY }; moved = false; rev = []; gif.setPointerCapture(e.pointerId); });
   gif.addEventListener("pointermove", e => {
@@ -1597,7 +1597,7 @@ window.__KG_BUILTIN = {
   document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("#root button,#root a"); if (!b || b.closest("#ame-widget")) return; const x = (b.textContent || b.getAttribute("aria-label") || "").trim().replace(/\s+/g, " "); if (x && x.length < 28) { EV.push({ t: `clicked "${x}"`, at: Date.now() }); if (EV.length > 30) EV.shift(); } }, true);
   const HV = [[/erase it|reset trial/i, "WAIT. that erases your logged days! please don't, unless you really mean it."], [/download log/i, "a backup! smart. keep it somewhere safe."], [/^pause$/i, "pausing? okay, just don't let the pause turn into a nap."]];
   document.addEventListener("pointerover", e => { if (muted || isOpen) return; const b = e.target.closest && e.target.closest("#root button"); if (!b) return; const x = (b.textContent || "").trim(), h = HV.find(h => h[0].test(x)); if (h && okCool("hv" + h[0], 90000)) say(h[1], { mood: /erase/i.test(x) ? "annoyed" : "" }); }, true);
-  let selT = 0; document.addEventListener("selectionchange", () => { clearTimeout(selT); selT = setTimeout(() => { const q = String(getSelection()).trim(); if (q.length > 25 && !muted && !isOpen && okCool("sel", 300000)) say("highlighting! is that the important bit? make it a recall card in the Moon Lab.", { mood: "happy" }); }, 900); });
+  let selT = 0; document.addEventListener("selectionchange", () => { clearTimeout(selT); selT = setTimeout(() => { const q = String(getSelection()).trim(); if (q.length > 25 && !muted && !isOpen && okCool("sel", 300000)) say("highlighting! is that the important bit? make it a recall card in Study.", { mood: "happy" }); }, 900); });
   document.addEventListener("copy", () => { if (!muted && !isOpen && okCool("copy", 400000)) irohaSay("Copying? Write it out by hand once. It sticks better.", { face: "stern" }); });
   document.addEventListener("paste", e => { if (e.target.closest && e.target.closest("#ame-widget")) return; if (!muted && !isOpen && okCool("paste", 400000)) irohaSay("Pasting? Write the last line yourself. That's the part that teaches you.", { face: "stern" }); });
   // pomodoro countdown awareness
@@ -1826,7 +1826,6 @@ window.__KG_BUILTIN = {
   window.__irohaSay = (t, o = {}) => setTimeout(() => { if (!document.hidden) irohaSay(t, Object.assign({ habit: true }, o)); }, o.delay ?? 2400);
 
   function iOpenChat() {
-    if (isOpen) closeBtn.click();
     iOpen = true; ichat.classList.add("open"); ibubble.classList.remove("show"); face("talking");
     imsgs.innerHTML = ""; iconv.forEach(m => iAdd(m.role, m.content));
     if (!iconv.length) { iAdd("ame", IR.greet); iconv.push({ role: "assistant", content: IR.greet }); saveI(); face("study", 6000); }
@@ -1834,8 +1833,6 @@ window.__KG_BUILTIN = {
   }
   function iCloseChat() { iOpen = false; ichat.classList.remove("open"); face("idle"); }
   iclose.addEventListener("click", iCloseChat);
-  // Only one chat open at a time so the two windows never stack.
-  new MutationObserver(() => { if (chat.classList.contains("open") && iOpen) iCloseChat(); }).observe(chat, { attributes: true, attributeFilter: ["class"] });
 
   async function iSend(preset, image) {
     const text = (preset || iinput.value).trim(); if (!text || iSending) return;
@@ -1872,7 +1869,7 @@ window.__KG_BUILTIN = {
 
   // click = open her chat, double-click = poke, drag = move her
   const IPK = "iroha-pos-v1"; let idg = null, imoved = false;
-  const iplace = (x, y) => { const w = iw.offsetWidth || 96, h = iw.offsetHeight || 110; x = Math.max(0, Math.min(innerWidth - w, x)); y = Math.max(iOpen ? 440 : 0, Math.min(innerHeight - h, y)); Object.assign(iw.style, { left: x + "px", top: y + "px", right: "auto", bottom: "auto" }); kgSide(); };
+  const iplace = (x, y) => { const w = iw.offsetWidth || 96, h = iw.offsetHeight || 110; x = Math.max(0, Math.min(innerWidth - w, x)); y = Math.max(0, Math.min(innerHeight - h, y)); Object.assign(iw.style, { left: x + "px", top: y + "px", right: "auto", bottom: "auto" }); kgSide(); };
   try { const p = JSON.parse(localStorage.getItem(IPK) || "null"); if (p) iplace(p.x, p.y); } catch (e) {}
   igif.addEventListener("pointerdown", e => { if (e.button) return; const r = iw.getBoundingClientRect(); idg = { ox: e.clientX - r.left, oy: e.clientY - r.top, sx: e.clientX, sy: e.clientY }; imoved = false; igif.setPointerCapture(e.pointerId); });
   igif.addEventListener("pointermove", e => {
@@ -3628,6 +3625,8 @@ body:not(.kg-sec-today) #kg-scene,body.habit-shh #kg-scene{display:none}
 #kg-scene h1{margin:0;font:800 30px/1.15 "Shippori Mincho B1",serif;color:#fbf5e4;background:none;-webkit-text-fill-color:#fbf5e4}
 .kgs-talk{position:absolute;left:24px;bottom:18px;z-index:3;display:grid;gap:8px;width:min(44%,400px)}
 .kgs-say{margin:0;padding:8px 13px 9px;border-radius:14px 14px 14px 4px;font:500 13.5px/1.42 "M PLUS Rounded 1c",sans-serif;color:#f6f2ff;background:rgba(13,11,36,.82);border:1px solid;box-shadow:0 6px 18px rgba(0,0,0,.28);overflow-wrap:anywhere}
+.kgs-say{max-height:98px;overflow-y:auto;scrollbar-width:none}
+.kgs-say::-webkit-scrollbar{display:none}
 .kgs-say[hidden]{display:none}
 .kgs-say b{display:block;font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;margin-bottom:1px}
 .kgs-say.k{border-color:rgba(255,111,174,.75)}.kgs-say.k b{color:#ff9cc8}
@@ -3655,8 +3654,9 @@ body.kg-light #kg-main #kg-scene button.kgs-who{background:none!important;border
 }
 @media(max-width:720px){
   #kg-scene{height:306px;border-radius:20px;margin-bottom:14px}
-  .kgs-copy{top:15px;left:15px;max-width:70%}
-  #kg-scene h1{font-size:23px}
+  .kgs-copy{top:15px;left:15px;max-width:80%}
+  #kg-scene h1{font-size:21px}
+  .kgs-say{max-height:76px}
   .kgs-eyebrow{font-size:9.5px;letter-spacing:.1em}
   .kgs-moon{top:10px;right:10px;width:50px;height:50px}
   .kgs-glow{top:-75px;right:-75px;width:200px;height:200px}
@@ -3681,7 +3681,7 @@ body.kg-shell #moon-lab .kl-primary:hover,body.kg-shell #habit-desk button.hb-pr
 #kg-nav a[aria-current="page"]{box-shadow:inset 0 -2px 0 #f5d27a}
 body.kg-light #kg-nav a[aria-current="page"]{box-shadow:inset 0 -2px 0 #c58a10}
 .kl-enter,#moon-lab>*{animation-duration:.24s}
-#iroha-chat .ame-header{background:linear-gradient(90deg,#123049,#1a4c6b 55%,#226a86)!important}
+#iroha-chat .iroha-header{background:linear-gradient(90deg,#123049,#1a4c6b 55%,#226a86)!important}
 /* a friendly line instead of a table of zeros */
 .kg-nothing{margin:6px 0 2px;padding:10px 13px;border-radius:12px;background:rgba(10,8,30,.4);border-left:3px solid;font-size:14px;line-height:1.45}
 .kg-nothing b{display:block;font-size:10px;letter-spacing:.09em;text-transform:uppercase;margin-bottom:1px}
@@ -3689,6 +3689,60 @@ body.kg-light #kg-nav a[aria-current="page"]{box-shadow:inset 0 -2px 0 #c58a10}
 .kg-nothing.i{border-color:#7fe3ff}.kg-nothing.i b{color:#7fe3ff}
 body.kg-light .kg-nothing{background:#f7f3fb}
 .kl-empty{border-style:solid;background:rgba(10,8,30,.3)}
+/* controls that belong to the site instead of the browser's defaults */
+input[type=range]{-webkit-appearance:none;appearance:none;height:22px;background:transparent;cursor:pointer;padding:0!important;border:0!important;box-shadow:none!important}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:99px;background:#3a3370}
+input[type=range]::-moz-range-track{height:6px;border-radius:99px;background:#3a3370}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;margin-top:-6px;border-radius:50%;background:radial-gradient(circle at 38% 32%,#ffd0e4,#ff6fae);border:2px solid #1c1839;box-shadow:0 0 8px rgba(255,111,174,.55)}
+input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:#ff6fae;border:2px solid #1c1839}
+input[type=range]:focus-visible{outline:2px solid #f5d27a;outline-offset:2px;border-radius:8px}
+body.kg-light input[type=range]::-webkit-slider-runnable-track{background:#d9cdef}
+body.kg-light input[type=range]::-moz-range-track{background:#d9cdef}
+body.kg-shell input[type=checkbox],body.kg-shell input[type=radio]{accent-color:#ff6fae;width:17px;height:17px;flex:none;cursor:pointer}
+body.kg-shell #kg-main input:not([type=range]):not([type=checkbox]):not([type=radio]):focus,body.kg-shell #kg-main select:focus,body.kg-shell #kg-main textarea:focus{outline:none;border-color:#7fe3ff!important;box-shadow:0 0 0 3px rgba(127,227,255,.18)!important}
+body.kg-shell #kg-main button:focus-visible,body.kg-shell #kg-main a:focus-visible,body.kg-shell #kg-main summary:focus-visible{outline:2px solid #f5d27a;outline-offset:2px}
+body.kg-shell #kg-main ::placeholder{color:#8f87bd;opacity:1}
+body.kg-shell #kg-main button:disabled{opacity:.5;cursor:not-allowed}
+::selection{background:rgba(255,111,174,.4);color:#fff}
+html{scrollbar-color:#3f3780 #0f0d24;scrollbar-width:thin}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:#0f0d24}
+::-webkit-scrollbar-thumb{background:#3f3780;border-radius:99px;border:2px solid #0f0d24}
+::-webkit-scrollbar-thumb:hover{background:#5a4fa8}
+body.kg-shell .kl-tabs::-webkit-scrollbar{display:none}
+/* date pickers, dropdowns and scrollbars open dark instead of flashing white */
+body.kg-shell{color-scheme:dark}
+body.kg-shell.kg-light{color-scheme:light}
+/* type: balanced headings, numbers that don't jitter, a little more room to read */
+body.kg-shell #kg-main h2,body.kg-shell #kg-main h3{text-wrap:balance}
+body.kg-shell #kg-main p{text-wrap:pretty}
+body.kg-shell .kl-table td,.kl-timer,.hb-timer,#kg-status{font-variant-numeric:tabular-nums}
+/* tables: quiet headers and clear rows */
+body.kg-shell .kl-table{border-collapse:collapse}
+body.kg-shell .kl-table thead th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#a69fd3;font-weight:800}
+body.kg-shell .kl-table th,body.kg-shell .kl-table td{padding:8px 6px;border-bottom:1px solid rgba(132,118,214,.14);text-align:left}
+body.kg-shell .kl-table tbody tr:last-child th,body.kg-shell .kl-table tbody tr:last-child td{border-bottom:0}
+body.kg-light .kl-table thead th{color:#6a6088!important}
+/* progress dots you can actually see before they are filled */
+#moon-lab .kl-dots button:not(.on){background:#1b1740;border-color:#4d4490}
+body.kg-light #moon-lab .kl-dots button:not(.on){background:#f3edfb!important;border-color:#b9a9dc!important}
+/* rows you act on respond to the pointer */
+@media(hover:hover){body.kg-shell:not(.kg-light) #moon-lab .kl-ch:hover{border-color:rgba(245,210,122,.42)!important;background:#201b40!important}}
+body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
+/* folds read as something you can open */
+.kl-quietfold>summary{list-style:none;display:inline-flex;align-items:center;gap:7px;color:#b9b1e2;opacity:1}
+.kl-quietfold>summary::-webkit-details-marker{display:none}
+.kl-quietfold>summary::before{content:"›";font-size:17px;line-height:1;color:#f5d27a;transition:transform .16s ease}
+.kl-quietfold[open]>summary::before{transform:rotate(90deg)}
+.kl-quietfold>summary:hover{color:#fff}
+/* two chat boxes you can tell apart at a glance */
+#ame-chat,#iroha-chat{border-width:2px!important;border-radius:22px!important}
+#ame-chat{border-color:#ff6fae!important}
+#iroha-chat{border-color:#4fc3e8!important}
+#ame-chat .ame-header{background:linear-gradient(90deg,#4a1f55,#7a2a6a 60%,#a03a7a)!important}
+#ame-chat .ame-header,#iroha-chat .iroha-header{user-select:none}
+@media(min-width:721px){#ame-chat .ame-header,#iroha-chat .iroha-header{cursor:grab;touch-action:none}#ame-chat .ame-header.kg-dragging,#iroha-chat .iroha-header.kg-dragging{cursor:grabbing}}
+.kgs-say{cursor:pointer}
 /* every tab reachable: rows wrap on a computer, and phones get a hint that there's more */
 @media(min-width:721px){body.kg-shell .kl-tabs{flex-wrap:wrap;overflow:visible}}
 @media(max-width:720px){body.kg-shell .kl-tabs.kg-more{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 34px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 34px),transparent)}}
@@ -3825,7 +3879,7 @@ body.kg-light .kg-nothing{background:#f7f3fb}
     for (const t of fresh) L.stk[t[0]] = d;
     save();
     // Existing progress unlocks quietly on first load instead of a parade of celebrations.
-    if (firstCheck && fresh.length > 2) K(`you already earned ${fresh.length} stickers! they're waiting in the Moon Lab sticker book 🌙`);
+    if (firstCheck && fresh.length > 2) K(`you already earned ${fresh.length} stickers! they're waiting in your sticker book, under Progress 🌙`);
     else for (const t of fresh) celebrate.push(t);
     firstCheck = false;
   }
@@ -3961,7 +4015,7 @@ body.kg-light .kg-nothing{background:#f7f3fb}
   }
   function askNow(speak) {
     L.ask = { q: nextQuestion(), at: Date.now(), rev: false }; save();
-    if (speak) I(L.ask.q.text + ' (Answer in Moon Lab · Recall.)', { face: 'study' });
+    if (speak) I(L.ask.q.text + ' (Answer in Study · Recall.)', { face: 'study' });
     pill(); if (tab === 'recall') softRender();
   }
   function grade(g) {
@@ -4089,7 +4143,7 @@ body.kg-light .kg-nothing{background:#f7f3fb}
   /* ---------- the section itself ---------- */
   let tab = 'chapters', subj = 'Physics', weak = false, section = 'today';
   try { tab = sessionStorage.getItem('kl-tab') || 'chapters'; section = sessionStorage.getItem('kl-section') || 'today'; } catch (e) {}
-  const root = document.createElement('section'); root.id = 'moon-lab'; root.setAttribute('aria-label', 'Moon Lab');
+  const root = document.createElement('section'); root.id = 'moon-lab'; root.setAttribute('aria-label', 'Page content');
   const anchor = document.getElementById('habit-original');
   if (anchor) anchor.parentNode.insertBefore(root, anchor); else document.body.insertBefore(root, document.getElementById('ame-journal') || document.getElementById('ame-widget'));
   const pillEl = document.createElement('button'); pillEl.id = 'kl-pill'; pillEl.type = 'button'; document.body.appendChild(pillEl);
@@ -6169,7 +6223,7 @@ body.kg-light .kg-nothing{background:#f7f3fb}
     const m = new Date().getHours() * 60 + new Date().getMinutes(), t = (m < 630 ? m + 1440 : m) - 630, left = b ? Math.max(0, b.end - t) : 0;
     const el = $('kg-status');
     if (el && window.__kgOnBreak) { el.textContent = `${me} Resting until ${window.__kgBreakUntil} · doctor's orders · chain safe`; return; }
-    if (el) el.textContent = `${me} ${M.hist().chain}-day chain ·${got >= need ? 'today counts ✓' : `${Math.max(0, need - got)} min until today counts`}${b && !M.isNight() ? ` · ${b.title}, ${Math.floor(left / 60) ? Math.floor(left / 60) + 'h ' : ''}${left % 60}m left` : ''}`;
+    if (el) el.textContent = `${me} ${M.hist().chain}-day chain · ${got >= need ? 'today counts ✓' : `${Math.max(0, need - got)} min until today counts`}${b && !M.isNight() ? ` · ${b.title}, ${Math.floor(left / 60) ? Math.floor(left / 60) + 'h ' : ''}${left % 60}m left` : ''}`;
     const dot = bar.querySelector('[data-sec="study"] .kg-dot'); if (dot) dot.hidden = !M.L.ask.q;
   }
   let cur = '';
@@ -6209,7 +6263,8 @@ body.kg-light .kg-nothing{background:#f7f3fb}
     const age = (((Date.now() - NEW_MOON) / 864e5) % SYNODIC + SYNODIC) % SYNODIC, phase = age / SYNODIC * Math.PI * 2;
     const lit = Math.round((1 - Math.cos(phase)) / 2 * 100);
     const name = age < 1.2 || age > SYNODIC - 1.2 ? 'New moon' : age < 6.6 ? 'Waxing crescent' : age < 8.2 ? 'First quarter' : age < 13.6 ? 'Waxing gibbous' : age < 15.9 ? 'Full moon' : age < 21.2 ? 'Waning gibbous' : age < 22.9 ? 'Last quarter' : 'Waning crescent';
-    return { phase, lit, name, waning: phase > Math.PI };
+    const icon = { 'New moon': '🌑', 'Waxing crescent': '🌒', 'First quarter': '🌓', 'Waxing gibbous': '🌔', 'Full moon': '🌕', 'Waning gibbous': '🌖', 'Last quarter': '🌗', 'Waning crescent': '🌘' }[name];
+    return { phase, lit, name, icon, waning: phase > Math.PI };
   }
   function moonSvg(m) {
     const r = 40, p = m.waning ? Math.PI * 2 - m.phase : m.phase, rx = (r * Math.abs(Math.cos(p))).toFixed(2);
@@ -6306,7 +6361,7 @@ body.kg-light .kg-nothing{background:#f7f3fb}
   let moonKey = '';
   function tick() {
     const m = moonNow(), key = m.name + m.lit;
-    if (key !== moonKey) { moonKey = key; $('kgs-moon').innerHTML = moonSvg(m); $('kgs-phase').textContent = `🌙 ${m.name} · ${m.lit}% lit`; }
+    if (key !== moonKey) { moonKey = key; $('kgs-moon').innerHTML = moonSvg(m); $('kgs-phase').textContent = `${m.icon} ${m.name} · ${m.lit}% lit`; }
     const { c, night } = skyColours();
     scene.style.setProperty('--s1', c[0]); scene.style.setProperty('--s2', c[1]); scene.style.setProperty('--s3', c[2]);
     scene.classList.toggle('night', night);
@@ -6328,6 +6383,115 @@ body.kg-light .kg-nothing{background:#f7f3fb}
   addEventListener('resize', tabs);
   addEventListener('moonlab:render', () => { tick(); tabs(); });
   tabs();
+})();
+
+</script>
+<script id="kg-chats-script">
+/* ===== Two separate chat boxes: each follows its companion, neither covers the other ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab, $ = id => document.getElementById(id);
+  const WHO = [
+    { w: $('ame-widget'), c: $('ame-chat'), a: $('ame-gif'), x: $('ame-close'), m: $('ame-messages'), pk: 'ame-pos-v1' },
+    { w: $('iroha-widget'), c: $('iroha-chat'), a: $('iroha-gif'), x: $('iroha-close'), m: $('iroha-messages'), pk: 'iroha-pos-v1' }
+  ].filter(p => p.w && p.c && p.a);
+  if (!M || WHO.length < 2) return;
+  const GAP = 10, MAX_W = 340, MAX_H = 470, PHONE = 720;
+  const isOpen = p => p.c.classList.contains('open');
+  const phone = () => innerWidth <= PHONE;
+  let order = WHO.filter(isOpen); // oldest first, so a new chat works around the one already there
+
+  const area = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+  function avatar(p) {
+    if (p.w.hidden || getComputedStyle(p.a).visibility === 'hidden') return null;
+    const r = p.a.getBoundingClientRect(); return r.width ? { x: r.left, y: r.top, w: r.width, h: r.height } : null;
+  }
+  function bounds() {
+    const bar = $('kg-bar'), nav = $('kg-nav'), barH = bar && bar.offsetParent !== null ? bar.getBoundingClientRect().bottom : 0;
+    const navH = phone() && nav && nav.offsetParent !== null ? nav.getBoundingClientRect().height : 0;
+    return { top: barH + 8, left: 8, right: innerWidth - 8, bottom: innerHeight - navH - 8 };
+  }
+  function put(p, r) {
+    const s = p.c.style, set = (k, v) => s.setProperty(k, v, 'important');
+    set('position', 'fixed'); set('left', r.x + 'px'); set('top', r.y + 'px'); set('right', 'auto'); set('bottom', 'auto'); set('width', r.w + 'px'); set('height', r.h + 'px'); set('max-width', 'none');
+  }
+  function layout() {
+    const b = bounds(), open = order.filter(isOpen);
+    if (phone()) {
+      // one sheet above the pair: there's no room for two side by side
+      const pair = WHO.map(avatar).filter(Boolean), floor = pair.length ? Math.min(...pair.map(a => a.y)) - GAP : b.bottom;
+      const bottom = Math.max(b.top + 240, Math.min(b.bottom, floor)), h = Math.min(MAX_H, bottom - b.top);
+      for (const p of open) put(p, { x: 12, y: bottom - h, w: innerWidth - 24, h });
+      return;
+    }
+    const W = Math.min(MAX_W, b.right - b.left), H = Math.min(MAX_H, b.bottom - b.top), placed = [];
+    const clamp = r => ({ x: Math.max(b.left, Math.min(b.right - W, r.x)), y: Math.max(b.top, Math.min(b.bottom - H, r.y)), w: W, h: H });
+    for (const p of open) {
+      const box = p.w.getBoundingClientRect(), a = avatar(p), r = a || { x: box.left, y: box.top, w: box.width, h: Math.max(box.height, 1) };
+      const tries = [{ x: r.x + r.w - W, y: r.y - H - GAP }, { x: r.x - W - GAP, y: r.y + r.h - H }, { x: r.x + r.w + GAP, y: r.y + r.h - H }, { x: r.x + r.w - W, y: r.y + r.h + GAP }];
+      for (const q of placed) tries.push({ x: q.x - W - GAP, y: q.y }, { x: q.x + q.w + GAP, y: q.y });
+      const faces = WHO.map(avatar).filter(Boolean);
+      let best = null, bestScore = Infinity;
+      tries.forEach((t, i) => {
+        const c = clamp(t);
+        const score = placed.reduce((n, q) => n + area(c, q) * 100, 0) + faces.reduce((n, f) => n + area(c, f) * 4, 0) + i;
+        if (score < bestScore) { bestScore = score; best = c; }
+      });
+      placed.push(best); put(p, best);
+    }
+  }
+  let queued = false;
+  const later = () => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; layout(); }); };
+
+  for (const p of WHO) {
+    new MutationObserver(() => {
+      const now = isOpen(p), was = order.includes(p);
+      if (now && !was) {
+        order.push(p);
+        if (phone()) for (const o of order) if (o !== p && isOpen(o)) o.x?.click();
+        layout();
+        requestAnimationFrame(() => { if (p.m) p.m.scrollTop = p.m.scrollHeight; }); // always open on the newest message
+      } else if (!now && was) { order = order.filter(o => o !== p); later(); }
+    }).observe(p.c, { attributes: true, attributeFilter: ['class'] });
+    new MutationObserver(later).observe(p.w, { attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
+
+    /* ---------- drag a chat by its title bar and she comes with it ---------- */
+    const head = p.c.querySelector('.ame-header,.iroha-header'); if (!head) continue;
+    let drag = null;
+    head.addEventListener('pointerdown', e => {
+      if (e.button || phone() || e.target.closest('button,input,select,a')) return;
+      const r = p.w.getBoundingClientRect(); drag = { ox: e.clientX - r.left, oy: e.clientY - r.top }; head.setPointerCapture(e.pointerId); head.classList.add('kg-dragging'); e.preventDefault();
+    });
+    head.addEventListener('pointermove', e => {
+      if (!drag) return; const w = p.w.offsetWidth || 96, h = p.w.offsetHeight || 96;
+      Object.assign(p.w.style, { left: Math.max(0, Math.min(innerWidth - w, e.clientX - drag.ox)) + 'px', top: Math.max(0, Math.min(innerHeight - h, e.clientY - drag.oy)) + 'px', right: 'auto', bottom: 'auto' });
+    });
+    const end = () => { if (!drag) return; drag = null; head.classList.remove('kg-dragging'); const r = p.w.getBoundingClientRect(); try { localStorage.setItem(p.pk, JSON.stringify({ x: r.left, y: r.top })); } catch (e) {} };
+    head.addEventListener('pointerup', end); head.addEventListener('pointercancel', end);
+  }
+  new MutationObserver(later).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  addEventListener('resize', () => {
+    for (const p of WHO) if (p.w.style.left) { // a smaller window never strands anyone off screen
+      const r = p.w.getBoundingClientRect();
+      p.w.style.left = Math.max(0, Math.min(innerWidth - r.width, r.left)) + 'px';
+      p.w.style.top = Math.max(0, Math.min(innerHeight - r.height, r.top)) + 'px';
+    }
+    later();
+  });
+  /* Esc closes the chat you opened last */
+  addEventListener('keydown', e => { if (e.key !== 'Escape') return; const open = order.filter(isOpen); if (open.length) open[open.length - 1].x?.click(); });
+  /* tapping a line in the Today scene opens that companion's chat */
+  $('kgs-say-k')?.addEventListener('click', () => { if (!isOpen(WHO[0])) WHO[0].a.click(); });
+  $('kgs-say-i')?.addEventListener('click', () => { if (!isOpen(WHO[1])) WHO[1].a.click(); });
+
+  /* ---------- Settings: send them home ---------- */
+  const companions = M.PANELS.companions;
+  if (companions) M.PANELS.companions = () => companions() + `<section class="kl-card"><h3>Where they stand</h3><p class="kl-small">Drag either of them, or a chat by its title bar, and they remember the spot.</p><button data-a="kgresetpos">Put them back in the corner</button></section>`;
+  M.ACTIONS.kgresetpos = () => {
+    for (const p of WHO) { try { localStorage.removeItem(p.pk); } catch (e) {} for (const k of ['left', 'top', 'right', 'bottom']) p.w.style.removeProperty(k); }
+    later(); window.__kaguyaSay?.('back in the corner! good view from here.');
+  };
+  layout();
 })();
 
 </script>
