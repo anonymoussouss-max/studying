@@ -3925,7 +3925,7 @@ body.kg-light #kg-focus-sky{display:none!important}
 #kg-focus-sky .kgs-moon{top:7vh;right:8vw;width:120px;height:120px;right:8vw;cursor:default;pointer-events:none}
 #kg-focus-sky .kgs-grove{height:58vh;opacity:.6}
 body.habit-shh #kg-main{width:min(720px,calc(100% - 24px))!important;max-width:720px!important;margin-left:auto!important;margin-right:auto!important}
-body.habit-shh #kg-main #habit-desk{margin-top:7vh}
+body.habit-shh #kg-main #habit-desk{margin-top:7vh;margin-left:auto;margin-right:auto}
 .kg-focusbar{height:6px;margin:2px auto 14px;width:min(420px,88%);border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden}
 .kg-focusbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--kg-a2,#ff5fa4),#f5d27a);transition:width 1s linear}
 @media(max-width:720px){
@@ -4095,6 +4095,20 @@ body.kg-light .kg-saved{background:#f7f3fb}
 .kgs-chain i::before{content:"";position:absolute;left:50%;top:-9px;width:1px;height:9px;background:rgba(255,235,190,.55)}
 @keyframes kgs-glow{50%{opacity:.72}}
 @media(prefers-reduced-motion:reduce){.kgs-chain i{animation:none}}
+.kgs-live[hidden]{display:none}
+/* phones don't zoom in when you tap a box */
+@media(max-width:720px){
+  #ame-input,#iroha-input,#mp-input,#kg-main input:not([type=range]):not([type=checkbox]):not([type=radio]),#kg-main select,#kg-main textarea{font-size:16px}
+}
+/* back down to the newest message */
+#ame-chat,#iroha-chat{position:fixed}
+.kg-chat-down{position:absolute;left:50%;bottom:118px;transform:translateX(-50%);z-index:5;padding:4px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.3);background:#2a2452;color:#f2eeff;font:700 11.5px "M PLUS Rounded 1c",sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.4);cursor:pointer}
+.kg-chat-down[hidden]{display:none}
+#iroha-chat .kg-chat-down{bottom:136px}
+.kg-chat-down:hover{background:#3a3370}
+.kg-chat-down:focus-visible{outline:2px solid #f5d27a;outline-offset:2px}
+/* room for the meter above Iroha on phones */
+@media(max-width:720px){#kg-scene:has(.kgs-meter:not([hidden])){height:352px}}
 </style>
 <script id="moon-lab-script">
 /* ===== Moon Lab: chapter tracker, boss battles, Iroha's recall, doubts, weekly rank, stickers, bond, voyage, kindness ===== */
@@ -6825,6 +6839,7 @@ body.kg-light .kg-saved{background:#f7f3fb}
     $('kgs-say-k').parentElement.classList.toggle('one-live', !!said.k !== !!said.i);
     const away = !!$('iroha-widget')?.hidden; // after 1:00 she's gone for the night
     $('kgs-who-i').hidden = away; $('kgs-say-i').hidden = away;
+    $('kgs-live').hidden = !!window.__kgLowest; // no show on a really hard day
     // Kaguya's expression changes while she's talking
     const kImg = $('kgs-who-k').firstElementChild, want = said.k && KG.kaguya.talking ? KG.kaguya.talking : KG.kaguya.idle;
     if (kImg.getAttribute('src') !== want) kImg.setAttribute('src', want);
@@ -6896,7 +6911,7 @@ body.kg-light .kg-saved{background:#f7f3fb}
   }
   function bounds() {
     const bar = $('kg-bar'), nav = $('kg-nav'), barH = bar && bar.offsetParent !== null ? bar.getBoundingClientRect().bottom : 0;
-    const navH = phone() && nav && nav.offsetParent !== null ? nav.getBoundingClientRect().height : 0;
+    const navH = phone() && nav ? nav.getBoundingClientRect().height : 0; // a fixed menu has no offsetParent, so measure it directly
     return { top: barH + 8, left: 8, right: innerWidth - 8, bottom: innerHeight - navH - 8 };
   }
   function put(p, r) {
@@ -6919,6 +6934,11 @@ body.kg-light .kg-saved{background:#f7f3fb}
   function layout() { place(); bubbles(); document.body.classList.toggle('kg-chat-full', phone() && order.some(p => isOpen(p) && p.big)); }
   function place() {
     const b = bounds(), open = order.filter(isOpen);
+    const vv = window.visualViewport, keyboard = phone() && vv && vv.height < innerHeight - 120;
+    if (keyboard) {
+      for (const p of open) put(p, { x: 8, y: Math.round(vv.offsetTop) + 6, w: innerWidth - 16, h: Math.round(vv.height) - 12 });
+      return;
+    }
     if (phone()) {
       // one sheet above the pair: there's no room for two side by side
       const pair = WHO.map(avatar).filter(Boolean), floor = pair.length ? Math.min(...pair.map(a => a.y)) - GAP : b.bottom;
@@ -6993,6 +7013,19 @@ body.kg-light .kg-saved{background:#f7f3fb}
     const end = () => { if (!drag) return; drag = null; head.classList.remove('kg-dragging'); const r = p.w.getBoundingClientRect(); try { localStorage.setItem(p.pk, JSON.stringify({ x: r.left, y: r.top })); } catch (e) {} };
     head.addEventListener('pointerup', end); head.addEventListener('pointercancel', end);
   }
+  if (window.visualViewport) { visualViewport.addEventListener('resize', later); visualViewport.addEventListener('scroll', later); }
+
+  /* ---------- reading back through a chat: a button back down to the newest message ---------- */
+  for (const p of WHO) {
+    if (!p.m) continue;
+    const down = document.createElement('button'); down.type = 'button'; down.className = 'kg-chat-down'; down.textContent = '↓ newest'; down.hidden = true;
+    down.onclick = () => { p.m.scrollTop = p.m.scrollHeight; };
+    p.m.after(down);
+    const check = () => { down.hidden = p.m.scrollHeight - p.m.scrollTop - p.m.clientHeight < 160; };
+    p.m.addEventListener('scroll', check, { passive: true });
+    new MutationObserver(check).observe(p.m, { childList: true });
+  }
+
   /* ---------- keep a line: save or copy anything they say ---------- */
   const L = M.L; L.saved = L.saved || [];
   const msgText = m => { const c = m.cloneNode(true); c.querySelector('.kg-msg-tools')?.remove(); return c.textContent.trim(); };
@@ -7096,7 +7129,7 @@ body.kg-light .kg-saved{background:#f7f3fb}
     for (const [v, name] of THEMES) if (curTheme() !== v) out.push({ label: 'Theme: ' + name, hint: 'Look', run: () => setTheme(v) });
     out.push({ label: 'Jump to the current block', hint: 'Plan', run: () => {
       M.go('plan');
-      setTimeout(() => { const li = [...($('habit-original')?.querySelectorAll('li') || [])].find(x => /\bNow\b/.test((x.querySelector('p') || x).textContent)); if (li) li.scrollIntoView({ block: 'center' }); }, 120);
+      setTimeout(() => { const li = [...($('habit-original')?.querySelectorAll('li') || [])].find(x => [...x.querySelectorAll('*')].some(e => !e.children.length && e.textContent.trim() === 'Now')); if (li) li.scrollIntoView({ block: 'center' }); }, 120);
     } });
     const store = window.DeskStore?.getState();
     if (store) out.push({ label: store.sound ? 'Turn sound off' : 'Turn sound on', hint: 'Sound', run: () => window.DeskStore.getState().toggleSound() });
