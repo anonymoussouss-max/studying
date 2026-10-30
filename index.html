@@ -1855,7 +1855,7 @@ window.__KG_BUILTIN = {
   });
   iinput.addEventListener("keydown", e => { if (e.key === "Enter") iSend(); });
   [["drill me", "drill me: one hard exam-style question on what i'm studying right now. no hints until i answer."], ["check my work", "i'm going to paste my working. check units, signs and assumptions, and tell me exactly where it breaks."], ["plan my next hour", "plan my next hour from my schedule and what's left today. concrete tasks, exact minutes."], ["i'm slacking", "i'm slacking. give me one task and a time limit, no sympathy."]].forEach(([l, q]) => {
-    const b = document.createElement("button"); b.type = "button"; b.textContent = l; b.onclick = () => iSend(q); ichips.appendChild(b);
+    const b = document.createElement("button"); b.type = "button"; b.textContent = l; b.onclick = async () => { if (l === "drill me" && window.__kgDrill && !window.__kgOnBreak) { const note = await window.__kgDrill(); if (note) window.__kgOnce = note; } iSend(q); }; ichips.appendChild(b);
   });
 
   // click = open her chat, double-click = poke, drag = move her
@@ -2010,6 +2010,7 @@ window.__KG_BUILTIN = {
     if (i >= 0 && out[i].role === "user" && window.__kgOnBreak) out[i].content = out[i].content.split("\n\n[desk page status")[0];
     // plus company mode / memories / the "not okay" note set by the company module
     if (i >= 0 && out[i].role === "user" && wantsTalk(who, String(conv[conv.length - 1]?.content || ""))) out[i].content += `\n\n[I'm bringing ${who === "iroha" ? "Kaguya" : "Iroha"} into this. She will answer right after you, so speak to her as well as to me.]`;
+    if (i >= 0 && out[i].role === "user" && who === "iroha" && window.__kgOnce) { out[i].content += "\n\n" + window.__kgOnce; window.__kgOnce = null; }
     if (i >= 0 && out[i].role === "user") out[i].content += crossNote(who) + (window.__kgNoteExtra && window.__kgNoteExtra[who] ? "\n\n" + window.__kgNoteExtra[who] : "");
     return out;
   };
@@ -3349,6 +3350,83 @@ body.kg-shell .kg-lean-l,body.kg-shell .kg-lean-r{animation-duration:2.4s}
 #moon-lab .kl-star.l1{background:#3a3270}#moon-lab .kl-star.l2{background:#5b4fa8}#moon-lab .kl-star.l3{background:#9d8de0}#moon-lab .kl-star.l4{background:#e6d6a0}#moon-lab .kl-star.l5{background:#f5d27a}
 #moon-lab .kl-star.medal{box-shadow:0 0 0 3px #17142f,0 0 0 5px #f5d27a}
 #ame-widget.kg-with::before{content:"☾ with you";position:absolute;top:-24px;right:8px;z-index:4;font:700 10px "M PLUS Rounded 1c",sans-serif;color:#ff9cc8;background:#17142f;border:1px solid #3b3470;border-radius:999px;padding:2px 8px;pointer-events:none;white-space:nowrap}
+/* icons */
+.kg-ic{width:1.15em;height:1.15em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+#kg-nav a span .kg-ic{width:18px;height:18px;display:block}
+body.kg-shell .kl-tabs button{display:inline-flex;align-items:center;gap:6px}
+/* quieter companions: the floating chips are gone, the numbers live in the top bar */
+#ame-mood,#ame-stat{display:none!important}
+#ame-widget.kg-with::before{display:none}
+/* music moves to the top bar */
+#kg-bar{backdrop-filter:none;background:rgba(12,10,30,.97)}
+#mp-widget{position:relative!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;flex:none;order:3;z-index:61;margin-left:6px}
+#mp-toggle{width:38px!important;height:38px!important;box-shadow:none!important}
+#mp-toggle svg{width:22px!important;height:22px!important}
+#mp-panel{position:fixed!important;top:62px!important;right:12px!important;left:auto!important;bottom:auto!important;max-height:calc(100vh - 150px);overflow:auto}
+/* a column for the companions so they don't sit on the content */
+@media(min-width:1100px) and (max-width:1560px){
+  #kg-main{width:calc(100% - 214px)!important;max-width:1000px;margin-left:max(16px,calc((100% - 180px - 1000px)/2))!important;margin-right:0!important}
+  #iroha-widget{right:40px;bottom:210px}
+}
+@media(max-width:1099px){
+  #ame-widget{width:84px}#ame-gif{width:84px!important;height:auto!important}
+  #iroha-gif{width:66px!important;height:auto!important}#iroha-widget{right:98px;width:66px;height:auto}
+  #kg-hw{width:130px}
+}
+@media(max-width:720px){
+  #ame-widget{width:62px;right:8px!important}#ame-gif{width:62px!important}
+  #iroha-gif{width:48px!important}#iroha-widget{right:72px!important;width:48px}
+}
+/* folds */
+.kl-fold>summary{cursor:pointer;font-weight:700;padding:6px 0;list-style-position:inside}
+.kl-fold[open]>summary{margin-bottom:8px}
+.kl-mainfold>summary{display:inline-block;background:#ff6fae;color:#1d1238;border-radius:12px;padding:9px 16px;list-style:none;margin-top:4px}
+.kl-mainfold>summary::-webkit-details-marker{display:none}
+.kl-quietfold>summary{font-size:13px;opacity:.85}
+details.kl-fold:not(.kl-mainfold):not(.kl-quietfold){background:#17142f;border:1px solid #2c2660;border-radius:18px;padding:10px 16px;margin-bottom:14px}
+.kl-enter{animation:kl-enter .18s ease-out}
+@keyframes kl-enter{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.kl-enter{animation:none}}
+/* question options */
+.kl-opts{display:grid;gap:6px;margin:8px 0}
+.kl-opts button{text-align:left;display:flex;gap:10px;align-items:flex-start;white-space:normal;padding:9px 12px;border-radius:10px;font-weight:500;width:100%}
+.kl-opts button b{flex:none}
+.kl-opts button.on{border-color:#ff6fae;background:#3a1f3f}
+.kl-opts button.key{border-color:#8fdc8a;background:#1c3324}
+.kl-opts button:disabled{opacity:1;cursor:default}
+.kl-tiny{font-size:12px!important;padding:4px 10px!important;margin-top:4px}
+.kl-strategy{margin:10px 0;padding:10px 12px;border-left:3px solid #f5d27a;background:#1e1a3a;border-radius:0 10px 10px 0}
+.kl-short{max-width:92px}.kl-short2{max-width:140px}
+#moon-lab .kl-qitem>p:first-child{white-space:pre-wrap}
+.kl-good b{color:#f5d27a;font-weight:600}
+/* settings: same shape as everything else */
+.kl-stack>button{align-self:flex-start;width:auto}
+body.kg-shell #habit-desk h2{font-size:20px;margin:4px 0 10px}
+body.kg-shell #habit-desk .hb-card{padding:18px}
+body.kg-shell .kl-card h3{margin-top:2px}
+/* the quiet room */
+#kg-room{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;color:#f2eeff;background:radial-gradient(circle at 50% 20%,#2c2460,#0c0a1e 70%);animation:kl-enter .6s ease-out}
+.kg-room-x{position:absolute;top:16px;right:16px;background:transparent;border:1px solid #3b3470;color:#c9c0ee;border-radius:10px;padding:7px 14px;cursor:pointer}
+.kg-room-clock{font:600 44px "Fraunces",serif;margin:0;opacity:.9}
+.kg-room-who{display:flex;align-items:flex-end;gap:12px}.kg-room-who img{max-height:min(46vh,340px);max-width:44vw}
+.kg-room-line{font-size:18px;margin:6px 0 0}.kg-room-small{font-size:13px;opacity:.65;margin:0;min-height:18px}
+/* daylight theme */
+body.kg-light{background:#f7f3fb!important;color:#2b2447}
+body.kg-light::before,body.kg-light::after{display:none!important}
+body.kg-light #kg-bar{background:#fff;border-color:#e5dcf5}
+body.kg-light #kg-bar b,body.kg-light #kg-status,body.kg-light #kg-nav a{color:#2b2447}
+body.kg-light #kg-nav a[aria-current="page"]{background:#ece4fb}
+body.kg-light #kg-nav{background:#fff}
+body.kg-light #kg-main,body.kg-light #kg-main *:not(.kl-primary):not(.kl-mainfold>summary){color:#2b2447}
+body.kg-light .kl-card,body.kg-light #habit-desk .hb-card,body.kg-light details.kl-fold:not(.kl-mainfold):not(.kl-quietfold),body.kg-light #ame-journal{background:#fff!important;border-color:#e5dcf5!important}
+body.kg-light #kg-main input,body.kg-light #kg-main select,body.kg-light #kg-main textarea,body.kg-light #kg-main button:not(.kl-primary){background:#f7f3fb!important;border-color:#d9cdef!important}
+body.kg-light #kg-main .kl-eyebrow{color:#a05a00}
+body.kg-light #kg-main .kl-small,body.kg-light #kg-main small{color:#6a6088}
+body.kg-light #habit-desk{--hb-soft:#f3edfb;--hb-line:#d9cdef;--hb-ink:#2b2447;--hb-paper:#fff}
+body.kg-light .kl-opts button.on{background:#ffe3ef!important;border-color:#ff6fae!important}
+body.kg-light .kl-opts button.key{background:#dff4dd!important;border-color:#5fae5a!important}
+body.kg-light .kl-strategy{background:#fff7e3}
+body.kg-light #kg-main .kl-chip{background:#f3edfb!important;border-color:#d9cdef!important}
 /* the chat stays clear of her little chips */
 #ame-widget:has(#ame-chat.open) #kg-hw,#ame-widget:has(#ame-chat.open) #ame-stat{display:none!important}
 #ame-widget.kg-with:has(#ame-chat.open)::before{display:none}
@@ -3966,9 +4044,9 @@ body.kg-shell .kl-big{line-height:1.1}
     const moodTxt = { steady: '☀️ steady', heavy: '☁️ heavy', hard: '🌧️ gentle mode', lowest: '🌑 company first' }[m] || 'not checked in';
     return `<section class="kl-card kl-kindcard">
         <div class="kl-kind"><div class="kl-row"><span class="kl-chip">Today: ${moodTxt}</span><button data-a="mood">Check in</button><button class="kl-soft" data-a="hard" ${L.gentle[d] ? 'disabled' : ''}>${L.gentle[d] ? 'Gentle mode is on' : "I'm having a hard day"}</button></div>
-        <div class="kl-row"><button data-a="watch" class="${watch ? 'kl-soft' : ''}">${watch ? '👁 Iroha is watching · stop' : '👁 Let Iroha watch my screen'}</button>${watch && L.watch?.topic ? `<span class="kl-chip">On screen: ${esc(L.watch.topic)}</span>` : ''}</div>
+        <details class="kl-fold kl-quietfold" data-keep="kind"><summary>Wins and screen watch</summary><div class="kl-row"><button data-a="watch" class="${watch ? 'kl-soft' : ''}">${watch ? '👁 Iroha is watching · stop' : '👁 Let Iroha watch my screen'}</button>${watch && L.watch?.topic ? `<span class="kl-chip">On screen: ${esc(L.watch.topic)}</span>` : ''}</div>
         <form data-f="win" class="kl-row"><input name="t" required maxlength="140" placeholder="One small win today…" aria-label="One small win today"><button>Add win</button></form>
-        <details class="kl-wins"><summary>Wins journal (${L.wins.length})</summary>${L.wins.slice(-14).reverse().map(w => `<p><time>${esc(w.d)}</time> ${esc(w.t)}</p>`).join('') || '<p class="kl-small">Your first win goes here. Small counts.</p>'}</details></div></section>
+        <details class="kl-wins"><summary>Wins journal (${L.wins.length})</summary>${L.wins.slice(-14).reverse().map(w => `<p><time>${esc(w.d)}</time> ${esc(w.t)}</p>`).join('') || '<p class="kl-small">Your first win goes here. Small counts.</p>'}</details></details></div></section>
 `;
   }
   const TODAY = [kindCard]; // the study and company modules add their own Today cards
@@ -4185,8 +4263,10 @@ body.kg-shell .kl-big{line-height:1.1}
     return qs;
   }
   // Writes small batches, double-checks each, and tops up until the set is full.
-  async function getSet(chs, n, progress) {
-    const good = [], unsure = []; let lastErr = '', tries = 0;
+  async function getSet(chs, n, progress, o = {}) {
+    // the bank comes first: checked problems, free and instant
+    const good = M.bankPick ? await M.bankPick(chs, n, { mixed: o.mixed, hard: o.hard }) : [], unsure = []; let lastErr = '', tries = 0;
+    progress?.(good.length);
     while (good.length < n && tries < Math.ceil(n / 2) + 3) {
       tries++;
       const r = await writeSet(chs, Math.min(4, n - good.length), good.map(q => q.t.slice(0, 60)));
@@ -4196,6 +4276,8 @@ body.kg-shell .kl-big{line-height:1.1}
       progress?.(good.length);
     }
     for (const q of unsure) if (good.length < n) { q.unv = true; good.push(q); }
+    // the AI is down or busy: reuse older bank problems rather than fail
+    if (good.length < n && M.bankPick) for (const q of await M.bankPick(chs, n, { mixed: o.mixed, hard: o.hard, again: true })) if (good.length < n && !good.some(g => g.bid === q.bid)) good.push(q);
     return good.length ? { qs: good.slice(0, n) } : { error: lastErr || 'json' };
   }
   async function writeSet(chs, n, avoid) {
@@ -4211,13 +4293,16 @@ body.kg-shell .kl-big{line-height:1.1}
   }
   M.getSet = getSet;
   M.attemptLog = o => attempt(o);
-  const right = M.right = (q, x) => { const v = M.num(x); return Number.isFinite(v) && Math.abs(v - q.a) <= Math.max(Math.abs(q.a) * q.tol, 1e-9); };
+  const right = M.right = (q, x) => {
+    if (q.type === 'mcq') return String(x ?? '') === String(q.a);
+    if (q.type === 'multi') return String(x || '').split(',').filter(s => s !== '').sort().join() === q.a.map(String).sort().join();
+    const v = M.num(x); return Number.isFinite(v) && Math.abs(v - q.a) <= Math.max(Math.abs(q.a) * q.tol, 1e-9); };
   const sets = { sprint: () => L.sprint, proof: () => L.proof, raid: () => L.raid };
   function qCard(kind, set, i) {
     const q = set.qs[i], done = set.state === 'done';
-    return `<div class="kl-qitem ${done ? (q.ok ? 'ok' : 'bad') : ''}"><p><b>${i + 1}.</b> ${esc(q.t)}</p>${done
-      ? `<p class="kl-small">You: ${esc(q.x || '—')} · key: ${esc(+q.a.toPrecision(6))} ${esc(q.u)} ${q.ok ? '✔' : '✘'}${q.disputed ? ' · re-checked' : ''}${q.s ? ' · ' + (q.s >= 60 ? Math.floor(q.s / 60) + 'm ' : '') + (q.s % 60) + 's' : ''}${q.unv ? " · ⚠ key wasn't double-checked" : ''}</p>${M.badRow ? M.badRow(kind, i, q) : ''}${!q.ok && !q.disputed ? `<button class="kl-ghost" data-a="qdispute" data-set="${kind}" data-i="${i}">Dispute this key</button>` : ''}${q.dtext ? `<details><summary>Iroha's re-check</summary><pre class="kl-paper">${esc(q.dtext)}</pre></details>` : ''}`
-      : `<div class="kl-row"><input data-qset="${kind}" data-qi="${i}" inputmode="decimal" placeholder="Answer${q.u ? ' in ' + esc(q.u) : ''}" value="${esc(q.x || '')}" aria-label="Answer to question ${i + 1}"><span class="kl-conf" role="group" aria-label="How sure are you?">${['sure', '50-50', 'guess'].map(c => `<button type="button" data-a="qconf" data-set="${kind}" data-i="${i}" data-v="${c}" aria-pressed="${q.conf === c}">${c}</button>`).join('')}</span></div>`}</div>`;
+    return `<div class="kl-qitem ${done ? (q.ok ? 'ok' : 'bad') : ''}"><p><b>${i + 1}.</b> ${esc(q.t)}</p>${M.optRow ? M.optRow(kind, i, q, done) : ''}${done
+      ? `<p class="kl-small">You: ${esc(M.yourText(q))} · key: ${esc(M.keyText(q))} ${q.ok ? '✔' : '✘'}${q.disputed ? ' · re-checked' : ''}${q.s ? ' · ' + (q.s >= 60 ? Math.floor(q.s / 60) + 'm ' : '') + (q.s % 60) + 's' : ''}${q.unv ? " · ⚠ key wasn't double-checked" : ''}</p>${M.badRow ? M.badRow(kind, i, q) : ''}${!q.ok && !q.disputed && !q.opts ? `<button class="kl-ghost" data-a="qdispute" data-set="${kind}" data-i="${i}">Dispute this key</button>` : ''}${q.dtext ? `<details><summary>Iroha's re-check</summary><pre class="kl-paper">${esc(q.dtext)}</pre></details>` : ''}`
+      : q.opts ? '' : `<div class="kl-row"><input data-qset="${kind}" data-qi="${i}" inputmode="decimal" placeholder="Answer${q.u ? ' in ' + esc(q.u) : ''}" value="${esc(q.x || '')}" aria-label="Answer to question ${i + 1}"><span class="kl-conf" role="group" aria-label="How sure are you?">${['sure', '50-50', 'guess'].map(c => `<button type="button" data-a="qconf" data-set="${kind}" data-i="${i}" data-v="${c}" aria-pressed="${q.conf === c}">${c}</button>`).join('')}</span></div>`}</div>`;
   }
   function timerRow(set) { return set.state === 'open' && set.start ? `<p class="kl-timer" data-clock="${set.start + set.limit}">${clock(set.start + set.limit - Date.now())}</p>` : ''; }
   setInterval(() => { for (const el of document.querySelectorAll('[data-clock]')) el.textContent = clock(Number(el.dataset.clock) - Date.now()); }, 1000);
@@ -4235,7 +4320,7 @@ body.kg-shell .kl-big{line-height:1.1}
   async function startSet(kind, chs, n, limitMin, extra = {}) {
     if (!chs.length) return I('Pick a chapter first.', { face: 'stern' });
     L[kind] = Object.assign({ state: 'loading', chs, limit: limitMin * 60000 }, extra); save(); M.render();
-    const r = await getSet(chs, n);
+    const r = await getSet(chs, n, null, { mixed: kind !== 'raid', hard: kind === 'proof' || extra.hard });
     if (r.error) { L[kind] = Object.assign(L[kind], { state: 'error', err: r.error }); save(); return M.render(); }
     Object.assign(L[kind], { state: 'open', qs: r.qs, start: Date.now() }); save(); M.render();
   }
@@ -4262,7 +4347,7 @@ body.kg-shell .kl-big{line-height:1.1}
   M.PANELS.exams = () => {
     const p = L.proof, c = p && chap(p.ch);
     let html = `<section class="kl-card kl-proof"><p class="kl-eyebrow">🏅 CHAPTER PROOF · THE ONLY WAY TO A MEDAL</p>`;
-    if (!p) html += `<h3>Ten problems. Sixty minutes. No hints.</h3><p class="kl-small">Pass with 8/10 to earn the chapter medal, 5 dots and a banked freeze. Iroha writes new problems every time.</p><form data-f="proof" class="kl-row"><select name="ch" aria-label="Chapter">${chapterOptions()}</select><button class="kl-primary">Start proof</button></form>`;
+    if (!p) html += `<h3>Ten problems. Sixty minutes. No hints.</h3><p class="kl-small">Pass with 8/10 to earn the chapter medal, 5 dots and a banked freeze. Questions come from the hard tier of her bank.</p><form data-f="proof" class="kl-row"><select name="ch" aria-label="Chapter">${chapterOptions()}</select><button class="kl-primary">Start proof</button></form>`;
     else if (p.state === 'loading') html += `<h3>${esc(c.name)}</h3><p>Iroha is writing your proof paper…</p>`;
     else if (p.state === 'error') html += `<h3>${esc(c.name)}</h3><p>Couldn't get a valid paper from the AI backend (${esc(p.err)}).</p><div class="kl-row"><button data-a="proofnew">Try again</button><button class="kl-ghost" data-a="setclose" data-set="proof">Close</button></div>`;
     else html += `<h3>${esc(c.name)}${p.state === 'done' ? ` · ${p.score}/10 ${L.medals[p.ch] ? '🏅' : ''}` : ''}</h3>${timerRow(p)}${p.qs.map((q, i) => qCard('proof', p, i)).join('')}
@@ -4273,7 +4358,7 @@ body.kg-shell .kl-big{line-height:1.1}
   /* ---------- Practice page: sprints, bosses with Iroha's questions, the Saturday raid, Rocket Lab ---------- */
   function sprintCard() {
     const s = L.sprint;
-    if (!s) return `<section class="kl-card"><p class="kl-eyebrow">⏱️ TIMED SPRINT</p><h3>8 problems, 20 minutes</h3><p class="kl-small">Mark how sure you are on each one; that feeds your calibration.</p><form data-f="sprint" class="kl-row"><select name="ch" aria-label="Chapter">${chapterOptions(suggestCh())}</select><button class="kl-primary">Start sprint</button></form></section>`;
+    if (!s) return `<section class="kl-card"><p class="kl-eyebrow">⏱️ TIMED SPRINT</p><h3>8 problems, 20 minutes</h3><p class="kl-small">Mark how sure you are on each one; that feeds your calibration.</p><form data-f="sprint" class="kl-row"><select name="ch" aria-label="Chapter">${chapterOptions(suggestCh())}</select><select name="level" aria-label="Level" class="kl-short2"><option value="">Mixed level</option><option value="hard">Hard tier</option></select><button class="kl-primary">Start sprint</button></form></section>`;
     if (s.state === 'loading') return '<section class="kl-card"><p class="kl-eyebrow">⏱️ TIMED SPRINT</p><p>Iroha is writing your sprint…</p></section>';
     if (s.state === 'error') return `<section class="kl-card"><p class="kl-eyebrow">⏱️ TIMED SPRINT</p><p>Couldn't get a valid set from the AI backend.</p><button data-a="setclose" data-set="sprint">Close</button></section>`;
     return `<section class="kl-card"><p class="kl-eyebrow">⏱️ TIMED SPRINT · ${esc(chName(s.chs[0]))}${s.state === 'done' ? ` · ${s.score}/${s.qs.length}` : ''}</p>${timerRow(s)}${s.qs.map((q, i) => qCard('sprint', s, i)).join('')}<div class="kl-row">${s.state === 'open' ? '<button class="kl-primary" data-a="setgrade" data-set="sprint">Check answers</button>' : ''}<button class="kl-ghost" data-a="setclose" data-set="sprint">${s.state === 'open' ? 'Abandon' : 'Close'}</button></div></section>`;
@@ -4372,10 +4457,10 @@ body.kg-shell .kl-big{line-height:1.1}
   function closeCard() {
     const b = openBlock(); if (!b) return '';
     const live = M.block()?.id === b.id, s = ({ maths: 'Maths', physics: 'Physics', chemistry: 'Chemistry' })[b.bucket], w = s && weakest(s);
-    return `<section class="kl-card kl-close"><p class="kl-eyebrow">${live ? 'NOW' : 'STILL OPEN'} · ${esc(b.title)}</p><h3>Close this block</h3><form data-f="closeout" data-block="${b.id}" class="kl-stack">
+    return `<section class="kl-card kl-close"><p class="kl-eyebrow">${live ? 'NOW' : 'STILL OPEN'} · ${esc(b.title)}</p><details class="kl-fold kl-mainfold" data-keep="close"><summary>Finish this block</summary><form data-f="closeout" data-block="${b.id}" class="kl-stack">
       <div class="kl-row"><label>Attempted<input name="att" inputmode="numeric" required placeholder="0"></label><label>Correct<input name="cor" inputmode="numeric" required placeholder="0"></label><label>Lectures<select name="lec"><option value="0">none</option><option value=".25">a quarter</option><option value=".5">half</option><option value=".75">most</option><option value="1">all</option></select></label></div>
       <select name="ch" aria-label="Chapter">${chapterOptions(w ? w.id : '', 'Chapter')}</select><input name="trap" maxlength="200" placeholder="One trap you fell into (it goes in your misses)"><select name="cause" aria-label="Cause">${causeOptions()}</select>
-      <button class="kl-primary">Close and tick the block</button></form></section>`;
+      <button class="kl-primary">Close and tick the block</button></form></details></section>`;
   }
   function askCard() { const q = L.ask.q; return q ? `<section class="kl-card kl-askcard"><p class="kl-eyebrow">✦ IROHA IS WAITING ON AN ANSWER</p><p>${esc(q.text)}</p><button data-a="go" data-v="study:recall">Answer in Recall</button></section>` : ''; }
   function lectureCard() {
@@ -4475,7 +4560,7 @@ body.kg-shell .kl-big{line-height:1.1}
   });
   Object.assign(M.FORMS, {
     proof: v => { M.show('study', 'exams'); startSet('proof', [v.ch], 10, 60, { ch: v.ch }); },
-    sprint: v => startSet('sprint', [v.ch], 8, 20),
+    sprint: v => startSet('sprint', [v.ch], 8, 20, { hard: v.level === 'hard' }),
     miss: v => { attempt({ src: 'manual', ch: v.ch, ok: false, q: v.q.trim(), cause: v.cause, fix: v.fix.trim() }); M.render(); I('Logged. It comes back tomorrow.', { face: 'study' }); },
     bossans: (v, f) => {
       const id = f.dataset.id, bq = L.bossQ[id], q = bq && bq.qs[bq.i]; if (!q) return;
@@ -5028,7 +5113,7 @@ body.kg-shell .kl-big{line-height:1.1}
     sunday: v => { const k = sundayKey(); (L.sunday[k] = L.sunday[k] || []).push({ t: v.t.trim() }); save(); M.render(); }
   });
   const css = document.createElement('style');
-  css.textContent = '#kg-hw{position:absolute;bottom:calc(100% + 28px);right:0;width:170px;padding:4px 8px 6px;border-radius:10px;background:#17142f;border:1px solid #3b3470;font:600 10px "M PLUS Rounded 1c",sans-serif;color:#ff9cc8;pointer-events:none!important;z-index:4}#kg-hw span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#kg-hw b{display:block;height:4px;margin-top:3px;border-radius:4px;background:#ff6fae}#kg-hw[hidden]{display:none}.kl-code{font:700 13px ui-monospace,monospace;background:#0f0d24;border:1px solid #3b3470;border-radius:8px;padding:3px 8px;word-break:break-all}.kl-jar{font-style:italic;color:#f5d27a}.kl-examday{border-color:#8fdc8a!important}@media(max-width:720px){#kg-hw{width:130px}}';
+  css.textContent = '#kg-hw{position:absolute;bottom:calc(100% + 28px);right:0;width:170px;padding:4px 8px 6px;border-radius:10px;background:#17142f;border:1px solid #3b3470;font:600 10px "M PLUS Rounded 1c",sans-serif;color:#ff9cc8;pointer-events:none!important;z-index:4}#kg-hw span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#kg-hw b{display:block;height:4px;margin-top:3px;border-radius:4px;background:#ff6fae}#kg-hw[hidden],#ame-bubble.show~#kg-hw{display:none}.kl-code{font:700 13px ui-monospace,monospace;background:#0f0d24;border:1px solid #3b3470;border-radius:8px;padding:3px 8px;word-break:break-all}.kl-jar{font-style:italic;color:#f5d27a}.kl-examday{border-color:#8fdc8a!important}@media(max-width:720px){#kg-hw{width:130px}}';
   document.head.appendChild(css);
   M.render();
 })();
@@ -5073,7 +5158,7 @@ body.kg-shell .kl-big{line-height:1.1}
         while (L.paper === p && p.qs.filter(q => q.sub === s).length < p.size) {
           const have = p.qs.filter(q => q.sub === s).length, all = CHAPS.filter(c => c.subj === s), started = all.filter(c => (L.ch[c.id]?.c || 0) >= 1);
           const pool = (started.length >= 3 ? started : all).slice().sort(() => Math.random() - .5).slice(0, 5).map(c => c.id);
-          const r = await M.getSet(pool, Math.min(6, p.size - have));
+          const r = await M.getSet(pool, Math.min(6, p.size - have), null, { mixed: true, hard: true });
           if (L.paper !== p) return;
           if (r.error) { if (++fails > 2) { p.state = 'error'; p.err = r.error; save(); return M.tab === 'paper' && M.render(); } continue; }
           for (const q of r.qs) p.qs.push(Object.assign(q, { sub: s }));
@@ -5083,17 +5168,25 @@ body.kg-shell .kl-big{line-height:1.1}
       if (L.paper === p) { p.state = 'ready'; save(); if (!M.inStudy()) K('your mock paper is ready, No.1! start it whenever you want ☾'); if (M.tab === 'paper') M.render(); }
     } finally { building = false; }
   }
+  // JEE-style marking: numeric +4/0, single-correct +3/-1, multi-correct +4, partial +1 per right option, -2 for any wrong option
+  function markOf(q) {
+    if (q.type === 'mcq') return q.ok ? 3 : -1;
+    if (q.type === 'multi') { const key = q.a.map(String), got = String(q.x || '').split(',').filter(s => s !== ''); if (got.some(x => !key.includes(x))) return -2; return got.length === key.length ? 4 : got.length; }
+    return q.ok ? 4 : 0;
+  }
   function tallyPaper(p) {
-    const t = { P: 0, C: 0, M: 0, right: 0, wrong: 0, blank: 0, by: {} };
+    const t = { right: 0, wrong: 0, blank: 0, score: 0, neg: 0, by: {} };
     for (const s of SUBJ) t.by[s] = { right: 0, wrong: 0, blank: 0, marks: 0 };
     for (const q of p.qs) {
       if (q.bad) continue;
       const b = t.by[q.sub], blank = !String(q.x || '').trim();
-      if (blank) { b.blank++; t.blank++; } else if (q.ok) { b.right++; t.right++; b.marks += 4; } else { b.wrong++; t.wrong++; b.marks -= 1; }
+      if (blank) { b.blank++; t.blank++; continue; }
+      const m = markOf(q); b.marks += m; t.score += m; if (m < 0) t.neg -= m;
+      if (m > 0) { b.right++; t.right++; } else { b.wrong++; t.wrong++; }
     }
     p.tally = t;
     const k = L.mocks.find(m => m.id === p.mockId);
-    if (k) Object.assign(k, { p: t.by.Physics.marks, c: t.by.Chemistry.marks, m: t.by.Maths.marks, neg: t.wrong });
+    if (k) Object.assign(k, { p: t.by.Physics.marks, c: t.by.Chemistry.marks, m: t.by.Maths.marks, neg: t.neg });
     return t;
   }
   function finishPaper() {
@@ -5105,7 +5198,7 @@ body.kg-shell .kl-big{line-height:1.1}
     p.state = 'done'; p.mockId = M.uid();
     L.mocks.push({ id: p.mockId, d: today(), name: `Full mock (${p.qs.length} questions)`, p: 0, c: 0, m: 0, max: p.size * 4, neg: 0, note: 'Written and marked on the desk' });
     const t = tallyPaper(p), weak = SUBJ.slice().sort((a, b) => t.by[a].marks - t.by[b].marks)[0]; save(); M.render(); M.checkStickers();
-    duo([['i', `${t.right * 4 - t.wrong} marks. ${t.wrong} wrong cost you ${t.wrong}. ${weak} is where the most marks went. Misses are in your deck.`], ['k', "you sat a whole paper!! that's the hard part done, No.1. go get water ☾"]]);
+    duo([['i', `${t.score} marks. Negatives cost you ${t.neg}. ${weak} is where the most marks went. Misses are in your deck.`], ['k', "you sat a whole paper!! that's the hard part done, No.1. go get water ☾"]]);
   }
   setInterval(() => {
     const p = L.paper; if (!p || p.state !== 'open') return;
@@ -5122,10 +5215,19 @@ body.kg-shell .kl-big{line-height:1.1}
     const p = L.paper, q = p?.qs[Number(e.target.dataset.pq)]; if (!q || q.s || !q.x) return;
     const now = Date.now(); q.s = Math.round((now - (p.lastAns || p.start)) / 1000); p.lastAns = now; save();
   });
+  // paper strategy: where the minutes went, and the habit to change
+  function timeUse(p) {
+    const done = p.qs.filter(q => q.s), sum = a => a.reduce((n, q) => n + q.s, 0), total = sum(done); if (!total || done.length < 5) return '';
+    const wrong = done.filter(q => !q.ok), stuck = wrong.filter(q => q.s > 300), share = Math.round(sum(wrong) * 100 / total);
+    const tip = stuck.length >= 2 ? `${stuck.length} questions took over 5 minutes and still went wrong. Try a hard rule: at 4 minutes, mark it and move on.`
+      : share >= 50 ? 'More than half your time went on questions you got wrong. Do a quick first pass for the sure ones, then come back.'
+      : t => t;
+    return `<div class="kl-strategy"><b>How you used your time</b><p class="kl-small">${share}% of your answering time went on questions you got wrong.${typeof tip === 'string' ? ' ' + tip : ' Good balance. Keep the same pacing.'}</p></div>`;
+  }
   M.PANELS.paper = () => {
     const p = L.paper;
-    if (!p) return `<section class="kl-card"><p class="kl-eyebrow">📝 FULL MOCK</p><h3>A timed paper, marked for you</h3><p>Iroha writes original JEE Advanced-level problems across all three subjects, from the chapters you've started. Each one has a numeric answer. Marking is +4 for right, −1 for wrong, 0 for blank. The score goes into your Mocks page and your misses go into Recall.</p>
-      <p class="kl-small">Real JEE Advanced papers change format every year and also have multiple-choice questions, so treat this as stamina and accuracy practice. Writing a paper takes a few minutes on the free AI. The clock only starts when you press start.</p>
+    if (!p) return `<section class="kl-card"><p class="kl-eyebrow">📝 FULL MOCK</p><h3>A timed paper, marked for you</h3><p>Iroha writes original JEE Advanced-level problems across all three subjects, from the chapters you've started. The paper mixes numeric, single-correct and multi-correct questions, with JEE-style marking: numeric +4, single-correct +3/−1, multi-correct +4 with partial marks and −2 for a wrong option. The score goes into your Mocks page and your misses go into Recall.</p>
+      <p class="kl-small">Real JEE Advanced papers change format every year, so treat this as stamina and accuracy practice. Chapters that run out of bank questions are topped up by the AI, which can take a few minutes. The clock only starts when you press start.</p>
       <div class="kl-row"><button class="kl-primary" data-a="papernew" data-v="9">Half paper · 27 questions · 90 min</button><button data-a="papernew" data-v="18">Full paper · 54 questions · 3 hours</button></div></section>`;
     if (p.state === 'building') { const total = p.size * 3, n = p.qs.length; return `<section class="kl-card"><p class="kl-eyebrow">📝 WRITING YOUR PAPER</p><h3>${n} of ${total} questions written and double-checked</h3><div class="kl-meter"><i style="width:${Math.round(n * 100 / total)}%"></i></div><p class="kl-small">You can leave this page. If you close the desk, it picks up where it stopped.</p><button class="kl-ghost" data-a="paperclose">Cancel</button></section>`; }
     if (p.state === 'error') return `<section class="kl-card"><p class="kl-eyebrow">📝 FULL MOCK</p><p>The AI backend stopped answering after ${p.qs.length} questions (${esc(p.err)}). It may be busy; the free tier has limits.</p><div class="kl-row"><button class="kl-primary" data-a="paperretry">Keep going</button><button class="kl-ghost" data-a="paperclose">Cancel</button></div></section>`;
@@ -5135,15 +5237,15 @@ body.kg-shell .kl-big{line-height:1.1}
       return `<section class="kl-card kl-paper-box"><div class="kl-row kl-paper-top"><b id="kl-paper-clock" class="kl-timer">${clock(p.start + p.limit - Date.now())}</b><span class="kl-small">${p.qs.filter(x => String(x.x || '').trim()).length}/${p.qs.length} answered</span><button class="kl-ghost" data-a="papersubmit">Submit paper</button></div>
         <div class="kl-palette">${p.qs.map((x, k) => `<button data-a="paperq" data-v="${k}" class="${k === i ? 'cur ' : ''}${String(x.x || '').trim() ? 'ans ' : ''}${x.mark ? 'mark' : ''}" aria-label="Question ${k + 1}">${k + 1}</button>`).join('')}</div>
         <p class="kl-eyebrow">${esc(q.sub)} · QUESTION ${i + 1}</p><p class="kl-paper-q">${esc(q.t)}</p>
-        <input data-pq="${i}" inputmode="decimal" value="${esc(q.x || '')}" placeholder="Answer${q.u ? ' in ' + esc(q.u) : ''}" aria-label="Your answer">
+        ${q.opts ? M.optRow('paper', i, q, false) : `<input data-pq="${i}" inputmode="decimal" value="${esc(q.x || '')}" placeholder="Answer${q.u ? ' in ' + esc(q.u) : ''}" aria-label="Your answer">`}
         <div class="kl-row"><button data-a="paperq" data-v="${Math.max(0, i - 1)}" ${i ? '' : 'disabled'}>← Previous</button><button data-a="papermark" aria-pressed="${!!q.mark}">${q.mark ? '★ Marked' : '☆ Mark for review'}</button><button class="kl-primary" data-a="paperq" data-v="${Math.min(p.qs.length - 1, i + 1)}" ${i < p.qs.length - 1 ? '' : 'disabled'}>Next →</button></div></section>`;
     }
-    const t = p.tally || tallyPaper(p), max = p.qs.filter(q => !q.bad).length * 4, score = t.right * 4 - t.wrong, timed = p.qs.filter(q => q.s), avg = timed.length ? Math.round(timed.reduce((n, q) => n + q.s, 0) / timed.length) : 0;
+    const t = p.tally || tallyPaper(p), max = p.qs.filter(q => !q.bad).reduce((n, q) => n + (q.type === 'mcq' ? 3 : 4), 0), score = t.score, timed = p.qs.filter(q => q.s), avg = timed.length ? Math.round(timed.reduce((n, q) => n + q.s, 0) / timed.length) : 0;
     return `<section class="kl-card"><p class="kl-eyebrow">📝 RESULT</p><p class="kl-big">${score}<small> / ${max}</small></p>
       <table class="kl-table"><thead><tr><th></th><th>Marks</th><th>Right</th><th>Wrong</th><th>Blank</th></tr></thead><tbody>${SUBJ.map(s => `<tr><th>${s}</th><td>${t.by[s].marks}</td><td>${t.by[s].right}</td><td>${t.by[s].wrong}</td><td>${t.by[s].blank}</td></tr>`).join('')}</tbody></table>
-      <p class="kl-small">Negatives cost ${t.wrong} mark${t.wrong === 1 ? '' : 's'}.${avg ? ` About ${avg >= 60 ? Math.floor(avg / 60) + 'm ' : ''}${avg % 60}s per answered question.` : ''}</p>
-      <div class="kl-row"><button class="kl-primary" data-a="paperclose">New paper</button><button data-a="go" data-v="progress:mocks">See it in Mocks</button></div></section>
-      <section class="kl-card"><h3>Review</h3>${p.qs.map((q, i) => { const blank = !String(q.x || '').trim(); return `<div class="kl-qitem ${blank ? '' : q.ok ? 'ok' : 'bad'}"><p><b>${i + 1}.</b> ${esc(q.t)}</p><p class="kl-small">You: ${esc(q.x || 'blank')} · key: ${esc(+q.a.toPrecision(6))} ${esc(q.u)}${q.s ? ` · ${q.s >= 60 ? Math.floor(q.s / 60) + 'm ' : ''}${q.s % 60}s` : ''}${q.unv ? " · ⚠ key wasn't double-checked" : ''}</p>${M.badRow('paper', i, q)}</div>`; }).join('')}</section>`;
+      <p class="kl-small">Negatives cost ${t.neg} mark${t.neg === 1 ? '' : 's'}.${avg ? ` About ${avg >= 60 ? Math.floor(avg / 60) + 'm ' : ''}${avg % 60}s per answered question.` : ''}</p>
+      ${timeUse(p)}<div class="kl-row"><button class="kl-primary" data-a="paperclose">New paper</button><button data-a="go" data-v="progress:mocks">See it in Mocks</button></div></section>
+      <section class="kl-card"><h3>Review</h3>${p.qs.map((q, i) => { const blank = !String(q.x || '').trim(); return `<div class="kl-qitem ${blank ? '' : q.ok ? 'ok' : 'bad'}"><p><b>${i + 1}.</b> ${esc(q.t)}</p>${M.optRow('paper', i, q, true)}<p class="kl-small">You: ${esc(blank ? 'blank' : M.yourText(q))} · key: ${esc(M.keyText(q))}${q.s ? ` · ${q.s >= 60 ? Math.floor(q.s / 60) + 'm ' : ''}${q.s % 60}s` : ''}${q.unv ? " · ⚠ key wasn't double-checked" : ''}</p>${M.badRow('paper', i, q)}</div>`; }).join('')}</section>`;
   };
   Object.assign(M.ACTIONS, {
     papernew: b => { const size = Number(b.dataset.v); L.paper = { state: 'building', size, qs: [], limit: (size === 18 ? 180 : 90) * 60000, i: 0 }; save(); M.render(); buildPaper(); },
@@ -5311,6 +5413,312 @@ body.kg-shell .kl-big{line-height:1.1}
 })();
 
 </script>
+<script id="kg-polish-script">
+/* ===== Polish: icons, tidier pages, light theme, sit with me, rituals, games, watch-along, good days, weak links, explain back, rocket project, question bank ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab; if (!M) return;
+  const { L, save, esc, pick, today, add, gap, days, K, I, duo, CHAPS, SUBJ, chap, chName, chapterOptions } = M;
+  const nowMin = () => { const n = new Date(); return n.getHours() * 60 + n.getMinutes(); };
+  const muted = () => localStorage.getItem('ame-mute-v1') === '1';
+  M.SECTIONS.company.splice(1, 0, ['sit', 'Sit with me']);
+  M.SECTIONS.progress.splice(2, 0, ['links', 'Weak links']);
+  M.SECTIONS.study.splice(6, 0, ['project', 'Rocket project']);
+
+  /* ---------- one icon set instead of mixed emoji ---------- */
+  const P = {
+    today: 'M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
+    study: 'M4 5c3-1 6-1 8 1 2-2 5-2 8-1v14c-3-1-6-1-8 1-2-2-5-2-8-1zM12 6v14', progress: 'M4 20V4M4 20h16M8 16l4-5 3 3 5-7',
+    plan: 'M5 5h14v15H5zM5 9h14M9 3v4M15 3v4', company: 'M19 14A8 8 0 1 1 10 4a6.5 6.5 0 0 0 9 10z', settings: 'M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M6 15v4',
+    chapters: 'M5 4h14v16H5zM9 8h6M9 12h6M9 16h3', practice: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', paper: 'M6 3h9l4 4v14H6zM15 3v4h4M9 12h6M9 16h6', exams: 'M12 4 2 9l10 5 10-5zM6 11v5c3 2 9 2 12 0v-5',
+    recall: 'M12 4a7 7 0 0 0-4 12.7V20h8v-3.3A7 7 0 0 0 12 4zM10 23h4', doubts: 'M9 9a3 3 0 1 1 4.5 2.6c-1 .6-1.5 1.2-1.5 2.4M12 18h.01', tools: 'M14 6l4 4-9 9H5v-4zM13 7l4 4', revision: 'M4 12a8 8 0 0 1 14-5l2 2M20 4v5h-5M20 12a8 8 0 0 1-14 5l-2-2M4 20v-5h5', project: 'M12 2c3 3 4 7 3 12H9C8 9 9 5 12 2zM9 14l-3 3v3l3-2M15 14l3 3v3l-3-2',
+    overview: 'M6 20v-6M12 20V6M18 20v-9', patterns: 'M3 12c3-6 5-6 8 0s5 6 10 0', links: 'M9 15l6-6M10 6l1-1a4 4 0 0 1 6 6l-1 1M14 18l-1 1a4 4 0 0 1-6-6l1-1', sky: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z', mocks: 'M4 19V5M4 19h16M8 15v-3M12 15V8M16 15v-5', rank: 'M8 4h8v5a4 4 0 0 1-8 0zM8 6H4c0 3 2 5 4 5M16 6h4c0 3-2 5-4 5M12 13v4M8 20h8', stickers: 'M5 5h14v9l-5 5H5zM14 19v-5h5', bond: 'M12 20S4 15 4 9a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 9c0 6-8 11-8 11z', voyage: 'M12 2c3 3 4 7 3 12H9C8 9 9 5 12 2zM9 14l-3 3v3l3-2M15 14l3 3v3l-3-2', report: 'M6 3h12v18H6zM9 8h6M9 12h6M9 16h4',
+    countdown: 'M12 8v5l3 2M12 4a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9 2h6', hangout: 'M4 5h16v11H9l-5 4z', sit: 'M6 13V7a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v6M4 13h16v5H4zM7 18v3M17 18v3', buddy: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-4 3-6 6-6s6 2 6 6M14 14c3-.5 8 1 8 6', comfort: 'M12 20S4 15 4 9a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 9c0 6-8 11-8 11z', memories: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l4 2', letters: 'M3 6h18v12H3zM3 7l9 6 9-6', sunday: 'M12 4v2M5 7l1.5 1.5M19 7l-1.5 1.5M8 14a4 4 0 1 1 8 0M3 18h18',
+    sync: 'M4 12a8 8 0 0 1 14-5l2 2M20 4v5h-5M20 12a8 8 0 0 1-14 5l-2-2M4 20v-5h5', app: 'M8 2h8a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM11 18h2', companions: 'M12 3l2.6 5.6 6 .7-4.4 4.2 1.2 6L12 16.5 6.6 19.5l1.2-6L3.4 9.3l6-.7z', support: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', backup: 'M5 3h11l3 3v15H5zM8 3v5h7V3M8 21v-7h8v7'
+  };
+  const icon = id => P[id] ? `<svg class="kg-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${P[id]}"/></svg>` : '';
+  window.__kgIcon = icon;
+  // Page furniture is tidied after each render: icons on tabs, no leading emoji on small labels.
+  const lead = /^[^\p{L}\p{N}]+/u, foldOpen = {};
+  let lastTab = '';
+  window.addEventListener('moonlab:render', e => {
+    const root = document.getElementById('moon-lab'); if (!root) return;
+    for (const b of root.querySelectorAll('.kl-tabs [data-v]')) { const dot = b.querySelector('.kl-dot'), label = b.textContent.replace(lead, '').trim(); b.innerHTML = icon(b.dataset.v) + `<span>${esc(label)}</span>` + (dot ? dot.outerHTML : ''); }
+    for (const p of root.querySelectorAll('.kl-eyebrow')) if (!p.children.length) p.textContent = p.textContent.replace(lead, '');
+    const body = root.querySelector('.kl-body'), id = e.detail.section + ':' + e.detail.tab;
+    if (body && id !== lastTab) { body.classList.add('kl-enter'); lastTab = id; }
+    for (const d of root.querySelectorAll('details[data-keep]')) { d.open = !!foldOpen[d.dataset.keep]; d.addEventListener('toggle', () => { foldOpen[d.dataset.keep] = d.open; }); }
+  });
+
+  /* ---------- Today: extras fold away ---------- */
+  const fold = [];
+  for (const name of ['strategyCard', 'lectureCard']) { const i = M.TODAY.findIndex(f => f.name === name); if (i >= 0) fold.push(M.TODAY.splice(i, 1)[0]); }
+  function moreCard() {
+    const inner = fold.map(f => f()).join(''); if (!inner.trim()) return '';
+    return `<details class="kl-fold" data-keep="more"><summary>Today's targets and strategy</summary>${inner}</details>`;
+  }
+  M.TODAY.push(moreCard);
+
+  /* ---------- light theme ---------- */
+  L.cset.light = !!L.cset.light;
+  const applyTheme = () => document.body.classList.toggle('kg-light', !!L.cset.light);
+  applyTheme();
+  const companions = M.PANELS.companions;
+  M.PANELS.companions = () => `<section class="kl-card kl-mini"><label class="kl-check"><input type="checkbox" data-a="lighttheme" ${L.cset.light ? 'checked' : ''}> Daylight theme: a light page for long daytime sessions</label></section>` + companions();
+  M.ACTIONS.lighttheme = b => { L.cset.light = b.checked; save(); applyTheme(); };
+
+  /* ---------- sit with me: a quiet room, nothing to do ---------- */
+  const SIT = ["i'm here.", 'no rush. no rush at all.', "you don't have to say anything.", 'look, the moon moved a little.', 'still here ☾', 'breathing is plenty for now.', 'this is nice, actually.', "i'm not going anywhere."];
+  let room = null, roomTimer = 0, roomStart = 0;
+  function closeRoom() { clearInterval(roomTimer); room?.remove(); room = null; }
+  function openRoom() {
+    closeRoom();
+    room = document.createElement('div'); room.id = 'kg-room'; roomStart = Date.now();
+    const src = window.__KG?.kaguya?.idle || '', iroha = window.__kgLowest ? window.__KG?.iroha?.idle : '';
+    room.innerHTML = `<button class="kg-room-x" data-room="x">Leave</button><p class="kg-room-clock" id="kg-room-clock"></p><div class="kg-room-who">${iroha ? `<img src="${iroha}" alt="Iroha sitting with you">` : ''}<img src="${src}" alt="Kaguya sitting with you"></div><p class="kg-room-line" id="kg-room-line">${esc(SIT[0])}</p><p class="kg-room-small" id="kg-room-small"></p>`;
+    document.body.appendChild(room);
+    room.addEventListener('click', e => { if (e.target.dataset.room) closeRoom(); });
+    let last = 0;
+    const tick = () => {
+      if (!room) return; const m = Math.floor((Date.now() - roomStart) / 60000);
+      document.getElementById('kg-room-clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('kg-room-small').textContent = m ? `together for ${m} minute${m === 1 ? '' : 's'}` : '';
+      if (m && m % 4 === 0 && last !== m) { last = m; document.getElementById('kg-room-line').textContent = pick(SIT); }
+    };
+    tick(); roomTimer = setInterval(tick, 15000);
+  }
+  M.PANELS.sit = () => `<section class="kl-card"><p class="kl-eyebrow">SIT WITH ME</p><h3>A quiet room with Kaguya</h3><p>No chat, no tasks, no notifications. Just the two of you and a clock, for as long as you like.</p><button class="kl-primary" data-a="sitopen">Go in</button></section>`;
+  M.ACTIONS.sitopen = openRoom;
+
+  /* ---------- games and watch-along on Hang out ---------- */
+  const GAMES = [['Word chain', "let's play word chain! you pick the first word, then i say one starting with its last letter."], ['This or that', "let's play this or that, quick fire. give me two options at a time and react to what i pick."], ['Story together', "let's write a silly story together, one line each. you start."], ['Guess the object', "think of an object from the moon palace and i'll try to guess it. give me a clue."], ['Two truths', "let's play two truths and a lie, moon princess edition. you go first."], ['Rate my snack', "i'm going to tell you what i'm eating and you rate it dramatically out of ten, like a food critic."]];
+  let watch = null;
+  async function watchTick() {
+    if (!watch) return;
+    if (Date.now() >= watch.end) { K(`that's the end of ${watch.title}! okay, tell me everything. what did you think? ☾`, { force: 1 }); clearInterval(watch.timer); watch = null; return M.tab === 'hangout' && M.render(); }
+    const r = await window.__kgAsk?.('kaguya', `[watch-along, not typed by me] We're watching "${watch.title}" together and about ${Math.round((Date.now() - watch.start) / 60000)} minutes have passed. You can't see the screen. Say one short, cosy line as if sitting next to me: a playful guess, a snack demand, or asking me how it is so far. No spoilers and no made-up plot details.`);
+    if (r && r.reply && watch) K(r.reply, { force: 1 });
+  }
+  const hangout = M.PANELS.hangout;
+  M.PANELS.hangout = () => hangout() + `<section class="kl-card"><h3>Little games</h3><div class="kl-chips">${GAMES.map(([l, q]) => `<button data-a="hang" data-q="${esc(q)}">${l}</button>`).join('')}</div></section>
+    <section class="kl-card"><h3>Watch together</h3>${watch ? `<p>Watching <b>${esc(watch.title)}</b> with Kaguya. She'll pop in a few times.</p><button class="kl-ghost" data-a="watchstop">Stop</button>` : `<p class="kl-small">Tell her what you're watching. She'll check in a few times while it plays and ask how it was at the end.</p><form data-f="watch" class="kl-row"><input name="title" required maxlength="80" placeholder="Movie or show" aria-label="Movie or show"><input name="min" inputmode="numeric" required maxlength="3" placeholder="Minutes" aria-label="Minutes" class="kl-short"><button>Start</button></form>`}</section>`;
+  M.FORMS.watch = v => {
+    const min = Math.max(5, Math.min(300, Number(v.min) || 30)), every = Math.max(8, min / 4) * 60000;
+    if (watch) clearInterval(watch.timer);
+    watch = { title: v.title.trim(), start: Date.now(), end: Date.now() + min * 60000 };
+    watch.timer = setInterval(watchTick, every); setTimeout(() => { if (watch && Date.now() >= watch.end) watchTick(); }, min * 60000 + 500);
+    M.render(); K(`yay, ${watch.title}! i brought imaginary popcorn ☾`, { force: 1 });
+  };
+  M.ACTIONS.watchstop = () => { if (watch) clearInterval(watch.timer); watch = null; M.render(); };
+
+  /* ---------- rituals: hello and goodnight that notice real things ---------- */
+  function lastThing() {
+    const y = add(today(), -1), j = (L.journal || {})[y], w = L.wins.filter(x => x.d === y).at(-1), g = (L.grat || []).filter(x => x.d === y).at(-1);
+    if (j && j.look) return `last night you said you were looking forward to "${j.look.slice(0, 60)}". `;
+    if (w) return `yesterday's win: "${w.t.slice(0, 60)}". still counts. `;
+    if (g) return `yesterday you were grateful for "${g.t.slice(0, 60)}". `;
+    return '';
+  }
+  setTimeout(() => {
+    const d = today(), m = nowMin(); if (M.isNight() || muted() || L.helloDay === d || M.inStudy() || m < 630 || m >= 23 * 60) return;
+    L.helloDay = d; save();
+    K(`${m < 13 * 60 ? 'good morning' : 'hi'}, No.1! ${lastThing()}${window.__kgOnBreak ? 'nothing to do today but be looked after ☾' : "glad you're here ☾"}`);
+  }, 7000);
+  setInterval(() => {
+    const d = today(), m = nowMin(); if (document.hidden || muted() || L.nightDay === d || !(m >= 45 && m < 60)) return;
+    L.nightDay = d; save(); const w = L.wins.filter(x => x.d === d).at(-1);
+    duo(Object.assign([['k', `goodnight, No.1. ${w ? `i'm keeping "${w.t.slice(0, 50)}" in my diary. ` : ''}close the page soon, okay? ☾`], ['i', 'Sleep well.']], { kgBreak: true }));
+  }, 60000);
+
+  /* ---------- good days: on a heavy day, something real from a better one ---------- */
+  function goodList() {
+    const out = []; for (const w of L.wins) out.push({ d: w.d, t: w.t });
+    for (const [d, j] of Object.entries(L.journal || {})) if (j.good) out.push({ d, t: j.good });
+    for (const g of L.grat || []) out.push({ d: g.d, t: g.t });
+    return out.sort((a, b) => a.d.localeCompare(b.d));
+  }
+  let goodPick = null;
+  function goodDayCard() {
+    const m = L.mood[today()]; if (!['heavy', 'hard', 'lowest'].includes(m)) return '';
+    const old = goodList().filter(x => x.d < today()); if (!old.length) return '';
+    goodPick = goodPick || pick(old);
+    return `<section class="kl-card kl-mini kl-good"><span>☾ Remember this? <b>“${esc(goodPick.t)}”</b> <small>${esc(goodPick.d)}</small></span></section>`;
+  }
+  M.TODAY.splice(1, 0, goodDayCard);
+  const memories = M.PANELS.memories;
+  M.PANELS.memories = () => { const g = goodList().slice(-30).reverse(); return memories() + `<section class="kl-card"><h3>Good days <small>${g.length}</small></h3>${g.map(x => `<p class="kl-small"><time>${esc(x.d)}</time> ${esc(x.t)}</p>`).join('') || '<p class="kl-small">Wins, gratitude and good things from your wind-down collect here.</p>'}</section>`; };
+
+  /* ---------- gentle warning: only after a real run of hard nights or days ---------- */
+  function warnCard() {
+    const d = today(); if (L.warnSeen && gap(d, L.warnSeen) < 7) return '';
+    let low = 0, short = 0;
+    for (let i = 0; i < 7; i++) { const x = add(d, -i); if (['hard', 'lowest'].includes(L.mood[x])) low++; const s = days()[x]?.sleep; if (Number.isFinite(s) && s < 5) short++; }
+    if (low < 4 && short < 3) return '';
+    const p = L.support || {};
+    return `<section class="kl-card kl-gentle"><p class="kl-eyebrow">A NOTE FROM BOTH OF US</p><p>This week has looked ${short >= 3 ? 'short on sleep' : 'really hard'}. It might be worth telling your doctor before your next appointment. You don't have to wait for it to get worse.</p>${p.person ? `<p class="kl-small">Your person: ${esc(p.person)}${p.contact ? ' · ' + esc(p.contact) : ''}</p>` : ''}<div class="kl-row"><button data-a="go" data-v="progress:patterns">See the week</button><button class="kl-ghost" data-a="warnok">Okay</button></div></section>`;
+  }
+  M.TODAY.unshift(warnCard);
+  M.ACTIONS.warnok = () => { L.warnSeen = today(); save(); M.render(); };
+
+  /* ---------- your hardest slot: which block keeps slipping ---------- */
+  const patterns = M.PANELS.patterns;
+  M.PANELS.patterns = () => {
+    const seen = {}, d = today();
+    for (let i = 1; i <= 14; i++) {
+      const x = add(d, -i), dd = days()[x]; if (!dd || dd.rested || !window.StudySchedule) continue;
+      for (const b of window.StudySchedule(!!dd.shortDay, new Date(x + 'T12:00:00').getDay())) { if (b.kind !== 'study') continue; const s = seen[b.title] = seen[b.title] || { n: 0, got: 0 }; s.n += b.minutes; s.got += Math.min(b.minutes, (dd.completed || {})[b.id] || 0); }
+    }
+    const rows = Object.entries(seen).filter(([, s]) => s.n > 0).map(([t, s]) => [t, Math.round(s.got * 100 / s.n)]).sort((a, b) => a[1] - b[1]);
+    const card = rows.length >= 3 && rows.some(r => r[1] > 0) ? `<section class="kl-card"><h3>Your energy across the day</h3><p class="kl-small">The share of each block you finished over the last two weeks. Your lowest one is a good home for lighter revision.</p>${rows.map(([t, p]) => `<div class="kl-li"><span>${esc(t)}<span class="kl-meter"><i style="width:${p}%"></i></span></span><b>${p}%</b></div>`).join('')}<p>Hardest slot lately: <b>${esc(rows[0][0])}</b>.</p></section>` : '';
+    return patterns() + card;
+  };
+
+  /* ---------- better after-question help ---------- */
+  const badRow = M.badRow;
+  M.badRow = (kind, i, q) => {
+    const blank = !String(q.x || '').trim();
+    return badRow(kind, i, q) + (q.sol && (blank || !q.ok) ? `<details class="kl-flag"><summary>Show the worked solution</summary><p class="kl-small kl-pre">${esc(q.sol)}</p></details>` : '') + (!blank && !q.ok && !q.bad ? `<button class="kl-ghost kl-tiny" data-a="whywrong" data-set="${kind}" data-i="${i}">Why did I get this wrong?</button>` : '');
+  };
+  M.ACTIONS.whywrong = b => {
+    const q = L[b.dataset.set]?.qs?.[Number(b.dataset.i)]; if (!q) return;
+    window.__irohaAsk?.(`Why did I get this wrong? Problem: ${q.t}${q.opts ? ' Options: ' + q.opts.map((o, k) => 'ABCD'[k] + ') ' + o).join(' ') : ''}\nMy answer: ${M.yourText(q)}. The key: ${M.keyText(q)}.\nDon't tell me the mistake. Ask me one short question at a time that leads me to find it myself.`);
+  };
+  M.ACTIONS.qopt = b => {
+    const set = L[b.dataset.set], q = set?.qs?.[Number(b.dataset.i)], v = b.dataset.v; if (!q || set.state !== 'open') return;
+    if (q.type === 'multi') { const cur = new Set(String(q.x || '').split(',').filter(Boolean)); cur.has(v) ? cur.delete(v) : cur.add(v); q.x = [...cur].sort().join(','); }
+    else q.x = String(q.x) === v ? '' : v;
+    if (!q.s) { const now = Date.now(); q.s = Math.round((now - (set.lastAns || set.start || now)) / 1000); set.lastAns = now; }
+    save(); M.softRender();
+  };
+
+  /* ---------- weak links: when a chapter struggles, check what it stands on ---------- */
+  const PRE = {
+    'Kinematics 2D & Projectiles': ['Vectors', 'Kinematics 1D'], 'Relative Motion': ['Vectors', 'Kinematics 1D'], "Newton's Laws of Motion": ['Vectors', 'Kinematics 1D'], 'Friction': ["Newton's Laws of Motion"], 'Circular Motion': ["Newton's Laws of Motion", 'Vectors'], 'Work, Energy & Power': ["Newton's Laws of Motion", 'Vectors'], 'Centre of Mass & Collisions': ['Work, Energy & Power', "Newton's Laws of Motion"], 'Rotational Motion': ['Centre of Mass & Collisions', 'Circular Motion', 'Vectors'], 'Gravitation': ['Circular Motion', 'Work, Energy & Power'], 'Fluid Mechanics': ["Newton's Laws of Motion", 'Work, Energy & Power'], 'Simple Harmonic Motion': ['Work, Energy & Power', 'Rotational Motion'], 'Waves on a String': ['Simple Harmonic Motion'], 'Sound Waves': ['Waves on a String'], 'Thermodynamics': ['Kinetic Theory of Gases'], 'Heat Transfer': ['Thermal Expansion & Calorimetry'], 'Electrostatics': ['Vectors'], "Gauss's Law & Potential": ['Electrostatics'], 'Capacitors': ["Gauss's Law & Potential"], 'Current Electricity': ['Capacitors'], 'Moving Charges & Magnetism': ['Vectors', 'Circular Motion', 'Current Electricity'], 'Electromagnetic Induction': ['Moving Charges & Magnetism'], 'Alternating Current': ['Electromagnetic Induction', 'Capacitors'], 'EM Waves': ['Alternating Current'], 'Wave Optics': ['Ray Optics', 'Waves on a String'], 'Dual Nature of Matter': ['Wave Optics'], 'Atoms': ['Dual Nature of Matter', 'Electrostatics'], 'Nuclei': ['Atoms'], 'Experimental Physics': ['Errors & Measurement'],
+    'Atomic Structure': ['Mole Concept'], 'Gaseous State': ['Mole Concept'], 'Thermodynamics & Thermochemistry': ['Gaseous State'], 'Chemical Equilibrium': ['Thermodynamics & Thermochemistry', 'Mole Concept'], 'Ionic Equilibrium': ['Chemical Equilibrium'], 'Redox Reactions': ['Mole Concept'], 'Electrochemistry': ['Redox Reactions', 'Thermodynamics & Thermochemistry'], 'Chemical Kinetics': ['Mole Concept'], 'Solutions': ['Mole Concept', 'Gaseous State'], 'Chemical Bonding': ['Periodic Table & Periodicity', 'Atomic Structure'], 'Coordination Compounds': ['Chemical Bonding', 'd & f Block'], 'd & f Block': ['Periodic Table & Periodicity'], 's-Block': ['Periodic Table & Periodicity'], 'p-Block (Groups 13–14)': ['Chemical Bonding'], 'p-Block (Groups 15–18)': ['Chemical Bonding'], 'Metallurgy': ['Redox Reactions', 'Thermodynamics & Thermochemistry'], 'Salt Analysis': ['Ionic Equilibrium', 'p-Block (Groups 15–18)'], 'Isomerism': ['IUPAC Nomenclature'], 'General Organic Chemistry': ['IUPAC Nomenclature', 'Chemical Bonding'], 'Hydrocarbons': ['General Organic Chemistry', 'Isomerism'], 'Haloalkanes & Haloarenes': ['General Organic Chemistry'], 'Alcohols, Phenols & Ethers': ['Haloalkanes & Haloarenes'], 'Aldehydes & Ketones': ['Alcohols, Phenols & Ethers'], 'Carboxylic Acids & Derivatives': ['Aldehydes & Ketones'], 'Amines': ['Carboxylic Acids & Derivatives', 'Haloalkanes & Haloarenes'], 'Biomolecules': ['Aldehydes & Ketones', 'Amines'], 'Polymers': ['General Organic Chemistry'], 'Practical Organic Chemistry': ['General Organic Chemistry'],
+    'Quadratic Equations': ['Sets, Relations & Functions'], 'Complex Numbers': ['Quadratic Equations'], 'Sequences & Series': ['Quadratic Equations'], 'Binomial Theorem': ['Permutations & Combinations'], 'Probability': ['Permutations & Combinations'], 'Determinants': ['Matrices'], 'Trigonometric Equations': ['Trigonometric Ratios & Identities'], 'Inverse Trigonometric Functions': ['Trigonometric Ratios & Identities'], 'Properties of Triangles': ['Trigonometric Ratios & Identities'], 'Circles': ['Straight Lines'], 'Parabola': ['Straight Lines', 'Quadratic Equations'], 'Ellipse': ['Parabola'], 'Hyperbola': ['Ellipse'], 'Limits': ['Sets, Relations & Functions', 'Trigonometric Ratios & Identities'], 'Continuity & Differentiability': ['Limits'], 'Methods of Differentiation': ['Continuity & Differentiability'], 'Application of Derivatives': ['Methods of Differentiation'], 'Indefinite Integration': ['Methods of Differentiation'], 'Definite Integration': ['Indefinite Integration'], 'Area Under Curves': ['Definite Integration'], 'Differential Equations': ['Indefinite Integration'], '3D Geometry': ['Vector Algebra'], 'Statistics': ['Sequences & Series']
+  };
+  const byName = n => CHAPS.find(c => c.name === n);
+  const strength = id => { const a = M.acc(id), n = L.ch[id]?.a || 0; return n >= 3 ? a : (L.ch[id]?.c || 0) * 20; };
+  M.PANELS.links = () => {
+    const out = [];
+    for (const c of CHAPS) {
+      const pre = (PRE[c.name] || []).map(byName).filter(Boolean), s = strength(c.id);
+      if (!(L.ch[c.id]?.c || L.ch[c.id]?.a) || s >= 60 || !pre.length) continue;
+      const weak = pre.filter(p => strength(p.id) < 60); if (weak.length) out.push([c, weak]);
+    }
+    const eg = CHAPS.filter(c => PRE[c.name]).length;
+    return `<section class="kl-card"><p class="kl-eyebrow">WEAK LINKS</p><h3>Fix the chapter underneath</h3><p class="kl-small">When a chapter struggles, the real gap is often in the one it's built on. This checks ${eg} of those connections against your dots and accuracy.</p>${out.map(([c, w]) => `<div class="kl-li"><span>${esc(c.name)}<small>Struggling · built on ${w.map(x => esc(x.name)).join(', ')}</small></span><button data-a="linksprint" data-id="${w[0].id}">Sprint on ${esc(w[0].name)}</button></div>`).join('') || '<p>Nothing to flag yet. Rate chapters and log questions, and links show up here.</p>'}</section>`;
+  };
+  M.ACTIONS.linksprint = b => { M.FORMS.sprint({ ch: b.dataset.id }); window.dispatchEvent(new CustomEvent('moonlab:go', { detail: { section: 'study', tab: 'practice' } })); };
+
+  /* ---------- explain it back: say it in your own words, Iroha marks the gaps ---------- */
+  const tools = M.PANELS.tools;
+  let listening = null;
+  M.PANELS.tools = () => `<section class="kl-card"><p class="kl-eyebrow">EXPLAIN IT BACK</p><h3>Say it in your own words</h3><p class="kl-small">Explain a topic without notes. Iroha marks what's missing or wrong, then Kaguya asks the confused question.</p><form data-f="explain" class="kl-stack"><select name="ch" aria-label="Chapter">${chapterOptions()}</select><textarea name="t" id="kl-explain" rows="4" required placeholder="Explain it as if to someone who missed the class…"></textarea><div class="kl-row"><button class="kl-primary">Mark my explanation</button>${(window.SpeechRecognition || window.webkitSpeechRecognition) ? `<button type="button" data-a="explainmic">${listening ? 'Stop listening' : '🎙 Speak it'}</button>` : ''}</div></form></section>` + tools();
+  M.FORMS.explain = v => {
+    const name = chName(v.ch), t = v.t.trim();
+    window.__irohaAsk?.(`Explain-it-back on ${name}. My explanation from memory:\n"${t.slice(0, 1800)}"\nMark it out of 10. List exactly what's missing or wrong, then the one thing to re-read. Be strict.`);
+    setTimeout(() => window.__kgAsk?.('kaguya', `[site event, not typed by me] I just tried to explain ${name} to Iroha. Ask me one short, genuinely confused beginner question about it, playfully.`).then(r => r && r.reply && K(r.reply, { force: 1 })), 9000);
+  };
+  M.ACTIONS.explainmic = () => {
+    if (listening) { listening.stop(); listening = null; return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition, r = new SR(); r.continuous = true; r.interimResults = false; r.lang = 'en-IN';
+    const el0 = document.getElementById('kl-explain'), s0 = document.querySelector('form[data-f="explain"] select'), ch = s0?.value; let said = el0?.value || '';
+    const put = () => { const el = document.getElementById('kl-explain'), s = document.querySelector('form[data-f="explain"] select'); if (el) el.value = said; if (s && ch) s.value = ch; };
+    r.onresult = e => { for (let i = e.resultIndex; i < e.results.length; i++) said += (said ? ' ' : '') + e.results[i][0].transcript; put(); };
+    r.onend = () => { listening = null; M.render(); put(); };
+    listening = r; r.start(); M.render(); put();
+  };
+
+  /* ---------- rocket project: one mission, six stages, each using the last result ---------- */
+  L.rp = L.rp || { i: 0, done: [] };
+  const G0 = 9.81, MU = 3.986e14, RE = 6371e3;
+  function rpSetup() { if (!L.rp.m) { L.rp.m = { h: 400, gto: 35786, pay: Math.round(1500 + Math.random() * 2500), isp2: 340 + Math.round(Math.random() * 20), isp1: 280 + Math.round(Math.random() * 20), f: 0.1 }; save(); } return L.rp.m; }
+  const STAGES = [
+    { name: 'Parking orbit', q: m => `Your mission: put a ${m.pay} kg satellite on its way to geostationary altitude. First, the parking orbit is circular at ${m.h} km. What is its orbital speed? (GM = 3.986 × 10¹⁴ m³/s², R = 6371 km)`, a: m => Math.sqrt(MU / (RE + m.h * 1e3)) / 1e3, u: 'km/s' },
+    { name: 'Transfer burn', q: m => `From ${m.h} km, a Hohmann transfer reaches ${m.gto} km. What Δv does the upper stage need for the first burn?`, a: m => { const r1 = RE + m.h * 1e3, r2 = RE + m.gto * 1e3; return Math.sqrt(MU / r1) * (Math.sqrt(2 * r2 / (r1 + r2)) - 1) / 1e3; }, u: 'km/s' },
+    { name: 'Upper stage mass ratio', q: m => `The upper stage has Isp = ${m.isp2} s (g₀ = 9.81 m/s²). It must deliver that transfer Δv plus 0.1 km/s for steering losses. What mass ratio m₀/m_f does it need?`, a: m => Math.exp((STAGES[1].a(m) + .1) * 1e3 / (m.isp2 * G0)), u: '' },
+    { name: 'Upper stage propellant', q: m => `Burnout mass is the ${m.pay} kg satellite plus dry stage structure equal to ${m.f * 100}% of the stage's propellant mass. With your mass ratio, how much propellant does the upper stage carry?`, a: m => { const R = STAGES[2].a(m); return m.pay * (R - 1) / (1 - m.f * (R - 1)); }, u: 'kg' },
+    { name: 'One stage to orbit?', q: m => `Reaching the ${m.h} km parking orbit from the ground needs about 9.4 km/s including losses. If one lower stage with Isp = ${m.isp1} s did it all, what mass ratio would it need?`, a: m => Math.exp(9.4e3 / (m.isp1 * G0)), u: '' },
+    { name: 'Why we stage', q: () => `If a stage's dry mass is 8% of its propellant, the largest mass ratio it can reach with zero payload is (1 + 0.08)/0.08. What is that limit?`, a: () => 1.08 / .08, u: '' }
+  ];
+  M.PANELS.project = () => {
+    const m = rpSetup(), i = L.rp.i;
+    const log = L.rp.done.map((d, k) => `<div class="kl-li"><span>Stage ${k + 1}: ${esc(STAGES[k].name)}</span><b>${esc(d)}</b></div>`).join('');
+    if (i >= STAGES.length) return `<section class="kl-card"><p class="kl-eyebrow">ROCKET PROJECT</p><h3>Mission complete 🚀</h3><p>You sized a mission by hand, from orbit to staging limits. Compare the mass ratio in stage 5 to the limit in stage 6: that gap is exactly why rockets have stages.</p>${log}<button data-a="rpnew">Start a new mission</button></section>`;
+    const s = STAGES[i];
+    return `<section class="kl-card"><p class="kl-eyebrow">ROCKET PROJECT · STAGE ${i + 1} OF ${STAGES.length}</p><h3>${esc(s.name)}</h3><p>${esc(s.q(m))}</p><form data-f="rpans" class="kl-row"><input name="x" inputmode="decimal" required placeholder="Answer${s.u ? ' in ' + s.u : ''}" aria-label="Answer"><button class="kl-primary">Check</button></form><p class="kl-small">Answers need to be within 2%. This waits as long as you need; there's no clock.</p></section>${log ? `<section class="kl-card"><h3>Your mission so far</h3>${log}</section>` : ''}`;
+  };
+  M.FORMS.rpans = v => {
+    const m = rpSetup(), s = STAGES[L.rp.i], a = s.a(m), x = M.num(v.x);
+    if (!(Number.isFinite(x) && Math.abs(x - a) <= Math.abs(a) * .02)) return I('Not within 2%. Check your units and which radius you used.', { face: 'stern' });
+    L.rp.done.push((+a.toPrecision(4)) + (s.u ? ' ' + s.u : '')); L.rp.i++; save(); M.render();
+    if (L.rp.i >= STAGES.length) duo([['k', 'MISSION COMPLETE!! you designed a ROCKET, No.1!!'], ['i', 'All six stages check out. That is real work.']]); else I(`Stage ${L.rp.i} checks out.`, { face: 'approve' });
+  };
+  M.ACTIONS.rpnew = () => { L.rp = { i: 0, done: [] }; save(); M.render(); };
+
+  /* ---------- question bank: Iroha's own stock of checked problems, loaded when needed ---------- */
+  L.seenQ = L.seenQ || {}; L.badBank = L.badBank || {};
+  const banks = {};
+  async function loadBank(subj) {
+    if (banks[subj]) return banks[subj];
+    const f = subj.toLowerCase() + '.json';
+    for (const url of ['data/' + f, f]) {
+      try { const r = await fetch(url); if (r.ok) { const j = await r.json(); return banks[subj] = j.q || []; } } catch (e) {}
+    }
+    return banks[subj] = [];
+  }
+  M.loadBank = loadBank;
+  const toQ = b => ({ t: b.t, a: b.a, u: b.u || '', tol: b.tol || .01, ch: b.ch, type: b.type || 'num', opts: b.opts, sol: b.sol, topic: b.topic, bid: b.id, src: 'bank', lv: b.lv || 0 });
+  // Unseen first, one version of each formula before a second; `again` reaches for older ones when nothing new is left.
+  M.bankPick = async (chs, n, o = {}) => {
+    const subs = [...new Set(chs.map(id => chap(id)?.subj).filter(Boolean))];
+    for (const s of subs) await loadBank(s);
+    const pool = subs.flatMap(s => banks[s]).filter(b => chs.includes(b.ch) && !L.badBank[b.id] && (o.mixed || !b.type || b.type === 'num'));
+    const fams = new Set(), first = [], rest = [];
+    for (const b of pool.filter(b => !L.seenQ[b.id]).sort(() => Math.random() - .5)) { const f = b.id.replace(/-v\d+$/, ''); (fams.has(f) ? rest : first).push(b); fams.add(f); }
+    let list = first.concat(rest);
+    // proofs, mocks and hard sprints reach for the hard tier first
+    if (o.hard) list = list.filter(b => b.lv).concat(list.filter(b => !b.lv));
+    if (o.again) list = list.concat(pool.filter(b => L.seenQ[b.id]).sort((a, b) => String(L.seenQ[a.id]).localeCompare(String(L.seenQ[b.id]))));
+    const out = list.slice(0, n).map(b => { L.seenQ[b.id] = today(); return toQ(b); });
+    if (out.length) save();
+    return out;
+  };
+  const qbad = M.ACTIONS.qbad;
+  M.ACTIONS.qbad = b => { const q = L[b.dataset.set]?.qs?.[Number(b.dataset.i)]; if (q && q.bid) L.badBank[q.bid] = b.dataset.v; qbad(b); };
+  // "drill me": she asks a real question from the bank, and knows the key without showing it
+  window.__kgDrill = async () => {
+    const b = M.block(), sub = b ? ({ maths: 'Maths', physics: 'Physics', chemistry: 'Chemistry' })[b.bucket] : null;
+    const started = CHAPS.filter(c => (!sub || c.subj === sub) && (L.ch[c.id]?.c || 0) >= 1).map(c => c.id);
+    const qs = await M.bankPick(started.length ? started : CHAPS.filter(c => !sub || c.subj === sub).map(c => c.id), 1, { mixed: true, again: true }), q = qs[0]; if (!q) return null;
+    const text = `${q.t}${q.opts ? '\n' + q.opts.map((o, k) => 'ABCD'[k] + ') ' + o).join('\n') : ''}`;
+    return `[Ask me this exact problem from the question bank, word for word, then wait for my answer. Do not reveal the key or the method until I've answered. When I answer, check it against the key. Problem: "${text}". Key: ${M.keyText(q)}. Worked solution, for you only until I've answered: ${q.sol || 'not given'}.]`;
+  };
+  // how full the shelves are
+  const toolsWithBank = M.PANELS.tools;
+  M.PANELS.tools = () => {
+    setTimeout(async () => {
+      const parts = []; let hard = 0; for (const s of SUBJ) { const b = await loadBank(s); hard += b.filter(q => q.lv).length; parts.push(`${s} ${b.filter(q => L.seenQ[q.id]).length}/${b.length}`); }
+      const el = document.getElementById('kl-bankstat'); if (el) el.textContent = `Seen so far: ${parts.join(' · ')}. Hard tier: ${hard} questions.`;
+    }, 50);
+    return `<section class="kl-card kl-mini"><span>📚 <b>Iroha's question bank.</b> <span id="kl-bankstat">Loading…</span></span></section>` + toolsWithBank();
+  };
+
+  /* ---------- key and answer text for every question type ---------- */
+  const L4 = 'ABCD';
+  M.keyText = q => q.type === 'mcq' ? L4[Number(q.a)] : q.type === 'multi' ? q.a.map(i => L4[i]).join(', ') : String(+Number(q.a).toPrecision(6)) + (q.u ? ' ' + q.u : '');
+  M.yourText = q => { const x = String(q.x || ''); if (!x) return '—'; return q.type === 'mcq' || q.type === 'multi' ? x.split(',').map(i => L4[Number(i)]).join(', ') : x; };
+  M.optRow = (set, i, q, done) => {
+    if (!q.opts) return '';
+    const chosen = new Set(String(q.x ?? '').split(',').filter(s => s !== '')), key = new Set([].concat(q.a).map(String));
+    return `<div class="kl-opts">${done ? '' : `<p class="kl-small">${q.type === 'multi' ? 'One or more correct.' : 'Exactly one correct.'}</p>`}${q.opts.map((o, k) => `<button type="button" class="${chosen.has(String(k)) ? 'on ' : ''}${done && key.has(String(k)) ? 'key' : ''}" ${done ? 'disabled' : `data-a="qopt" data-set="${set}" data-i="${i}" data-v="${k}"`} aria-pressed="${chosen.has(String(k))}"><b>${L4[k]}</b> ${esc(o)}</button>`).join('')}</div>`;
+  };
+
+  M.render();
+})();
+
+</script>
 <script id="kg-rest-script">
 /* ===== Rest: a doctor's-orders break (no study, no nagging, chain safe) and the birthday ===== */
 (function () {
@@ -5342,7 +5750,7 @@ body.kg-shell .kl-big{line-height:1.1}
   }
 
   /* ---------- Today while on break: no close-outs, no strategy, no questions ---------- */
-  const STUDY_CARDS = new Set(['closeCard', 'askCard', 'strategyCard', 'lectureCard', 'nextCard', 'sleepCard', 'softCard', 'buddyStartCard', 'buddySwapCard']);
+  const STUDY_CARDS = new Set(['closeCard', 'askCard', 'strategyCard', 'lectureCard', 'nextCard', 'sleepCard', 'softCard', 'buddyStartCard', 'buddySwapCard', 'moreCard']);
   const todayPanel = M.PANELS.today;
   M.PANELS.today = () => {
     const bd = bdayCard();
@@ -5396,9 +5804,12 @@ body.kg-shell .kl-big{line-height:1.1}
   /* ---------- first day back: gentle on purpose ---------- */
   function backCheck() {
     if (!L.breakUntil || onBreak() || L.breakBack === L.breakUntil) return;
-    L.breakBack = L.breakUntil; save();
+    L.breakBack = L.breakUntil;
+    // return plan: the longer the break, the more short days to come back on
+    const last = L.breaks[L.breaks.length - 1], len = last ? M.gap(L.breakUntil, last.from) : 1, n = len <= 3 ? 2 : len <= 7 ? 3 : 5;
+    L.softUntil = M.add(today(), n - 1); save();
     setTimeout(() => M.toFallback?.(), 1500);
-    setTimeout(() => script([['k', "you're back!! i missed study-you, but i liked rest-you too. today's the short plan, okay? no catching up."], ['i', 'Eight hours at most today. Do not try to recover lost time. There is none to recover.'], ['k', 'and if your doctor wants longer, just move the date in Settings. no questions asked ☾']]), 6000);
+    setTimeout(() => script([['k', `you're back!! i missed study-you, but i liked rest-you too. the next ${n} days are short ones, okay? no catching up.`], ['i', `Eight hours at most for ${n} days. Do not try to recover lost time. There is none to recover.`], ['k', 'and if your doctor wants longer, just move the date in Settings. no questions asked ☾']]), 6000);
   }
 
   Object.assign(M.ACTIONS, {
@@ -5458,7 +5869,8 @@ body.kg-shell .kl-big{line-height:1.1}
   const lab = $('moon-lab'), hd = $('habit-desk'), orig = $('habit-original'), journal = $('ame-journal');
   document.body.classList.add('kg-shell');
   const bar = document.createElement('header'); bar.id = 'kg-bar';
-  bar.innerHTML = `<div class="kg-brand"><b>Kaguya Desk</b><span id="kg-status" aria-live="polite"></span></div><nav id="kg-nav" aria-label="Pages">${NAV.map(([id, ic, label]) => `<a href="#${id}" data-sec="${id}"><span aria-hidden="true">${ic}</span><em>${label}</em><i class="kg-dot" hidden></i></a>`).join('')}</nav>`;
+  bar.innerHTML = `<div class="kg-brand"><b>Kaguya Desk</b><span id="kg-status" aria-live="polite"></span></div><nav id="kg-nav" aria-label="Pages">${NAV.map(([id, ic, label]) => `<a href="#${id}" data-sec="${id}"><span aria-hidden="true">${window.__kgIcon?.(id) || ic}</span><em>${label}</em><i class="kg-dot" hidden></i></a>`).join('')}</nav>`;
+  const mp = $('mp-widget'); if (mp) bar.append(mp); // the music button lives in the top bar, off the content
   const main = document.createElement('main'); main.id = 'kg-main';
   const first = hd || lab; first.parentNode.insertBefore(bar, first); first.parentNode.insertBefore(main, first);
 
