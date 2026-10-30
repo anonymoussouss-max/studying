@@ -896,7 +896,7 @@ window.__KG_BUILTIN = {
     </div>
     <div id="ame-messages"></div>
     <div class="ame-input-area">
-      <input type="text" id="ame-input" placeholder="say something to the princess..." autocomplete="off" />
+      <textarea id="ame-input" rows="1" placeholder="say something to the princess..." autocomplete="off" title="Enter sends. Shift+Enter starts a new line."></textarea>
       <button id="ame-send">send</button>
     </div>
   </div>
@@ -906,13 +906,13 @@ window.__KG_BUILTIN = {
   <img id="iroha-gif" alt="Iroha, your stern study coach" draggable="false" referrerpolicy="no-referrer" title="Iroha · click to report in, double-click to poke" />
   <div id="iroha-chat">
     <div class="iroha-header">
-      <span>Iroha</span>
+      <span>Dr. Iroha</span>
       <button id="iroha-close" type="button" aria-label="Close Iroha's chat">×</button>
     </div>
     <div id="iroha-messages"></div>
     <div id="iroha-chips"></div>
     <div class="ame-input-area iroha-input-area">
-      <input type="text" id="iroha-input" placeholder="report to Iroha. be precise." autocomplete="off" />
+      <textarea id="iroha-input" rows="1" placeholder="report to Iroha. be precise." autocomplete="off" title="Enter sends. Shift+Enter starts a new line."></textarea>
       <button id="iroha-send">send</button>
     </div>
   </div>
@@ -1305,8 +1305,10 @@ window.__KG_BUILTIN = {
     sendBtn.disabled = true;
     gif.src = GIFS.talking;
 
+    const dots = document.createElement("div"); dots.className = "ame-msg ame kg-typing"; dots.textContent = "..."; messagesEl.appendChild(dots); messagesEl.scrollTop = messagesEl.scrollHeight;
     try {
       const r = await postChat(withActivity(conversation, "kaguya"), ameContext(), "kaguya");
+      dots.remove();
       if (r.reply) {
         addMessage("ame", r.reply);
         window.__kgPop?.("k", r.reply);
@@ -1315,6 +1317,7 @@ window.__KG_BUILTIN = {
         window.__kgAfterReply?.("kaguya", text, r.reply);
       } else addMessage("ame", failLine("kaguya", r, text));
     } finally {
+      dots.remove();
       isSending = false;
       sendBtn.disabled = false;
       if (!isOpen) gif.src = GIFS.idle;
@@ -1392,7 +1395,7 @@ window.__KG_BUILTIN = {
     const last = conversation[conversation.length - 1];
     if (muted || isSending || aiBusy || Date.now() - lastAi < 45000 || (last && last.role === "user")) return say(fallback, { mood: m });
     aiBusy = true; lastAi = Date.now();
-    if (isOpen) { typingEl = document.createElement("div"); typingEl.className = "ame-msg ame"; typingEl.textContent = "..."; messagesEl.appendChild(typingEl); messagesEl.scrollTop = messagesEl.scrollHeight; } else showBubble("...", true);
+    if (isOpen) { typingEl = document.createElement("div"); typingEl.className = "ame-msg ame kg-typing"; typingEl.textContent = "..."; messagesEl.appendChild(typingEl); messagesEl.scrollTop = messagesEl.scrollHeight; } else showBubble("...", true);
     const ctrl = new AbortController(), to = setTimeout(() => ctrl.abort(), 9000);
     try {
       const msgs = conversation.slice(-14).map(x => ({ role: x.role, content: x.content })).concat([{ role: "user", content: `[site event, not typed by me; the desk page reported it: ${desc}. Dated observations: ${JSON.stringify(journal.patterns || [])}. react to it in 1-2 short lines, in character, using what you know of my day.] ${KAGUYA_NOTE}` }]);
@@ -1505,7 +1508,7 @@ window.__KG_BUILTIN = {
   let hiddenAt = 0;
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) { hiddenAt = Date.now(); document.title = "...No.1? 🌙"; return; }
-    document.title = TITLE; lastAct = Date.now(); if (!hiddenAt) return;
+    document.title = window.__kgTitle || TITLE; lastAct = Date.now(); if (!hiddenAt) return;
     const min = Math.round((Date.now() - hiddenAt) / 60000), ctx = ameContext(); hiddenAt = 0; if (min < 2 || muted) return;
     const line = min < 6 ? "welcome back! quick break? good. back to it." : min < 30 ? `${min} minutes away! hope that was a real break. the block missed you.` : `${min} minutes!! i almost made iroha go looking for you. back to the desk, No.1.`;
     EV.push({ t: `left the page for ${min} min`, at: Date.now() });
@@ -1607,7 +1610,7 @@ window.__KG_BUILTIN = {
     if (l > 55e3 && l < 62e3 && okCool("p60", 50000)) say(p.mode === "work" ? "one minute left! finish the line you're on." : "one minute of break left! water, stretch.", { mood: "happy" }); }, 4000);
   sendBtn.addEventListener("click", sendMessage);
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") sendMessage();
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
   // Persistent companion journal. Only facts derived from saved days enter memory.
   const journalKey = 'ame-journal-v1';
@@ -1817,32 +1820,40 @@ window.__KG_BUILTIN = {
     if (cur) out.push(cur);
     return out;
   }
-  const popTime = t => Math.max(2600, Math.min(10000, 1400 + t.length * 52)); // about 19 characters a second, plus a moment to look over
-  function popShow(who, text) {
+  // about 19 characters a second plus a moment to look over, scaled by the speed chosen in Settings
+  const POP_SPEED = { relaxed: 1.4, normal: 1, quick: .72 };
+  const popTime = t => { let s = "normal"; try { s = localStorage.getItem("kg-pop-speed") || s; } catch (e) {} return Math.max(2600, Math.min(10000, 1400 + t.length * 52)) * (POP_SPEED[s] || 1); };
+  function popShow(who, text, part) {
     const el = who === "k" ? bubble : ibubble;
     clearTimeout(who === "k" ? bt : ibt);
-    el.textContent = text; el.classList.remove("typing"); el._at = Date.now(); el.classList.add("show"); layoutBubbles();
+    el.textContent = text; el.dataset.part = part || ""; el.classList.remove("typing"); el._at = Date.now(); el.classList.add("show"); layoutBubbles();
   }
   function popPump() {
     if (POP.busy || !POP.q.length) return;
     if (document.hidden) return; // the rest waits until you're back on the page
     POP.busy = true;
-    const [who, text] = POP.q.shift(), el = who === "k" ? bubble : ibubble;
-    popShow(who, text);
-    setTimeout(() => {
+    const [who, text, part] = POP.q.shift(), el = who === "k" ? bubble : ibubble;
+    popShow(who, text, part);
+    let left = popTime(text);
+    const tick = setInterval(() => {
+      if (el.matches(":hover") || document.hidden) return; // pointing at a bubble holds it there while you read
+      left -= 200; if (left > 0) return;
+      clearInterval(tick);
       // the same speaker carrying on keeps the bubble up, so it reads as one voice
       if (!POP.q.length || POP.q[0][0] !== who) el.classList.remove("show");
       setTimeout(() => { POP.busy = false; popPump(); }, 280);
-    }, popTime(text));
+    }, 200);
   }
   function popAdd(who, text) {
     if (muted || !text) return;
-    for (const piece of popSplit(text)) POP.q.push([who, piece]);
+    const pieces = popSplit(text);
+    pieces.forEach((piece, i) => POP.q.push([who, piece, pieces.length > 1 ? (i + 1) + "/" + pieces.length : ""]));
     popPump();
   }
   document.addEventListener("visibilitychange", popPump);
   window.__kgPop = popAdd;
   window.__kgPopClear = () => { POP.q.length = 0; };
+  window.__kgPopDrop = who => { POP.q = POP.q.filter(x => x[0] !== who); };
   const kShow = showBubble; showBubble = function (t, typing) {
     if (typing) { if (!POP.busy) { bubble._at = Date.now(); kShow(t, true); layoutBubbles(); } return; }
     popAdd("k", t);
@@ -1867,7 +1878,7 @@ window.__KG_BUILTIN = {
   window.__irohaSay = (t, o = {}) => setTimeout(() => { if (!document.hidden) irohaSay(t, Object.assign({ habit: true }, o)); }, o.delay ?? 2400);
 
   function iOpenChat() {
-    iOpen = true; ichat.classList.add("open"); ibubble.classList.remove("show"); face("talking");
+    iOpen = true; iw.classList.remove("unread"); ichat.classList.add("open"); ibubble.classList.remove("show"); face("talking");
     imsgs.innerHTML = ""; iconv.forEach(m => iAdd(m.role, m.content));
     if (!iconv.length) { iAdd("ame", IR.greet); iconv.push({ role: "assistant", content: IR.greet }); saveI(); face("study", 6000); }
     iinput.focus();
@@ -1881,7 +1892,7 @@ window.__KG_BUILTIN = {
     if (!iOpen) iOpenChat();
     iinput.value = ""; iAdd("user", (image ? "📷 " : "") + text); iconv.push({ role: "user", content: text }); saveI();
     iSending = true; isend.disabled = true; face(talkFace(text));
-    const typing = document.createElement("div"); typing.className = "ame-msg ame"; typing.dataset.who = "iroha"; typing.textContent = "..."; imsgs.appendChild(typing); imsgs.scrollTop = imsgs.scrollHeight;
+    const typing = document.createElement("div"); typing.className = "ame-msg ame kg-typing"; typing.dataset.who = "iroha"; typing.textContent = "..."; imsgs.appendChild(typing); imsgs.scrollTop = imsgs.scrollHeight;
     try {
       const r = await postChat(withActivity(iconv, "iroha"), ameContext(), "iroha", image ? 45000 : 15000, image);
       typing.remove();
@@ -1904,7 +1915,7 @@ window.__KG_BUILTIN = {
     try { iSend(iinput.value.trim() || "Check the working in this photo. Point to the exact line where it breaks.", await shrink(f)); }
     catch (e) { iAdd("ame", "I couldn't read that image. Try a JPG or PNG."); }
   });
-  iinput.addEventListener("keydown", e => { if (e.key === "Enter") iSend(); });
+  iinput.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); iSend(); } });
   [["drill me", "drill me: one hard exam-style question on what i'm studying right now. no hints until i answer."], ["check my work", "i'm going to paste my working. check units, signs and assumptions, and tell me exactly where it breaks."], ["plan my next hour", "plan my next hour from my schedule and what's left today. concrete tasks, exact minutes."], ["school days", "look at my schedule today and give me one piece of advice on it from your school days."], ["i'm slacking", "i'm slacking. give me one task and a time limit, no sympathy."]].forEach(([l, q]) => {
     const b = document.createElement("button"); b.type = "button"; b.textContent = l; b.onclick = async () => { if (l === "drill me" && window.__kgDrill && !window.__kgOnBreak) { const note = await window.__kgDrill(); if (note) window.__kgOnce = note; } iSend(q); }; ichips.appendChild(b);
   });
@@ -2115,12 +2126,17 @@ window.__KG_BUILTIN = {
   }
   setInterval(() => schoolTip(), 60000);
   window.__kgSchoolTip = () => schoolTip(true);
+  window.__kgSchool = () => SCHOOL;
   window.__kgBanter = kind => runBanter(pick(kind && BANTER[kind] ? BANTER[kind] : banterPool()));
   // Hooks for the Moon Lab module, which lives outside this scope.
   window.__kgScript = script => runBanter(script);
   window.__kgAddBanter = (kind, script) => (BANTER[kind] || BANTER.any).push(script);
   window.__kaguyaSay = (text, o = {}) => say(text, Object.assign({ mood: "happy" }, o));
   window.__irohaAsk = text => iSend(text);
+  window.__kgClearChat = who => {
+    if (who === "k") { conversation.length = 0; saveConversation(); messagesEl.textContent = ""; }
+    else { iconv.length = 0; saveI(); imsgs.textContent = ""; }
+  };
   window.__kaguyaAsk = text => { if (!isOpen) openChat(); input.value = text; sendMessage(); };
   window.__kgAsk = (who, text, image, long) => postChat([{ role: "user", content: text + "\n\n" + (who === "iroha" ? IROHA_NOTE : KAGUYA_NOTE) }], ameContext(), who, long ? 55000 : image ? 30000 : 25000, image, long);
 
@@ -2179,6 +2195,7 @@ window.__KG_BUILTIN = {
     if (isOpen) addMessage("ame", tag("kaguya"));
     if (iOpen) iAdd("ame", tag("iroha"));
     if (!isOpen && speaker === "kaguya") widget.classList.add("unread");
+    if (!iOpen && speaker === "iroha") iw.classList.add("unread");
     popAdd(speaker === "kaguya" ? "k" : "i", text);
     if (speaker === "iroha") face(talkFace(text), 5000); else mood("talk");
   }
@@ -2191,7 +2208,7 @@ window.__KG_BUILTIN = {
     try {
       for (let k = 0; k < turns; k++) {
         const other = who === "kaguya" ? "Iroha" : "Kaguya", last = k === turns - 1;
-        const dots = document.createElement("div"); dots.className = "ame-msg ame kg-from"; dots.dataset.who = who; dots.dataset.name = who === "kaguya" ? "Kaguya" : "Iroha"; dots.textContent = "...";
+        const dots = document.createElement("div"); dots.className = "ame-msg ame kg-from kg-typing"; dots.dataset.who = who; dots.dataset.name = who === "kaguya" ? "Kaguya" : "Iroha"; dots.textContent = "...";
         box()?.appendChild(dots); if (box()) box().scrollTop = box().scrollHeight;
         const prompt = `[site event, not typed by me: you and ${other} are talking to each other in front of me. ${userText ? `What started it, from me: "${String(userText).slice(0, 400)}".` : ""}
 ${log.length ? "The conversation so far:\n" + log.join("\n") : "You speak first."}
@@ -3142,7 +3159,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     if((!desk().sound || window.__kgOnBreak) && melodyTimer)stopAudio();
   },1000);
   // Keep the original schedule, floating companion and dashboard on the same rule.
-  window.HabitDesk={
+  window.HabitDesk={setTheme(t){h.settings.theme=t;save();render();},
     minutes:iso=>C.minutes(h,days(),iso),
     history:(d,iso)=>C.history(h,d,iso),
     counted:(iso,d)=>{const status=C.history(h,{...days(),[iso]:d || days()[iso]},iso).statuses[iso];return status==='study'||status==='rest';},
@@ -3646,8 +3663,15 @@ body:not(.kg-sec-today) #kg-scene,body.habit-shh #kg-scene{display:none}
 .kgs-stars .tw{animation:kgs-tw var(--tw) ease-in-out var(--from) infinite}
 @keyframes kgs-tw{50%{opacity:.2}}
 .kgs-glow{position:absolute;top:-70px;right:296px;width:320px;height:320px;z-index:-1;border-radius:50%;background:radial-gradient(circle,rgba(250,235,190,.3),rgba(250,235,190,0) 68%);pointer-events:none}
-.kgs-moon{position:absolute;top:18px;right:410px;width:92px;height:92px;filter:drop-shadow(0 0 16px rgba(250,235,190,.55))}
+.kgs-moon{display:block;padding:0;border:0;background:none;cursor:pointer;border-radius:50%;transition:transform .25s ease;position:absolute;top:18px;right:410px;width:92px;height:92px;filter:drop-shadow(0 0 16px rgba(250,235,190,.55))}
 .kgs-moon svg{display:block;width:100%;height:100%}
+.kgs-moon:hover{transform:scale(1.06)}
+.kgs-moon:focus-visible{outline:3px solid #f5d27a;outline-offset:2px}
+#kg-scene.fullmoon .kgs-moon{filter:drop-shadow(0 0 30px rgba(255,240,195,.9))}
+#kg-scene.fullmoon .kgs-glow{background:radial-gradient(circle,rgba(255,240,195,.48),rgba(255,240,195,0) 70%)}
+.kgs-shoot{position:absolute;width:96px;height:2px;border-radius:99px;background:linear-gradient(90deg,rgba(255,255,255,0),#fff);opacity:0;transform:rotate(18deg);pointer-events:none;z-index:0}
+.kgs-shoot.run{animation:kgs-shoot 1s ease-out}
+@keyframes kgs-shoot{0%{opacity:0;transform:rotate(18deg) translateX(-60px)}12%{opacity:1}100%{opacity:0;transform:rotate(18deg) translateX(240px)}}
 .kgs-moon-dark{fill:#2a2652;opacity:.75}.kgs-moon-lit{fill:#f8edc8}
 .kgs-craters circle{fill:#1c1838;opacity:.09}
 .kgs-hills{position:absolute;left:0;right:0;bottom:0;width:100%;height:96px;z-index:0}
@@ -3665,11 +3689,16 @@ body:not(.kg-sec-today) #kg-scene,body.habit-shh #kg-scene{display:none}
 .kgs-copy{position:absolute;top:22px;left:26px;z-index:2;max-width:46%;text-shadow:0 2px 12px rgba(5,4,20,.8)}
 .kgs-eyebrow{margin:0 0 4px;font:800 11px "M PLUS Rounded 1c",sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#f5d27a}
 #kg-scene h1{margin:0;font:800 30px/1.15 "Shippori Mincho B1",serif;color:#fbf5e4;background:none;-webkit-text-fill-color:#fbf5e4}
+.kgs-sub{margin:5px 0 0;font:600 12.5px "M PLUS Rounded 1c",sans-serif;color:#d8d2f6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+body.kg-light #kg-main #kg-scene .kgs-sub{color:#d8d2f6!important}
+body.kg-no-scene #kg-scene{display:none}
 .kgs-talk{position:absolute;left:24px;bottom:18px;z-index:3;display:grid;gap:8px;width:min(44%,400px)}
 .kgs-say{margin:0;padding:8px 13px 9px;border-radius:14px 14px 14px 4px;font:500 13.5px/1.42 "M PLUS Rounded 1c",sans-serif;color:#f6f2ff;background:rgba(13,11,36,.82);border:1px solid;box-shadow:0 6px 18px rgba(0,0,0,.28);overflow-wrap:anywhere}
 .kgs-say{max-height:98px;overflow-y:auto;scrollbar-width:none}
 .kgs-say::-webkit-scrollbar{display:none}
 .kgs-say[hidden]{display:none}
+.kgs-say.live.k{box-shadow:0 0 16px rgba(255,111,174,.45)}
+.kgs-say.live.i{box-shadow:0 0 16px rgba(127,227,255,.4)}
 .kgs-say b{display:block;font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;margin-bottom:1px}
 .kgs-say.k{border-color:rgba(255,111,174,.75)}.kgs-say.k b{color:#ff9cc8}
 .kgs-say.i{border-color:rgba(127,227,255,.65)}.kgs-say.i b{color:#7fe3ff}
@@ -3684,6 +3713,7 @@ body:not(.kg-sec-today) #kg-scene,body.habit-shh #kg-scene{display:none}
 /* the scene stands in for the floating pair while it's on screen */
 body.kg-scene-on #ame-gif,body.kg-scene-on #iroha-gif,body.kg-scene-on #ame-bubble,body.kg-scene-on #iroha-bubble{visibility:hidden!important;pointer-events:none!important}
 body.kg-scene-on #ame-widget::after{display:none!important}
+body.kg-scene-on #kg-hw{visibility:hidden!important}
 body.kg-light #kg-main #kg-scene h1{color:#fbf5e4!important}
 body.kg-light #kg-main #kg-scene .kgs-eyebrow{color:#f5d27a!important}
 body.kg-light #kg-main #kg-scene .kgs-say span{color:#f6f2ff!important}
@@ -3695,10 +3725,13 @@ body.kg-light #kg-main #kg-scene button.kgs-who{background:none!important;border
   .kgs-moon{right:310px;width:74px;height:74px}.kgs-glow{right:210px}
 }
 @media(max-width:720px){
-  #kg-scene{height:306px;border-radius:20px;margin-bottom:14px}
+  #kg-scene{height:334px;border-radius:20px;margin-bottom:14px}
+  #kg-hw{display:none!important}
   .kgs-copy{top:15px;left:15px;max-width:80%}
   #kg-scene h1{font-size:21px}
   .kgs-say{max-height:76px}
+  .kgs-talk.one-live{grid-template-columns:1fr}
+  .kgs-talk.one-live .kgs-say:not(.live){display:none}
   .kgs-eyebrow{font-size:9.5px;letter-spacing:.1em}
   .kgs-moon{top:10px;right:10px;width:50px;height:50px}
   .kgs-glow{top:-75px;right:-75px;width:200px;height:200px}
@@ -3713,12 +3746,12 @@ body.kg-light #kg-main #kg-scene button.kgs-who{background:none!important;border
 @media(prefers-reduced-motion:reduce){#kg-scene *{animation:none!important;transition:none!important}}
 
 /* ===== Polish: one clear thing per page, with depth instead of flat boxes ===== */
-body.kg-shell:not(.kg-light) .kl-card,body.kg-shell:not(.kg-light) .kl-boss,body.kg-shell:not(.kg-light) .hb-card{background:linear-gradient(180deg,#1c1839,#15122c)!important;border-color:rgba(132,118,214,.24)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 10px 26px rgba(4,3,18,.3)!important}
+body.kg-shell:not(.kg-light) .kl-card,body.kg-shell:not(.kg-light) .kl-boss,body.kg-shell:not(.kg-light) .hb-card{background:linear-gradient(180deg,var(--kg-c1),var(--kg-c2))!important;border-color:var(--kg-cb)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 10px 26px rgba(4,3,18,.3)!important}
 body.kg-shell:not(.kg-light) .kl-breakcard{background:radial-gradient(120% 150% at 0 0,rgba(245,210,122,.13),transparent 58%),linear-gradient(180deg,#221c44,#17132f)!important;border-color:rgba(245,210,122,.45)!important}
 body.kg-shell:not(.kg-light) .kl-mini{background:rgba(23,20,47,.58)!important;box-shadow:none!important}
 body.kg-shell:not(.kg-light) .kl-next{border-color:rgba(255,111,174,.45)!important}
-body.kg-shell #moon-lab .kl-primary,body.kg-shell #habit-desk button.hb-primary{background:linear-gradient(180deg,#ff86bc,#ff5fa4);border-color:#ff7bb4;box-shadow:0 5px 16px rgba(255,95,164,.26)!important;transition:transform .15s ease,box-shadow .15s ease}
-body.kg-shell #moon-lab .kl-primary:hover,body.kg-shell #habit-desk button.hb-primary:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(255,95,164,.36)!important}
+body.kg-shell #moon-lab .kl-primary,body.kg-shell #habit-desk button.hb-primary{background:linear-gradient(180deg,var(--kg-a1),var(--kg-a2));border-color:var(--kg-a1);box-shadow:0 5px 16px color-mix(in srgb,var(--kg-a2) 28%,transparent)!important;transition:transform .15s ease,box-shadow .15s ease}
+body.kg-shell #moon-lab .kl-primary:hover,body.kg-shell #habit-desk button.hb-primary:hover{transform:translateY(-1px);box-shadow:0 8px 20px color-mix(in srgb,var(--kg-a2) 38%,transparent)!important}
 #kg-nav a{transition:background .18s,color .18s}
 #kg-nav a[aria-current="page"]{box-shadow:inset 0 -2px 0 #f5d27a}
 body.kg-light #kg-nav a[aria-current="page"]{box-shadow:inset 0 -2px 0 #c58a10}
@@ -3785,9 +3818,283 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
 #ame-chat .ame-header,#iroha-chat .iroha-header{user-select:none}
 @media(min-width:721px){#ame-chat .ame-header,#iroha-chat .iroha-header{cursor:grab;touch-action:none}#ame-chat .ame-header.kg-dragging,#iroha-chat .iroha-header.kg-dragging{cursor:grabbing}}
 .kgs-say{cursor:pointer}
+#iroha-bubble.show{pointer-events:auto!important;cursor:pointer}
+.kl-seg{display:inline-flex;gap:4px;flex-wrap:wrap}
+#moon-lab .kl-seg [aria-pressed="true"]{background:#2a2452;border-color:#ff6fae}
 /* every tab reachable: rows wrap on a computer, and phones get a hint that there's more */
 @media(min-width:721px){body.kg-shell .kl-tabs{flex-wrap:wrap;overflow:visible}}
 @media(max-width:720px){body.kg-shell .kl-tabs.kg-more{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 34px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 34px),transparent)}}
+/* themes */
+body.kg-shell{--kg-a1:#ff86bc;--kg-a2:#ff5fa4;--kg-c1:#1c1839;--kg-c2:#15122c;--kg-cb:rgba(132,118,214,.24)}
+body.kg-shell[data-theme="autumn"]{--kg-a1:#ffbf6b;--kg-a2:#f2953a;--kg-c1:#281a2b;--kg-c2:#1c1220;--kg-cb:rgba(242,160,80,.26)}
+body.kg-shell[data-theme="winter"]{--kg-a1:#6fe2ff;--kg-a2:#35b4f0;--kg-c1:#13214f;--kg-c2:#0d173a;--kg-cb:rgba(103,224,255,.26)}
+body.kg-shell[data-theme="spring"]{--kg-a1:#95e4a6;--kg-a2:#5cc781;--kg-c1:#14292c;--kg-c2:#0e1f22;--kg-cb:rgba(143,224,160,.26)}
+body.kg-shell[data-theme="autumn"] #moon-lab{--kl-pink:#f7a64a}
+body.kg-shell[data-theme="winter"] #moon-lab{--kl-pink:#4fc6f5}
+body.kg-shell[data-theme="spring"] #moon-lab{--kl-pink:#6fd190}
+body.kg-shell[data-theme="autumn"]:not(.kg-light){background:linear-gradient(180deg,#150c1c,#37201f) fixed!important}
+body.kg-shell[data-theme="winter"]:not(.kg-light){background:linear-gradient(180deg,#060b29,#112260) fixed!important}
+body.kg-shell[data-theme="spring"]:not(.kg-light){background:linear-gradient(180deg,#07181b,#143632) fixed!important}
+/* find anything */
+#kg-find{order:2;flex:none;width:36px;height:36px;display:grid;place-items:center;padding:0;border-radius:50%;border:1px solid rgba(132,118,214,.35);background:transparent;color:#c9c2ee;cursor:pointer}
+#kg-find:hover{background:#1d1942;color:#fff}
+#kg-find:focus-visible{outline:3px solid #f5d27a;outline-offset:2px}
+body.kg-light #kg-find{color:#2b2447;border-color:#d9cdef}
+body.kg-light #kg-find:hover{background:#ece4fb}
+#kg-pal{position:fixed;inset:0;z-index:20000;display:flex;align-items:flex-start;justify-content:center;padding:12vh 16px 16px;background:rgba(6,5,20,.6)}
+.kg-pal-box{width:min(560px,100%);max-height:70vh;display:flex;flex-direction:column;border-radius:18px;background:#1a1638;border:1px solid rgba(245,210,122,.4);box-shadow:0 24px 60px rgba(0,0,0,.55);overflow:hidden;color:#f2eeff;font-family:"M PLUS Rounded 1c",sans-serif}
+#kg-pal-q{flex:none;width:100%;box-sizing:border-box;padding:15px 18px;border:0;border-bottom:1px solid rgba(132,118,214,.25);background:transparent;color:#fff;font:600 16px "M PLUS Rounded 1c",sans-serif;outline:none}
+#kg-pal-q::placeholder{color:#8f87bd}
+#kg-pal-list{margin:0;padding:6px;list-style:none;overflow:auto;flex:1;min-height:0}
+#kg-pal-list li{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:9px 12px;border-radius:10px;cursor:pointer;font-weight:600;font-size:14px}
+#kg-pal-list li small{flex:none;font-weight:600;font-size:11px;color:#a69fd3}
+#kg-pal-list li[aria-selected="true"]{background:#2a2452;box-shadow:inset 3px 0 0 #f5d27a}
+@media(hover:hover){#kg-pal-list li:hover{background:#231e48}}
+#kg-pal-list li.none{color:#a69fd3;cursor:default}
+.kg-pal-keys{flex:none;margin:0;padding:8px 14px;border-top:1px solid rgba(132,118,214,.2);font-size:11px;color:#a69fd3}
+.kg-pal-keys b{color:#f2eeff;font-weight:700}
+/* back to top */
+#kg-top{position:fixed;left:16px;bottom:20px;z-index:55;width:40px;height:40px;padding:0;border-radius:50%;border:1px solid rgba(245,210,122,.45);background:#1c1839;color:#f5d27a;font:800 18px/1 "M PLUS Rounded 1c",sans-serif;cursor:pointer;opacity:0;pointer-events:none;transform:translateY(8px);transition:opacity .2s,transform .2s;box-shadow:0 6px 16px rgba(0,0,0,.35)}
+#kg-top.show{opacity:1;pointer-events:auto;transform:none}
+#kg-top:focus-visible{outline:3px solid #f5d27a;outline-offset:2px}
+body.habit-shh #kg-top{display:none}
+/* pages fade in, display settings */
+.kg-page-in{animation:kg-page-in .22s ease-out}
+@keyframes kg-page-in{from{opacity:.01}to{opacity:1}}
+body.kg-text-sm #kg-main{zoom:.92}
+body.kg-text-lg #kg-main{zoom:1.12}
+body.kg-text-sm .ame-msg,body.kg-text-sm #ame-bubble,body.kg-text-sm #iroha-bubble{font-size:12px!important}
+body.kg-text-lg .ame-msg,body.kg-text-lg #ame-bubble,body.kg-text-lg #iroha-bubble{font-size:15.5px!important}
+body.kg-calm *:not(.kl-breath),body.kg-calm *::before,body.kg-calm *::after{animation:none!important;transition:none!important}
+.kg-setrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid rgba(132,118,214,.14)}
+/* chapter search and subject colours */
+#kl-chq{flex:1 1 220px;min-width:0}
+.kg-legend{margin:0 0 6px}
+.kg-legend p{margin:4px 0 0}
+#moon-lab .kl-subjects [data-s] b::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;background:var(--subj)}
+#moon-lab .kl-subjects [data-s="Physics"]{--subj:#7fe3ff}
+#moon-lab .kl-subjects [data-s="Chemistry"]{--subj:#8fe0a0}
+#moon-lab .kl-subjects [data-s="Maths"]{--subj:#f5d27a}
+#moon-lab .kl-subjects [data-s] .kl-meter i{background:var(--subj)}
+#moon-lab .kl-subjects [data-s][aria-pressed="true"]{border-color:var(--subj);box-shadow:0 0 16px color-mix(in srgb,var(--subj) 28%,transparent)}
+@media(max-width:720px){
+  .kg-pal-keys span{display:none}
+  #kg-pal{padding-top:8vh}
+  #kg-top{bottom:72px;left:12px;width:36px;height:36px}
+  #kg-find{width:34px;height:34px}
+}
+/* today's progress in the scene */
+.kgs-meter{display:flex;align-items:center;gap:8px;margin-top:7px;font:700 11px "M PLUS Rounded 1c",sans-serif;color:#d8d2f6}
+.kgs-meter[hidden]{display:none}
+.kgs-meter .bar{flex:none;width:130px;height:6px;border-radius:99px;background:rgba(255,255,255,.16);overflow:hidden}
+.kgs-meter i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#f5d27a,#ff9cc8);transition:width .4s}
+.kgs-meter .txt{white-space:nowrap}
+body.kg-light #kg-main #kg-scene .kgs-meter .txt{color:#d8d2f6!important}
+/* typing dots */
+.ame-msg.kg-typing{color:transparent!important;min-width:52px;min-height:30px;position:relative;user-select:none}
+.ame-msg.kg-typing::after{content:"";position:absolute;left:14px;bottom:12px;width:6px;height:6px;border-radius:50%;background:#d8d2f6;box-shadow:10px 0 0 #d8d2f6,20px 0 0 #d8d2f6;animation:kg-dots 1.1s ease-in-out infinite}
+@keyframes kg-dots{50%{opacity:.3}}
+/* bigger chat */
+.kg-chat-big{flex:none;width:28px;height:28px;margin-right:8px;padding:0;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:#1c1838;color:#f2eeff;font-size:14px;line-height:1;cursor:pointer}
+.kg-chat-big[aria-pressed="true"]{border-color:#f5d27a;color:#f5d27a}
+.kg-chat-big:focus-visible{outline:2px solid #f5d27a;outline-offset:2px}
+.iroha-header .kg-chat-big{margin-left:auto}
+#ame-mute{margin-right:6px!important}
+/* the hint chip steps aside when she speaks */
+#ame-widget:has(#ame-bubble.show) #kg-hw{opacity:0}
+/* forms: the main button is a button, not a banner */
+#moon-lab form>button.kl-primary,#habit-desk form>button.hb-primary{width:auto;align-self:flex-start;justify-self:start;padding-inline:26px}
+/* syllabus sky: unlit stars you can see */
+#moon-lab .kl-star{background:#1b1740;border-color:#4d4490}
+/* the full schedule on Plan: calmer "right now", and a pill that holds its words */
+#habit-original section.bg-primary{background:radial-gradient(120% 150% at 100% 0,rgba(255,111,174,.22),transparent 60%),linear-gradient(180deg,#261d49,#17132f)!important;color:#f7f2ff!important;border:1px solid rgba(255,111,174,.5);box-shadow:0 10px 26px rgba(4,3,18,.3)}
+#habit-original section.bg-primary .text-primary-fg,#habit-original section.bg-primary p,#habit-original section.bg-primary span,#habit-original section.bg-primary h2,#habit-original section.bg-primary h3{color:inherit!important}
+body.kg-light #habit-original section.bg-primary{background:#ffeef6!important;color:#2b2447!important}
+#habit-original div:has(>h2.text-primary)+button{flex:none;height:auto;min-height:38px;white-space:nowrap;padding:8px 14px;line-height:1.2}
+body:not(.kg-light) #habit-original section.bg-primary dl>div{background:rgba(13,11,36,.6)!important}
+#habit-original section.bg-primary [class~="bg-primary-fg/20"]{background:rgba(255,255,255,.14)!important}
+#habit-original section.bg-primary [class~="bg-primary-fg"]{background:linear-gradient(90deg,#ff6fae,#f5d27a)!important}
+body:not(.kg-light) #habit-original section.bg-primary input{background:rgba(10,8,30,.45)!important;border-color:rgba(255,255,255,.2)!important;color:#fff!important}
+body:not(.kg-light) #habit-original section.bg-primary button{border:1px solid rgba(255,255,255,.28);background:transparent;color:#f7f2ff!important}
+body:not(.kg-light) #habit-original section.bg-primary .flex-wrap>button:first-child{background:linear-gradient(180deg,var(--kg-a1),var(--kg-a2));border-color:var(--kg-a1);color:#1d1238!important}
+body.kg-light #habit-original section.bg-primary dl>div{background:#ffe0f0!important}
+/* focus session: centred, with the night behind it */
+#kg-focus-sky{display:none;position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+body.habit-shh #kg-focus-sky{display:block}
+body.kg-light #kg-focus-sky{display:none!important}
+#kg-focus-sky .kgs-moon{top:7vh;right:8vw;width:120px;height:120px;right:8vw;cursor:default;pointer-events:none}
+#kg-focus-sky .kgs-grove{height:58vh;opacity:.6}
+body.habit-shh #kg-main{width:min(720px,calc(100% - 24px))!important;max-width:720px!important;margin-left:auto!important;margin-right:auto!important}
+body.habit-shh #kg-main #habit-desk{margin-top:7vh}
+.kg-focusbar{height:6px;margin:2px auto 14px;width:min(420px,88%);border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden}
+.kg-focusbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--kg-a2,#ff5fa4),#f5d27a);transition:width 1s linear}
+@media(max-width:720px){
+  #kg-focus-sky .kgs-moon{width:64px;height:64px;top:3vh;right:5vw}
+  #kg-focus-sky .kgs-grove.left{display:none}
+  body.habit-shh #kg-main #habit-desk{margin-top:9vh}
+}
+/* a little more life */
+.kgs-who img{animation:kgs-bob 5.6s ease-in-out infinite}
+.kgs-who.i img{animation-delay:-2.3s;animation-duration:6.4s}
+@keyframes kgs-bob{50%{transform:translateY(-3px)}}
+#mp-widget.mp-live #mp-toggle svg{animation:kg-spin 7s linear infinite}
+@keyframes kg-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.kgs-who img,#mp-widget.mp-live #mp-toggle svg{animation:none!important}}
+body.kg-shell button:not(:disabled):active{transform:translateY(1px) scale(.985)}
+.kgs-meter.done i{box-shadow:0 0 10px rgba(245,210,122,.85)}
+.kgs-meter.done .txt{color:#f5d27a}
+/* the schedule's subject colours */
+#habit-original li[data-subj="Physics"]>:first-child{background:#7fe3ff!important}
+#habit-original li[data-subj="Chemistry"]>:first-child{background:#8fe0a0!important}
+#habit-original li[data-subj="Maths"]>:first-child{background:#f5d27a!important}
+/* birthday lanterns */
+.kgs-lanterns{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.kgs-lanterns i{position:absolute;bottom:-40px;width:calc(16px*var(--size));height:calc(20px*var(--size));border-radius:45% 45% 38% 38%;background:radial-gradient(circle at 50% 62%,#fff1b8,#ffb24d 55%,#e8702f);box-shadow:0 0 calc(18px*var(--size)) rgba(255,180,90,.85);animation:kgs-lantern var(--up) linear var(--from) infinite}
+@keyframes kgs-lantern{0%{transform:translateY(0) translateX(0);opacity:0}8%{opacity:1}50%{transform:translateY(-190px) translateX(14px)}92%{opacity:.9}100%{transform:translateY(-380px) translateX(-8px);opacity:0}}
+/* sync and offline */
+#kg-cloud{order:2;flex:none;width:36px;height:36px;display:grid;place-items:center;padding:0;border-radius:50%;border:1px solid rgba(127,227,255,.4);background:transparent;color:#7fe3ff;cursor:pointer}
+#kg-cloud[hidden]{display:none}
+#kg-cloud.off{color:#a69fd3;border-color:rgba(166,159,211,.4);opacity:.75}
+#kg-cloud:hover{background:#1d1942}
+#kg-cloud:focus-visible{outline:3px solid #f5d27a;outline-offset:2px}
+#kg-offline{position:fixed;top:68px;left:50%;transform:translate(-50%,-10px);z-index:58;max-width:calc(100% - 24px);width:max-content;padding:7px 14px;border-radius:999px;background:#2a2452;border:1px solid #f5d27a;color:#fbf5e4;font:600 12.5px "M PLUS Rounded 1c",sans-serif;box-shadow:0 8px 20px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+#kg-offline.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:720px){#kg-cloud{width:34px;height:34px}#kg-offline{border-radius:14px;text-align:center}}
+/* multi-line chat boxes */
+#ame-input,#iroha-input{display:block;box-sizing:border-box;resize:none;overflow-y:auto;scrollbar-width:none;min-height:42px;max-height:130px;line-height:1.35;border-radius:18px!important;font-family:inherit}
+#ame-input::-webkit-scrollbar,#iroha-input::-webkit-scrollbar{display:none}
+.ame-input-area{align-items:flex-end}
+/* faces on the title bars */
+.kg-chat-face{flex:none;width:30px;height:30px;margin-right:8px;border-radius:50%;object-fit:cover;object-position:50% 10%;background:#0f0d24;border:1.5px solid rgba(255,255,255,.55);pointer-events:none}
+#ame-chat .ame-header span::before,#iroha-chat .iroha-header span::before{content:none!important}
+/* her expression can change without nudging anyone */
+.kgs-who.k{width:232px;display:flex;justify-content:center;align-items:flex-end}
+@media(max-width:940px){.kgs-who.k{width:182px}}
+@media(max-width:720px){.kgs-who.k{width:142px}}
+.kg-stkmeter{display:block;margin:0 0 12px}
+/* the seasons pass through the scene: snow in winter, petals in spring */
+.kgs-flies i:nth-child(n+8){display:none}
+.kgs-flies.snow i,.kgs-flies.petals i{display:block;top:-12px;bottom:auto!important;box-shadow:none;animation:kgs-fall var(--fly) linear var(--from) infinite}
+.kgs-flies.snow i{background:#fff;opacity:.85}
+.kgs-flies.petals i{width:7px;height:5px;border-radius:70% 15%;background:#ffc4dc}
+@keyframes kgs-fall{0%{transform:translate(0,-10px) rotate(0)}100%{transform:translate(26px,330px) rotate(300deg)}}
+/* the tab row stays with you on long pages */
+body.kg-shell .kl-tabs{position:sticky;top:var(--kg-bar-h,60px);z-index:20;background:rgba(14,12,34,.94);padding:6px 4px;margin-inline:-4px;border-radius:0 0 12px 12px}
+body.kg-light .kl-tabs{background:rgba(255,255,255,.96)}
+#kg-bar{box-shadow:0 6px 18px rgba(4,3,18,.28)}
+body.kg-light #kg-bar{box-shadow:0 4px 14px rgba(70,50,120,.1)}
+.kg-newcard{border-color:rgba(245,210,122,.5)!important}
+.kg-newcard .kl-list{margin-bottom:12px}
+body.kg-text-sm .kl-tabs{top:calc(var(--kg-bar-h,60px)/.92)!important}
+body.kg-text-lg .kl-tabs{top:calc(var(--kg-bar-h,60px)/1.12)!important}
+/* Daylight: the planner's boxes follow the theme too */
+body.kg-light #kg-main #habit-desk input:not([type=checkbox]):not([type=range]):not([type=file]),body.kg-light #kg-main #habit-desk select,body.kg-light #kg-main #habit-desk textarea{background:#f7f3fb!important;color:#2b2447!important;border-color:#d9cdef!important}
+body.kg-light #habit-desk .hb-level-0{background:#efe8fb}
+body.kg-light #habit-desk .hb-level-1{background:#d9cdef}
+body.kg-light #habit-desk .hb-rest{background:#d3ecf5}
+/* the scene's start button */
+.kgs-cta{flex:none;margin-left:2px;padding:3px 11px;border-radius:999px;border:1px solid var(--kg-a1,#ff86bc);background:rgba(13,11,36,.55);color:#fbf5e4;font:700 11.5px "M PLUS Rounded 1c",sans-serif;cursor:pointer;text-shadow:none}
+.kgs-cta:hover{background:var(--kg-a2,#ff5fa4);color:#1d1238}
+.kgs-cta:focus-visible{outline:2px solid #f5d27a;outline-offset:2px}
+body.kg-light #kg-main #kg-scene .kgs-cta{color:#fbf5e4!important}
+/* theme swatches */
+.kg-swatches button{display:inline-flex;align-items:center;gap:7px}
+.kg-swatches i{flex:none;width:12px;height:12px;border-radius:50%;box-shadow:0 0 8px rgba(255,255,255,.25)}
+@media(max-width:720px){.kgs-meter .bar{width:84px}.kgs-meter{gap:6px}}
+/* each tab shows its own content: the 12-week grid lives on Overview, the corner and backup cards under App and Backup */
+body.kg-sec-progress:not([data-tab="overview"]) #habit-desk,body.kg-sec-progress:not([data-tab="overview"]) #ame-journal{display:none!important}
+body.kg-sec-settings:not([data-tab="app"]):not([data-tab="backup"]) #habit-desk{display:none!important}
+/* the clock stays in sight during sprints and mocks */
+body.kg-shell .kl-timer,body.kg-shell .kl-paper-top{position:sticky;top:calc(var(--kg-bar-h,60px) + 52px);z-index:15;background:var(--kg-c1,#1c1839);border-radius:10px;padding:2px 8px}
+body.kg-light .kl-timer,body.kg-light .kl-paper-top{background:#fff}
+@media(min-width:721px) and (max-width:1000px){body.kg-shell .kl-timer,body.kg-shell .kl-paper-top{top:calc(var(--kg-bar-h,60px) + 92px)}}
+/* a full-screen phone chat has the screen to itself */
+body.kg-chat-full #ame-gif,body.kg-chat-full #iroha-gif,body.kg-chat-full #ame-bubble,body.kg-chat-full #iroha-bubble{visibility:hidden!important;pointer-events:none!important}
+body.kg-chat-full #ame-widget::after{display:none!important}
+/* the quiet room's night */
+#kg-room{isolation:isolate;font-family:"M PLUS Rounded 1c",sans-serif}
+#kg-room .kg-room-clock{font:600 44px "Shippori Mincho B1",serif}
+body:has(#kg-room) #ame-widget,body:has(#kg-room) #iroha-widget{visibility:hidden!important}
+body:has(#kg-room) #ame-chat,body:has(#kg-room) #iroha-chat{display:none!important}
+.kg-room-sky{position:absolute;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.kg-room-sky .kgs-moon{position:absolute;top:7vh;left:8vw;right:auto;width:110px;height:110px;pointer-events:none}
+.kg-room-sky .kgs-grove{height:58vh;opacity:.55}
+@media(max-width:720px){.kg-room-sky .kgs-moon{width:64px;height:64px;top:4vh;left:6vw}.kg-room-sky .kgs-grove.left{display:none}}
+/* printing a report or doctor summary leaves all of this out */
+@media print{#kg-scene,#kg-top,#kg-find,#kg-cloud,#kg-offline,#kg-mstop,#kg-focus-sky,#kg-pal{display:none!important}}
+@media(prefers-reduced-motion:reduce){.kg-page-in{animation:none}#kg-focus-sky *,.kg-room-sky *,.ame-msg.kg-typing::after,.kgs-shoot{animation:none!important;transition:none!important}}
+/* Kaguya's stream badge */
+.kgs-live{position:absolute;top:14px;right:14px;z-index:3;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,111,174,.65);background:rgba(13,11,36,.68);color:#fff;font:800 10.5px "M PLUS Rounded 1c",sans-serif;letter-spacing:.06em;cursor:pointer}
+.kgs-live i{width:7px;height:7px;border-radius:50%;background:#ff5f7e;box-shadow:0 0 8px #ff5f7e;animation:kgs-live 1.6s ease-in-out infinite}
+.kgs-live span{font-weight:600;letter-spacing:0;color:#d8d2f6}
+.kgs-live:hover{background:rgba(255,95,164,.3)}
+.kgs-live:focus-visible{outline:2px solid #f5d27a;outline-offset:2px}
+@keyframes kgs-live{50%{opacity:.35}}
+body.kg-light #kg-main #kg-scene .kgs-live{color:#fff!important;background:rgba(13,11,36,.68)!important}
+body.kg-light #kg-main #kg-scene .kgs-live span{color:#d8d2f6!important}
+/* the slim banner on other pages */
+#kg-strip{--s1:#0b0a24;--s2:#1c1646;--s3:#3a2460;position:relative;isolation:isolate;display:flex;align-items:center;gap:12px;min-height:66px;margin:0 0 14px;padding:9px 16px;border-radius:18px;overflow:hidden;background:linear-gradient(100deg,var(--s1),var(--s2) 60%,var(--s3));border:1px solid rgba(255,255,255,.08)}
+body.kg-sec-today #kg-strip,body.habit-shh #kg-strip,body.kg-no-scene #kg-strip{display:none}
+#kg-strip .kgs-stars{opacity:.6}
+.kgst-face{flex:none;width:48px;height:48px;border-radius:50%;object-fit:cover;object-position:50% 8%;background:#0f0d24;border:2px solid rgba(255,255,255,.6);pointer-events:none}
+.kgst-face.k{border-color:rgba(255,111,174,.85)}.kgst-face.i{border-color:rgba(127,227,255,.8)}
+.kgst-copy{min-width:0}
+#kg-strip h2{margin:0;font:800 20px/1.15 "Shippori Mincho B1",serif;color:#fbf5e4!important;background:none}
+#kgst-line{margin:2px 0 0;font:500 13px/1.35 "M PLUS Rounded 1c",sans-serif;color:#e6e0fb!important}
+body.kg-light #kg-main #kg-strip h2{color:#fbf5e4!important}
+body.kg-light #kg-main #kg-strip #kgst-line{color:#e6e0fb!important}
+/* the lab note */
+.kg-labnote{display:flex;align-items:center;gap:14px;border-color:rgba(127,227,255,.32)!important}
+.kg-labnote img{flex:none;width:52px;height:52px;border-radius:50%;object-fit:cover;object-position:50% 8%;background:#0f0d24;border:2px solid rgba(127,227,255,.65)}
+.kg-labnote p{margin:0}
+.kg-labnote .kl-eyebrow{color:#7fe3ff!important;margin-bottom:3px!important}
+body.kg-light .kg-labnote .kl-eyebrow{color:#0b7ea6!important}
+@media(max-width:720px){
+  .kgs-live{top:68px;right:8px;padding:3px 8px;font-size:9.5px}
+  #kg-strip{min-height:58px;padding:8px 12px;margin-bottom:10px;border-radius:16px}
+  .kgst-face{width:40px;height:40px}
+  #kg-strip h2{font-size:17px}
+  #kgst-line{font-size:12px}
+  .kg-labnote img{width:44px;height:44px}
+}
+@media print{#kg-strip,.kg-labnote{display:none!important}}
+#iroha-widget.unread::after{content:"";position:absolute;top:2px;right:2px;width:12px;height:12px;border-radius:50%;background:#7fe3ff;box-shadow:0 0 10px #7fe3ff;pointer-events:none}
+body.kg-scene-on #iroha-widget::after,body.kg-chat-full #iroha-widget::after{display:none!important}
+#kg-skip{position:fixed;top:-60px;left:12px;z-index:21000;padding:8px 14px;border-radius:10px;background:#f5d27a;color:#1d1238;font:700 13px "M PLUS Rounded 1c",sans-serif;text-decoration:none}
+#kg-skip:focus{top:10px}
+#kg-main:focus{outline:none}
+/* the "2/5" on split messages */
+#ame-bubble[data-part]:not([data-part=""])::after,#iroha-bubble[data-part]:not([data-part=""])::after{content:attr(data-part);display:block;margin-top:3px;text-align:right;font:700 10px "M PLUS Rounded 1c",sans-serif;opacity:.65}
+.kgs-say[data-part]:not([data-part=""]) b::after{content:" · " attr(data-part);font-weight:700;opacity:.8;text-transform:none}
+/* save and copy on chat messages */
+.kg-msg-tools{display:inline-flex;gap:2px;margin-left:6px;vertical-align:middle;visibility:hidden}
+.ame-msg:hover .kg-msg-tools,.kg-msg-tools:focus-within{visibility:visible}
+@media(hover:none){.kg-msg-tools{visibility:visible;opacity:.7}}
+.kg-msg-tools button{width:22px;height:22px;padding:0;border:0;border-radius:6px;background:rgba(255,255,255,.08);color:inherit;font-size:12px;line-height:1;cursor:pointer}
+.kg-msg-tools button:hover{background:rgba(255,255,255,.2)}
+.kg-msg-tools button[aria-pressed="true"]{color:#f5d27a}
+.kg-msg-tools button:focus-visible{outline:2px solid #f5d27a;outline-offset:1px}
+/* the collection */
+.kg-saved{margin:8px 0 0;padding:9px 12px;border-left:3px solid;border-radius:0 10px 10px 0;background:rgba(10,8,30,.35)}
+.kg-saved.k{border-color:#ff6fae}.kg-saved.i{border-color:#7fe3ff}
+.kg-saved p{margin:0;white-space:pre-wrap}
+.kg-saved footer{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;font-size:11.5px;color:#a69fd3}
+#moon-lab .kg-saved footer button{min-height:0;width:22px;height:22px;padding:0;border-radius:6px;font-size:13px;line-height:1}
+body.kg-light .kg-saved{background:#f7f3fb}
+/* tablet widths: the bar keeps to one tidy line */
+.kg-brand b{white-space:nowrap}
+@media(min-width:721px) and (max-width:1020px){
+  #kg-status{display:none}
+  .kg-brand b{font-size:16px}
+  #kg-bar{gap:8px}
+  #kg-nav a{padding:8px 8px;font-size:12px;gap:4px}
+}
+/* the chain, hanging in the bamboo */
+.kgs-chain{position:absolute;inset:0;z-index:0;pointer-events:none}
+.kgs-chain i{position:absolute;width:9px;height:12px;border-radius:45% 45% 38% 38%;background:radial-gradient(circle at 50% 62%,#fff1b8,#ffb24d 60%,#e8702f);box-shadow:0 0 12px rgba(255,180,90,.8);animation:kgs-glow 3.4s ease-in-out var(--from) infinite}
+.kgs-chain i::before{content:"";position:absolute;left:50%;top:-9px;width:1px;height:9px;background:rgba(255,235,190,.55)}
+@keyframes kgs-glow{50%{opacity:.72}}
+@media(prefers-reduced-motion:reduce){.kgs-chain i{animation:none}}
 </style>
 <script id="moon-lab-script">
 /* ===== Moon Lab: chapter tracker, boss battles, Iroha's recall, doubts, weekly rank, stickers, bond, voyage, kindness ===== */
@@ -4183,7 +4490,7 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
   function closeMood() { document.getElementById('kl-mood')?.remove(); }
 
   /* ---------- the section itself ---------- */
-  let tab = 'chapters', subj = 'Physics', weak = false, section = 'today';
+  let tab = 'chapters', subj = 'Physics', weak = false, section = 'today', chq = '';
   try { tab = sessionStorage.getItem('kl-tab') || 'chapters'; section = sessionStorage.getItem('kl-section') || 'today'; } catch (e) {}
   const root = document.createElement('section'); root.id = 'moon-lab'; root.setAttribute('aria-label', 'Page content');
   const anchor = document.getElementById('habit-original');
@@ -4211,17 +4518,21 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
   function pChapters() {
     const d = today(), pct = s => { const cs = CHAPS.filter(c => c.subj === s); return Math.round(cs.reduce((n, c) => n + (L.ch[c.id]?.c || 0), 0) * 100 / (cs.length * 5)); };
     let html = `<div class="kl-row kl-subjects">${SUBJ.map(s => `<button data-a="subj" data-s="${s}" aria-pressed="${s === subj}"><b>${s}</b><span class="kl-meter"><i style="width:${pct(s)}%"></i></span><small>${pct(s)}% confident</small></button>`).join('')}</div>
-      <div class="kl-row kl-legend"><label class="kl-check"><input type="checkbox" data-a="weak" ${weak ? 'checked' : ''}> Weak chapters only (0–2 dots)</label><span>Dots: ${CONF.slice(1).map((c, i) => `${i + 1} ${c}`).join(' · ')} · 🌙 studied today (Iroha questions you on it) · ✔/✘ log a question · ⚔ summon as boss</span></div>`;
-    for (const [unit] of CH[subj]) {
-      const rows = CHAPS.filter(c => c.subj === subj && c.unit === unit && (!weak || (L.ch[c.id]?.c || 0) <= 2));
+      <div class="kl-row kl-legend"><input id="kl-chq" type="search" value="${esc(chq)}" placeholder="Search all chapters…" aria-label="Search all chapters" autocomplete="off"><label class="kl-check"><input type="checkbox" data-a="weak" ${weak ? 'checked' : ''}> Weak chapters only (0–2 dots)</label></div>
+      <details class="kl-fold kl-quietfold kg-legend"><summary>What do the dots and buttons mean?</summary><p class="kl-small">Dots: ${CONF.slice(1).map((c, i) => `${i + 1} ${c}`).join(' · ')} · 🌙 studied today (Iroha questions you on it) · ✔/✘ log a question · ⚔ summon as boss · 🎓 chapter complete, take Iroha's exam</p></details>`;
+    const q = chq.trim().toLowerCase(); let found = 0;
+    for (const s of q ? SUBJ : [subj]) for (const [unit] of CH[s]) {
+      const rows = CHAPS.filter(c => c.subj === s && c.unit === unit && (!weak || (L.ch[c.id]?.c || 0) <= 2) && (!q || c.name.toLowerCase().includes(q) || unit.toLowerCase().includes(q)));
       if (!rows.length) continue;
-      html += `<h4 class="kl-unit">${esc(unit)}</h4><div class="kl-chapters">` + rows.map(c => {
+      found += rows.length;
+      html += `<h4 class="kl-unit">${q ? esc(s) + ' · ' : ''}${esc(unit)}</h4><div class="kl-chapters">` + rows.map(c => {
         const s = L.ch[c.id] || {}, v = s.c || 0, a = acc(c.id), on = s.last === d, fight = L.boss[c.id]?.active;
         return `<div class="kl-ch ${on ? 'is-today' : ''}"><div class="kl-ch-name">${L.medals[c.id] ? '🏅 ' : ''}${esc(c.name)}${fight ? ' <span class="kl-tag">⚔ boss</span>' : ''}<small>${CONF[v]}${window.MoonLab?.fade?.(c.id) ? ' · fading, revise it' : ''}${s.done ? ' · complete' : ''}${a !== null ? ` · question ${s.k || 0}/${s.a} (${a}%)` : ''}</small></div>
           <div class="kl-dots" role="group" aria-label="Confidence for ${esc(c.name)}">${[1, 2, 3, 4, 5].map(n => `<button data-a="conf" data-id="${c.id}" data-v="${n}" class="${n <= v ? 'on' : ''}" aria-label="${CONF[n]}" title="${CONF[n]}"></button>`).join('')}</div>
           <div class="kl-ch-act"><button data-a="studied" data-id="${c.id}" aria-pressed="${on}" title="Studied today">🌙</button><button data-a="pyq" data-id="${c.id}" data-ok="1" title="Correct question">✔</button><button data-a="pyq" data-id="${c.id}" data-ok="0" title="Wrong question">✘</button><button data-a="summon" data-id="${c.id}" title="Summon as boss">⚔</button><button data-a="done" data-id="${c.id}" title="Chapter complete: take Iroha's exam">🎓</button></div></div>`;
       }).join('') + '</div>';
     }
+    if (!found) html += `<p class="kl-empty">${q ? `No chapter matches "${esc(chq.trim())}".` : 'Nothing here right now. Turn off Weak chapters only to see them all.'}</p>`;
     return html;
   }
   function pBosses() {
@@ -4272,7 +4583,7 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
   function pStickers() {
     const n = ST.filter(t => L.stk[t[0]]).length;
     const look = localStorage.getItem('kg-look') === 'princess' ? 'princess' : 'casual';
-    return `${L.stk['princess-look'] ? `<div class="kl-row kl-card"><b>Kaguya's look</b><button data-a="look" data-v="casual" aria-pressed="${look === 'casual'}">Casual</button><button data-a="look" data-v="princess" aria-pressed="${look === 'princess'}">👘 Princess</button></div>` : ''}<p class="kl-intro">${n} of ${ST.length} collected. Tap a collected sticker to hear what they said.</p><div class="kl-stickers">${ST.map(t => L.stk[t[0]]
+    return `${L.stk['princess-look'] ? `<div class="kl-row kl-card"><b>Kaguya's look</b><button data-a="look" data-v="casual" aria-pressed="${look === 'casual'}">Casual</button><button data-a="look" data-v="princess" aria-pressed="${look === 'princess'}">👘 Princess</button></div>` : ''}<p class="kl-intro">${n} of ${ST.length} collected. Tap a collected sticker to hear what they said.</p><span class="kl-meter kg-stkmeter"><i style="width:${Math.round(n * 100 / ST.length)}%"></i></span><div class="kl-stickers">${[...ST].sort((a, b) => !!L.stk[b[0]] - !!L.stk[a[0]]).map(t => L.stk[t[0]]
       ? `<button class="kl-stk on" data-a="stk" data-id="${t[0]}"><span>${t[1]}</span><b>${esc(t[2])}</b><small>${esc(L.stk[t[0]])}</small></button>`
       : `<div class="kl-stk"><span>🔒</span><b>${esc(t[2])}</b><small>${esc(t[3])}</small></div>`).join('')}</div>`;
   }
@@ -4436,6 +4747,7 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
   });
   // keep exam answers safe while you type
   root.addEventListener('input', e => { if (e.target.id === 'kl-exam-ans' && L.exam) { L.exam.ans = e.target.value; save(); } });
+  root.addEventListener('input', e => { if (e.target.id !== 'kl-chq') return; chq = e.target.value; const at = e.target.selectionStart; render(); const box = document.getElementById('kl-chq'); if (box) { box.focus(); box.setSelectionRange(at, at); } });
   root.addEventListener('submit', e => {
     e.preventDefault(); const f = e.target, v = Object.fromEntries(new FormData(f)), d = today();
     if (window.MoonLab?.FORMS[f.dataset.f]) return window.MoonLab.FORMS[f.dataset.f](v, f);
@@ -6268,13 +6580,19 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
     if (el) el.textContent = `${me} ${M.hist().chain}-day chain · ${got >= need ? 'today counts ✓' : `${Math.max(0, need - got)} min until today counts`}${b && !M.isNight() ? ` · ${b.title}, ${Math.floor(left / 60) ? Math.floor(left / 60) + 'h ' : ''}${left % 60}m left` : ''}`;
     const dot = bar.querySelector('[data-sec="study"] .kg-dot'); if (dot) dot.hidden = !M.L.ask.q;
   }
+  // each page reopens on the tab you left it on
+  const LAST = 'kg-last-tabs'; let last = {};
+  try { last = JSON.parse(localStorage.getItem(LAST) || '{}') || {}; } catch (e) {}
+  addEventListener('moonlab:render', e => { const d = e.detail; if (d && d.section && d.tab && last[d.section] !== d.tab) { last[d.section] = d.tab; try { localStorage.setItem(LAST, JSON.stringify(last)); } catch (e2) {} } });
   let cur = '';
   function go(sec, tab) {
     if (!NAV.some(n => n[0] === sec)) sec = 'today';
     const changed = sec !== cur; cur = sec;
     for (const [id] of NAV) document.body.classList.toggle('kg-sec-' + id, id === sec);
     for (const a of bar.querySelectorAll('[data-sec]')) a.setAttribute('aria-current', a.dataset.sec === sec ? 'page' : 'false');
-    place(sec); M.show(sec, tab);
+    place(sec); M.show(sec, tab || last[sec]);
+    window.__kgTitle = (sec === 'today' ? '' : NAV.find(n => n[0] === sec)[2] + ' · ') + 'Kaguya Desk'; if (!document.hidden) document.title = window.__kgTitle;
+    if (changed) { main.classList.remove('kg-page-in'); void main.offsetWidth; main.classList.add('kg-page-in'); }
     if (location.hash.slice(1) !== sec) history.replaceState(null, '', '#' + sec);
     if (changed) window.scrollTo({ top: 0 });
     status();
@@ -6314,6 +6632,32 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
     return `<svg viewBox="-46 -46 92 92" aria-hidden="true"><circle r="${r}" class="kgs-moon-dark"/><path d="${d}" class="kgs-moon-lit" ${m.waning ? 'transform="scale(-1,1)"' : ''}/><g class="kgs-craters"><circle cx="-12" cy="-14" r="6"/><circle cx="13" cy="8" r="8"/><circle cx="-6" cy="18" r="4"/><circle cx="20" cy="-18" r="3.5"/></g></svg>`;
   }
 
+  // the browser tab's little icon shows tonight's moon too
+  function moonFavicon(m) {
+    const r = 46, p = m.waning ? Math.PI * 2 - m.phase : m.phase, rx = (r * Math.abs(Math.cos(p))).toFixed(2);
+    const d = `M0,${-r} A${r},${r} 0 0 1 0,${r} A${rx},${r} 0 0 ${p > Math.PI / 2 ? 1 : 0} 0,${-r} Z`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-50 -50 100 100"><circle r="${r}" fill="#2a2652"/><path d="${d}" fill="#f8edc8"${m.waning ? ' transform="scale(-1,1)"' : ''}/></svg>`;
+    let link = document.querySelector('link[rel="icon"]');
+    if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.append(link); }
+    link.type = 'image/svg+xml'; link.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+  const MOON_LINES = {
+    'New moon': "no moon tonight. it's just being shy. i know the feeling. (i don't.)",
+    'Waxing crescent': "see that little sliver? it's growing. slowly is still growing, No.1.",
+    'First quarter': 'half a moon. half is still plenty.',
+    'Waxing gibbous': "almost full! the whole sky's getting ready for me. i mean, for it.",
+    'Full moon': "FULL MOON! that's my hometown at its absolute best. you're welcome.",
+    'Waning gibbous': "it's shrinking a little, but it's still showing off.",
+    'Last quarter': 'half a moon again. even the moon takes it slower sometimes.',
+    'Waning crescent': 'a tiny moon tonight. resting up before it comes back. very smart of it.'
+  };
+
+  function nextFullMoon() {
+    const age = (((Date.now() - NEW_MOON) / 864e5) % SYNODIC + SYNODIC) % SYNODIC, half = SYNODIC / 2;
+    const days = age < half ? half - age : SYNODIC + half - age;
+    return new Date(Date.now() + days * 864e5).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
   /* ---------- scenery, drawn here so nothing is copied from anywhere ---------- */
   function grove(seed, mirror) {
     const r = rng(seed); let out = '';
@@ -6335,8 +6679,9 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
   }
   function flies() {
     const r = rng(19); let out = '';
-    for (let i = 0; i < 7; i++) out += `<i style="left:${(6 + r() * 88).toFixed(1)}%;bottom:${(8 + r() * 34).toFixed(1)}%;--fly:${(7 + r() * 8).toFixed(1)}s;--from:${(-r() * 9).toFixed(1)}s"></i>`;
-    return `<div class="kgs-flies" aria-hidden="true">${out}</div>`;
+    for (let i = 0; i < 12; i++) out += `<i style="left:${(6 + r() * 88).toFixed(1)}%;bottom:${(8 + r() * 34).toFixed(1)}%;--fly:${(7 + r() * 8).toFixed(1)}s;--from:${(-r() * 9).toFixed(1)}s"></i>`;
+    const m = new Date().getMonth(), season = m === 11 || m === 0 ? ' snow' : m === 2 || m === 3 ? ' petals' : '';
+    return `<div class="kgs-flies${season}" aria-hidden="true">${out}</div>`;
   }
 
   /* ---------- sky colours: the time of day, tinted by the theme you picked ---------- */
@@ -6349,7 +6694,7 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
   function skyColours() {
     let theme = 'rose'; try { theme = JSON.parse(localStorage.getItem('ame-habit-v1') || '{}').settings?.theme || 'rose'; } catch (e) {}
     const set = THEME[theme] || THEME.rose, h = new Date().getHours();
-    return { c: h >= 5 && h < 9 ? set.morn : h >= 9 && h < 16 ? set.day : h >= 16 && h < 19 ? set.dusk : set.night, night: h >= 19 || h < 5 };
+    return { theme, c: h >= 5 && h < 9 ? set.morn : h >= 9 && h < 16 ? set.day : h >= 16 && h < 19 ? set.dusk : set.night, night: h >= 19 || h < 5 };
   }
 
   /* ---------- what they say today: one steady pair of lines per day, until something else happens ---------- */
@@ -6364,22 +6709,109 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
     if (day === 0) return ['sunday! i declare a royal holiday.', 'Rest properly. That is the whole assignment.'];
     return [of(["we're live, No.1! let's make today a good episode.", "your happy ending needs today's page. no pressure. some pressure.", "i believe in you so loudly that iroha asked me to stop."]), of(['One task, then the next one. That is all a day is.', 'Write the units. Check the signs. Then we talk.', 'I ran worse days than this one in school. Start small.'])];
   }
+  const isBirthday = () => { const d = new Date(); return d.getMonth() === 9 && d.getDate() === 31; };
+  function lanterns() {
+    const r = rng(1031); let out = '';
+    for (let i = 0; i < 14; i++) out += `<i style="left:${(3 + r() * 94).toFixed(1)}%;--up:${(13 + r() * 12).toFixed(1)}s;--from:${(-r() * 24).toFixed(1)}s;--size:${(.7 + r() * .7).toFixed(2)}"></i>`;
+    return `<div class="kgs-lanterns" aria-hidden="true">${out}</div>`;
+  }
   function greeting() {
+    if (isBirthday()) return 'Happy birthday, No.1.';
+    if (M.isNight()) return 'Still up, No.1?';
     const h = new Date().getHours();
     return h < 5 ? "It's late, No.1." : h < 12 ? 'Good morning, No.1.' : h < 17 ? 'Good afternoon, No.1.' : h < 22 ? 'Good evening, No.1.' : "It's getting late, No.1.";
   }
 
+  // one small lantern on the bamboo for each day of the chain, so the scene grows with you
+  let chainDrawn = -1;
+  function chainLanterns() {
+    let chain = 0; try { chain = M.hist().chain || 0; } catch (e) {}
+    const el = $('kgs-chain'); if (!el || chain === chainDrawn) return;
+    chainDrawn = chain;
+    const n = Math.min(chain, 14), r = rng(2718); let out = '';
+    for (let i = 0; i < n; i++) out += `<i style="left:${(i < 7 ? 2 + r() * 16 : 82 + r() * 15).toFixed(1)}%;top:${(12 + r() * 46).toFixed(1)}%;--from:${(-r() * 5).toFixed(1)}s"></i>`;
+    el.innerHTML = out;
+    el.title = chain ? `${chain}-day chain: a lantern for each day` : '';
+  }
+  function subLine() {
+    const d = new Date(), date = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    if (d.getMonth() === 9 && d.getDate() === 31) return date + ' · your birthday 🎂';
+    if (window.__kgLowest) return date;
+    if (window.__kgOnBreak) { const n = M.L.breakUntil ? M.gap(M.L.breakUntil, M.today()) : 0; return n > 0 ? `${date} · ${n} day${n === 1 ? '' : 's'} of rest left` : date; }
+    if (M.isNight()) return date + ' · sleep time';
+    const b = M.block(); if (!b) return date;
+    const m = d.getHours() * 60 + d.getMinutes(), t = (m < 630 ? m + 1440 : m) - 630, left = Math.max(0, b.end - t);
+    return `${date} · ${b.title}, ${Math.floor(left / 60) ? Math.floor(left / 60) + 'h ' : ''}${left % 60}m left`;
+  }
+
+  // how close today is to counting; not shown on rest days or hard days
+  function dayMeter() {
+    const el = $('kgs-meter'), d = M.today(), day = M.days()[d] || {};
+    if (window.__kgOnBreak || window.__kgLowest || window.__kgGentle || M.isNight() || new Date().getDay() === 0 || day.rested) { el.hidden = true; return; }
+    const need = window.StudyPlan ? window.StudyPlan.need(!!day.shortDay) : 576, got = Math.round(M.mins(d));
+    el.hidden = false;
+    el.querySelector('i').style.width = Math.min(100, got * 100 / Math.max(1, need)) + '%';
+    el.classList.toggle('done', got >= need);
+    el.querySelector('.txt').textContent = got >= need ? 'today counts ✓' : `${got} of ${need} min`;
+  }
+
   /* ---------- build it once: it sits outside the page panels, so re-renders don't restart it ---------- */
   const scene = document.createElement('section'); scene.id = 'kg-scene'; scene.setAttribute('aria-label', "Today's sky, with Kaguya and Iroha");
-  scene.innerHTML = `${stars()}<div class="kgs-glow" aria-hidden="true"></div><div class="kgs-moon" id="kgs-moon"></div>
+  scene.innerHTML = `${stars()}<div class="kgs-glow" aria-hidden="true"></div><button type="button" class="kgs-moon" id="kgs-moon" title="Tonight's moon"></button><div class="kgs-shoot" id="kgs-shoot" aria-hidden="true"></div>
     <svg class="kgs-hills" viewBox="0 0 1000 120" preserveAspectRatio="none" aria-hidden="true"><path class="b" d="M0,70 C160,20 300,90 470,55 C640,20 800,80 1000,40 V120 H0Z"/><path class="f" d="M0,95 C200,60 380,110 560,88 C720,68 860,104 1000,80 V120 H0Z"/></svg>
-    ${grove(4242, false)}${grove(9191, true)}${flies()}
-    <div class="kgs-copy"><p class="kgs-eyebrow" id="kgs-phase"></p><h1 id="kgs-hello"></h1></div>
+    ${isBirthday() ? lanterns() : ''}${grove(4242, false)}${grove(9191, true)}<div class="kgs-chain" id="kgs-chain" aria-hidden="true"></div>${flies()}
+    <button type="button" class="kgs-live" id="kgs-live" title="Kaguya is live" aria-label="Kaguya is live. One viewer: you."><i></i>LIVE<span>· 1 viewer</span></button><div class="kgs-copy"><p class="kgs-eyebrow" id="kgs-phase"></p><h1 id="kgs-hello"></h1><p class="kgs-sub" id="kgs-sub"></p><div class="kgs-meter" id="kgs-meter" hidden><span class="bar"><i></i></span><span class="txt"></span><button type="button" class="kgs-cta" id="kgs-cta" title="Start a focus session">▶ Start</button></div></div>
     <div class="kgs-talk"><p class="kgs-say k" id="kgs-say-k"><b>Kaguya</b><span></span></p><p class="kgs-say i" id="kgs-say-i"><b>Iroha</b><span></span></p></div>
-    <div class="kgs-cast"><button type="button" class="kgs-who i" id="kgs-who-i" aria-label="Talk to Iroha"><img alt="" draggable="false" src="${esc(KG.iroha.desk || KG.iroha.idle)}"></button><button type="button" class="kgs-who k" id="kgs-who-k" aria-label="Talk to Kaguya"><img alt="" draggable="false" src="${esc(KG.kaguya.idle)}"></button></div>`;
+    <div class="kgs-cast"><button type="button" class="kgs-who i" id="kgs-who-i" aria-label="Talk to Iroha" title="Talk to Iroha"><img alt="" draggable="false" src="${esc(KG.iroha.desk || KG.iroha.idle)}"></button><button type="button" class="kgs-who k" id="kgs-who-k" aria-label="Talk to Kaguya" title="Talk to Kaguya"><img alt="" draggable="false" src="${esc(KG.kaguya.idle)}"></button></div>`;
   main.prepend(scene);
+  const STRIP = {
+    study: ['i', ['Units first. Excuses never.', 'If you can derive it cold, you know it.', 'One clean page beats ten rushed ones.'], ['This page can wait. So can you.']],
+    progress: ['k', ["look at you go. i'm clipping all of this.", 'every square is a little episode of you.', 'numbers! i love numbers when they are about you.'], ["no numbers needed this week. you're doing the rest thing perfectly."]],
+    plan: ['i', ['A plan you can keep beats a plan you admire.', 'Decide the next task. Then only that one.', 'Leave room for real life. I learned that late.'], ['The only plan right now is rest.']],
+    company: ['k', ['no studying in here. house rules.', "this is my favourite room. it has you in it.", 'what do you want to do? anything but homework.'], ['no studying in here. house rules.']],
+    settings: ['k', ['press things! i dare you.', "make it comfy. i'll judge your theme either way.", 'this is where i keep all the buttons.'], ['make it comfy. rest is easier when it looks nice.']]
+  };
+  const strip = document.createElement('section'); strip.id = 'kg-strip'; strip.setAttribute('aria-label', 'Page title');
+  strip.innerHTML = `${stars()}<img class="kgst-face" id="kgst-face" alt="" draggable="false"><div class="kgst-copy"><h2 id="kgst-title"></h2><p id="kgst-line"></p></div>`;
+  scene.after(strip);
+  function paintStrip(sec) {
+    const s = STRIP[sec]; if (!s) return;
+    const seed = Math.floor(Date.parse(M.today()) / 864e5) || 0, list = window.__kgOnBreak ? s[2] : s[1], who = s[0] === 'k' ? 'Kaguya' : 'Iroha';
+    $('kgst-title').textContent = sec[0].toUpperCase() + sec.slice(1);
+    $('kgst-line').textContent = list[seed % list.length];
+    $('kgst-line').className = s[0];
+    const face = s[0] === 'k' ? KG.kaguya.idle : KG.iroha.desk || KG.iroha.idle, f = $('kgst-face');
+    if (f.getAttribute('src') !== face) f.setAttribute('src', face);
+    f.title = who; f.className = 'kgst-face ' + s[0];
+  }
+  addEventListener('moonlab:render', e => paintStrip(e.detail?.section));
+  // the same night sits quietly behind a focus session
+  const focusSky = document.createElement('div'); focusSky.id = 'kg-focus-sky'; focusSky.setAttribute('aria-hidden', 'true');
+  focusSky.innerHTML = `${stars()}<div class="kgs-moon" id="kgf-moon"></div>${grove(777, false)}${grove(555, true)}`;
+  document.body.prepend(focusSky);
+  // the quiet room in Company gets the same night
+  new MutationObserver(() => {
+    const room = $('kg-room'); if (!room || room.querySelector('.kg-room-sky')) return;
+    const sky = focusSky.cloneNode(true); sky.removeAttribute('id'); sky.classList.add('kg-room-sky'); sky.querySelector('#kgf-moon')?.removeAttribute('id'); room.prepend(sky);
+  }).observe(document.body, { childList: true });
   $('kgs-who-k').onclick = () => $('ame-gif')?.click();
   $('kgs-who-i').onclick = () => $('iroha-gif')?.click();
+  const LIVE_LINES = ["one viewer, and it's the only one i wanted. don't leave.", 'chat is very quiet today. chat is you. say something!', "you're my whole audience, No.1. no pressure. some pressure.", "iroha says this doesn't count as a stream. iroha is wrong.", 'thanks for tuning in. the next segment is: me, being delightful.'];
+  let liveAt = 0;
+  $('kgs-live').onclick = () => { window.__kaguyaSay?.(LIVE_LINES[liveAt++ % LIVE_LINES.length], { force: 1 }); };
+  $('kgs-cta').onclick = () => { const f = $('hb-start'); if (!f) return; f.scrollIntoView({ block: 'center', behavior: document.body.classList.contains('kg-calm') ? 'auto' : 'smooth' }); f.elements.task?.focus({ preventScroll: true }); };
+  $('kgs-moon').onclick = () => { const line = isBirthday() ? 'the moon came out specially for your birthday. i asked it to. you are welcome.' : MOON_LINES[moonNow().name]; if (line) window.__kaguyaSay?.(line, { force: 1 }); };
+  // now and then, on a clear night, a shooting star
+  (function star() {
+    setTimeout(() => {
+      const s = $('kgs-shoot');
+      if (scene.classList.contains('night') && document.body.classList.contains('kg-scene-on') && !document.hidden && !document.body.classList.contains('kg-calm') && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        s.style.left = 8 + Math.random() * 60 + '%'; s.style.top = 4 + Math.random() * 26 + '%';
+        s.classList.remove('run'); void s.offsetWidth; s.classList.add('run');
+      }
+      star();
+    }, 25000 + Math.random() * 50000);
+  })();
 
   /* ---------- while the scene is on screen it replaces the floating pair, so they aren't shown twice ---------- */
   const said = { k: null, i: null };
@@ -6388,13 +6820,20 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
     const [k, i] = lines();
     $('kgs-say-k').lastElementChild.textContent = said.k || k;
     $('kgs-say-i').lastElementChild.textContent = said.i || i;
+    // on a phone whoever is speaking takes the full width, so a long line never gets cut off
+    $('kgs-say-k').classList.toggle('live', !!said.k); $('kgs-say-i').classList.toggle('live', !!said.i);
+    $('kgs-say-k').parentElement.classList.toggle('one-live', !!said.k !== !!said.i);
     const away = !!$('iroha-widget')?.hidden; // after 1:00 she's gone for the night
     $('kgs-who-i').hidden = away; $('kgs-say-i').hidden = away;
+    // Kaguya's expression changes while she's talking
+    const kImg = $('kgs-who-k').firstElementChild, want = said.k && KG.kaguya.talking ? KG.kaguya.talking : KG.kaguya.idle;
+    if (kImg.getAttribute('src') !== want) kImg.setAttribute('src', want);
   }
   function mirror(who) {
     const b = bubbles[who]; if (!b) return;
     const name = b.querySelector('.kg-bubble-name, .ame-bubble-name');
     const text = b.classList.contains('show') ? b.textContent.replace(name?.textContent || '', '').trim() : null;
+    $('kgs-say-' + who).dataset.part = (text && b.dataset.part) || '';
     if (text !== said[who]) { said[who] = text; paint(); }
   }
   for (const who of ['k', 'i']) if (bubbles[who]) new MutationObserver(() => mirror(who)).observe(bubbles[who], { attributes: true, attributeFilter: ['class'], childList: true, characterData: true, subtree: true });
@@ -6403,11 +6842,16 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
   let moonKey = '';
   function tick() {
     const m = moonNow(), key = m.name + m.lit;
-    if (key !== moonKey) { moonKey = key; $('kgs-moon').innerHTML = moonSvg(m); $('kgs-phase').textContent = `${m.icon} ${m.name} · ${m.lit}% lit`; }
-    const { c, night } = skyColours();
-    scene.style.setProperty('--s1', c[0]); scene.style.setProperty('--s2', c[1]); scene.style.setProperty('--s3', c[2]);
+    if (key !== moonKey) { moonKey = key; moonFavicon(m); scene.classList.toggle('fullmoon', m.name === 'Full moon'); $('kgs-moon').setAttribute('aria-label', `Tonight's moon: ${m.name}. Tap for Kaguya's opinion.`); $('kgs-moon').title = `${m.name}. Next full moon: ${nextFullMoon()}`; $('kgs-moon').innerHTML = moonSvg(m); $('kgf-moon').innerHTML = moonSvg(m); $('kgs-phase').textContent = `${m.icon} ${m.name} · ${m.lit}% lit`; }
+    const { c, night, theme } = skyColours();
+    document.body.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', c[0]);
+    chainLanterns();
+    for (const el of [scene, $('kg-strip')]) { el.style.setProperty('--s1', c[0]); el.style.setProperty('--s2', c[1]); el.style.setProperty('--s3', c[2]); }
     scene.classList.toggle('night', night);
     $('kgs-hello').textContent = greeting();
+    $('kgs-sub').textContent = subLine();
+    dayMeter();
     paint();
   }
   tick(); setInterval(tick, 60000);
@@ -6438,7 +6882,9 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
     { w: $('iroha-widget'), c: $('iroha-chat'), a: $('iroha-gif'), x: $('iroha-close'), m: $('iroha-messages'), pk: 'iroha-pos-v1' }
   ].filter(p => p.w && p.c && p.a);
   if (!M || WHO.length < 2) return;
-  const GAP = 10, MAX_W = 340, MAX_H = 470, PHONE = 720;
+  const GAP = 10, MAX_W = 340, MAX_H = 470, BIG_W = 560, BIG_H = 720, PHONE = 720;
+  let bigs = {}; try { bigs = JSON.parse(localStorage.getItem('kg-chat-big') || '{}') || {}; } catch (e) {}
+  for (const p of WHO) p.big = !!bigs[p.pk];
   const isOpen = p => p.c.classList.contains('open');
   const phone = () => innerWidth <= PHONE;
   let order = WHO.filter(isOpen); // oldest first, so a new chat works around the one already there
@@ -6470,19 +6916,20 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
       for (const [k, v] of [['position', 'fixed'], ['left', left + 'px'], ['top', Math.max(8, c.bottom - 150) + 'px'], ['right', 'auto'], ['bottom', 'auto'], ['margin-bottom', '0']]) s.setProperty(k, v, 'important');
     }
   }
-  function layout() { place(); bubbles(); }
+  function layout() { place(); bubbles(); document.body.classList.toggle('kg-chat-full', phone() && order.some(p => isOpen(p) && p.big)); }
   function place() {
     const b = bounds(), open = order.filter(isOpen);
     if (phone()) {
       // one sheet above the pair: there's no room for two side by side
       const pair = WHO.map(avatar).filter(Boolean), floor = pair.length ? Math.min(...pair.map(a => a.y)) - GAP : b.bottom;
       const bottom = Math.max(b.top + 240, Math.min(b.bottom, floor)), h = Math.min(MAX_H, bottom - b.top);
-      for (const p of open) put(p, { x: 12, y: bottom - h, w: innerWidth - 24, h });
+      for (const p of open) put(p, p.big ? { x: 8, y: b.top, w: innerWidth - 16, h: b.bottom - b.top } : { x: 12, y: bottom - h, w: innerWidth - 24, h });
       return;
     }
-    const W = Math.min(MAX_W, b.right - b.left), H = Math.min(MAX_H, b.bottom - b.top), placed = [];
-    const clamp = r => ({ x: Math.max(b.left, Math.min(b.right - W, r.x)), y: Math.max(b.top, Math.min(b.bottom - H, r.y)), w: W, h: H });
+    const placed = [];
     for (const p of open) {
+      const W = Math.min(p.big ? BIG_W : MAX_W, b.right - b.left), H = Math.min(p.big ? BIG_H : MAX_H, b.bottom - b.top);
+      const clamp = r => ({ x: Math.max(b.left, Math.min(b.right - W, r.x)), y: Math.max(b.top, Math.min(b.bottom - H, r.y)), w: W, h: H });
       const box = p.w.getBoundingClientRect(), a = avatar(p), r = a || { x: box.left, y: box.top, w: box.width, h: Math.max(box.height, 1) };
       const tries = [{ x: r.x + r.w - W, y: r.y - H - GAP }, { x: r.x - W - GAP, y: r.y + r.h - H }, { x: r.x + r.w + GAP, y: r.y + r.h - H }, { x: r.x + r.w - W, y: r.y + r.h + GAP }];
       for (const q of placed) tries.push({ x: q.x - W - GAP, y: q.y }, { x: q.x + q.w + GAP, y: q.y });
@@ -6506,6 +6953,7 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
         order.push(p);
         if (phone()) for (const o of order) if (o !== p && isOpen(o)) o.x?.click();
         layout();
+        window.__kgPopDrop?.(p === WHO[0] ? 'k' : 'i'); // the whole message is right there now, so no leftover pieces
         requestAnimationFrame(() => { if (p.m) p.m.scrollTop = p.m.scrollHeight; }); // always open on the newest message
       } else if (!now && was) { order = order.filter(o => o !== p); later(); }
     }).observe(p.c, { attributes: true, attributeFilter: ['class'] });
@@ -6513,6 +6961,26 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
 
     /* ---------- drag a chat by its title bar and she comes with it ---------- */
     const head = p.c.querySelector('.ame-header,.iroha-header'); if (!head) continue;
+    /* her face on the title bar, and a typing box that grows with what you write */
+    const KG = window.__KG, face = document.createElement('img'); face.className = 'kg-chat-face'; face.alt = ''; face.draggable = false; face.src = p === WHO[0] ? KG.kaguya.idle : KG.iroha.desk || KG.iroha.idle; head.prepend(face);
+    const box = p.c.querySelector('textarea');
+    if (box) {
+      const fit = () => { box.style.height = 'auto'; box.style.height = Math.min(box.scrollHeight + 4, 130) + 'px'; };
+      // what you've typed survives a reload until you send it
+      const DRAFT = 'kg-draft-' + p.c.id;
+      try { const saved = localStorage.getItem(DRAFT); if (saved && !box.value) { box.value = saved; setTimeout(fit, 0); } } catch (e) {}
+      const keep = () => { try { if (box.value) localStorage.setItem(DRAFT, box.value); else localStorage.removeItem(DRAFT); } catch (e) {} };
+      box.addEventListener('input', keep);
+      box.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) setTimeout(keep, 0); });
+      p.c.querySelector('#ame-send,#iroha-send')?.addEventListener('click', () => setTimeout(keep, 0));
+      box.addEventListener('input', fit);
+      box.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) setTimeout(fit, 0); });
+      p.c.querySelector('#ame-send,#iroha-send')?.addEventListener('click', () => setTimeout(fit, 0));
+    }
+    /* a bigger box for long replies */
+    const bigBtn = document.createElement('button'); bigBtn.type = 'button'; bigBtn.className = 'kg-chat-big'; bigBtn.textContent = '⤢'; bigBtn.title = 'Bigger or smaller chat'; bigBtn.setAttribute('aria-label', 'Make this chat bigger or smaller'); bigBtn.setAttribute('aria-pressed', String(p.big));
+    bigBtn.onclick = () => { p.big = !p.big; bigBtn.setAttribute('aria-pressed', String(p.big)); bigs[p.pk] = p.big; try { localStorage.setItem('kg-chat-big', JSON.stringify(bigs)); } catch (e) {} layout(); if (p.m) p.m.scrollTop = p.m.scrollHeight; };
+    p.x?.before(bigBtn);
     let drag = null;
     head.addEventListener('pointerdown', e => {
       if (e.button || phone() || e.target.closest('button,input,select,a')) return;
@@ -6525,6 +6993,41 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
     const end = () => { if (!drag) return; drag = null; head.classList.remove('kg-dragging'); const r = p.w.getBoundingClientRect(); try { localStorage.setItem(p.pk, JSON.stringify({ x: r.left, y: r.top })); } catch (e) {} };
     head.addEventListener('pointerup', end); head.addEventListener('pointercancel', end);
   }
+  /* ---------- keep a line: save or copy anything they say ---------- */
+  const L = M.L; L.saved = L.saved || [];
+  const msgText = m => { const c = m.cloneNode(true); c.querySelector('.kg-msg-tools')?.remove(); return c.textContent.trim(); };
+  const isSaved = text => L.saved.some(x => x.text === text);
+  function addTools(box) {
+    for (const m of box.querySelectorAll('.ame-msg.ame:not(.kg-typing):not([data-tools])')) {
+      const text = msgText(m); if (!text) continue;
+      m.dataset.tools = '1';
+      const bar = document.createElement('span'); bar.className = 'kg-msg-tools';
+      bar.innerHTML = `<button type="button" data-act="save" title="Keep this line" aria-label="Keep this line" aria-pressed="${isSaved(text)}">${isSaved(text) ? '★' : '☆'}</button><button type="button" data-act="copy" title="Copy" aria-label="Copy this message">⧉</button>`;
+      m.append(bar);
+    }
+  }
+  for (const p of WHO) {
+    if (!p.m) continue;
+    addTools(p.m);
+    new MutationObserver(() => addTools(p.m)).observe(p.m, { childList: true });
+    p.m.addEventListener('click', e => {
+      const b = e.target.closest('.kg-msg-tools button'); if (!b) return;
+      const m = b.closest('.ame-msg'), text = msgText(m);
+      if (b.dataset.act === 'copy') {
+        navigator.clipboard?.writeText(text).then(() => { b.textContent = '✓'; setTimeout(() => { b.textContent = '⧉'; }, 1200); }).catch(() => {});
+        return;
+      }
+      const who = m.dataset.who || (p === WHO[0] ? 'kaguya' : 'iroha');
+      if (isSaved(text)) L.saved = L.saved.filter(x => x.text !== text);
+      else L.saved.unshift({ who, text: text.slice(0, 1200), at: M.today() });
+      L.saved = L.saved.slice(0, 200); M.save();
+      const on = isSaved(text); b.textContent = on ? '★' : '☆'; b.setAttribute('aria-pressed', String(on));
+    });
+  }
+  const memories = M.PANELS.memories;
+  if (memories) M.PANELS.memories = () => memories() + `<section class="kl-card"><h3>Lines you saved <small>${L.saved.length}</small></h3>${L.saved.length ? L.saved.map((x, i) => `<blockquote class="kg-saved ${x.who === 'iroha' ? 'i' : 'k'}"><p>${M.esc(x.text)}</p><footer>${x.who === 'iroha' ? 'Iroha' : 'Kaguya'} · ${M.esc(x.at)}<button data-a="kgunsave" data-v="${i}" title="Remove" aria-label="Remove this line">×</button></footer></blockquote>`).join('') : '<p class="kl-small">Tap ☆ on anything they say in chat and it stays here.</p>'}</section>`;
+  M.ACTIONS.kgunsave = b => { L.saved.splice(Number(b.dataset.v), 1); M.save(); M.render(); };
+
   new MutationObserver(later).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   addEventListener('resize', () => {
     for (const p of WHO) if (p.w.style.left) { // a smaller window never strands anyone off screen
@@ -6542,12 +7045,231 @@ body.kg-shell #moon-lab .kl-ch{transition:border-color .15s,background .15s}
 
   /* ---------- Settings: send them home ---------- */
   const companions = M.PANELS.companions;
-  if (companions) M.PANELS.companions = () => companions() + `<section class="kl-card"><h3>Where they stand</h3><p class="kl-small">Drag either of them, or a chat by its title bar, and they remember the spot.</p><button data-a="kgresetpos">Put them back in the corner</button></section>`;
+  const popSpeed = () => { try { return localStorage.getItem('kg-pop-speed') || 'normal'; } catch (e) { return 'normal'; } };
+  if (companions) M.PANELS.companions = () => companions() + `<section class="kl-card"><h3>Speech bubbles</h3><p class="kl-small">Long messages appear one piece at a time. Choose how long each piece stays up. Pointing at a bubble holds it until you move away.</p><div class="kl-seg" role="group" aria-label="Bubble speed">${[['relaxed', 'Relaxed'], ['normal', 'Normal'], ['quick', 'Quick']].map(([v, l]) => `<button data-a="kgpopspeed" data-v="${v}" aria-pressed="${popSpeed() === v}">${l}</button>`).join('')}</div></section><section class="kl-card"><h3>Where they stand</h3><p class="kl-small">Drag either of them, or a chat by its title bar, and they remember the spot.</p><button data-a="kgresetpos">Put them back in the corner</button></section><section class="kl-card"><h3>Start a chat fresh</h3><p class="kl-small">Clears that chat's messages on this device. Your Company → Memories stay.</p><div class="kl-row"><button data-a="kgclearchat" data-v="k">Clear Kaguya's chat</button><button data-a="kgclearchat" data-v="i">Clear Iroha's chat</button></div></section>`;
+  M.ACTIONS.kgpopspeed = b => {
+    try { localStorage.setItem('kg-pop-speed', b.dataset.v); } catch (e) {}
+    M.render(); window.__kaguyaSay?.({ relaxed: "okay, nice and slow. plenty of time to read every word i say.", normal: 'back to my usual speed!', quick: 'fast mode! try to keep up, No.1.' }[b.dataset.v]);
+  };
+  M.ACTIONS.kgclearchat = b => {
+    const name = b.dataset.v === 'k' ? 'Kaguya' : 'Iroha';
+    if (!confirm(`Clear your chat with ${name}? This can't be undone.`)) return;
+    window.__kgClearChat?.(b.dataset.v); b.textContent = 'Cleared ✓'; b.disabled = true;
+  };
   M.ACTIONS.kgresetpos = () => {
     for (const p of WHO) { try { localStorage.removeItem(p.pk); } catch (e) {} for (const k of ['left', 'top', 'right', 'bottom']) p.w.style.removeProperty(k); }
     later(); window.__kaguyaSay?.('back in the corner! good view from here.');
   };
   layout();
+})();
+
+</script>
+<script id="kg-nav-script">
+/* ===== Getting around: find anything, page keys, back to top, display settings ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab, $ = id => document.getElementById(id), esc = M && M.esc;
+  if (!M || !M.go) return;
+  const PAGES = [['today', 'Today'], ['study', 'Study'], ['progress', 'Progress'], ['plan', 'Plan'], ['company', 'Company'], ['settings', 'Settings']];
+  const typing = el => el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
+  const clean = l => String(typeof l === 'function' ? l() : l).replace(/<[^>]+>/g, '').replace(/^[^\p{L}\p{N}]+/u, '').trim();
+
+  const THEMES = [['rose', 'Moonlit night', '#ff6fae'], ['autumn', 'Lantern gold', '#f7a64a'], ['winter', 'Tsukuyomi neon', '#4fc6f5'], ['spring', 'Bamboo grove', '#6fd190']];
+  const curTheme = () => { try { return JSON.parse(localStorage.getItem('ame-habit-v1') || '{}').settings?.theme || 'rose'; } catch (e) { return 'rose'; } };
+  const setTheme = v => { window.HabitDesk?.setTheme?.(v); M.render(); };
+
+  // the page knows which tab is open, so each tab shows only what belongs to it
+  addEventListener('moonlab:render', e => { if (e.detail?.tab) document.body.dataset.tab = e.detail.tab; });
+
+  /* ---------- find anything: Ctrl+K or / ---------- */
+  function items() {
+    const out = [];
+    for (const [sec, name] of PAGES) {
+      out.push({ label: name, hint: 'Page', run: () => M.go(sec) });
+      const tabs = (M.SECTIONS[sec] || []).filter(([id]) => M.PANELS[id]);
+      if (tabs.length > 1) for (const [id, label] of tabs) out.push({ label: clean(label), hint: name, run: () => M.go(sec, id) });
+    }
+    out.push({ label: 'Talk to Kaguya', hint: 'Chat', run: () => { if (!$('ame-chat').classList.contains('open')) $('ame-gif').click(); } });
+    if (!$('iroha-widget')?.hidden) out.push({ label: 'Talk to Iroha', hint: 'Chat', run: () => { if (!$('iroha-chat').classList.contains('open')) $('iroha-gif').click(); } });
+    if ($('mp-widget')?.classList.contains('mp-live')) out.push({ label: 'Stop the music', hint: 'Music', run: () => window.DeskMusic?.stop() });
+    else out.push({ label: 'Open the music player', hint: 'Music', run: () => $('mp-toggle')?.click() });
+    for (const [v, name] of THEMES) if (curTheme() !== v) out.push({ label: 'Theme: ' + name, hint: 'Look', run: () => setTheme(v) });
+    out.push({ label: 'Jump to the current block', hint: 'Plan', run: () => {
+      M.go('plan');
+      setTimeout(() => { const li = [...($('habit-original')?.querySelectorAll('li') || [])].find(x => /\bNow\b/.test((x.querySelector('p') || x).textContent)); if (li) li.scrollIntoView({ block: 'center' }); }, 120);
+    } });
+    const store = window.DeskStore?.getState();
+    if (store) out.push({ label: store.sound ? 'Turn sound off' : 'Turn sound on', hint: 'Sound', run: () => window.DeskStore.getState().toggleSound() });
+    return out;
+  }
+  let pal = null, back = null;
+  function close() { if (!pal) return; pal.remove(); pal = null; back?.focus?.(); back = null; }
+  function open() {
+    if (pal) return close();
+    back = document.activeElement;
+    pal = document.createElement('div'); pal.id = 'kg-pal'; pal.setAttribute('role', 'dialog'); pal.setAttribute('aria-modal', 'true'); pal.setAttribute('aria-label', 'Find a page or action');
+    pal.innerHTML = `<div class="kg-pal-box"><input id="kg-pal-q" type="text" autocomplete="off" placeholder="Where to? Try recall, mocks, letters…" aria-label="Search pages and actions" role="combobox" aria-expanded="true" aria-controls="kg-pal-list"><ul id="kg-pal-list" role="listbox"></ul><p class="kg-pal-keys"><b>↑↓</b> choose <b>Enter</b> open <b>Esc</b> close <span>· keys <b>1–6</b> switch pages</span></p></div>`;
+    document.body.append(pal);
+    const q = $('kg-pal-q'), list = $('kg-pal-list'), all = items(); let cur = 0, shown = all;
+    const draw = () => {
+      const v = q.value.trim().toLowerCase();
+      shown = !v ? all : all.filter(x => (x.label + ' ' + x.hint).toLowerCase().includes(v)).sort((a, b) => b.label.toLowerCase().startsWith(v) - a.label.toLowerCase().startsWith(v));
+      cur = Math.min(cur, Math.max(0, shown.length - 1));
+      list.innerHTML = shown.length ? shown.map((x, i) => `<li role="option" id="kg-pal-${i}" aria-selected="${i === cur}" data-i="${i}"><span>${esc(x.label)}</span><small>${esc(x.hint)}</small></li>`).join('') : '<li class="none">Nothing by that name.</li>';
+      q.setAttribute('aria-activedescendant', shown.length ? 'kg-pal-' + cur : '');
+      list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+    };
+    const go = i => { const it = shown[i]; if (!it) return; back = null; close(); it.run(); };
+    q.addEventListener('input', () => { cur = 0; draw(); });
+    q.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown') { cur = Math.min(shown.length - 1, cur + 1); draw(); e.preventDefault(); }
+      else if (e.key === 'ArrowUp') { cur = Math.max(0, cur - 1); draw(); e.preventDefault(); }
+      else if (e.key === 'Enter') { go(cur); e.preventDefault(); }
+      else if (e.key === 'Escape') { close(); e.preventDefault(); e.stopPropagation(); }
+    });
+    list.addEventListener('click', e => { const li = e.target.closest('[data-i]'); if (li) go(Number(li.dataset.i)); });
+    pal.addEventListener('pointerdown', e => { if (e.target === pal) close(); });
+    draw(); q.focus();
+  }
+  addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'k') { open(); e.preventDefault(); return; }
+    if (e.key === 'Escape' && $('kl-mood')) { [...$('kl-mood').querySelectorAll('button')].find(b => /^ask me later/i.test(b.textContent.trim()))?.click(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || pal || document.body.classList.contains('habit-shh') || $('kl-mood')) return;
+    if (e.key === '/') { open(); e.preventDefault(); }
+    else if (/^[1-6]$/.test(e.key)) M.go(PAGES[Number(e.key) - 1][0]);
+  });
+  const bar = $('kg-bar');
+  if (bar) {
+    const find = document.createElement('button'); find.id = 'kg-find'; find.type = 'button'; find.title = 'Find anything (Ctrl+K)'; find.setAttribute('aria-label', 'Find a page or action');
+    find.innerHTML = '<svg viewBox="0 0 24 24" class="kg-ic" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.8-3.8"/></svg>';
+    find.onclick = open; bar.append(find);
+  }
+
+  /* the sticky tab row sits exactly under the top bar, whatever its height */
+  const barHeight = () => { if (bar && bar.offsetHeight) document.documentElement.style.setProperty('--kg-bar-h', bar.offsetHeight + 'px'); };
+  barHeight(); addEventListener('resize', barHeight);
+
+  /* ---------- on a phone, swipe sideways to change page ---------- */
+  let sw = null;
+  addEventListener('touchstart', e => {
+    sw = null;
+    if (e.touches.length !== 1 || pal || document.body.classList.contains('habit-shh')) return;
+    if (e.target.closest('input,textarea,select,.kl-tabs,.kl-scroll,.kl-palette,#ame-chat,#iroha-chat,#mp-panel,#ame-gif,#iroha-gif,#kl-mood')) return;
+    sw = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+  }, { passive: true });
+  addEventListener('touchend', e => {
+    if (!sw || !e.changedTouches.length) return;
+    const dx = e.changedTouches[0].clientX - sw.x, dy = e.changedTouches[0].clientY - sw.y, quick = Date.now() - sw.t < 600; sw = null;
+    if (!quick || Math.abs(dx) < 90 || Math.abs(dy) > 50) return;
+    const i = PAGES.findIndex(p => document.body.classList.contains('kg-sec-' + p[0])), next = PAGES[i + (dx < 0 ? 1 : -1)];
+    if (i >= 0 && next) M.go(next[0]);
+  }, { passive: true });
+
+  const brand = bar?.querySelector('.kg-brand b');
+  if (brand) { brand.style.cursor = 'pointer'; brand.title = 'Go to Today'; brand.onclick = () => M.go('today'); }
+
+  const skip = document.createElement('a'); skip.id = 'kg-skip'; skip.href = '#kg-main'; skip.textContent = 'Skip to content';
+  skip.onclick = e => { e.preventDefault(); const m = $('kg-main'); m.setAttribute('tabindex', '-1'); m.focus({ preventScroll: true }); m.scrollIntoView(); };
+  document.body.prepend(skip);
+
+  /* ---------- back to top on long pages ---------- */
+  const top = document.createElement('button'); top.id = 'kg-top'; top.type = 'button'; top.textContent = '↑'; top.title = 'Back to top'; top.setAttribute('aria-label', 'Back to top');
+  top.onclick = () => scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches || document.body.classList.contains('kg-calm') ? 'auto' : 'smooth' });
+  document.body.append(top);
+  let topOn = false;
+  addEventListener('scroll', () => { const on = scrollY > 700; if (on !== topOn) { topOn = on; top.classList.toggle('show', on); } }, { passive: true });
+
+  /* ---------- during a focus session: a progress bar, and the time in the browser tab ---------- */
+  let wasFocus = false;
+  setInterval(() => {
+    const on = document.body.classList.contains('habit-shh');
+    if (!on) { if (wasFocus) { wasFocus = false; document.title = window.__kgTitle || 'Kaguya Desk'; } return; }
+    wasFocus = true;
+    const el = document.querySelector('#habit-desk .hb-timer'); if (!el) return;
+    let a = null; try { a = JSON.parse(localStorage.getItem('ame-habit-v1') || '{}').active; } catch (e) {}
+    if (!a) return;
+    let bar = el.nextElementSibling; if (!bar || !bar.classList.contains('kg-focusbar')) { bar = document.createElement('div'); bar.className = 'kg-focusbar'; bar.innerHTML = '<i></i>'; el.after(bar); }
+    const done = window.HabitCore?.elapsed ? window.HabitCore.elapsed(a) : a.accruedMs || 0;
+    bar.firstElementChild.style.width = Math.min(100, done * 100 / Math.max(1, a.targetMs || 1)) + '%';
+    document.title = el.textContent.trim() + ' · ' + (a.subject || 'focus');
+  }, 1000);
+
+  /* ---------- the schedule on Plan takes the subject colours ---------- */
+  const plan = $('habit-original');
+  if (plan) {
+    const tag = () => { for (const h of plan.querySelectorAll('li h3')) { const m = /^(Physics|Chemistry|Maths)\b/.exec(h.textContent.trim()), li = h.closest('li'); if (li && m && li.dataset.subj !== m[1]) li.dataset.subj = m[1]; } };
+    let queued = false;
+    new MutationObserver(() => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; tag(); }); }).observe(plan, { childList: true, subtree: true });
+    tag();
+  }
+
+  /* ---------- sync status and an offline notice, so you always know where your work is ---------- */
+  const cloud = document.createElement('button'); cloud.id = 'kg-cloud'; cloud.type = 'button'; cloud.hidden = true;
+  cloud.innerHTML = '<svg viewBox="0 0 24 24" class="kg-ic" aria-hidden="true"><path d="M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9.5a4.25 4.25 0 0 1-.75 8.5z"/></svg>';
+  cloud.onclick = () => M.go('settings', 'sync');
+  if (bar) bar.append(cloud);
+  function cloudTick() {
+    let s = {}; try { s = JSON.parse(localStorage.getItem('kg-sync') || '{}') || {}; } catch (e) {}
+    cloud.hidden = !s.code; if (!s.code) return;
+    const mins = s.ts ? Math.floor((Date.now() - s.ts) / 60000) : null;
+    const ago = mins === null ? 'not yet' : mins < 1 ? 'just now' : mins < 60 ? mins + ' min ago' : mins < 1440 ? Math.floor(mins / 60) + 'h ago' : new Date(s.ts).toLocaleDateString();
+    const label = navigator.onLine ? 'Last synced: ' + ago : "Offline. Sync will catch up when you're back.";
+    cloud.title = label; cloud.setAttribute('aria-label', label); cloud.classList.toggle('off', !navigator.onLine);
+  }
+  const off = document.createElement('div'); off.id = 'kg-offline'; off.setAttribute('role', 'status'); off.textContent = "You're offline. Your desk still saves here; chat and sync will wait.";
+  document.body.append(off);
+  const net = () => { off.classList.toggle('show', !navigator.onLine); cloudTick(); };
+  addEventListener('online', net); addEventListener('offline', net); net(); setInterval(cloudTick, 30000);
+
+  /* ---------- a one-time note about what changed, so nothing new goes unnoticed ---------- */
+  const NEW = 'kg-new-v1';
+  const newCard = function whatsNew() {
+    try { if (localStorage.getItem(NEW)) return ''; } catch (e) { return ''; }
+    return `<section class="kl-card kg-newcard"><p class="kl-eyebrow">✨ NEW ON YOUR DESK</p><h3>A few things to try</h3><ul class="kl-list">
+      <li><b>Find anything:</b> tap the magnifier at the top, or press Ctrl+K.</li>
+      <li><b>Two chats:</b> they sit side by side and follow Kaguya and Iroha around. ⤢ makes one bigger.</li>
+      <li><b>Paced bubbles:</b> long messages arrive piece by piece. Point at one to hold it. Speed is in Settings → Companions.</li>
+      <li><b>Your way:</b> theme swatches, text size and calm motion are in Settings → App. Your theme now colours the whole site.</li>
+      <li><b>Tap the moon</b> in the scene. It's tonight's real moon.</li></ul><button class="kl-primary" data-a="kgnewok">Got it</button></section>`;
+  };
+  M.TODAY.splice(0, 0, newCard);
+  M.ACTIONS.kgnewok = () => { try { localStorage.setItem(NEW, '1'); } catch (e) {} M.render(); };
+  M.render();
+
+  /* ---------- Dr. Iroha's lab note: one school-days tip a day, on Today ---------- */
+  const labNote = function labNote() {
+    const S = window.__kgSchool?.(); if (!S || window.__kgLowest) return '';
+    const seed = Math.floor(Date.parse(M.today()) / 864e5) || 0, list = window.__kgOnBreak ? S.rest : [...S.gap, ...S.morning, ...S.behind, ...S.late];
+    const face = window.__KG?.iroha.desk || window.__KG?.iroha.idle || '';
+    return `<section class="kl-card kg-labnote"><img src="${esc(face)}" alt="" draggable="false"><div><p class="kl-eyebrow">🧪 DR. IROHA'S LAB NOTE</p><p>${esc(list[seed % list.length])}</p></div></section>`;
+  };
+  M.TODAY.push(labNote);
+  M.render();
+
+  /* ---------- display settings ---------- */
+  const DK = 'kg-display';
+  let disp = { text: 'normal', motion: 'full', scene: true };
+  try { disp = Object.assign(disp, JSON.parse(localStorage.getItem(DK) || '{}')); } catch (e) {}
+  function apply() {
+    const b = document.body.classList;
+    b.toggle('kg-text-sm', disp.text === 'small'); b.toggle('kg-text-lg', disp.text === 'large');
+    b.toggle('kg-calm', disp.motion === 'calm'); b.toggle('kg-no-scene', !disp.scene);
+  }
+  apply();
+  const seg = (k, opts) => `<div class="kl-seg" role="group">${opts.map(([v, l]) => `<button data-a="kgdisp" data-k="${k}" data-v="${v}" aria-pressed="${String(disp[k]) === v}">${l}</button>`).join('')}</div>`;
+  const app = M.PANELS.app;
+  if (app) M.PANELS.app = () => `<section class="kl-card kl-stack"><p class="kl-eyebrow">DISPLAY</p><h3>Make it comfortable</h3>
+    <div class="kg-setrow"><b>Theme</b><div class="kl-seg kg-swatches" role="group">${THEMES.map(([v, l, c]) => `<button data-a="kgtheme" data-v="${v}" aria-pressed="${curTheme() === v}"><i style="background:${c}"></i>${l}</button>`).join('')}</div></div>
+    <div class="kg-setrow"><b>Text size</b>${seg('text', [['small', 'Small'], ['normal', 'Normal'], ['large', 'Large']])}</div>
+    <div class="kg-setrow"><b>Motion</b>${seg('motion', [['full', 'Full'], ['calm', 'Calm']])}</div>
+    <div class="kg-setrow"><b>Moonlit scene on Today</b>${seg('scene', [['true', 'Show'], ['false', 'Hide']])}</div>
+    <p class="kl-small">Calm stops the twinkling, swaying and sliding. These stay on this device only. Tip: press Ctrl+K to jump anywhere.</p></section>` + app();
+  M.ACTIONS.kgtheme = b => setTheme(b.dataset.v);
+  M.ACTIONS.kgdisp = b => {
+    const k = b.dataset.k; disp[k] = k === 'scene' ? b.dataset.v === 'true' : b.dataset.v;
+    try { localStorage.setItem(DK, JSON.stringify(disp)); } catch (e) {}
+    apply(); M.render();
+  };
 })();
 
 </script>
