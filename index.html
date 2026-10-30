@@ -1101,7 +1101,7 @@ window.__KG_BUILTIN = {
       renderSavedMessages();
       silenceGreet();
     } else {
-      const greeting = "oh! you clicked me! hi hi, No.1 ☾\ni'm kaguya. ask me anything, or just let me watch you study. that's fun too.";
+      const greeting = "oh! you clicked me! hi hi, No.1 🌙\ni'm kaguya. ask me anything, or just let me watch you study. that's fun too.";
       addMessage("ame", greeting);
       conversation.push({ role: "assistant", content: greeting });
       saveConversation();
@@ -1364,7 +1364,7 @@ window.__KG_BUILTIN = {
   function showBubble(t, typing) { bubble.textContent = t; bubble.classList.toggle("typing", !!typing); bubble.classList.add("show"); clearTimeout(bt); if (!typing) bt = setTimeout(() => bubble.classList.remove("show"), 5500 + t.length * 45); }
   function burst(ch, n = 8) {
     const r = gif.getBoundingClientRect();
-    for (let i = 0; i < n; i++) { const s = document.createElement("span"); s.className = "ame-spark"; s.textContent = pick([ch, "☾", "✦", "★"]);
+    for (let i = 0; i < n; i++) { const s = document.createElement("span"); s.className = "ame-spark"; s.textContent = pick([ch, "🌙", "✦", "★"]);
       s.style.left = r.left + r.width / 2 + "px"; s.style.top = r.top + r.height * .35 + "px";
       s.style.setProperty("--dx", (Math.random() * 160 - 80) + "px"); s.style.setProperty("--dy", -(40 + Math.random() * 110) + "px");
       document.body.appendChild(s); setTimeout(() => s.remove(), 1100); }
@@ -1414,7 +1414,7 @@ window.__KG_BUILTIN = {
     quality: ["sleep quality logged. thanks for being honest.", "noted how you slept. it matters more than you think."], energy: ["energy logged. low or high, i'd rather know.", "okay. i'll plan my cheering around that."],
     mock: ["mock logged: {v}. a number isn't you. what you do next is.", "{v}. i'm not judging the score. iroha is judging the error notebook."],
     note: ["you wrote a note. ...i read it.", "noted. literally. i'm keeping it."], goal: ["a goal, written down! now it's a promise.", "i saw that goal. i'll ask about it later."],
-    rest: ["rest logged. books closed. you listened to me. ☾", "good. rest counts. rest IS the work today."], unrest: ["un-rested? okay. don't sneak a mock paper in."],
+    rest: ["rest logged. books closed. you listened to me. 🌙", "good. rest counts. rest IS the work today."], unrest: ["un-rested? okay. don't sneak a mock paper in."],
     short: ["eight-hour day. today’s focus stays; the breaks count as taking care of you."], unshort: ["full day again! okay. i believe in you."], focus: ["focus mode. the world shrinks to the page. i'll be quiet."], unfocus: ["focus mode off. hi again!"]
   };
   const PRI = ["dayfull", "done", "cycle", "undo", "mock", "sleep", "pstart", "pbreak", "ppause", "rest", "goal", "note", "prog"];
@@ -1502,7 +1502,7 @@ window.__KG_BUILTIN = {
   // she notices if you leave
   let hiddenAt = 0;
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) { hiddenAt = Date.now(); document.title = "...No.1? ☾"; return; }
+    if (document.hidden) { hiddenAt = Date.now(); document.title = "...No.1? 🌙"; return; }
     document.title = TITLE; lastAct = Date.now(); if (!hiddenAt) return;
     const min = Math.round((Date.now() - hiddenAt) / 60000), ctx = ameContext(); hiddenAt = 0; if (min < 2 || muted) return;
     const line = min < 6 ? "welcome back! quick break? good. back to it." : min < 30 ? `${min} minutes away! hope that was a real break. the block missed you.` : `${min} minutes!! i almost made iroha go looking for you. back to the desk, No.1.`;
@@ -1558,7 +1558,7 @@ window.__KG_BUILTIN = {
   // live stat chip
   const stat = document.createElement("button"); stat.id = "ame-stat"; stat.type = "button"; widget.appendChild(stat);
   stat.onclick = () => ask("review my day so far in 2 lines. what did i do, what's left?");
-  const upStat = () => { const d = deskSummary(); stat.textContent = d ? `☾ ${Math.round(d.studyDoneMin)}m · ${d.streakDays}d` : "☾ hi"; stat.title = d ? `${d.studyDoneMin}/${d.studyPlannedMin} study min today · ${d.streakDays}-day streak — click for a review` : "click me"; };
+  const upStat = () => { const d = deskSummary(); stat.textContent = d ? `🌙 ${Math.round(d.studyDoneMin)}m · ${d.streakDays}d` : "🌙 hi"; stat.title = d ? `${d.studyDoneMin}/${d.studyPlannedMin} study min today · ${d.streakDays}-day streak — click for a review` : "click me"; };
   upStat(); setInterval(upStat, 15000);
   const _si2 = Storage.prototype.setItem;
   Storage.prototype.setItem = function (k) { const r = _si2.apply(this, arguments); if (k === DK && this === window.localStorage) setTimeout(() => { try { upStat(); milestone(); } catch (e) {} }, 50); return r; };
@@ -1620,7 +1620,7 @@ window.__KG_BUILTIN = {
   const badge = document.createElement('span'); badge.id = 'ame-mood'; badge.setAttribute('role', 'status'); widget.appendChild(badge);
   const sticker = document.createElement('span'); sticker.id = 'ame-sticker'; widget.appendChild(sticker);
   const panel = document.createElement('details'); panel.id = 'ame-journal';
-  const heading = document.createElement('summary'); heading.textContent = '☾ Kaguya’s journal'; panel.appendChild(heading);
+  const heading = document.createElement('summary'); heading.textContent = '🌙 Kaguya’s journal'; panel.appendChild(heading);
   const entries = document.createElement('div'); panel.appendChild(entries);
   document.body.insertBefore(panel, widget);
   const voice = document.createElement('button'); voice.type = 'button';
@@ -1662,7 +1662,7 @@ window.__KG_BUILTIN = {
     for (const [date, recap] of Object.entries(journal.weekly).sort().slice(-1)) add('Week ending ' + date, (recap.summary ? recap.summary+'\n\n' : '') + recap.text);
     for (const [date, recap] of Object.entries(journal.daily).sort().slice(-3).reverse()) add(date + ' · day review', (recap.summary ? recap.summary+'\n\n' : '') + recap.text);
     if (!entries.children.length) add('Tonight, we look back.', 'Your day review appears at wind-down or when you mark the day rested. Sunday brings a weekly card.');
-    add('Little rewards', '1 day: familiar lines · 3 days: heart sticker · 7 days: alternate idle pose. Unlocked: ' + (Object.keys(journal.unlocks).join(', ') || 'keep going ☾'));
+    add('Little rewards', '1 day: familiar lines · 3 days: heart sticker · 7 days: alternate idle pose. Unlocked: ' + (Object.keys(journal.unlocks).join(', ') || 'keep going 🌙'));
     const patterns = journal.patterns || [];
     if (patterns.length) add('What I remember', patterns.slice(-5).map(p => `${p.date}: ${p.pattern}`).join('\n'));
   }
@@ -1697,9 +1697,9 @@ window.__KG_BUILTIN = {
     for (const [threshold, reward] of [[1,'familiar lines'],[3,'heart sticker'],[7,'alternate idle']]) if (count >= threshold) journal.unlocks[reward] = true;
     sticker.textContent = (journal.unlocks['heart sticker'] ? '🌙' : '') + (window.HabitDesk?.context().drops?.includes('Little lantern badge') ? '🏮' : '');
     if (journal.unlocks['alternate idle']) GIFS.idle = GIFS.alt || GIFS.idle;
-    if (journal.unlocks['familiar lines'] && !LOCAL.poke.includes('same desk, same moon, our little ritual. i remember. ☾')) LOCAL.poke.push('same desk, same moon, our little ritual. i remember. ☾');
+    if (journal.unlocks['familiar lines'] && !LOCAL.poke.includes('same desk, same moon, our little ritual. i remember. 🌙')) LOCAL.poke.push('same desk, same moon, our little ritual. i remember. 🌙');
     const feeling = Number.isFinite(s.day.sleep) && s.day.sleep < 6 ? 'worried' : sessionSulkyUntil > now ? 'sulking' : s.full || s.day.rested || count >= 3 ? 'proud' : 'calm';
-    widget.dataset.mood = feeling; badge.textContent = ({ proud:'☾ proud', worried:'☁ worried', sulking:'☂ pouting', calm:'✦ on air' })[feeling];
+    widget.dataset.mood = feeling; badge.textContent = ({ proud:'🌙 proud', worried:'☁ worried', sulking:'☂ pouting', calm:'✦ on air' })[feeling];
     saveJournal(); renderJournal();
     const priorDays = lastJournalState?.days || {};
     for (const [iso,d] of Object.entries(st.days || {})) {
@@ -1744,7 +1744,7 @@ window.__KG_BUILTIN = {
   window.addEventListener('habit:speak', e => {
     if (!e.detail || muted || document.hidden) return;
     oldSay(e.detail.text, { mood: 'happy' });
-    if (e.detail.milestone && !matchMedia('(prefers-reduced-motion: reduce)').matches) burst('☾', 16);
+    if (e.detail.milestone && !matchMedia('(prefers-reduced-motion: reduce)').matches) burst('🌙', 16);
     if (!isOpen) companionSound(e.detail.text);
   });
   window.addEventListener('habit:change', () => {
@@ -2827,7 +2827,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
   function render() {
     const t=totals(), nextUp=next();
     root.dataset.theme=settings().theme;
-    root.innerHTML=`<header class="hb-header"><div><p class="hb-eyebrow">TONIGHT’S BROADCAST FROM THE MOON</p><h1>The moon keeps your seat <span>☾</span></h1><p>One question. One derivation. A little closer to orbit.</p></div><div class="hb-score"><strong>${t.chain} day chain</strong><span>${t.xp} XP · ${t.freezeLeft} freeze${t.freezeLeft===1?'':'s'} banked</span><span>${t.weekDays}/5 study days this week</span></div></header>
+    root.innerHTML=`<header class="hb-header"><div><p class="hb-eyebrow">TONIGHT’S BROADCAST FROM THE MOON</p><h1>The moon keeps your seat <span>🌙</span></h1><p>One question. One derivation. A little closer to orbit.</p></div><div class="hb-score"><strong>${t.chain} day chain</strong><span>${t.xp} XP · ${t.freezeLeft} freeze${t.freezeLeft===1?'':'s'} banked</span><span>${t.weekDays}/5 study days this week</span></div></header>
       <nav class="hb-tabs" aria-label="Habit desk">${[['start','Today'],['review','Mistakes'],['progress','Progress'],['plan','Plan'],['settings','Cozy & backup']].map(([id,label])=>`<button type="button" data-view="${id}" aria-current="${view===id?'page':'false'}">${label}${id==='review' && due().length ? ` <span>${due().length}</span>`:''}</button>`).join('')}</nav>
       <div id="hb-content">${view==='start'?startView(nextUp):view==='review'?reviewView():view==='progress'?progressView():view==='plan'?planView():settingsView()}</div>
       <footer class="hb-footer">Your progress stays in this browser. <button type="button" data-action="backup">Download a complete backup</button></footer>`;
@@ -2868,7 +2868,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     const target=study.reduce((n,b)=>n+b.minutes,0),logged=C.minutes(h,days(),today()),pct=target?Math.min(100,Math.round(logged*100/target)):0;
     const time=offset=>{const m=(630+offset)%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');};
     return `<article class="hb-day-map hb-card" id="hb-day-map"><div class="hb-section-heading"><div><p class="hb-eyebrow">${esc(C.date(today()).toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'}))} · YOUR DAY</p><h2>${focus?esc(focus)+' is today’s focus.':'Sunday belongs to you.'}</h2><p>${focus?`${short?'8-hour fallback':'12-hour plan'} · 80% (${short?'6.4':'9.6'}h) keeps the chain · sleep 01:00`:'A full rest day. You do not owe the desk a session.'}</p></div>${focus?button(short?'8h fallback on · switch to 12h':'Switch to 8h fallback','fallback','aria-pressed="'+short+'"'):button('Mark today rested','rest')}</div>
-    ${focus?`<div class="hb-day-progress"><strong>${Math.round(logged)} / ${target} min logged</strong><span>${logged>=target*0.8?'Today counts ☾':Math.max(0,Math.ceil(target*0.8-logged))+' min until today counts (80%)'}</span></div><progress max="100" value="${pct}" aria-label="Today’s study progress">${pct}%</progress><details><summary>See the ${short?'8':'12'}-hour schedule · ${study.length} study blocks</summary><ol class="hb-timeline">${blocks.map(b=>`<li class="hb-block-${b.kind}"><time>${time(b.start)}–${time(b.end)}</time><span><strong>${esc(b.title)}</strong><small>${b.minutes}m · ${esc(b.kind==='study' && b.id==='focus'?'today’s priority':b.kind)}</small></span>${b.kind==='study'?button('Choose','block-task','data-block="'+esc(b.id)+'" aria-label="Choose '+esc(b.title)+'"'):''}</li>`).join('')}</ol><p class="hb-caption">A plan is a guide. Only saved work counts. Switching keeps your logs; each plan caps its own blocks.</p></details>`:'<p>Walk, eat, see someone, do something with no score attached. ♡</p>'}</article>`;
+    ${focus?`<div class="hb-day-progress"><strong>${Math.round(logged)} / ${target} min logged</strong><span>${logged>=target*0.8?'Today counts 🌙':Math.max(0,Math.ceil(target*0.8-logged))+' min until today counts (80%)'}</span></div><progress max="100" value="${pct}" aria-label="Today’s study progress">${pct}%</progress><details><summary>See the ${short?'8':'12'}-hour schedule · ${study.length} study blocks</summary><ol class="hb-timeline">${blocks.map(b=>`<li class="hb-block-${b.kind}"><time>${time(b.start)}–${time(b.end)}</time><span><strong>${esc(b.title)}</strong><small>${b.minutes}m · ${esc(b.kind==='study' && b.id==='focus'?'today’s priority':b.kind)}</small></span>${b.kind==='study'?button('Choose','block-task','data-block="'+esc(b.id)+'" aria-label="Choose '+esc(b.title)+'"'):''}</li>`).join('')}</ol><p class="hb-caption">A plan is a guide. Only saved work counts. Switching keeps your logs; each plan caps its own blocks.</p></details>`:'<p>Walk, eat, see someone, do something with no score attached. ♡</p>'}</article>`;
   }
   function restartView() {return `<details class="hb-card hb-extra"><summary>Make this feel like something I chose</summary><form id="hb-reason" class="hb-stack"><label>What do I want studying to make possible?<textarea name="reason" rows="2" maxlength="300" placeholder="Something that matters to you, beyond a score.">${esc(settings().reason || '')}</textarea></label><button type="submit">Keep my reason</button></form><p>Try one small question before deciding how the whole day will go.</p></details>`;}
   function discoveryView() {const finds=h.sessions.filter(s=>s.discovery).slice(-4).reverse();return `<details class="hb-card hb-extra"><summary>Little discoveries · ${h.sessions.filter(s=>s.discovery).length}</summary><p>Keep the moments when an idea clicks. Add one at the end of a session.</p>${finds.map(s=>`<blockquote><p>“${esc(s.discovery)}”</p><cite>${esc(s.subject)} · ${esc(s.date)}</cite></blockquote>`).join('') || '<p class="hb-caption">Your first “oh, that’s why!” belongs here.</p>'}</details>`;}
@@ -2983,13 +2983,13 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     h.break=null;
     h.active={id:uid(),date:today(),task:values.task.trim(),topic:values.topic.trim(),subject:values.subject,kind,hard,comeback,accruedMs:0,targetMs:minutes*60000,lastStart:Date.now(),running:true,phase:'study',checkpoints:[]};
     settings().energy=values.energy || settings().energy;
-    h.shh=true;save();focus(true);view='start';render();startAudio();say('one task. phone away. i’ll sit right here with you ☾');window.__irohaSay?.('Timer is running. No tab switching. Write every step.',{face:'stern'});
+    h.shh=true;save();focus(true);view='start';render();startAudio();say('one task. phone away. i’ll sit right here with you 🌙');window.__irohaSay?.('Timer is running. No tab switching. Write every step.',{face:'stern'});
     $('hb-session-card').scrollIntoView({behavior:'smooth',block:'start'});
   }
   function pause() { const a=h.active;if(!a || a.phase==='closeout')return;if(a.running){a.accruedMs=C.elapsed(a);a.running=false;stopAudio();}else{if(sleeping() && (a.kind==='mock' || a.hard)){toast('Sleep guard: end this heavy task, then choose light review.');return;}a.lastStart=Date.now();a.running=true;h.break=null;startAudio();}save();render(); }
   function end() { const a=h.active;if(!a)return;a.accruedMs=C.elapsed(a);a.running=false;a.phase='closeout';h.break=null;stopAudio();save();view='start';h.shh=false;render();$('hb-session-card').scrollIntoView({behavior:'smooth'}); }
   function takeBreak() { if(h.active?.phase==='closeout') {toast('Save your close-out first; then take a break.');return;}if(h.active?.running){h.active.accruedMs=C.elapsed(h.active);h.active.running=false;}stopAudio();window.DeskMusic?.stop();const i=(h.breakCount || 0)%breakPrompts.length;h.breakCount=(h.breakCount || 0)+1;h.break={endsAt:Date.now()+5*60000,prompt:breakPrompts[i]};save();view='start';render(); }
-  function celebrate() { const n=totals().chain;if(![7,30,100].includes(n)||h.milestones.includes(n))return;h.milestones.push(n);save();say(`${n} days of showing up! clip it, frame it, keep it. ☾`,true);window.__irohaSay?.('Noted. Keep the standard.',{face:'approve'}); }
+  function celebrate() { const n=totals().chain;if(![7,30,100].includes(n)||h.milestones.includes(n))return;h.milestones.push(n);save();say(`${n} days of showing up! clip it, frame it, keep it. 🌙`,true);window.__irohaSay?.('Noted. Keep the standard.',{face:'approve'}); }
   function drop() {
     if(Math.random()>=.3)return null;
     const options=['Moonlight soundtrack','Little lantern badge','Quiet courage badge','Kaguya line: “same desk, new orbit. i’m here.”','Kaguya line: “five minutes is a launch window. you took it.”'].filter(x=>!h.drops.includes(x));
@@ -3151,7 +3151,7 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
 #habit-desk h1 span{font-family:inherit;color:#f5d27a;-webkit-text-fill-color:#f5d27a;text-shadow:0 0 18px rgba(245,210,122,.6)}
 #habit-desk h2,#habit-desk h3{font-family:"Shippori Mincho B1",serif;font-weight:800;letter-spacing:.01em}
 #habit-desk .hb-eyebrow{color:#f5d27a;letter-spacing:.24em}
-#habit-desk .hb-eyebrow::before{content:"☾ ";color:#ff9cc8}
+#habit-desk .hb-eyebrow::before{content:"🌙 ";color:#ff9cc8}
 .hb-card{background:linear-gradient(180deg,color-mix(in srgb,var(--hb-paper) 92%,#fff 3%),var(--hb-paper))!important;box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 14px 38px rgba(0,0,0,.38)!important;backdrop-filter:blur(6px);position:relative}
 .hb-card::before{content:"";position:absolute;left:22px;right:22px;top:-1px;height:1px;background:linear-gradient(90deg,transparent,rgba(245,210,122,.55),rgba(255,111,174,.55),transparent);pointer-events:none}
 #habit-desk .hb-day-map{background:radial-gradient(circle at 100% 0,rgba(245,210,122,.12),transparent 40%),linear-gradient(130deg,var(--hb-soft),var(--hb-paper) 75%)!important}
@@ -3165,7 +3165,7 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
 #habit-desk[data-theme="winter"]{--hb-accent:#5fd8ff;--hb-soft:#0f2a3a;--hb-line:#245068;--hb-ink:#e3f7ff;--hb-paper:#0d1b29}
 #habit-desk[data-theme="spring"]{--hb-accent:#8fdc8a;--hb-soft:#16301d;--hb-line:#2f5a37;--hb-ink:#e9f7e6;--hb-paper:#11211a}
 #habit-original>summary{background:#1c1838;color:#f2eeff;border-color:#3b3470}
-#habit-original>summary::before{content:"☾  ";color:#f5d27a}
+#habit-original>summary::before{content:"🌙  ";color:#f5d27a}
 #habit-notice{background:#1c1838;color:#f2eeff;border-color:#6c5fc7;box-shadow:0 0 30px rgba(255,111,174,.25)}
 #ame-journal{background:#17142f;color:#f2eeff;border-color:#3b3470}
 
@@ -3175,7 +3175,7 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
 /* Kaguya's chat window: night glass with a moonlit rim */
 #ame-chat,#iroha-chat{background:radial-gradient(circle at 50% -40px,rgba(245,210,122,.18),transparent 120px),linear-gradient(180deg,#1a1638 0%,#120f2a 100%)!important;border-color:#6c5fc7!important;box-shadow:0 18px 40px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.04) inset,0 0 40px rgba(255,111,174,.15)!important}
 .ame-header{background:linear-gradient(90deg,#2a1f5c,#45286e 55%,#5a2a6e)!important;color:#f2eeff!important;font-family:"Shippori Mincho B1",serif;font-size:15px!important}
-.ame-header span::before{content:"☾  "!important;color:#f5d27a}
+.ame-header span::before{content:"🌙  "!important;color:#f5d27a}
 .ame-msg.user{color:#1d1238!important;font-weight:700!important}
 .ame-msg.ame{background:#221d44!important;color:#f7f2ff!important;border-color:#ff6fae66!important;box-shadow:0 4px 0 #160f33!important}
 #ame-input,#iroha-input{background:#141130!important;color:#f2eeff!important}
@@ -3183,7 +3183,7 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
 #ame-mute,#ame-close,#iroha-close{background:#1c1838!important}
 #ame-bubble{background:#221d44!important;color:#f7f2ff!important;border-color:#ff6fae!important;box-shadow:0 5px 0 #160f33,0 0 22px rgba(255,111,174,.35)!important}
 #ame-bubble::before,#iroha-bubble::before{display:block;font:800 9px/1.2 "M PLUS Rounded 1c",sans-serif;letter-spacing:.2em;margin-bottom:3px}
-#ame-bubble::before{content:"☾ KAGUYA";color:#ff9cc8}
+#ame-bubble::before{content:"🌙 KAGUYA";color:#ff9cc8}
 #ame-widget.unread::after{background:#ff6fae;box-shadow:0 0 10px #ff6fae}
 .ame-spark{color:#f5d27a!important;text-shadow:0 0 8px #ff6fae}
 #ame-gif{filter:drop-shadow(0 8px 18px rgba(255,111,174,.45));height:150px;object-fit:contain;object-position:50% 100%}
@@ -3232,7 +3232,7 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
 /* music player: moon disc */
 #mp-toggle{background:radial-gradient(circle at 40% 35%,#2a2452,#141130)!important;box-shadow:0 0 18px rgba(245,210,122,.3)!important}
 .mp-header{background:linear-gradient(90deg,#2a1f5c,#45286e 55%,#5a2a6e)!important;color:#f2eeff!important}
-.mp-header span::before{content:"☾ "!important}
+.mp-header span::before{content:"🌙 "!important}
 
 @media(max-width:620px){
   body::before{top:auto;bottom:150px;right:auto;left:10px;opacity:.4}
@@ -3469,7 +3469,7 @@ body.kg-shell .kg-lean-l,body.kg-shell .kg-lean-r{animation-duration:2.4s}
 #moon-lab .kl-star{width:20px;height:20px;min-height:0;padding:0;border-radius:50%;border:1px solid #3b3470;background:#141130}
 #moon-lab .kl-star.l1{background:#3a3270}#moon-lab .kl-star.l2{background:#5b4fa8}#moon-lab .kl-star.l3{background:#9d8de0}#moon-lab .kl-star.l4{background:#e6d6a0}#moon-lab .kl-star.l5{background:#f5d27a}
 #moon-lab .kl-star.medal{box-shadow:0 0 0 3px #17142f,0 0 0 5px #f5d27a}
-#ame-widget.kg-with::before{content:"☾ with you";position:absolute;top:-24px;right:8px;z-index:4;font:700 10px "M PLUS Rounded 1c",sans-serif;color:#ff9cc8;background:#17142f;border:1px solid #3b3470;border-radius:999px;padding:2px 8px;pointer-events:none;white-space:nowrap}
+#ame-widget.kg-with::before{content:"🌙 with you";position:absolute;top:-24px;right:8px;z-index:4;font:700 10px "M PLUS Rounded 1c",sans-serif;color:#ff9cc8;background:#17142f;border:1px solid #3b3470;border-radius:999px;padding:2px 8px;pointer-events:none;white-space:nowrap}
 /* icons */
 .kg-ic{width:1.15em;height:1.15em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
 #kg-nav a span .kg-ic{width:18px;height:18px;display:block}
@@ -3598,6 +3598,100 @@ body.kg-light #kg-mstop{color:#c2337c}
 .mp-volnote{margin:8px 0;font-size:12px;opacity:.8}
 .mp-volrow[hidden],.mp-volnote[hidden]{display:none}
 </style>
+<style id="kg-scene-style">
+/* ===== The scene on Today ===== */
+#kg-scene{--s1:#0b0a24;--s2:#1c1646;--s3:#3a2460;position:relative;height:290px;margin:0 0 18px;border-radius:24px;overflow:hidden;isolation:isolate;background:linear-gradient(180deg,var(--s1),var(--s2) 58%,var(--s3));border:1px solid rgba(255,255,255,.09);box-shadow:0 18px 44px rgba(0,0,0,.38);transition:background 1s}
+body:not(.kg-sec-today) #kg-scene,body.habit-shh #kg-scene{display:none}
+.kgs-stars{position:absolute;inset:0;width:100%;height:100%;z-index:-1;fill:#fff;opacity:.45}
+#kg-scene.night .kgs-stars{opacity:.95}
+.kgs-stars .tw{animation:kgs-tw var(--tw) ease-in-out var(--from) infinite}
+@keyframes kgs-tw{50%{opacity:.2}}
+.kgs-glow{position:absolute;top:-70px;right:296px;width:320px;height:320px;z-index:-1;border-radius:50%;background:radial-gradient(circle,rgba(250,235,190,.3),rgba(250,235,190,0) 68%);pointer-events:none}
+.kgs-moon{position:absolute;top:18px;right:410px;width:92px;height:92px;filter:drop-shadow(0 0 16px rgba(250,235,190,.55))}
+.kgs-moon svg{display:block;width:100%;height:100%}
+.kgs-moon-dark{fill:#2a2652;opacity:.75}.kgs-moon-lit{fill:#f8edc8}
+.kgs-craters circle{fill:#1c1838;opacity:.09}
+.kgs-hills{position:absolute;left:0;right:0;bottom:0;width:100%;height:96px;z-index:0}
+.kgs-hills .b{fill:#120f2e;opacity:.72}.kgs-hills .f{fill:#0b0920}
+.kgs-grove{position:absolute;bottom:0;width:260px;height:100%;z-index:0;pointer-events:none}
+.kgs-grove.left{left:0}.kgs-grove.right{right:0}
+.kgs-stalk{fill:#0d1a26;transform-box:view-box;transform-origin:50% 100%;animation:kgs-sway var(--sway) ease-in-out var(--from) infinite alternate}
+.kgs-stalk.far{fill:#1c2a48;opacity:.62}
+.kgs-node{fill:#36506a;opacity:.55}.kgs-leaf{fill:#1a3a3c}
+.kgs-stalk.far .kgs-leaf{fill:#24405a}
+@keyframes kgs-sway{from{transform:rotate(-.5deg)}to{transform:rotate(.6deg)}}
+.kgs-flies{position:absolute;inset:0;z-index:0;pointer-events:none}
+.kgs-flies i{position:absolute;width:4px;height:4px;border-radius:50%;background:#ffe9a8;box-shadow:0 0 9px 2px rgba(255,225,140,.7);animation:kgs-fly var(--fly) ease-in-out var(--from) infinite}
+@keyframes kgs-fly{0%,100%{transform:translate(0,0);opacity:.15}35%{transform:translate(16px,-20px);opacity:.95}70%{transform:translate(-12px,-34px);opacity:.45}}
+.kgs-copy{position:absolute;top:22px;left:26px;z-index:2;max-width:46%;text-shadow:0 2px 12px rgba(5,4,20,.8)}
+.kgs-eyebrow{margin:0 0 4px;font:800 11px "M PLUS Rounded 1c",sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#f5d27a}
+#kg-scene h1{margin:0;font:800 30px/1.15 "Shippori Mincho B1",serif;color:#fbf5e4;background:none;-webkit-text-fill-color:#fbf5e4}
+.kgs-talk{position:absolute;left:24px;bottom:18px;z-index:3;display:grid;gap:8px;width:min(44%,400px)}
+.kgs-say{margin:0;padding:8px 13px 9px;border-radius:14px 14px 14px 4px;font:500 13.5px/1.42 "M PLUS Rounded 1c",sans-serif;color:#f6f2ff;background:rgba(13,11,36,.82);border:1px solid;box-shadow:0 6px 18px rgba(0,0,0,.28);overflow-wrap:anywhere}
+.kgs-say[hidden]{display:none}
+.kgs-say b{display:block;font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;margin-bottom:1px}
+.kgs-say.k{border-color:rgba(255,111,174,.75)}.kgs-say.k b{color:#ff9cc8}
+.kgs-say.i{border-color:rgba(127,227,255,.65)}.kgs-say.i b{color:#7fe3ff}
+.kgs-cast{position:absolute;right:30px;bottom:0;z-index:2;display:flex;align-items:flex-end;gap:2px}
+.kgs-who{display:block;padding:0;margin:0;border:0;background:none;cursor:pointer;border-radius:16px;transition:transform .22s ease,filter .22s ease}
+.kgs-who[hidden]{display:none}
+.kgs-who img{display:block;width:auto;pointer-events:none;user-select:none;-webkit-user-drag:none}
+.kgs-who.k img{height:224px}.kgs-who.i img{height:200px}
+.kgs-who.k{filter:drop-shadow(0 0 16px rgba(255,111,174,.32))}.kgs-who.i{filter:drop-shadow(0 0 16px rgba(127,227,255,.34))}
+.kgs-who:hover{transform:translateY(-5px)}
+.kgs-who:focus-visible{outline:3px solid #f5d27a;outline-offset:2px}
+/* the scene stands in for the floating pair while it's on screen */
+body.kg-scene-on #ame-gif,body.kg-scene-on #iroha-gif,body.kg-scene-on #ame-bubble,body.kg-scene-on #iroha-bubble{visibility:hidden!important;pointer-events:none!important}
+body.kg-light #kg-main #kg-scene h1{color:#fbf5e4!important}
+body.kg-light #kg-main #kg-scene .kgs-eyebrow{color:#f5d27a!important}
+body.kg-light #kg-main #kg-scene .kgs-say span{color:#f6f2ff!important}
+body.kg-light #kg-main #kg-scene .kgs-say.k b{color:#ff9cc8!important}
+body.kg-light #kg-main #kg-scene .kgs-say.i b{color:#7fe3ff!important}
+body.kg-light #kg-main #kg-scene button.kgs-who{background:none!important;border:0!important}
+@media(max-width:940px){
+  .kgs-who.k img{height:176px}.kgs-who.i img{height:156px}
+  .kgs-moon{right:310px;width:74px;height:74px}.kgs-glow{right:210px}
+}
+@media(max-width:720px){
+  #kg-scene{height:306px;border-radius:20px;margin-bottom:14px}
+  .kgs-copy{top:15px;left:15px;max-width:70%}
+  #kg-scene h1{font-size:23px}
+  .kgs-eyebrow{font-size:9.5px;letter-spacing:.1em}
+  .kgs-moon{top:10px;right:10px;width:50px;height:50px}
+  .kgs-glow{top:-75px;right:-75px;width:200px;height:200px}
+  .kgs-grove{width:150px}.kgs-grove.left{opacity:.5}
+  .kgs-talk{left:8px;right:8px;bottom:8px;width:auto;grid-template-columns:1fr 1fr;gap:6px}
+  .kgs-say{padding:6px 9px 7px;font-size:12px;line-height:1.34;border-radius:12px}
+  .kgs-say b{font-size:9px}
+  .kgs-cast{right:6px;bottom:88px}
+  .kgs-who.k img{height:138px}.kgs-who.i img{height:124px}
+  .kgs-hills{height:150px}
+}
+@media(prefers-reduced-motion:reduce){#kg-scene *{animation:none!important;transition:none!important}}
+
+/* ===== Polish: one clear thing per page, with depth instead of flat boxes ===== */
+body.kg-shell:not(.kg-light) .kl-card,body.kg-shell:not(.kg-light) .kl-boss,body.kg-shell:not(.kg-light) .hb-card{background:linear-gradient(180deg,#1c1839,#15122c)!important;border-color:rgba(132,118,214,.24)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 10px 26px rgba(4,3,18,.3)!important}
+body.kg-shell:not(.kg-light) .kl-breakcard{background:radial-gradient(120% 150% at 0 0,rgba(245,210,122,.13),transparent 58%),linear-gradient(180deg,#221c44,#17132f)!important;border-color:rgba(245,210,122,.45)!important}
+body.kg-shell:not(.kg-light) .kl-mini{background:rgba(23,20,47,.58)!important;box-shadow:none!important}
+body.kg-shell:not(.kg-light) .kl-next{border-color:rgba(255,111,174,.45)!important}
+body.kg-shell #moon-lab .kl-primary,body.kg-shell #habit-desk button.hb-primary{background:linear-gradient(180deg,#ff86bc,#ff5fa4);border-color:#ff7bb4;box-shadow:0 5px 16px rgba(255,95,164,.26)!important;transition:transform .15s ease,box-shadow .15s ease}
+body.kg-shell #moon-lab .kl-primary:hover,body.kg-shell #habit-desk button.hb-primary:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(255,95,164,.36)!important}
+#kg-nav a{transition:background .18s,color .18s}
+#kg-nav a[aria-current="page"]{box-shadow:inset 0 -2px 0 #f5d27a}
+body.kg-light #kg-nav a[aria-current="page"]{box-shadow:inset 0 -2px 0 #c58a10}
+.kl-enter,#moon-lab>*{animation-duration:.24s}
+#iroha-chat .ame-header{background:linear-gradient(90deg,#123049,#1a4c6b 55%,#226a86)!important}
+/* a friendly line instead of a table of zeros */
+.kg-nothing{margin:6px 0 2px;padding:10px 13px;border-radius:12px;background:rgba(10,8,30,.4);border-left:3px solid;font-size:14px;line-height:1.45}
+.kg-nothing b{display:block;font-size:10px;letter-spacing:.09em;text-transform:uppercase;margin-bottom:1px}
+.kg-nothing.k{border-color:#ff6fae}.kg-nothing.k b{color:#ff9cc8}
+.kg-nothing.i{border-color:#7fe3ff}.kg-nothing.i b{color:#7fe3ff}
+body.kg-light .kg-nothing{background:#f7f3fb}
+.kl-empty{border-style:solid;background:rgba(10,8,30,.3)}
+/* every tab reachable: rows wrap on a computer, and phones get a hint that there's more */
+@media(min-width:721px){body.kg-shell .kl-tabs{flex-wrap:wrap;overflow:visible}}
+@media(max-width:720px){body.kg-shell .kl-tabs.kg-more{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 34px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 34px),transparent)}}
+</style>
 <script id="moon-lab-script">
 /* ===== Moon Lab: chapter tracker, boss battles, Iroha's recall, doubts, weekly rank, stickers, bond, voyage, kindness ===== */
 (function () {
@@ -3656,7 +3750,7 @@ body.kg-light #kg-mstop{color:#c2337c}
   }
   function burst(n = 18) {
     const r = document.getElementById('moon-lab')?.getBoundingClientRect(); const x = innerWidth / 2, y = r ? Math.max(80, Math.min(innerHeight - 80, r.top + 120)) : innerHeight / 2;
-    for (let i = 0; i < n; i++) { const s = document.createElement('span'); s.className = 'ame-spark'; s.textContent = pick(['☾', '✦', '★', '✧']); s.style.left = x + 'px'; s.style.top = y + 'px'; s.style.setProperty('--dx', (Math.random() * 320 - 160) + 'px'); s.style.setProperty('--dy', -(60 + Math.random() * 180) + 'px'); document.body.appendChild(s); setTimeout(() => s.remove(), 1100); }
+    for (let i = 0; i < n; i++) { const s = document.createElement('span'); s.className = 'ame-spark'; s.textContent = pick(['🌙', '✦', '★', '✧']); s.style.left = x + 'px'; s.style.top = y + 'px'; s.style.setProperty('--dx', (Math.random() * 320 - 160) + 'px'); s.style.setProperty('--dy', -(60 + Math.random() * 180) + 'px'); document.body.appendChild(s); setTimeout(() => s.remove(), 1100); }
   }
 
   /* ---------- stickers ---------- */
@@ -3714,7 +3808,7 @@ body.kg-light #kg-mstop{color:#c2337c}
     ['voyager', '🚀', 'Launch Clearance', 'Unlock the voyage map.', s => s.voy, [['i', "Distance and escape velocity, correct. You're cleared for launch."], ['k', '3... 2... 1... LIFTOFF!!']]],
     ['moon-landing', '🌑', 'Moon Landing', 'Fly 50 study hours on the voyage map.', s => s.voy && s.hours >= 50, [['k', "we landed on the moon! it's my hometown!"], ['i', 'Fifty hours. Mars is next.']]],
     ['mars', '🔴', 'Red Planet', 'Fly 150 study hours on the voyage map.', s => s.voy && s.hours >= 150, [['i', 'Mars. A hundred and fifty hours. The asteroid belt is next.'], ['k', 'red planet! i want a souvenir.']]],
-    ['princess-look', '👘', 'Princess Look', "Your first day that counts unlocks Kaguya's princess outfit.", s => s.counted >= 1, [['k', 'i changed into my princess outfit for you! switch looks in the sticker book ☾'], ['i', 'She insisted. Back to work.']]],
+    ['princess-look', '👘', 'Princess Look', "Your first day that counts unlocks Kaguya's princess outfit.", s => s.counted >= 1, [['k', 'i changed into my princess outfit for you! switch looks in the sticker book 🌙'], ['i', 'She insisted. Back to work.']]],
     ['mock-1', '📊', 'First Mock', 'Log your first mock in the analyser.', s => s.mocks >= 1, [['k', 'first mock logged! the climb starts here.'], ['i', 'A number to beat. Good.']]],
     ['mock-70', '🎯', 'Seventy Club', 'Score 70% or more on a mock.', s => s.mock70, [['k', 'SEVENTY PERCENT?! chat, we are in the big leagues!!'], ['i', '70% on a full mock. Hold that, then push past it.']]],
     ['medal-1', '🏅', 'First Medal', "Pass one of Iroha's chapter exams.", s => s.medals >= 1, [['i', 'Your first chapter medal. Earned, not given.'], ['k', 'MEDAL!! wear it to every study session!!']]],
@@ -3730,7 +3824,7 @@ body.kg-light #kg-mstop{color:#c2337c}
     for (const t of fresh) L.stk[t[0]] = d;
     save();
     // Existing progress unlocks quietly on first load instead of a parade of celebrations.
-    if (firstCheck && fresh.length > 2) K(`you already earned ${fresh.length} stickers! they're waiting in the Moon Lab sticker book ☾`);
+    if (firstCheck && fresh.length > 2) K(`you already earned ${fresh.length} stickers! they're waiting in the Moon Lab sticker book 🌙`);
     else for (const t of fresh) celebrate.push(t);
     firstCheck = false;
   }
@@ -3982,7 +4076,7 @@ body.kg-light #kg-mstop{color:#c2337c}
   function openMood() {
     if (document.getElementById('kl-mood')) return;
     const m = document.createElement('div'); m.id = 'kl-mood'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', 'Mood check-in');
-    m.innerHTML = `<div class="kl-mood-card"><p class="kl-eyebrow">☾ MORNING CHECK-IN</p><h2>How is today feeling?</h2><p>No wrong answer. This only changes how hard we push.</p>
+    m.innerHTML = `<div class="kl-mood-card"><p class="kl-eyebrow">🌙 MORNING CHECK-IN</p><h2>How is today feeling?</h2><p>No wrong answer. This only changes how hard we push.</p>
       <div class="kl-mood-opts"><button data-m="steady">☀️<b>Steady</b><small>Full 12-hour plan</small></button><button data-m="heavy">☁️<b>Heavy</b><small>Maybe the 8-hour plan</small></button><button data-m="hard">🌧️<b>Really hard</b><small>Gentle mode, 8 hours</small></button><button data-m="lowest">🌑<b>Not okay</b><small>Company first, study later</small></button></div>
       ${L.wins.length ? `<details><summary>Your recent wins (${L.wins.length})</summary><ul>${L.wins.slice(-6).reverse().map(w => `<li><time>${esc(w.d)}</time> ${esc(w.t)}</li>`).join('')}</ul></details>` : ''}
       <button class="kl-ghost" data-m="later">Ask me later</button></div>`;
@@ -3999,7 +4093,7 @@ body.kg-light #kg-mstop{color:#c2337c}
   if (anchor) anchor.parentNode.insertBefore(root, anchor); else document.body.insertBefore(root, document.getElementById('ame-journal') || document.getElementById('ame-widget'));
   const pillEl = document.createElement('button'); pillEl.id = 'kl-pill'; pillEl.type = 'button'; document.body.appendChild(pillEl);
   pillEl.onclick = () => { if (L.ask.q) { tab = 'recall'; render(); } root.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
-  function pill() { const p = !!L.ask.q; pillEl.textContent = p ? '✦ Iroha asked you something' : '☾ Moon Lab'; pillEl.classList.toggle('asking', p); }
+  function pill() { const p = !!L.ask.q; pillEl.textContent = p ? '✦ Iroha asked you something' : '🌙 Moon Lab'; pillEl.classList.toggle('asking', p); }
 
   function moon() {
     const syn = 29.530588853, age = (((Date.now() / 864e5) - Date.UTC(2000, 0, 6, 18, 14) / 864e5) % syn + syn) % syn, i = Math.round(age / syn * 8) % 8;
@@ -4011,7 +4105,7 @@ body.kg-light #kg-mstop{color:#c2337c}
     study: [['chapters', '📖 Chapters'], ['practice', '🎯 Practice'], ['exams', '🎓 Exams'], ['recall', '🧠 Recall'], ['doubts', '❓ Doubts'], ['tools', '🔬 Tools']],
     progress: [['overview', '📈 Overview'], ['sky', '🌌 Syllabus sky'], ['mocks', '📊 Mocks'], ['rank', '🏆 Rank'], ['stickers', '✨ Stickers'], ['bond', '💞 Bond'], ['voyage', () => L.voy.passed ? '🚀 Voyage' : '🔒 Voyage']],
     plan: [['countdown', '⏳ Countdown']],
-    company: [['hangout', '☾ Hang out'], ['comfort', '🫶 Comfort'], ['memories', '💭 Memories'], ['letters', '💌 Letters']],
+    company: [['hangout', '🌙 Hang out'], ['comfort', '🫶 Comfort'], ['memories', '💭 Memories'], ['letters', '💌 Letters']],
     settings: [['companions', '✦ Companions'], ['support', '🛟 Support'], ['backup', '💾 Backup']]
   };
   const TABS = () => (SECTIONS[section] || []).filter(([id]) => PANELS[id]).map(([id, label]) => [id, typeof label === 'function' ? label() : label]);
@@ -4020,7 +4114,7 @@ body.kg-light #kg-mstop{color:#c2337c}
   function pChapters() {
     const d = today(), pct = s => { const cs = CHAPS.filter(c => c.subj === s); return Math.round(cs.reduce((n, c) => n + (L.ch[c.id]?.c || 0), 0) * 100 / (cs.length * 5)); };
     let html = `<div class="kl-row kl-subjects">${SUBJ.map(s => `<button data-a="subj" data-s="${s}" aria-pressed="${s === subj}"><b>${s}</b><span class="kl-meter"><i style="width:${pct(s)}%"></i></span><small>${pct(s)}% confident</small></button>`).join('')}</div>
-      <div class="kl-row kl-legend"><label class="kl-check"><input type="checkbox" data-a="weak" ${weak ? 'checked' : ''}> Weak chapters only (0–2 dots)</label><span>Dots: ${CONF.slice(1).map((c, i) => `${i + 1} ${c}`).join(' · ')} · ☾ studied today (Iroha questions you on it) · ✔/✘ log a question · ⚔ summon as boss</span></div>`;
+      <div class="kl-row kl-legend"><label class="kl-check"><input type="checkbox" data-a="weak" ${weak ? 'checked' : ''}> Weak chapters only (0–2 dots)</label><span>Dots: ${CONF.slice(1).map((c, i) => `${i + 1} ${c}`).join(' · ')} · 🌙 studied today (Iroha questions you on it) · ✔/✘ log a question · ⚔ summon as boss</span></div>`;
     for (const [unit] of CH[subj]) {
       const rows = CHAPS.filter(c => c.subj === subj && c.unit === unit && (!weak || (L.ch[c.id]?.c || 0) <= 2));
       if (!rows.length) continue;
@@ -4028,7 +4122,7 @@ body.kg-light #kg-mstop{color:#c2337c}
         const s = L.ch[c.id] || {}, v = s.c || 0, a = acc(c.id), on = s.last === d, fight = L.boss[c.id]?.active;
         return `<div class="kl-ch ${on ? 'is-today' : ''}"><div class="kl-ch-name">${L.medals[c.id] ? '🏅 ' : ''}${esc(c.name)}${fight ? ' <span class="kl-tag">⚔ boss</span>' : ''}<small>${CONF[v]}${window.MoonLab?.fade?.(c.id) ? ' · fading, revise it' : ''}${s.done ? ' · complete' : ''}${a !== null ? ` · question ${s.k || 0}/${s.a} (${a}%)` : ''}</small></div>
           <div class="kl-dots" role="group" aria-label="Confidence for ${esc(c.name)}">${[1, 2, 3, 4, 5].map(n => `<button data-a="conf" data-id="${c.id}" data-v="${n}" class="${n <= v ? 'on' : ''}" aria-label="${CONF[n]}" title="${CONF[n]}"></button>`).join('')}</div>
-          <div class="kl-ch-act"><button data-a="studied" data-id="${c.id}" aria-pressed="${on}" title="Studied today">☾</button><button data-a="pyq" data-id="${c.id}" data-ok="1" title="Correct question">✔</button><button data-a="pyq" data-id="${c.id}" data-ok="0" title="Wrong question">✘</button><button data-a="summon" data-id="${c.id}" title="Summon as boss">⚔</button><button data-a="done" data-id="${c.id}" title="Chapter complete: take Iroha's exam">🎓</button></div></div>`;
+          <div class="kl-ch-act"><button data-a="studied" data-id="${c.id}" aria-pressed="${on}" title="Studied today">🌙</button><button data-a="pyq" data-id="${c.id}" data-ok="1" title="Correct question">✔</button><button data-a="pyq" data-id="${c.id}" data-ok="0" title="Wrong question">✘</button><button data-a="summon" data-id="${c.id}" title="Summon as boss">⚔</button><button data-a="done" data-id="${c.id}" title="Chapter complete: take Iroha's exam">🎓</button></div></div>`;
       }).join('') + '</div>';
     }
     return html;
@@ -4054,7 +4148,7 @@ body.kg-light #kg-mstop{color:#c2337c}
         <textarea id="kl-ans" rows="4" placeholder="Answer from memory. No book."></textarea>
         ${q.kind === 'card' || q.kind === 'miss' ? (L.ask.rev ? `<div class="kl-back"><b>Your saved answer:</b> ${esc(q.back || '(none saved)')}</div>` : '<button data-a="reveal">Reveal the saved answer</button>') : ''}
         <div class="kl-row"><button class="kl-primary" data-a="grade" data-g="got">✔ Got it</button><button data-a="grade" data-g="shaky">〜 Shaky</button><button data-a="grade" data-g="miss">✘ Missed</button><button class="kl-ghost" data-a="askai">Check with Iroha (AI)</button></div>`
-        : `<h3>No question waiting.</h3><p class="kl-small">Mark chapters ☾ in the tracker and Iroha builds questions from them.</p><button class="kl-primary" data-a="ask">Ask me one now</button>`}</article>
+        : `<h3>No question waiting.</h3><p class="kl-small">Mark chapters 🌙 in the tracker and Iroha builds questions from them.</p><button class="kl-primary" data-a="ask">Ask me one now</button>`}</article>
       <div class="kl-grid2"><div class="kl-card"><h3>Your deck <small>${due} due · ${L.cards.length} cards</small></h3>
         <form data-f="card" class="kl-stack"><select name="ch" aria-label="Chapter">${chapterOptions('', 'Any chapter')}</select><input name="q" required maxlength="300" placeholder="Question (e.g. Range of a projectile on level ground?)"><input name="a" maxlength="500" placeholder="Answer (e.g. R = u² sin 2θ / g)"><button>Add card</button></form>
         <p class="kl-small">Reviews come back after 1, 2, 4, 8, 16, 32 and 60 days. Shaky or missed questions from Iroha join the deck automatically.</p></div>
@@ -4182,7 +4276,7 @@ body.kg-light #kg-mstop{color:#c2337c}
   const inStudy = () => { const b = block(); return !!b && b.kind === 'study' && !days()[today()]?.rested && !window.__kgOnBreak; };
   let peekUntil = 0;
   function nightCard() {
-    return `<section class="kl-card kl-night"><p class="kl-eyebrow">☾ CLOSED FOR THE NIGHT</p><h3>The desk opens again at 10:30.</h3><p>Kaguya: it's late, No.1. close the page and sleep. i'll keep the moon on for you.</p><p class="kl-small">Not okay tonight? Comfort and Support stay open.</p><div class="kl-row"><button data-a="go" data-v="company:comfort">🫶 Comfort</button><button class="kl-ghost" data-a="go" data-v="settings:support">🛟 Support</button></div></section>`;
+    return `<section class="kl-card kl-night"><p class="kl-eyebrow">🌙 CLOSED FOR THE NIGHT</p><h3>The desk opens again at 10:30.</h3><p>Kaguya: it's late, No.1. close the page and sleep. i'll keep the moon on for you.</p><p class="kl-small">Not okay tonight? Comfort and Support stay open.</p><div class="kl-row"><button data-a="go" data-v="company:comfort">🫶 Comfort</button><button class="kl-ghost" data-a="go" data-v="settings:support">🛟 Support</button></div></section>`;
   }
   function quietCard() {
     const b = block();
@@ -4248,7 +4342,7 @@ body.kg-light #kg-mstop{color:#c2337c}
   root.addEventListener('submit', e => {
     e.preventDefault(); const f = e.target, v = Object.fromEntries(new FormData(f)), d = today();
     if (window.MoonLab?.FORMS[f.dataset.f]) return window.MoonLab.FORMS[f.dataset.f](v, f);
-    if (f.dataset.f === 'win') { L.wins.push({ d, t: v.t.trim().slice(0, 140) }); save(); render(); K(pick(['added to the highlight reel ☾', 'WIN! clip it!', 'see? you do real things, No.1.'])); return checkStickers(); }
+    if (f.dataset.f === 'win') { L.wins.push({ d, t: v.t.trim().slice(0, 140) }); save(); render(); K(pick(['added to the highlight reel 🌙', 'WIN! clip it!', 'see? you do real things, No.1.'])); return checkStickers(); }
     if (f.dataset.f === 'summon') return summon(v.id);
     if (f.dataset.f === 'mock') return addMock(v);
     if (f.dataset.f === 'card') { L.cards.push({ id: uid(), ch: v.ch, q: v.q.trim(), a: v.a.trim(), st: 0, due: add(d, 1), n: 0 }); save(); I('Card added. First review tomorrow.', { face: 'study' }); return render(); }
@@ -4628,11 +4722,12 @@ body.kg-light #kg-mstop{color:#c2337c}
     const cmax = Math.max(1, ...Object.values(causes)), ins = Object.entries(L.insights).sort().pop();
     const subj = SUBJ.map(s => { const a = L.attempts.filter(x => x.ch && chap(x.ch)?.subj === s && gap(d, x.d) <= 30 && x.src !== 'block'); return [s, a.length, a.length ? Math.round(a.filter(x => x.ok).length * 100 / a.length) : null]; });
     let lec = 0, prac = 0; for (let i = 0; i < 7; i++) { const x = L.lecture[add(d, -i)]; if (x) { lec += x.lec; prac += x.prac; } }
+    const nothing = (who, line) => `<p class="kg-nothing ${who}"><b>${who === 'k' ? 'Kaguya' : 'Iroha'}</b>${line}</p>`, off = window.__kgOnBreak;
     return `${ins ? `<section class="kl-card"><p class="kl-eyebrow">IROHA'S WEEKLY OBSERVATION · ${esc(ins[0])}</p><p>${esc(ins[1])}</p></section>` : ''}
-      <div class="kl-grid2"><section class="kl-card"><h3>Calibration <small>last 60 days</small></h3><table class="kl-table"><thead><tr><th>You said</th><th>Answers</th><th>Right</th></tr></thead><tbody>${cal.map(([c, n, p]) => `<tr><th>${c}</th><td>${n}</td><td>${p === null ? '—' : p + '%'}</td></tr>`).join('')}</tbody></table><p class="kl-small">${cal[2][2] !== null && cal[2][2] < 34 ? 'Your guesses lose marks under negative marking: skip them in the exam.' : 'In JEE, attempt "sure" answers and skip guesses unless you can rule out two options.'}</p></section>
+      <div class="kl-grid2"><section class="kl-card"><h3>Calibration <small>last 60 days</small></h3>${!recent.length ? nothing('i', off ? 'Nothing to read yet. It can wait.' : 'No answers rated yet. Mark a few as sure, 50-50 or guess, and I will show you whether "sure" really means sure.') : `<table class="kl-table"><thead><tr><th>You said</th><th>Answers</th><th>Right</th></tr></thead><tbody>${cal.map(([c, n, p]) => `<tr><th>${c}</th><td>${n}</td><td>${p === null ? '—' : p + '%'}</td></tr>`).join('')}</tbody></table><p class="kl-small">${cal[2][2] !== null && cal[2][2] < 34 ? 'Your guesses lose marks under negative marking: skip them in the exam.' : 'In JEE, attempt "sure" answers and skip guesses unless you can rule out two options.'}</p>`}</section>
       <section class="kl-card"><h3>Why things break <small>last 30 days</small></h3>${Object.keys(causes).length ? Object.entries(causes).sort((a, b) => b[1] - a[1]).map(([c, n]) => `<label class="kl-small">${esc(c)} · ${n}<span class="kl-bar now"><i style="width:${Math.round(n * 100 / cmax)}%"></i></span></label>`).join('') : '<p class="kl-small">Tag misses with a cause and the pattern shows up here.</p>'}</section></div>
-      <div class="kl-grid2"><section class="kl-card"><h3>Accuracy by subject <small>30 days</small></h3><table class="kl-table"><tbody>${subj.map(([s, n, p]) => `<tr><th>${s}</th><td>${n} questions</td><td>${p === null ? '—' : p + '%'}</td></tr>`).join('')}</tbody></table></section>
-      <section class="kl-card"><h3>Lectures vs practice <small>7 days</small></h3><span class="kl-meter big"><i style="width:${lec + prac ? Math.round(prac * 100 / (lec + prac)) : 0}%"></i></span><p class="kl-small">${prac} min solving · ${lec} min watching</p></section></div>`;
+      <div class="kl-grid2"><section class="kl-card"><h3>Accuracy by subject <small>30 days</small></h3>${!subj.some(x => x[1]) ? nothing('k', off ? "resting, so this stays empty. that's the plan!" : 'empty stage for now! your subjects show up here once you answer some questions.') : `<table class="kl-table"><tbody>${subj.map(([s, n, p]) => `<tr><th>${s}</th><td>${n} questions</td><td>${p === null ? '—' : p + '%'}</td></tr>`).join('')}</tbody></table>`}</section>
+      <section class="kl-card"><h3>Lectures vs practice <small>7 days</small></h3>${!(lec + prac) ? nothing('i', off ? 'Nothing logged, as instructed.' : 'Nothing logged this week. When there is, I will show how much was solving and how much was watching.') : `<span class="kl-meter big"><i style="width:${lec + prac ? Math.round(prac * 100 / (lec + prac)) : 0}%"></i></span><p class="kl-small">${prac} min solving · ${lec} min watching</p>`}</section></div>`;
   };
   M.PANELS.sky = () => SUBJ.map(s => `<section class="kl-card"><h3>${s}</h3>${M.CH[s].map(([unit]) => `<div class="kl-skyrow"><span class="kl-small">${esc(unit)}</span><div class="kl-stars">${CHAPS.filter(c => c.subj === s && c.unit === unit).map(c => { const e = eff(c.id); return `<button class="kl-star l${e}${L.medals[c.id] ? ' medal' : ''}" data-a="skyjump" data-s="${s}" title="${esc(c.name)} · ${CONF[e]}${M.fade(c.id) ? ' · fading' : ''}${L.medals[c.id] ? ' · medal' : ''}" aria-label="${esc(c.name)}: ${CONF[e]}"></button>`; }).join('')}</div></div>`).join('')}</section>`).join('') + '<p class="kl-small">Brighter stars are stronger chapters. Stars dim when a chapter goes 3 weeks without revision (medal chapters hold for 6). Gold rings are medals.</p>';
 
@@ -4679,7 +4774,7 @@ body.kg-light #kg-mstop{color:#c2337c}
     raidstart: async () => { const d = today(), chs = CHAPS.filter(c => L.ch[c.id]?.last && gap(d, L.ch[c.id].last) <= 7).map(c => c.id).slice(0, 6); L.raid = { d, state: 'loading', hp: 7, i: 0 }; M.render(); const r = await getSet(chs, 12); Object.assign(L.raid, r.qs ? { state: 'open', qs: r.qs } : { state: 'error' }); save(); M.render(); },
     skyjump: b => { M.setSubj(b.dataset.s); window.dispatchEvent(new CustomEvent('moonlab:go', { detail: { section: 'study', tab: 'chapters' } })); },
     photocheck: photoCheck,
-    photomiss: () => { attempt({ src: 'photo', ch: '', ok: false, q: (L.photo.q || 'photo-checked working') + ' · ' + L.photo.text.slice(0, 120) }); K('logged in your misses ☾'); M.render(); },
+    photomiss: () => { attempt({ src: 'photo', ch: '', ok: false, q: (L.photo.q || 'photo-checked working') + ' · ' + L.photo.text.slice(0, 120) }); K('logged in your misses 🌙'); M.render(); },
     teachscore: async () => { const t = L.teach; teachBusy = true; M.render(); const r = await ask('iroha', `[score an explanation, not typed by me] Concept: ${t.concept} (${chName(t.ch)}). Transcript: ${t.turns.map(x => (x.who === 'me' ? 'Me' : 'Kaguya') + ': ' + x.text).join(' | ')}. Score the clarity of my explanation from 1 to 10 and list the gaps in at most 4 short lines.`); teachBusy = false; t.turns.push({ who: 'i', text: r.reply || "Couldn't reach the backend." }); save(); M.render(); M.checkStickers(); },
     teachend: () => { L.teach = null; save(); M.render(); },
     battleplan: battlePlan
@@ -4701,7 +4796,7 @@ body.kg-light #kg-mstop{color:#c2337c}
       if (r.hp <= 0) { r.won = true; duo([['k', 'RAID CLEARED!!! the weekly boss is DOWN!'], ['i', 'A full week, tested. Good.']]); burst(20); } else if (!ok) I(`Healed. Key: ${+q.a.toPrecision(5)} ${q.u}.`, { face: 'stern' });
       save(); M.render(); M.checkStickers();
     },
-    rocket: v => { const r = L.rocket, ok = right(Object.assign({ tol: .015 }, r.q), v.x); r.done = true; r.ok = ok; if (ok) r.solved = (r.solved || 0) + 1; save(); M.render(); M.checkStickers(); if (ok) K('orbit achieved! rocket scientist No.1 ☾'); else I('Recheck units: kilometres to metres.', { face: 'stern' }); },
+    rocket: v => { const r = L.rocket, ok = right(Object.assign({ tol: .015 }, r.q), v.x); r.done = true; r.ok = ok; if (ok) r.solved = (r.solved || 0) + 1; save(); M.render(); M.checkStickers(); if (ok) K('orbit achieved! rocket scientist No.1 🌙'); else I('Recheck units: kilometres to metres.', { face: 'stern' }); },
     teach: async v => {
       if (!L.teach) L.teach = { ch: v.ch, concept: v.concept.trim(), turns: [] };
       const t = L.teach; t.turns.push({ who: 'me', text: v.text.trim() }); teachBusy = true; save(); M.render();
@@ -4730,7 +4825,7 @@ body.kg-light #kg-mstop{color:#c2337c}
     ['raid-1', '🛡️', 'Raid Cleared', 'Clear a Saturday raid.', () => !!(L.raid && L.raid.won), [['k', 'the weekly boss fell to YOU.'], ['i', 'A whole week held up under testing.']]],
     ['rocket-1', '🛰️', 'Orbit Engineer', 'Solve a Rocket Lab quest.', () => (L.rocket.solved || 0) >= 1, [['k', 'rocket scientist No.1, reporting for duty!'], ['i', 'Orbital mechanics is just Gravitation done carefully. Correct.']]],
     ['rocket-10', '🚀', 'Mission Control', 'Solve 10 Rocket Lab quests.', () => (L.rocket.solved || 0) >= 10, [['k', 'TEN orbits. you basically work at a space agency now.'], ['i', 'Ten. Your intuition for orbits is real now.']]],
-    ['ledger-7', '📋', 'Honest Ledger', 'Close 7 blocks with your three numbers.', () => Object.values(L.blocks).reduce((n, b) => n + Object.keys(b).length, 0) >= 7, [['i', 'Seven blocks closed honestly. That data is worth more than the ticks.'], ['k', 'the ledger of a champion ☾']]],
+    ['ledger-7', '📋', 'Honest Ledger', 'Close 7 blocks with your three numbers.', () => Object.values(L.blocks).reduce((n, b) => n + Object.keys(b).length, 0) >= 7, [['i', 'Seven blocks closed honestly. That data is worth more than the ticks.'], ['k', 'the ledger of a champion 🌙']]],
     ['teach-1', '🗣️', 'Little Teacher', 'Teach Kaguya a concept and get scored.', () => !!(L.teach && L.teach.turns.some(x => x.who === 'i')), [['k', 'you taught me something! i understood like 60% of it!'], ['i', 'Explaining is the fastest way to find your own gaps.']]],
     ['photo-1', '📷', 'Under the Lens', 'Photo-check your working once.', () => !!L.photo, [['i', 'Real working, checked. Do this on every hard problem.'], ['k', 'iroha squinted at your handwriting for a full minute.']]]
   );
@@ -4792,7 +4887,7 @@ body.kg-light #kg-mstop{color:#c2337c}
   /* ---------- Today cards ---------- */
   function companyCard() {
     const m = moodToday(), low = m === 'heavy' || m === 'hard' || m === 'lowest';
-    return `<section class="kl-card kl-companycard ${low ? 'warm' : ''}"><div class="kl-row kl-between"><div><p class="kl-eyebrow">☾ COMPANY</p><p>${low ? "Kaguya: it's a heavy one today, huh. want me to keep you company for a bit?" : 'Kaguya is around whenever you want company, study or not.'}</p></div><button class="${low ? 'kl-primary' : ''}" data-a="go" data-v="company:hangout">Hang out</button></div></section>`;
+    return `<section class="kl-card kl-companycard ${low ? 'warm' : ''}"><div class="kl-row kl-between"><div><p class="kl-eyebrow">🌙 COMPANY</p><p>${low ? "Kaguya: it's a heavy one today, huh. want me to keep you company for a bit?" : 'Kaguya is around whenever you want company, study or not.'}</p></div><button class="${low ? 'kl-primary' : ''}" data-a="go" data-v="company:hangout">Hang out</button></div></section>`;
   }
   function moodMemoryCard() {
     const ms = recentMoods(), heavy = ms.filter(v => v === 'heavy' || v === 'hard' || v === 'lowest').length, lowest = ms.filter(v => v === 'lowest').length;
@@ -4803,7 +4898,7 @@ body.kg-light #kg-mstop{color:#c2337c}
   function windCard() {
     const m = nowMin(); if (!(m >= 23 * 60 + 30 || m < 60)) return '';
     const j = L.journal[today()] || {};
-    return `<section class="kl-card kl-wind"><p class="kl-eyebrow">☾ WIND-DOWN · SCREENS OFF SOON</p><h3>Three lines, then sleep.</h3><form data-f="journal" class="kl-stack">
+    return `<section class="kl-card kl-wind"><p class="kl-eyebrow">🌙 WIND-DOWN · SCREENS OFF SOON</p><h3>Three lines, then sleep.</h3><form data-f="journal" class="kl-stack">
       <input name="good" maxlength="140" placeholder="One thing that went well" value="${esc(j.good || '')}"><input name="fix" maxlength="140" placeholder="One thing to fix tomorrow" value="${esc(j.fix || '')}"><input name="look" maxlength="140" placeholder="One thing I'm looking forward to" value="${esc(j.look || '')}">
       <button class="kl-primary">Save and say goodnight</button></form><p class="kl-small">Tomorrow starts at 10:30. First block: Maths, hardest problems first.</p></section>`;
   }
@@ -4812,7 +4907,7 @@ body.kg-light #kg-mstop{color:#c2337c}
 
   /* ---------- Company pages ---------- */
   const CHIPS = [['Tell me a moon story', 'tell me a short, cozy moon-princess story. something that would make me smile.'], ['Would you rather', "let's play would you rather! you go first."], ['20 questions', "let's play 20 questions. you think of something and i'll guess."], ['After JEE plans', "let's daydream about fun things to do after JEE."], ['Ask about my day', 'ask me about my day, like a friend would.'], ['Word game', "let's play a quick word game."], ['Just keep me company', 'can you just keep me company for a bit?']];
-  M.PANELS.hangout = () => `<section class="kl-card kl-hang"><p class="kl-eyebrow">☾ HANG OUT</p><h3>Company with Kaguya</h3><p>No study talk unless you want it. She's chattier here, and she remembers what you tell her in Memories.</p>
+  M.PANELS.hangout = () => `<section class="kl-card kl-hang"><p class="kl-eyebrow">🌙 HANG OUT</p><h3>Company with Kaguya</h3><p>No study talk unless you want it. She's chattier here, and she remembers what you tell her in Memories.</p>
     <div class="kl-chips">${CHIPS.map(([l, q]) => `<button data-a="hang" data-q="${esc(q)}">${l}</button>`).join('')}</div>
     <form data-f="hang" class="kl-row"><input name="t" maxlength="400" placeholder="Say anything to Kaguya…" aria-label="Say anything to Kaguya"><button class="kl-primary">Send</button></form></section>
     <section class="kl-card"><label class="kl-check"><input type="checkbox" data-a="cset" data-k="studyWithMe" ${L.cset.studyWithMe ? 'checked' : ''}> Study with me: during blocks she just sits with you, quietly, so you're not alone at the desk.</label></section>`;
@@ -4850,7 +4945,7 @@ body.kg-light #kg-mstop{color:#c2337c}
     if (writing) return; writing = kind; M.render();
     const f = JSON.stringify(weekFacts()), d = today();
     let r, title = '', who = 'kaguya';
-    if (kind === 'letter') r = await ask('kaguya', `[letter request, not typed by me] Write me a warm Sunday letter from you (Kaguya), about 120 words, plain text, signed "— Kaguya ☾". Notice real things from this week's facts, be proud of me, be kind about anything hard. Facts: ${f}`);
+    if (kind === 'letter') r = await ask('kaguya', `[letter request, not typed by me] Write me a warm Sunday letter from you (Kaguya), about 120 words, plain text, signed "— Kaguya 🌙". Notice real things from this week's facts, be proud of me, be kind about anything hard. Facts: ${f}`);
     else if (kind === 'note') { who = 'iroha'; r = await ask('iroha', `[weekly note, not typed by me] Write a short weekly note to me from you (Iroha): at most 4 lines, firm and fair, one thing to keep and one thing to fix next week, signed "— Iroha". Facts: ${f}`); }
     else if (kind === 'diary') r = await ask('kaguya', `[diary request, not typed by me] Write tonight's entry in your own diary, 3 short lines, about today with me, from your point of view. Plain text. Facts: ${f}`);
     else {
@@ -4922,11 +5017,11 @@ body.kg-light #kg-mstop{color:#c2337c}
   });
   Object.assign(M.FORMS, {
     hang: v => { if (!v.t.trim()) return; company = true; notes(); window.__kaguyaAsk?.(v.t.trim()); M.render(); },
-    mem: v => { L.memories.push({ id: M.uid(), d: today(), t: v.t.trim() }); save(); notes(); M.render(); K(pick(["got it. i'll remember ☾", "noted in my moon diary forever.", "ooh, i like knowing that about you."])); },
-    qotd: v => { L.memories.push({ id: M.uid(), d: today(), t: qotd() + ' ' + v.a.trim() }); save(); notes(); M.render(); K(pick(["i love that. thank you for telling me ☾", "that's so you. remembered!", "hehe, now i know you a little better."])); },
-    journal: v => { L.journal[today()] = { good: v.good.trim(), fix: v.fix.trim(), look: v.look.trim() }; save(); M.render(); duo([['k', "goodnight, No.1. today counted for something, even the hard parts. sleep well ☾"], ['i', 'Sleep. Same time tomorrow.']]); },
+    mem: v => { L.memories.push({ id: M.uid(), d: today(), t: v.t.trim() }); save(); notes(); M.render(); K(pick(["got it. i'll remember 🌙", "noted in my moon diary forever.", "ooh, i like knowing that about you."])); },
+    qotd: v => { L.memories.push({ id: M.uid(), d: today(), t: qotd() + ' ' + v.a.trim() }); save(); notes(); M.render(); K(pick(["i love that. thank you for telling me 🌙", "that's so you. remembered!", "hehe, now i know you a little better."])); },
+    journal: v => { L.journal[today()] = { good: v.good.trim(), fix: v.fix.trim(), look: v.look.trim() }; save(); M.render(); duo([['k', "goodnight, No.1. today counted for something, even the hard parts. sleep well 🌙"], ['i', 'Sleep. Same time tomorrow.']]); },
     support: v => { L.support = { person: v.person.trim(), contact: v.contact.trim(), helpline: v.helpline.trim(), helps: v.helps.trim() }; save(); M.render(); },
-    care: v => { L.cset.meds = v.meds.trim(); L.cset.water = Math.max(0, Math.min(240, parseInt(v.water) || 0)); save(); M.render(); K('reminders saved. i\'ll be gentle about it ☾'); }
+    care: v => { L.cset.meds = v.meds.trim(); L.cset.water = Math.max(0, Math.min(240, parseInt(v.water) || 0)); save(); M.render(); K('reminders saved. i\'ll be gentle about it 🌙'); }
   });
 
   /* ---------- ambient sound, sky colour, notifications ---------- */
@@ -4988,8 +5083,8 @@ body.kg-light #kg-mstop{color:#c2337c}
     notes(); skyTick(); ambientTick();
     document.getElementById('ame-widget')?.classList.toggle('kg-with', !!(study && L.cset.studyWithMe && !M.isNight()));
     // medicine and water: short, gentle, allowed even during blocks
-    for (const t of String(L.cset.meds || '').split(',').map(s => s.trim()).filter(Boolean)) if (t === hm && remDone[d + t] !== true) { remDone[d + t] = true; K(`medicine time, No.1 (${t}). water too ☾`, { force: 1 }); notify('Medicine time', `It's ${t}. Water too.`); }
-    if (L.cset.water && m >= 630 && m < 1410 && Date.now() - lastWater > L.cset.water * 60000) { lastWater = Date.now(); K('sip of water? ☾', { force: 1 }); }
+    for (const t of String(L.cset.meds || '').split(',').map(s => s.trim()).filter(Boolean)) if (t === hm && remDone[d + t] !== true) { remDone[d + t] = true; K(`medicine time, No.1 (${t}). water too 🌙`, { force: 1 }); notify('Medicine time', `It's ${t}. Water too.`); }
+    if (L.cset.water && m >= 630 && m < 1410 && Date.now() - lastWater > L.cset.water * 60000) { lastWater = Date.now(); K('sip of water? 🌙', { force: 1 }); }
     if (!b || b.id === lastBlock) return;
     const prev = lastBlock; lastBlock = b.id; if (!prev || window.__kgOnBreak) return;
     notify(b.title + ' starts now', (b.kind === 'study' ? 'Study block' : 'Break') + ' · Kaguya Desk');
@@ -5006,13 +5101,13 @@ body.kg-light #kg-mstop{color:#c2337c}
     const d = today(), last = ((M.read('ame-habit-v1', {}) || {}).lastBackup) || 0;
     if (!L.cset.autoBackup || new Date(d + 'T12:00:00').getDay() !== 0 || L.autoBackupDay === d || Date.now() - last < 6 * 864e5) return;
     L.autoBackupDay = d; save();
-    setTimeout(() => { document.querySelector('#habit-desk [data-action="backup"]')?.click(); K('weekly backup saved to your downloads ☾'); }, 400);
+    setTimeout(() => { document.querySelector('#habit-desk [data-action="backup"]')?.click(); K('weekly backup saved to your downloads 🌙'); }, 400);
   }, { capture: true });
 
   // heavy days: Kaguya offers company once, outside study blocks
   setTimeout(() => {
     const m = moodToday(); if (!['heavy', 'hard'].includes(m) || L.offered === today() || M.inStudy()) return;
-    L.offered = today(); save(); K("hey, heavy day huh. if you want company, i'm in the Company tab. no pressure ☾");
+    L.offered = today(); save(); K("hey, heavy day huh. if you want company, i'm in the Company tab. no pressure 🌙");
   }, 20000);
   M.render();
 })();
@@ -5108,11 +5203,11 @@ body.kg-light #kg-mstop{color:#c2337c}
     const d = today(), last = L.lastSeen;
     if (last && gap(d, last) >= 2) {
       welcome = true;
-      setTimeout(() => duo([['k', "you're back!! i missed you. no catching up, no guilt. we just start again from here ☾"], ['i', 'One block. That is all today asks for. Start small.']]), 5000);
+      setTimeout(() => duo([['k', "you're back!! i missed you. no catching up, no guilt. we just start again from here 🌙"], ['i', 'One block. That is all today asks for. Start small.']]), 5000);
     }
     L.lastSeen = d; save();
   })();
-  function welcomeCard() { return welcome ? `<section class="kl-card kl-companycard warm"><p class="kl-eyebrow">☾ WELCOME BACK</p><p>Nothing to make up. The chain starts again the moment today counts. Start with one small sprint.</p><button class="kl-primary" data-a="go" data-v="study:practice">One small sprint</button></section>` : ''; }
+  function welcomeCard() { return welcome ? `<section class="kl-card kl-companycard warm"><p class="kl-eyebrow">🌙 WELCOME BACK</p><p>Nothing to make up. The chain starts again the moment today counts. Start with one small sprint.</p><button class="kl-primary" data-a="go" data-v="study:practice">One small sprint</button></section>` : ''; }
 
   /* ---------- 4. Kaguya's study bar: she works on her own little task next to you ---------- */
   const TASKS = ['polishing moon crystals', 'practising her stream intro', 'writing to the moon rabbits', 'sorting her star collection', 'learning one equation (she says)', 'sewing a new ribbon', 'tidying the moon palace', 'composing a tiny song'];
@@ -5120,11 +5215,11 @@ body.kg-light #kg-mstop{color:#c2337c}
   let hwBlock = '';
   function hwTick() {
     const b = M.block(), on = b && b.kind === 'study' && L.cset && L.cset.studyWithMe && !M.isNight() && !window.__kgOnBreak;
-    if (!on) { if (hwBlock) { hwBlock = ''; hw.hidden = true; if (!M.isNight()) K('done! we both finished our blocks ☾ ' + pick(['high five!', 'snack break?', 'good work, partner.'])); } else hw.hidden = true; return; }
+    if (!on) { if (hwBlock) { hwBlock = ''; hw.hidden = true; if (!M.isNight()) K('done! we both finished our blocks 🌙 ' + pick(['high five!', 'snack break?', 'good work, partner.'])); } else hw.hidden = true; return; }
     const m = nowMin(), t = (m < 630 ? m + 1440 : m) - 630, p = Math.max(0, Math.min(100, Math.round((t - b.start) * 100 / b.minutes)));
     if (hwBlock !== b.id) { hwBlock = b.id; hw.dataset.task = TASKS[(b.start / 10 | 0) % TASKS.length]; }
     const her = (L.buddy?.[today()]?.[b.id] || {}).her || hw.dataset.task;
-    hw.hidden = false; hw.innerHTML = `<span>☾ ${esc(her)}</span><b style="width:${p}%"></b>`;
+    hw.hidden = false; hw.innerHTML = `<span>🌙 ${esc(her)}</span><b style="width:${p}%"></b>`;
     // one silent wave at the halfway mark, no words
     if (p >= 50 && hw.dataset.waved !== b.id) { hw.dataset.waved = b.id; hw.classList.add('wave'); hw.dataset.wave = '👋'; setTimeout(() => hw.classList.remove('wave'), 6000); }
   }
@@ -5161,8 +5256,8 @@ body.kg-light #kg-mstop{color:#c2337c}
   };
   setTimeout(() => {
     const d = today(), w = new Date(d + 'T12:00:00').getDay(), plan = L.sunday[d] || [];
-    if (w === 0 && plan.length && nowMin() >= 18 * 60 && L.sundayAsked !== d) { L.sundayAsked = d; save(); K(`so? did you get to ${plan[0].t} today? tell me everything ☾`); }
-    if (w === 6 && !Object.keys(L.sunday).includes(add(d, 1)) && L.sundayNudge !== d && !M.inStudy()) { L.sundayNudge = d; save(); K("tomorrow's sunday! want to plan something fun? Company → Sunday ☾"); }
+    if (w === 0 && plan.length && nowMin() >= 18 * 60 && L.sundayAsked !== d) { L.sundayAsked = d; save(); K(`so? did you get to ${plan[0].t} today? tell me everything 🌙`); }
+    if (w === 6 && !Object.keys(L.sunday).includes(add(d, 1)) && L.sundayNudge !== d && !M.inStudy()) { L.sundayNudge = d; save(); K("tomorrow's sunday! want to plan something fun? Company → Sunday 🌙"); }
   }, 15000);
 
   /* ---------- 8. monthly recap and printable report ---------- */
@@ -5196,7 +5291,7 @@ body.kg-light #kg-mstop{color:#c2337c}
     const first = !L.recapMonth; L.recapMonth = mk; save(); clearInterval(recap); if (first) return;
     const s = rangeStats(prevMonth(d), add(mk + '-01', -1));
     duo(s.counted || Number(s.hours) ? [['k', `new month! last month you studied ${s.hours} hours and ${s.counted} days counted. ${s.medals.length ? 'and ' + s.medals.length + ' medal' + (s.medals.length > 1 ? 's' : '') + '!!' : "let's go for a medal this month!"}`], ['i', 'The full report is in Progress → Report.']]
-      : [['k', "new month, fresh page! nothing to carry over. we start whenever you're ready ☾"]]);
+      : [['k', "new month, fresh page! nothing to carry over. we start whenever you're ready 🌙"]]);
   }, 20000);
 
   /* ---------- 9. seasonal stickers: four new ones every three months ---------- */
@@ -5208,7 +5303,7 @@ body.kg-light #kg-mstop{color:#c2337c}
     const tag = ` (${sName} ${y})`;
     return [
       [`season-${sId}-days`, sEmoji, `${sName}: 30 Days`, `30 days that count this season${tag}.`, ok(() => Object.entries(M.hist().statuses).filter(([x, s]) => inSeason(x) && counted(s)).length >= 30), [['k', `30 counted days this season! the ${sName.toLowerCase()} sticker is yours!`], ['i', 'Thirty days in one season. Consistent.']]],
-      [`season-${sId}-medals`, '🏅', `${sName}: 3 Medals`, `Prove 3 chapters this season${tag}.`, ok(() => Object.values(L.medals || {}).filter(v => inSeason(v.d)).length >= 3), [['k', 'three medals in one season?! show-off ☾'], ['i', 'Three proven chapters. That moves a rank.']]],
+      [`season-${sId}-medals`, '🏅', `${sName}: 3 Medals`, `Prove 3 chapters this season${tag}.`, ok(() => Object.values(L.medals || {}).filter(v => inSeason(v.d)).length >= 3), [['k', 'three medals in one season?! show-off 🌙'], ['i', 'Three proven chapters. That moves a rank.']]],
       [`season-${sId}-recall`, '🧠', `${sName}: 100 Recalls`, `Answer 100 of Iroha's questions this season${tag}.`, ok(() => L.log.filter(e => e.t === 'recall' && inSeason(e.d)).length >= 100), [['i', 'A hundred recalls this season. Memory built, not borrowed.'], ['k', "your brain is a palace now, i've seen it."]]],
       [`season-${sId}-grat`, '🫙', `${sName}: Full Jar`, `Put 20 things in the gratitude jar this season${tag}.`, ok(() => L.grat.filter(g => inSeason(g.d)).length >= 20), [['k', 'the jar is FULL of good things. like you.'], ['i', '...Twenty good things. Keep noticing them.']]]
     ];
@@ -5228,16 +5323,16 @@ body.kg-light #kg-mstop{color:#c2337c}
     syncpull: pull,
     syncauto: b => { setSync({ auto: b.checked }); },
     syncoff: () => { if (!confirm('Turn sync off on this device? Your cloud copy stays.')) return; localStorage.removeItem('kg-sync'); syncMsg = ''; remote = null; M.render(); },
-    examcheck: b => { const ex = examDate(), all = L.examCheck = L.examCheck || {}, c = all[ex] = all[ex] || {}; c[b.dataset.i] = b.checked; save(); if (Object.values(c).filter(Boolean).length === 6) duo([['k', "all packed! you're going to do great, No.1. i'll be right here after ☾"], ['i', "You're ready. Read twice, answer once."]]); },
+    examcheck: b => { const ex = examDate(), all = L.examCheck = L.examCheck || {}, c = all[ex] = all[ex] || {}; c[b.dataset.i] = b.checked; save(); if (Object.values(c).filter(Boolean).length === 6) duo([['k', "all packed! you're going to do great, No.1. i'll be right here after 🌙"], ['i', "You're ready. Read twice, answer once."]]); },
     revdone: b => { const id = b.dataset.id, d = today(); (L.rev[id] = L.rev[id] || []).push(d); const c = L.ch[id] = L.ch[id] || {}; c.last = d; save(); M.render(); M.checkStickers(); I(`Round ${L.rev[id].length} on ${chName(id)} logged. Next one in ${GAPS[L.rev[id].length] || 0} days.`, { face: 'study' }); },
     sunadd: b => { const k = sundayKey(); (L.sunday[k] = L.sunday[k] || []).push({ t: b.dataset.t }); save(); M.render(); K(pick(['ooh, good choice!', 'yes!! that one!', "i'm coming too (in spirit)."])); },
-    sundone: b => { const p = (L.sunday[sundayKey()] || [])[Number(b.dataset.i)]; if (p) { p.done = b.checked; save(); if (b.checked) K('you did it! that counts as a win too ☾'); } },
+    sundone: b => { const p = (L.sunday[sundayKey()] || [])[Number(b.dataset.i)]; if (p) { p.done = b.checked; save(); if (b.checked) K('you did it! that counts as a win too 🌙'); } },
     reprange: b => { repRange = b.dataset.v; M.render(); },
     repprint: () => window.print()
   });
   Object.assign(M.FORMS, {
     synccode: v => { setSync({ code: v.code.trim(), auto: true, ts: 0, fp: '' }); syncMsg = 'Code saved. Loading your desk from the cloud…'; M.render(); pull(); },
-    grat: v => { L.grat.push({ d: today(), t: v.t.trim() }); save(); M.render(); M.checkStickers(); K(pick(['into the jar it goes ☾', 'that one made me smile.', 'saved for a rainy day.'])); },
+    grat: v => { L.grat.push({ d: today(), t: v.t.trim() }); save(); M.render(); M.checkStickers(); K(pick(['into the jar it goes 🌙', 'that one made me smile.', 'saved for a rainy day.'])); },
     sunday: v => { const k = sundayKey(); (L.sunday[k] = L.sunday[k] || []).push({ t: v.t.trim() }); save(); M.render(); }
   });
   const css = document.createElement('style');
@@ -5293,7 +5388,7 @@ body.kg-light #kg-mstop{color:#c2337c}
           save(); if (M.tab === 'paper') M.softRender();
         }
       }
-      if (L.paper === p) { p.state = 'ready'; save(); if (!M.inStudy()) K('your mock paper is ready, No.1! start it whenever you want ☾'); if (M.tab === 'paper') M.render(); }
+      if (L.paper === p) { p.state = 'ready'; save(); if (!M.inStudy()) K('your mock paper is ready, No.1! start it whenever you want 🌙'); if (M.tab === 'paper') M.render(); }
     } finally { building = false; }
   }
   // JEE-style marking: numeric +4/0, single-correct +3/-1, multi-correct +4, partial +1 per right option, -2 for any wrong option
@@ -5326,7 +5421,7 @@ body.kg-light #kg-mstop{color:#c2337c}
     p.state = 'done'; p.mockId = M.uid();
     L.mocks.push({ id: p.mockId, d: today(), name: `Full mock (${p.qs.length} questions)`, p: 0, c: 0, m: 0, max: p.size * 4, neg: 0, note: 'Written and marked on the desk' });
     const t = tallyPaper(p), weak = SUBJ.slice().sort((a, b) => t.by[a].marks - t.by[b].marks)[0]; save(); M.render(); M.checkStickers();
-    duo([['i', `${t.score} marks. Negatives cost you ${t.neg}. ${weak} is where the most marks went. Misses are in your deck.`], ['k', "you sat a whole paper!! that's the hard part done, No.1. go get water ☾"]]);
+    duo([['i', `${t.score} marks. Negatives cost you ${t.neg}. ${weak} is where the most marks went. Misses are in your deck.`], ['k', "you sat a whole paper!! that's the hard part done, No.1. go get water 🌙"]]);
   }
   setInterval(() => {
     const p = L.paper; if (!p || p.state !== 'open') return;
@@ -5445,7 +5540,7 @@ body.kg-light #kg-mstop{color:#c2337c}
   }
   function softTick() { if (L.softUntil && today() <= L.softUntil && !window.__kgOnBreak) M.toFallback?.(); }
   Object.assign(M.ACTIONS, {
-    softon: () => { const d = today(); L.softUntil = add(d, 2); L.softAsked = d; save(); softTick(); M.render(); duo([['k', "three lighter days, starting now. you're not behind, you're pacing ☾"], ['i', 'Eight hours counts in full. No extra.']]); },
+    softon: () => { const d = today(); L.softUntil = add(d, 2); L.softAsked = d; save(); softTick(); M.render(); duo([['k', "three lighter days, starting now. you're not behind, you're pacing 🌙"], ['i', 'Eight hours counts in full. No extra.']]); },
     softno: () => { L.softAsked = today(); save(); M.render(); },
     softoff: () => { L.softUntil = ''; save(); M.render(); }
   });
@@ -5477,7 +5572,7 @@ body.kg-light #kg-mstop{color:#c2337c}
       const b = M.block(), d = today(); if (!b) return;
       const i = (b.start / 10 | 0) % HER.length; (L.buddy[d] = L.buddy[d] || {})[b.id] = { goal: v.g.trim(), her: HER[i], i };
       for (const x of Object.keys(L.buddy)) if (gap(d, x) > 400) delete L.buddy[x];
-      save(); M.render(); K(`deal! you do that, i'll be ${HER[i]}. no talking till the end ☾`);
+      save(); M.render(); K(`deal! you do that, i'll be ${HER[i]}. no talking till the end 🌙`);
     },
     buddyswap: (v, f) => {
       const d = today(), x = L.buddy[d]?.[f.dataset.id]; if (!x) return;
@@ -5506,7 +5601,7 @@ body.kg-light #kg-mstop{color:#c2337c}
   setTimeout(() => {
     if (M.inStudy() || M.isNight()) return;
     const d = today(), m = L.memories.find(x => x.ev && x.on && x.on <= d && gap(d, x.on) <= 5 && !x.asked);
-    if (m) { m.asked = true; save(); K(`hey! how did ${m.ev} go? i've been wondering ☾`); }
+    if (m) { m.asked = true; save(); K(`hey! how did ${m.ev} go? i've been wondering 🌙`); }
   }, 25000);
   const memPanel = M.PANELS.memories;
   M.PANELS.memories = () => `<section class="kl-card kl-mini"><label class="kl-check"><input type="checkbox" data-a="automem" ${L.cset.autoMem ? 'checked' : ''}> Let Kaguya pick up small things from our chats. She never saves health details, and you can delete anything below.</label></section>` + memPanel();
@@ -5597,7 +5692,7 @@ body.kg-light #kg-mstop{color:#c2337c}
   M.ACTIONS.lighttheme = b => { L.cset.light = b.checked; save(); applyTheme(); };
 
   /* ---------- sit with me: a quiet room, nothing to do ---------- */
-  const SIT = ["i'm here.", 'no rush. no rush at all.', "you don't have to say anything.", 'look, the moon moved a little.', 'still here ☾', 'breathing is plenty for now.', 'this is nice, actually.', "i'm not going anywhere."];
+  const SIT = ["i'm here.", 'no rush. no rush at all.', "you don't have to say anything.", 'look, the moon moved a little.', 'still here 🌙', 'breathing is plenty for now.', 'this is nice, actually.', "i'm not going anywhere."];
   let room = null, roomTimer = 0, roomStart = 0;
   function closeRoom() { clearInterval(roomTimer); room?.remove(); room = null; }
   function openRoom() {
@@ -5624,7 +5719,7 @@ body.kg-light #kg-mstop{color:#c2337c}
   let watch = null;
   async function watchTick() {
     if (!watch) return;
-    if (Date.now() >= watch.end) { K(`that's the end of ${watch.title}! okay, tell me everything. what did you think? ☾`, { force: 1 }); clearInterval(watch.timer); watch = null; return M.tab === 'hangout' && M.render(); }
+    if (Date.now() >= watch.end) { K(`that's the end of ${watch.title}! okay, tell me everything. what did you think? 🌙`, { force: 1 }); clearInterval(watch.timer); watch = null; return M.tab === 'hangout' && M.render(); }
     const r = await window.__kgAsk?.('kaguya', `[watch-along, not typed by me] We're watching "${watch.title}" together and about ${Math.round((Date.now() - watch.start) / 60000)} minutes have passed. You can't see the screen. Say one short, cosy line as if sitting next to me: a playful guess, a snack demand, or asking me how it is so far. No spoilers and no made-up plot details.`);
     if (r && r.reply && watch) K(r.reply, { force: 1 });
   }
@@ -5636,7 +5731,7 @@ body.kg-light #kg-mstop{color:#c2337c}
     if (watch) clearInterval(watch.timer);
     watch = { title: v.title.trim(), start: Date.now(), end: Date.now() + min * 60000 };
     watch.timer = setInterval(watchTick, every); setTimeout(() => { if (watch && Date.now() >= watch.end) watchTick(); }, min * 60000 + 500);
-    M.render(); K(`yay, ${watch.title}! i brought imaginary popcorn ☾`, { force: 1 });
+    M.render(); K(`yay, ${watch.title}! i brought imaginary popcorn 🌙`, { force: 1 });
   };
   M.ACTIONS.watchstop = () => { if (watch) clearInterval(watch.timer); watch = null; M.render(); };
 
@@ -5651,12 +5746,12 @@ body.kg-light #kg-mstop{color:#c2337c}
   setTimeout(() => {
     const d = today(), m = nowMin(); if (M.isNight() || muted() || L.helloDay === d || M.inStudy() || m < 630 || m >= 23 * 60) return;
     L.helloDay = d; save();
-    K(`${m < 13 * 60 ? 'good morning' : 'hi'}, No.1! ${lastThing()}${window.__kgOnBreak ? 'nothing to do today but be looked after ☾' : "glad you're here ☾"}`);
+    K(`${m < 13 * 60 ? 'good morning' : 'hi'}, No.1! ${lastThing()}${window.__kgOnBreak ? 'nothing to do today but be looked after 🌙' : "glad you're here 🌙"}`);
   }, 7000);
   setInterval(() => {
     const d = today(), m = nowMin(); if (document.hidden || muted() || L.nightDay === d || !(m >= 45 && m < 60)) return;
     L.nightDay = d; save(); const w = L.wins.filter(x => x.d === d).at(-1);
-    duo(Object.assign([['k', `goodnight, No.1. ${w ? `i'm keeping "${w.t.slice(0, 50)}" in my diary. ` : ''}close the page soon, okay? ☾`], ['i', 'Sleep well.']], { kgBreak: true }));
+    duo(Object.assign([['k', `goodnight, No.1. ${w ? `i'm keeping "${w.t.slice(0, 50)}" in my diary. ` : ''}close the page soon, okay? 🌙`], ['i', 'Sleep well.']], { kgBreak: true }));
   }, 60000);
 
   /* ---------- good days: on a heavy day, something real from a better one ---------- */
@@ -5671,7 +5766,7 @@ body.kg-light #kg-mstop{color:#c2337c}
     const m = L.mood[today()]; if (!['heavy', 'hard', 'lowest'].includes(m)) return '';
     const old = goodList().filter(x => x.d < today()); if (!old.length) return '';
     goodPick = goodPick || pick(old);
-    return `<section class="kl-card kl-mini kl-good"><span>☾ Remember this? <b>“${esc(goodPick.t)}”</b> <small>${esc(goodPick.d)}</small></span></section>`;
+    return `<section class="kl-card kl-mini kl-good"><span>🌙 Remember this? <b>“${esc(goodPick.t)}”</b> <small>${esc(goodPick.d)}</small></span></section>`;
   }
   M.TODAY.splice(1, 0, goodDayCard);
   const memories = M.PANELS.memories;
@@ -5871,7 +5966,7 @@ body.kg-light #kg-mstop{color:#c2337c}
   M.TODAY.splice(2, 0, medsCard);
   M.ACTIONS.medtake = b => {
     const d = today(); (L.medsLog[d] = L.medsLog[d] || []).push({ dose: b.dataset.v, at: now() }); L.medsSeen = true; save(); M.render();
-    K('thank you for looking after yourself ☾', { force: 1 });
+    K('thank you for looking after yourself 🌙', { force: 1 });
   };
 
   /* ---------- the summary ---------- */
@@ -5944,15 +6039,14 @@ body.kg-light #kg-mstop{color:#c2337c}
     return bd + breakCard() + M.TODAY.filter(f => !STUDY_CARDS.has(f.name)).map(f => f()).join('');
   };
   function breakCard() {
-    return `<section class="kl-card kl-breakcard"><p class="kl-eyebrow">☾ ON BREAK · DOCTOR'S ORDERS</p><h3>No studying until ${esc(pretty(L.breakUntil))}.</h3>
+    return `<section class="kl-card kl-breakcard"><p class="kl-eyebrow">🌙 ON BREAK · DOCTOR'S ORDERS</p><h3>No studying until ${esc(pretty(L.breakUntil))}.</h3>
       <p>Resting is the whole plan right now. Nothing is piling up and there's nothing to make up. Your chain is safe: these days count as rest.</p>
-      <p class="kl-small">Kaguya: i've got you, No.1. we're doing nice things only ☾<br>Iroha: Your doctor's instruction is the plan. Follow it.</p>
-      <div class="kl-row"><button class="kl-primary" data-a="go" data-v="company:hangout">☾ Hang out with Kaguya</button><button data-a="go" data-v="company:comfort">🫶 Comfort</button><button data-a="go" data-v="company:sunday">🌤 Plan something nice</button></div></section>`;
+      <div class="kl-row"><button class="kl-primary" data-a="go" data-v="company:hangout">🌙 Hang out with Kaguya</button><button data-a="go" data-v="company:comfort">🫶 Comfort</button><button data-a="go" data-v="company:sunday">🌤 Plan something nice</button></div></section>`;
   }
 
   /* ---------- study pages stay closed unless you really want in ---------- */
   let peekUntil = 0;
-  const lockCard = () => `<section class="kl-card kl-breakcard"><p class="kl-eyebrow">☾ RESTING UNTIL ${esc(pretty(L.breakUntil)).toUpperCase()}</p><h3>This page is having a nap too.</h3><p>Your chapters and misses aren't going anywhere. They'll be exactly here when you're back.</p><div class="kl-row"><button class="kl-primary" data-a="go" data-v="company:hangout">☾ Hang out instead</button><button class="kl-ghost" data-a="breakpeek">Just let me look for a bit</button></div></section>`;
+  const lockCard = () => `<section class="kl-card kl-breakcard"><p class="kl-eyebrow">🌙 RESTING UNTIL ${esc(pretty(L.breakUntil)).toUpperCase()}</p><h3>This page is having a nap too.</h3><p>Your chapters and misses aren't going anywhere. They'll be exactly here when you're back.</p><div class="kl-row"><button class="kl-primary" data-a="go" data-v="company:hangout">🌙 Hang out instead</button><button class="kl-ghost" data-a="breakpeek">Just let me look for a bit</button></div></section>`;
   const LOCKED = [...M.SECTIONS.study.map(t => t[0]), 'rank'];
   for (const id of LOCKED) {
     const p = M.PANELS[id]; if (!p) continue;
@@ -5961,7 +6055,7 @@ body.kg-light #kg-mstop{color:#c2337c}
 
   /* ---------- settings ---------- */
   const companions = M.PANELS.companions;
-  M.PANELS.companions = () => `<section class="kl-card kl-stack"><p class="kl-eyebrow">☾ BREAK AND BIRTHDAY</p>
+  M.PANELS.companions = () => `<section class="kl-card kl-stack"><p class="kl-eyebrow">🌙 BREAK AND BIRTHDAY</p>
     ${onBreak() ? `<h3>On break until ${esc(pretty(L.breakUntil))}</h3>` : '<h3>No break set</h3><p class="kl-small">If a doctor or your body says stop, set a date. Study switches off, both companions go easy, and your chain stays safe.</p>'}
     <form data-f="breakdate" class="kl-row"><label>Back to studying on <input type="date" name="d" required value="${esc(L.breakUntil && onBreak() ? L.breakUntil : '')}"></label><button>${onBreak() ? 'Change date' : 'Start a break'}</button></form>
     ${onBreak() ? '<button class="kl-ghost" data-a="breakend">End the break today</button>' : ''}
@@ -5975,7 +6069,7 @@ body.kg-light #kg-mstop{color:#c2337c}
     const y = new Date().getFullYear(), letter = (L.bdayLetters || {})[y];
     return `<section class="kl-card kl-bday"><p class="kl-eyebrow">🎂 OCTOBER SPECIAL · ONE DAY ONLY</p><h3>Happy birthday, No.1!</h3><p>No study, no plans, no numbers today. You're allowed to just be celebrated.</p>
       ${letter ? `<details open><summary>Kaguya's birthday letter</summary><p class="kl-pre">${esc(letter)}</p></details>` : `<button class="kl-primary" data-a="bdayletter" ${letterBusy ? 'disabled' : ''}>${letterBusy ? 'Kaguya is writing…' : "💌 Open Kaguya's birthday letter"}</button>`}
-      <div class="kl-row"><button data-a="bdayparty">🎉 More confetti</button><button data-a="bdaychat">☾ Birthday chat with Kaguya</button></div></section>`.replace('OCTOBER SPECIAL · ', '');
+      <div class="kl-row"><button data-a="bdayparty">🎉 More confetti</button><button data-a="bdaychat">🌙 Birthday chat with Kaguya</button></div></section>`.replace('OCTOBER SPECIAL · ', '');
   }
   let letterBusy = false;
   function bdayHello() {
@@ -5995,7 +6089,7 @@ body.kg-light #kg-mstop{color:#c2337c}
     const last = L.breaks[L.breaks.length - 1], len = last ? M.gap(L.breakUntil, last.from) : 1, n = len <= 3 ? 2 : len <= 7 ? 3 : 5;
     L.softUntil = M.add(today(), n - 1); save();
     setTimeout(() => M.toFallback?.(), 1500);
-    setTimeout(() => script([['k', `you're back!! i missed study-you, but i liked rest-you too. the next ${n} days are short ones, okay? no catching up.`], ['i', `Eight hours at most for ${n} days. Do not try to recover lost time. There is none to recover.`], ['k', 'and if your doctor wants longer, just move the date in Settings. no questions asked ☾']]), 6000);
+    setTimeout(() => script([['k', `you're back!! i missed study-you, but i liked rest-you too. the next ${n} days are short ones, okay? no catching up.`], ['i', `Eight hours at most for ${n} days. Do not try to recover lost time. There is none to recover.`], ['k', 'and if your doctor wants longer, just move the date in Settings. no questions asked 🌙']]), 6000);
   }
 
   Object.assign(M.ACTIONS, {
@@ -6012,22 +6106,22 @@ body.kg-light #kg-mstop{color:#c2337c}
     bdaychat: () => window.__kaguyaAsk?.("it's my birthday today! keep me company and make it feel special."),
     bdayletter: async () => {
       if (letterBusy) return; letterBusy = true; M.render();
-      const r = await window.__kgAsk?.('kaguya', `[birthday letter request, not typed by me] It's my birthday today. Write me a warm, funny, heartfelt birthday letter from you (Kaguya), about 120 words, plain text, signed "— Kaguya ☾". I've been burnt out and am resting on my doctor's advice, so be gentle about that if you mention it. No study talk at all. Include one small line that Iroha insisted on adding, in her clipped voice.`);
+      const r = await window.__kgAsk?.('kaguya', `[birthday letter request, not typed by me] It's my birthday today. Write me a warm, funny, heartfelt birthday letter from you (Kaguya), about 120 words, plain text, signed "— Kaguya 🌙". I've been burnt out and am resting on my doctor's advice, so be gentle about that if you mention it. No study talk at all. Include one small line that Iroha insisted on adding, in her clipped voice.`);
       letterBusy = false;
       if (r && r.reply) { L.bdayLetters = L.bdayLetters || {}; L.bdayLetters[new Date().getFullYear()] = r.reply.trim(); save(); }
-      else K("my letter got lost in space! try opening it again in a minute ☾");
+      else K("my letter got lost in space! try opening it again in a minute 🌙");
       M.render();
     }
   });
   Object.assign(M.FORMS, {
     breakdate: v => {
-      if (!v.d || v.d <= today()) return K('pick a date after today for that ☾');
+      if (!v.d || v.d <= today()) return K('pick a date after today for that 🌙');
       const last = L.breaks[L.breaks.length - 1];
       if (onBreak() && last) last.until = v.d; else L.breaks.push({ from: today(), until: v.d });
       L.breakUntil = v.d; L.breakBack = ''; save(); sync(); M.render();
-      script([['k', `okay! rest until ${pretty(v.d)}. princess's orders ☾`], ['i', 'Understood. Rest is the assignment.']]);
+      script([['k', `okay! rest until ${pretty(v.d)}. princess's orders 🌙`], ['i', 'Understood. Rest is the assignment.']]);
     },
-    bday: v => { L.bday = v.b.trim(); save(); M.render(); K('saved! i am already planning ☾'); }
+    bday: v => { L.bday = v.b.trim(); save(); M.render(); K('saved! i am already planning 🌙'); }
   });
 
   const css = document.createElement('style');
@@ -6048,7 +6142,7 @@ body.kg-light #kg-mstop{color:#c2337c}
   'use strict';
   const M = window.MoonLab; if (!M) return;
   window.KGShell = true;
-  const NAV = [['today', '☀', 'Today'], ['study', '📖', 'Study'], ['progress', '📈', 'Progress'], ['plan', '🗓', 'Plan'], ['company', '☾', 'Company'], ['settings', '⚙', 'Settings']];
+  const NAV = [['today', '☀', 'Today'], ['study', '📖', 'Study'], ['progress', '📈', 'Progress'], ['plan', '🗓', 'Plan'], ['company', '🌙', 'Company'], ['settings', '⚙', 'Settings']];
   // which view of the old habit desk belongs on each page (Study and Company don't use it)
   const HABIT = { today: 'start', progress: 'progress', plan: 'plan', settings: 'settings' };
   const $ = id => document.getElementById(id);
@@ -6095,6 +6189,144 @@ body.kg-light #kg-mstop{color:#c2337c}
   setInterval(status, 30000);
   M.go = go;
   go(location.hash.slice(1) || 'today');
+})();
+
+</script>
+<script id="kg-scene-script">
+/* ===== The moonlit scene on Today: tonight's real moon, a sky that follows the clock, and the two of them ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab, main = document.getElementById('kg-main'), KG = window.__KG;
+  if (!M || !main || !KG) return;
+  const $ = id => document.getElementById(id), esc = M.esc;
+
+  function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+
+  /* ---------- the moon, from the real lunar cycle ---------- */
+  const SYNODIC = 29.530588853, NEW_MOON = Date.UTC(2000, 0, 6, 18, 14);
+  function moonNow() {
+    const age = (((Date.now() - NEW_MOON) / 864e5) % SYNODIC + SYNODIC) % SYNODIC, phase = age / SYNODIC * Math.PI * 2;
+    const lit = Math.round((1 - Math.cos(phase)) / 2 * 100);
+    const name = age < 1.2 || age > SYNODIC - 1.2 ? 'New moon' : age < 6.6 ? 'Waxing crescent' : age < 8.2 ? 'First quarter' : age < 13.6 ? 'Waxing gibbous' : age < 15.9 ? 'Full moon' : age < 21.2 ? 'Waning gibbous' : age < 22.9 ? 'Last quarter' : 'Waning crescent';
+    return { phase, lit, name, waning: phase > Math.PI };
+  }
+  function moonSvg(m) {
+    const r = 40, p = m.waning ? Math.PI * 2 - m.phase : m.phase, rx = (r * Math.abs(Math.cos(p))).toFixed(2);
+    const d = `M0,${-r} A${r},${r} 0 0 1 0,${r} A${rx},${r} 0 0 ${p > Math.PI / 2 ? 1 : 0} 0,${-r} Z`;
+    return `<svg viewBox="-46 -46 92 92" aria-hidden="true"><circle r="${r}" class="kgs-moon-dark"/><path d="${d}" class="kgs-moon-lit" ${m.waning ? 'transform="scale(-1,1)"' : ''}/><g class="kgs-craters"><circle cx="-12" cy="-14" r="6"/><circle cx="13" cy="8" r="8"/><circle cx="-6" cy="18" r="4"/><circle cx="20" cy="-18" r="3.5"/></g></svg>`;
+  }
+
+  /* ---------- scenery, drawn here so nothing is copied from anywhere ---------- */
+  function grove(seed, mirror) {
+    const r = rng(seed); let out = '';
+    for (let i = 0; i < 9; i++) {
+      const far = i < 4, x = Math.pow(r(), 1.5) * 230 + 4, w = far ? 4 + r() * 3 : 7 + r() * 5, top = -10 - r() * 20, cls = far ? 'far' : 'near';
+      let nodes = '', leaves = '';
+      for (let y = 30 + r() * 30; y < 320; y += 44 + r() * 26) {
+        nodes += `<rect x="${(x - 1).toFixed(1)}" y="${y.toFixed(1)}" width="${(w + 2).toFixed(1)}" height="2.4" rx="1.2" class="kgs-node"/>`;
+        if (r() < .55) { const dir = r() < .5 ? -1 : 1, lx = x + (dir > 0 ? w : 0), l = 16 + r() * 18; leaves += `<path d="M${lx.toFixed(1)},${y.toFixed(1)} q${(dir * l * .55).toFixed(1)},-9 ${(dir * l).toFixed(1)},${(2 + r() * 8).toFixed(1)} q${(-dir * l * .55).toFixed(1)},-1 ${(-dir * l).toFixed(1)},${(-2 - r() * 8).toFixed(1)}Z" class="kgs-leaf"/>`; }
+      }
+      out += `<g class="kgs-stalk ${cls}" style="--sway:${(6 + r() * 5).toFixed(1)}s;--from:${(-r() * 8).toFixed(1)}s"><rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="340" rx="${(w / 2).toFixed(1)}"/>${nodes}${leaves}</g>`;
+    }
+    return `<svg class="kgs-grove ${mirror ? 'right' : 'left'}" viewBox="0 0 260 320" preserveAspectRatio="${mirror ? 'xMaxYMax' : 'xMinYMax'} slice" aria-hidden="true"${''}>${mirror ? `<g transform="translate(260,0) scale(-1,1)">${out}</g>` : out}</svg>`;
+  }
+  function stars() {
+    const r = rng(77); let out = '';
+    for (let i = 0; i < 54; i++) out += `<circle cx="${(r() * 100).toFixed(1)}%" cy="${(r() * 72).toFixed(1)}%" r="${(.5 + r() * 1.1).toFixed(2)}"${r() < .4 ? ` class="tw" style="--tw:${(2.5 + r() * 4).toFixed(1)}s;--from:${(-r() * 5).toFixed(1)}s"` : ''}/>`;
+    return `<svg class="kgs-stars" aria-hidden="true">${out}</svg>`;
+  }
+  function flies() {
+    const r = rng(19); let out = '';
+    for (let i = 0; i < 7; i++) out += `<i style="left:${(6 + r() * 88).toFixed(1)}%;bottom:${(8 + r() * 34).toFixed(1)}%;--fly:${(7 + r() * 8).toFixed(1)}s;--from:${(-r() * 9).toFixed(1)}s"></i>`;
+    return `<div class="kgs-flies" aria-hidden="true">${out}</div>`;
+  }
+
+  /* ---------- sky colours: the time of day, tinted by the theme you picked ---------- */
+  const THEME = {
+    rose: { night: ['#0b0a24', '#1c1646', '#3a2460'], morn: ['#2a2a66', '#6a4a8e', '#d58aa6'], day: ['#1d2a68', '#3a3f8e', '#6d5aa8'], dusk: ['#23184e', '#6a2a70', '#e0708a'] },
+    autumn: { night: ['#120b1c', '#2c1730', '#57301f'], morn: ['#3a2340', '#8a4a3a', '#e0a050'], day: ['#3a2438', '#6e3f35', '#b87a3a'], dusk: ['#24122c', '#7a2f2c', '#e88a3a'] },
+    winter: { night: ['#050a24', '#0d1a4e', '#1a2f7a'], morn: ['#10245e', '#2a5a9e', '#7fd0e8'], day: ['#0e2260', '#1f4a9a', '#3f8fd0'], dusk: ['#140f4e', '#4a2a9a', '#e05fd0'] },
+    spring: { night: ['#071a1c', '#0f2f2e', '#1f4a3a'], morn: ['#1a3f4a', '#3f7a6a', '#b8d890'], day: ['#123a44', '#22665a', '#5a9a68'], dusk: ['#16283e', '#3a4a5a', '#d09a70'] }
+  };
+  function skyColours() {
+    let theme = 'rose'; try { theme = JSON.parse(localStorage.getItem('ame-habit-v1') || '{}').settings?.theme || 'rose'; } catch (e) {}
+    const set = THEME[theme] || THEME.rose, h = new Date().getHours();
+    return { c: h >= 5 && h < 9 ? set.morn : h >= 9 && h < 16 ? set.day : h >= 16 && h < 19 ? set.dusk : set.night, night: h >= 19 || h < 5 };
+  }
+
+  /* ---------- what they say today: one steady pair of lines per day, until something else happens ---------- */
+  function lines() {
+    const d = new Date(), day = d.getDay(), seed = Math.floor(Date.parse(M.today()) / 864e5) || 0;
+    const of = list => list[seed % list.length];
+    if (d.getMonth() === 9 && d.getDate() === 31) return ["HAPPY BIRTHDAY, NO.1!! the whole moon is celebrating. i checked.", 'Happy birthday. ...I mean that.'];
+    if (window.__kgLowest) return ["no show today. it's just me, right here with you.", "I'm here too. There's no rush. Take your time."];
+    if (window.__kgOnBreak) return [of(["the moon's out and you're off duty, No.1. best combo.", 'my official orders: be extremely comfy.', 'nothing to do today except be looked after.']), of(['Your doctor set the plan. It is a good plan.', 'Nothing is due. Keep it that way.', 'Resting counts. I checked the numbers.'])];
+    if (M.isNight()) return ["the moon's my shift now. go to sleep, No.1. i'll keep watch.", 'Past wind-down. The work will still be there tomorrow.'];
+    if (window.__kgGentle) return ['gentle day. tiny steps still get the clip.', 'A lighter day is still a real day.'];
+    if (day === 0) return ['sunday! i declare a royal holiday.', 'Rest properly. That is the whole assignment.'];
+    return [of(["we're live, No.1! let's make today a good episode.", "your happy ending needs today's page. no pressure. some pressure.", "i believe in you so loudly that iroha asked me to stop."]), of(['One task, then the next one. That is all a day is.', 'Write the units. Check the signs. Then we talk.', 'I ran worse days than this one in school. Start small.'])];
+  }
+  function greeting() {
+    const h = new Date().getHours();
+    return h < 5 ? "It's late, No.1." : h < 12 ? 'Good morning, No.1.' : h < 17 ? 'Good afternoon, No.1.' : h < 22 ? 'Good evening, No.1.' : "It's getting late, No.1.";
+  }
+
+  /* ---------- build it once: it sits outside the page panels, so re-renders don't restart it ---------- */
+  const scene = document.createElement('section'); scene.id = 'kg-scene'; scene.setAttribute('aria-label', "Today's sky, with Kaguya and Iroha");
+  scene.innerHTML = `${stars()}<div class="kgs-glow" aria-hidden="true"></div><div class="kgs-moon" id="kgs-moon"></div>
+    <svg class="kgs-hills" viewBox="0 0 1000 120" preserveAspectRatio="none" aria-hidden="true"><path class="b" d="M0,70 C160,20 300,90 470,55 C640,20 800,80 1000,40 V120 H0Z"/><path class="f" d="M0,95 C200,60 380,110 560,88 C720,68 860,104 1000,80 V120 H0Z"/></svg>
+    ${grove(4242, false)}${grove(9191, true)}${flies()}
+    <div class="kgs-copy"><p class="kgs-eyebrow" id="kgs-phase"></p><h1 id="kgs-hello"></h1></div>
+    <div class="kgs-talk"><p class="kgs-say k" id="kgs-say-k"><b>Kaguya</b><span></span></p><p class="kgs-say i" id="kgs-say-i"><b>Iroha</b><span></span></p></div>
+    <div class="kgs-cast"><button type="button" class="kgs-who i" id="kgs-who-i" aria-label="Talk to Iroha"><img alt="" draggable="false" src="${esc(KG.iroha.desk || KG.iroha.idle)}"></button><button type="button" class="kgs-who k" id="kgs-who-k" aria-label="Talk to Kaguya"><img alt="" draggable="false" src="${esc(KG.kaguya.idle)}"></button></div>`;
+  main.prepend(scene);
+  $('kgs-who-k').onclick = () => $('ame-gif')?.click();
+  $('kgs-who-i').onclick = () => $('iroha-gif')?.click();
+
+  /* ---------- while the scene is on screen it replaces the floating pair, so they aren't shown twice ---------- */
+  const said = { k: null, i: null };
+  const bubbles = { k: $('ame-bubble'), i: $('iroha-bubble') };
+  function paint() {
+    const [k, i] = lines();
+    $('kgs-say-k').lastElementChild.textContent = said.k || k;
+    $('kgs-say-i').lastElementChild.textContent = said.i || i;
+    const away = !!$('iroha-widget')?.hidden; // after 1:00 she's gone for the night
+    $('kgs-who-i').hidden = away; $('kgs-say-i').hidden = away;
+  }
+  function mirror(who) {
+    const b = bubbles[who]; if (!b) return;
+    const name = b.querySelector('.kg-bubble-name, .ame-bubble-name');
+    const text = b.classList.contains('show') ? b.textContent.replace(name?.textContent || '', '').trim() : null;
+    if (text !== said[who]) { said[who] = text; paint(); }
+  }
+  for (const who of ['k', 'i']) if (bubbles[who]) new MutationObserver(() => mirror(who)).observe(bubbles[who], { attributes: true, attributeFilter: ['class'], childList: true, characterData: true, subtree: true });
+  new IntersectionObserver(es => { for (const e of es) document.body.classList.toggle('kg-scene-on', e.isIntersecting && e.intersectionRatio >= .4); }, { threshold: [0, .4, .8] }).observe(scene);
+
+  let moonKey = '';
+  function tick() {
+    const m = moonNow(), key = m.name + m.lit;
+    if (key !== moonKey) { moonKey = key; $('kgs-moon').innerHTML = moonSvg(m); $('kgs-phase').textContent = `🌙 ${m.name} · ${m.lit}% lit`; }
+    const { c, night } = skyColours();
+    scene.style.setProperty('--s1', c[0]); scene.style.setProperty('--s2', c[1]); scene.style.setProperty('--s3', c[2]);
+    scene.classList.toggle('night', night);
+    $('kgs-hello').textContent = greeting();
+    paint();
+  }
+  tick(); setInterval(tick, 60000);
+
+  /* ---------- tabs on phones: keep the current one in view and hint that there are more ---------- */
+  function tabs() {
+    for (const t of document.querySelectorAll('.kl-tabs')) {
+      const cur = t.querySelector('[aria-current="page"]');
+      if (cur && t.scrollWidth > t.clientWidth) t.scrollLeft = Math.max(0, cur.offsetLeft - t.offsetLeft - 24);
+      fade(t);
+    }
+  }
+  function fade(t) { t.classList.toggle('kg-more', t.scrollLeft + t.clientWidth < t.scrollWidth - 6); }
+  document.addEventListener('scroll', e => { if (e.target.classList?.contains('kl-tabs')) fade(e.target); }, true);
+  addEventListener('resize', tabs);
+  addEventListener('moonlab:render', () => { tick(); tabs(); });
+  tabs();
 })();
 
 </script>
