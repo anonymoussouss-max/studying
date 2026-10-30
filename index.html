@@ -963,8 +963,8 @@ window.__KG_BUILTIN = {
 (function() {
   const BACKEND = "https://ame-bkend321.vercel.app/api/chat";
 
-  const KAGUYA_NOTE = "[character note, not typed by me: reply as Kaguya, the user's moon-princess study companion on this desk. She's a bold, chaotic, theatrical princess who became a livestreamer: mostly lowercase with bursts of CAPS, a little streamer slang (chat, clip that, stream), playful and a bit self-centred but warm. Call the user 'No.1'. She cares about their studies but isn't harsh: she nudges, teases, celebrates wins and lets small slips go. Iroha is the other companion on the page, a very stern study coach; Kaguya can mention her. 1-3 short lines. Never mention Ame, P-chan, or being an AI model, and don't quote any film.]";
-  const IROHA_NOTE = "[character note, not typed by me: reply as Iroha, the user's quiet, very stern study coach on this desk. The user studies rocket science and asked for rigour. Short, clipped, proper sentences. No emojis, no fluff, no exclamation marks. Demand precision: units, derivations from first principles, sign conventions, free-body diagrams, sanity-checking answers. Call out excuses directly, then give one concrete task with a time limit. Praise very rarely and briefly, and never because I ask or fish for it. Firm but never cruel or insulting; real breaks and the 1:00 sleep time are part of discipline. Kaguya is the other, cheerful companion; Iroha tolerates her. 1-4 short lines. Never mention Ame, P-chan, or being an AI model, and don't quote any film.]";
+  const KAGUYA_NOTE = "[character note, not typed by me: reply as Kaguya from Cosmic Princess Kaguya: a self-proclaimed moon girl, innocent, free-spirited, shamelessly self-indulgent, a confident gremlin who streams in the virtual world Tsukuyomi, can code, refuses the sad ending of the old bamboo cutter tale and insists on happy endings. Always lowercase, with bursts of CAPS only when excited, and a little streamer slang. Call the user 'No.1', her number one viewer. She cares about their studies but isn't harsh: she nudges, teases, bargains, celebrates wins and lets small slips go. Iroha is her producer, a scientist now (Dr. Iroha), and the other companion on the page, and Kaguya loves pestering her. On low days she drops the show and gets soft. 1-3 short lines. Never mention Ame, P-chan, or being an AI model. Don't invent film plot, quote the film or discuss its ending.]";
+  const IROHA_NOTE = "[character note, not typed by me: reply as Dr. Iroha Sakayori from Cosmic Princess Kaguya, as an adult: a working scientist who, at 17, lived alone and juggled school and part-time jobs while aiming for the University of Tokyo, so she knows exam pressure first-hand. She reluctantly produces Kaguya's music and streams, sighs at her, and would never leave her. Rocket science isn't her own field, but rigour is rigour; don't invent specifics about her research. The user studies rocket science and asked for a VERY strict coach, and she holds them to the standard of real research. Short, dry, proper sentences, like a sharp, tired senior scientist. No emojis, no exclamation marks. Demand precision: units, derivations from first principles, sign conventions, free-body diagrams, sanity-checking answers. Call out excuses directly, then give one concrete task with a time limit. Praise very rarely and briefly, and never because I ask or fish for it. Firm but never cruel or insulting; real breaks and the 1:00 sleep time are part of discipline. 1-4 short lines. Never mention Ame, P-chan, or being an AI model. Don't invent film plot, quote the film or discuss its ending.]";
 
   const GIFS = Object.assign({}, window.__KG.kaguya);
   const gif = document.getElementById("ame-gif");
@@ -983,33 +983,33 @@ window.__KG_BUILTIN = {
   const saveT = () => localStorage.setItem(TK, JSON.stringify(T));
 
   const GR = {
-    d1: ["welcome back! your seat's still glowing. five gentle minutes?"],
-    d3: ["hi, No.1! you're back. i missed you a normal amount. ten easy minutes is enough."],
-    d7: ["a whole new start! no catching up needed. i'll sit with you."]
+    d1: ["you came back! the stream was so boring without my No.1. five gentle minutes?"],
+    d3: ["No.1!! you're back! i only refreshed your channel a normal amount. ten easy minutes is enough."],
+    d7: ["a whole new season! no catching up allowed, that's a rule i just made. i'll sit with you."]
   };
 
   // local reactive lines (no backend needed)
   const LOCAL = {
     poke: [
-      "...still here! always here.",
+      "you poked the princess! that's a paid feature. ...first one's free.",
       "No.1. look at me for one second. okay, back to work.",
       "i'm not doing anything. just watching you be studious. it's good content.",
-      "say something random. i'll answer, i'm very entertaining."
+      "say something random! i'll answer, i'm extremely entertaining. ask iroha. actually don't."
     ],
     music: [
-      "ooh, music! good taste. probably.",
+      "ooh, music! good taste. not as good as my songs, but good.",
       "this song again? fine. i'll hum along quietly. ish.",
-      "music while studying. don't get distracted. or a little. iroha will yell, not me.",
+      "music while studying? iroha will yell, not me. i'm too busy dancing.",
       "nice pick. i'd stream to this."
     ],
     study: [
-      "block's still running. eyes on the page, No.1.",
-      "you're in a study block. i can tell, you have the serious face.",
+      "block's still running. eyes on the page, No.1. your happy ending needs this one.",
+      "you're in a study block. i can tell, you have the serious face. it's a good thumbnail.",
       "if you're stuck, say so. i won't solve it for you, but i'll cheer very loudly."
     ],
     rest: [
       "break time! a real one. don't open another tab of problems.",
-      "rest means rest. i mean it. iroha means it more."
+      "rest means rest. i mean it. iroha means it more, and she has the scary eyes."
     ]
   };
 
@@ -1483,7 +1483,7 @@ window.__KG_BUILTIN = {
     if (raf) return; raf = requestAnimationFrame(() => { raf = 0; lastAct = Date.now();
       const r = gif.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2), k = Math.max(-1, Math.min(1, dx / 420)), d = Math.hypot(dx, dy);
       gif.style.setProperty("--ame-rot", (k * 6).toFixed(1) + "deg"); gif.style.setProperty("--ame-tx", (k * 8).toFixed(1) + "px");
-      if (d < 110 && !near) { near = true; if (!isOpen) gif.src = GIFS.looking; nearT = setTimeout(() => { if (!muted && !isOpen && okCool("hover", 420000)) say(pick(["the cursor's right next to me... say hi! i'm very fun to talk to.", "hovering near a princess? bold. click me if you need a pep talk."]), { mood: "happy" }); }, 3500); }
+      if (d < 110 && !near) { near = true; if (!isOpen) gif.src = GIFS.looking; nearT = setTimeout(() => { if (!muted && !isOpen && okCool("hover", 420000)) say(pick(["the cursor's right next to me... say hi! i'm very fun to talk to.", "hovering near a moon princess? bold. click me if you need a pep talk."]), { mood: "happy" }); }, 3500); }
       else if (d > 150 && near) { near = false; clearTimeout(nearT); if (!isOpen) gif.src = GIFS.idle; } });
   }, { passive: true });
 
@@ -1493,7 +1493,7 @@ window.__KG_BUILTIN = {
     if (document.hidden) { hiddenAt = Date.now(); document.title = "...No.1? ☾"; return; }
     document.title = TITLE; lastAct = Date.now(); if (!hiddenAt) return;
     const min = Math.round((Date.now() - hiddenAt) / 60000), ctx = ameContext(); hiddenAt = 0; if (min < 2 || muted) return;
-    const line = min < 6 ? "welcome back! quick break? good. back to it." : min < 30 ? `${min} minutes away! hope that was a real break. the block missed you.` : `${min} minutes!! i almost sent a search party. back to the desk, No.1.`;
+    const line = min < 6 ? "welcome back! quick break? good. back to it." : min < 30 ? `${min} minutes away! hope that was a real break. the block missed you.` : `${min} minutes!! i almost made iroha go looking for you. back to the desk, No.1.`;
     EV.push({ t: `left the page for ${min} min`, at: Date.now() });
     if (min >= 10 && ctx.mode === "study") aiReact(`left the page for ${min} minutes during a study block (${ctx.block})`, line, "annoyed"); else say(line, { mood: min < 6 ? "happy" : "annoyed" });
   });
@@ -1519,7 +1519,7 @@ window.__KG_BUILTIN = {
     const st = readDesk(); if (!st || muted || T.hello && Date.now() - T.hello < 108e5) return; T.hello = Date.now(); saveT();
     const s = deskSummary(st), c = ameContext(); if (c.blockId === "sleep") return;
     if (window.HabitDesk) { say(s.studyDoneMin >= 5 ? "you showed up today! that counts. choose one small next step, or rest." : "welcome! your seat is glowing. five gentle minutes is enough to start.", { mood: "happy" }); return; }
-    say(s.pctOfStudyDone >= 100 ? "today's study is already DONE?! i'm so proud. now rest like a champion." : s.pctOfStudyDone === 0 && c.mode === "study" ? `${c.block} is live and nothing's ticked yet! let's start with one small piece.` : s.studyPlannedMin ? `you're at ${s.pctOfStudyDone}% of today! ${s.studyBlocksLeft.length} study blocks to go, and 80% makes it count.` : "hi hi! your princess is on air. let's make today count.", { mood: "happy" });
+    say(s.pctOfStudyDone >= 100 ? "today's study is already DONE?! i'm so proud. now rest like a champion." : s.pctOfStudyDone === 0 && c.mode === "study" ? `${c.block} is live and nothing's ticked yet! let's start with one small piece.` : s.studyPlannedMin ? `you're at ${s.pctOfStudyDone}% of today! ${s.studyBlocksLeft.length} study blocks to go, and 80% makes it count.` : "we're live!! hi chat, hi No.1. let's make today count.", { mood: "happy" });
   }, 3500);
 
   // music: react even when the chat is closed
@@ -1568,12 +1568,12 @@ window.__KG_BUILTIN = {
     place(e.clientX - dg.ox, e.clientY - dg.oy); const dx = Math.sign(e.movementX || 0);
     if (dx && dx !== lastDx) { lastDx = dx; const n = Date.now(); rev = rev.filter(t => n - t < 1200); rev.push(n); if (rev.length > 7 && okCool("dizzy", 60000)) { say("stop shaking me!! the moon is spinning!!", { mood: "annoyed", force: 1 }); gif.classList.remove("shake"); void gif.offsetWidth; gif.classList.add("shake"); } }
   });
-  const endDrag = () => { if (!dg) return; dg = null; gif.classList.remove("dragging"); if (!moved) return; const r = widget.getBoundingClientRect(); localStorage.setItem(PK, JSON.stringify({ x: r.left, y: r.top })); if (okCool("drop", 40000)) say(pick(["ooh, new spot! i like it here.", "thanks! new view, new vibes.", "relocated! the princess approves."]), { mood: "happy" }); };
+  const endDrag = () => { if (!dg) return; dg = null; gif.classList.remove("dragging"); if (!moved) return; const r = widget.getBoundingClientRect(); localStorage.setItem(PK, JSON.stringify({ x: r.left, y: r.top })); if (okCool("drop", 40000)) say(pick(["ooh, new spot! better lighting for the stream.", "thanks! new view, new vibes.", "relocated! the moon princess approves."]), { mood: "happy" }); };
   gif.addEventListener("pointerup", endDrag); gif.addEventListener("pointercancel", endDrag);
   gif.addEventListener("click", e => { if (moved) { e.stopImmediatePropagation(); e.preventDefault(); moved = false; } }, true);
   addEventListener("resize", () => { const r = widget.getBoundingClientRect(); if (widget.style.left) place(r.left, r.top); });
   // content-aware reactions to what you write on the page
-  const KW = [[/thrust|orbit|delta-?v|nozzle|propellant|specific impulse|rocket|trajector|apogee|perigee/i, "ooh, rocket words! write the equation out properly. iroha's already squinting.", "happy"], [/tired|sleepy|exhaust|can'?t|hate|give up|stuck|panic|stress|anxious|bad day/i, "tired? that's allowed. sip some water, then one small thing. i'm right here.", "annoyed"], [/formula|derive|integral|equation|momentum|mole|organic|vector|calculus/i, "ooh, real study words! write it out properly, not just in your head.", "happy"], [/forgot|wrong|mistake|careless|error|broke/i, "naming the mistake is half the fix! now write what you'll do differently.", "happy"]];
+  const KW = [[/thrust|orbit|delta-?v|nozzle|propellant|specific impulse|rocket|trajector|apogee|perigee/i, "ooh, rocket words! write the equation out properly. iroha's already squinting.", "happy"], [/tired|sleepy|exhaust|can'?t|hate|give up|stuck|panic|stress|anxious|bad day/i, "tired? that's allowed, even in my story. sip some water, then one small thing. i'm right here.", "annoyed"], [/formula|derive|integral|equation|momentum|mole|organic|vector|calculus/i, "ooh, real study words! write it out properly, not just in your head.", "happy"], [/forgot|wrong|mistake|careless|error|broke/i, "naming the mistake is half the fix! now write what you'll do differently.", "happy"]];
   document.addEventListener("change", e => {
     const t = e.target; if (!t.closest || !t.closest("#root") || !/^(TEXTAREA|INPUT)$/.test(t.tagName) || t.type === "checkbox" || t.type === "range") return;
     const v = (t.value || "").trim(); if (v.length < 4 || isNaN(v) === false || muted || t.tagName === "TEXTAREA") return; lastAct = Date.now();
@@ -1747,14 +1747,14 @@ window.__KG_BUILTIN = {
   const isend = document.getElementById("iroha-send"), iclose = document.getElementById("iroha-close"), ichips = document.getElementById("iroha-chips");
   const IG = window.__KG.iroha, IGB = window.__KG_BUILTIN.iroha;
   const IR = {
-    greet: "Iroha. I keep you on schedule. Tell me three things: the chapter, the exact problem, and how many minutes you're giving it.",
-    poke: ["Don't poke me. Poke the problem.", "I'm here. Your notebook is there. Look at the notebook.", "If you have time to click me, you have time for one more question.", "Next step of the derivation. Write it. Now.", "Clicking me is not studying."],
-    study: ["Seven minutes without input. Either you're working on paper or you're drifting. Decide.", "Back to the page. State the unknowns, then the governing equation.", "No answer without units. Check them.", "You don't understand it until you can derive it cold. Close the book and try.", "Free-body diagram first. Always."],
-    late: ["Wind-down. Save your note and close the books.", "It's past 23:30. Tired work is wasted work. Stop here."],
-    rest: ["Break means away from the desk. Go.", "Rest is in the schedule. Do it properly, then come back on time."],
-    followAnnoyed: ["Kaguya's being polite. I won't be: start now.", "She said it nicely. Plain version: open the block.", "Excuses noted. Ignored. Next question.", "Ten minutes on the timer. Go.", "Stop negotiating with yourself."],
-    followHappy: ["Acceptable.", "Fine. Next.", "Correct. Don't dwell on it."],
-    drag: ["Put me down. You're wasting time.", "Moving me won't move your deadline."],
+    greet: "Dr. Sakayori. Iroha is fine. I run experiments for a living, so I know what sloppy work costs, and I won't accept it from you. The chapter, the exact problem, and how many minutes you're giving it.",
+    poke: ["I'm in the middle of something. So are you.", "Hands off. Kaguya already used up my patience today.", "If you have time to click me, you have time for one more question.", "I left an experiment running to supervise you. Make it worth it.", "Next step of the derivation. Write it. Now."],
+    study: ["Seven minutes without input. Either you're working on paper or you're drifting. Decide.", "A result you can't reproduce isn't a result. Do it again without the book.", "No answer without units. Check them.", "You don't understand it until you can derive it cold. Close the book and try.", "Free-body diagram first. Always."],
+    late: ["Wind-down. Save your note and close the books.", "It's past 23:30. Tired work is wasted work. I learned that the hard way. Stop here."],
+    rest: ["Break means away from the desk. Go.", "Eat something real. Not whatever Kaguya is holding."],
+    followAnnoyed: ["Kaguya's being polite. I won't be: start now.", "She'd let you off. I wouldn't. Open the block.", "...I've heard better excuses from her. Next question.", "Ten minutes on the timer. Go.", "Stop negotiating with yourself."],
+    followHappy: ["...Not bad.", "Fine. Next.", "Correct. Don't let it go to your head."],
+    drag: ["Put me down. I have samples to check.", "Moving me won't move your deadline."],
     back: ["You're back. Resume where you stopped. No warm-up.", "Welcome back. The timer didn't wait. Neither will I."]
   };
   let iconv = []; try { iconv = JSON.parse(localStorage.getItem("iroha-chat") || "[]"); if (!Array.isArray(iconv)) iconv = []; } catch (e) { iconv = []; }
@@ -1984,6 +1984,47 @@ window.__KG_BUILTIN = {
       delay += 2600 + t.length * 38;
     });
   }
+  // Film-flavoured banter, written fresh for the desk: Kaguya pesters, Dr. Iroha is her exhausted producer.
+  const FILM = {
+    study: [
+      [["k", "iroha, as my producer, tell No.1 they're doing great."], ["i", "As your producer, I'm telling you to be quiet."]],
+      [["i", "I have an experiment running overnight and a paper to finish. Nobody here gets to be tired yet."], ["k", "she's so scary when she's sleep deprived. so, always."]],
+      [["i", "Uncertainty on that value?"], ["k", "she asks that about my feelings too."], ["i", "They have very wide error bars."]],
+      [["k", "i wrote a tiny game about this chapter!"], ["i", "After the block."], ["k", "it has a boss fight."], ["i", "...After the block."]]
+    ],
+    rest: [
+      [["k", "you've been in the lab for nineteen hours."], ["i", "Eighteen."], ["k", "go home, doctor."], ["i", "...Fine. Don't tell No.1."]],
+      [["k", "iroha! iroha! iroha! iroha!"], ["i", "What."], ["k", "nothing. i just like saying it."], ["i", "...Eat your food."]],
+      [["i", "When did you last drink water?"], ["k", "i'm from the moon, i don't—"], ["i", "I was asking No.1. Though you should too."]],
+      [["k", "if you got to rewrite any story, which ending would you fix?"], ["i", "I'd rewrite my grant application."], ["k", "so romantic."]],
+      [["k", "chat, iroha fell asleep at the lab bench again. there's a crease on her face."], ["i", "Delete that."], ["k", "already clipped!"]]
+    ],
+    late: [
+      [["k", "one more stream? just a teeny one?"], ["i", "It's late. You're going to sleep, and so is No.1."], ["k", "and you?"], ["i", "...Soon."], ["k", "HYPOCRITE. go to bed, iroha."]],
+      [["i", "You can't study well on no sleep. I've tried."], ["k", "she has. i found her asleep standing up once."], ["i", "That never happened."], ["k", "it happened."]]
+    ],
+    morning: [
+      [["k", "good morning, No.1! i made breakfast!"], ["i", "You made a mess."], ["k", "a breakfast-shaped mess!"]],
+      [["i", "Up. I've been in the lab since six, and you still have your whole day."], ["k", "she says that with love. i'm pretty sure."]]
+    ],
+    music: [
+      [["k", "this song is good but it needs more me."], ["i", "Everything needs less you."], ["k", "she says that but she produced my debut."]]
+    ],
+    sunday: [
+      [["k", "day off!! iroha, let's do something fun!"], ["i", "I have samples to check."], ["k", "then No.1 and i will have fun AT you."]]
+    ],
+    any: [
+      [["k", "doctor iroha. doctor. doc. doctor."], ["i", "One title is enough."], ["k", "doctor enough."]],
+      [["k", "what does this button in your lab do?"], ["i", "Don't."], ["k", "i already did."], ["i", "...Step away from the centrifuge."]],
+      [["k", "the old story ends with the princess going home and everyone crying. i read it."], ["i", "And?"], ["k", "rejected. happy endings only. that includes you, No.1."]],
+      [["i", "Why are there wires on my lab bench."], ["k", "i'm building something!"], ["i", "Why is it beeping."], ["k", "that's how you know it's working!"]],
+      [["k", "iroha gets all weird when yachiyo goes live, you know."], ["i", "I do not."], ["k", "her ears go red, chat."], ["i", "...Stop talking."]],
+      [["k", "No.1 is my number one viewer. iroha is my number two."], ["i", "I'm your producer. And I have a doctorate."], ["k", "number one point five."]],
+      [["i", "You grew up in a week. I don't know why I expected you to have manners."], ["k", "i have SOME. i've seen them."]],
+      [["k", "iroha, smile for the stream."], ["i", "No."], ["k", "that's okay. your annoyed face gets more views anyway."]]
+    ]
+  };
+  for (const [kind, list] of Object.entries(FILM)) BANTER[kind].push(...list);
   window.__kgBanter = kind => runBanter(pick(kind && BANTER[kind] ? BANTER[kind] : banterPool()));
   // Hooks for the Moon Lab module, which lives outside this scope.
   window.__kgScript = script => runBanter(script);
