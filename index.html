@@ -2279,6 +2279,8 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
         <button type="button" class="mp-ctrl" id="mp-addq" disabled title="add current to queue">+ queue</button>
       </div>
 
+      <label id="mp-volrow" class="mp-volrow" hidden>volume <input id="mp-vol" type="range" min="0" max="100" step="5" aria-label="music volume"></label>
+      <p id="mp-volnote" class="mp-volnote" hidden>spotify sets its own volume, so use your device's volume for this one.</p>
       <button id="mp-size" class="mp-chip" type="button" aria-pressed="false" hidden>show tracks</button>
 
       <form id="mp-form" novalidate>
@@ -2308,10 +2310,8 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
   const PRESETS = [
     { label: "lofi girl",      source: "youtube", url: "https://www.youtube.com/watch?v=jfKZnUIqYAA" },
     { label: "lofi beats",     source: "spotify", url: "https://open.spotify.com/playlist/37i9dQZF1DWWQRwui0ExPn" },
-    { label: "peaceful piano", source: "spotify", url: "https://open.spotify.com/playlist/37i9dQZF1DX4sWSpwq3LiO" },
-    { label: "join me in death", source: "youtube", url: "https://www.youtube.com/watch?v=gCYcHz2k5x0" }
+    { label: "peaceful piano", source: "spotify", url: "https://open.spotify.com/playlist/37i9dQZF1DX4sWSpwq3LiO" }
   ];
-  // note: join me in death id is a placeholder-ish; user can paste real link and it will history it
   const KEY = "mp-v2";
   const MAX_HISTORY = 40;
 
@@ -2359,7 +2359,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
         m = u.pathname.match(/^\/(?:embed|shorts|live|v)\/([\w-]{11})/);
         if (m) id = m[1];
       }
-      let q = "autoplay=1&rel=0&playsinline=1";
+      let q = "autoplay=1&mute=1&enablejsapi=1&rel=0&playsinline=1";
       const withList = list && YT_LIST.test(list);
       if (id && YT_ID.test(id)) {
         if (loop) q += "&loop=1&playlist=" + id;
@@ -2482,6 +2482,30 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
 
   let current = null;
 
+  // the old "join me in death" pick was a placeholder link to a different song
+  const WRONG = "gCYcHz2k5x0", wrongPick = x => x.label === "join me in death" && String(x.url).includes(WRONG);
+  state.history = state.history.filter(x => !wrongPick(x));
+  state.queue = state.queue.filter(x => !wrongPick(x));
+  if (String(state.lastUrl).includes(WRONG)) state.lastUrl = null;
+
+  const volRow = $("mp-volrow"), volInput = $("mp-vol"), volNote = $("mp-volnote");
+  function getVol() {
+    let v = null; try { v = localStorage.getItem("mp-vol"); } catch (e) {}
+    return v !== null && Number(v) >= 0 && Number(v) <= 100 ? Number(v) : 30;
+  }
+  function ytSend(f, func, args) {
+    try { f.contentWindow.postMessage(JSON.stringify({ event: "command", func: func, args: args || [] }), "*"); } catch (e) {}
+  }
+  function ytVolume(f) {
+    const v = getVol(); ytSend(f, "setVolume", [v]); ytSend(f, v ? "unMute" : "mute");
+  }
+  volInput.value = getVol();
+  volInput.addEventListener("input", () => {
+    try { localStorage.setItem("mp-vol", volInput.value); } catch (e) {}
+    const f = stage.querySelector("iframe");
+    if (f && current && current.kind === "youtube") ytVolume(f);
+  });
+
   function play(p, labelHint, fromQueue) {
     if (p.error) return showError(p.error);
     // re-parse with loop flag for youtube
@@ -2498,6 +2522,9 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     f.allow = "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
     f.setAttribute("allowfullscreen", "");
     f.referrerPolicy = "strict-origin-when-cross-origin";
+    volRow.hidden = p.kind !== "youtube"; volNote.hidden = p.kind !== "spotify";
+    // the player needs a moment before it listens, so the volume is sent a few times
+    if (p.kind === "youtube") f.addEventListener("load", () => { [300, 1000, 2000, 4000].forEach(ms => setTimeout(() => { if (f.isConnected) ytVolume(f); }, ms)); });
     stage.appendChild(f);
 
     stage.dataset.kind = p.kind;
@@ -2534,6 +2561,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     stage.classList.remove("has-player");
     widget.classList.remove("mp-live");
     stopBtn.disabled = true;
+    volRow.hidden = true; volNote.hidden = true;
     sizeBtn.hidden = true;
     addQBtn.disabled = true;
     current = null;
@@ -2644,7 +2672,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
       }
 
       row.append(main, actions);
-      row.addEventListener("click", () => {
+      row.addEventListener("dblclick", () => {
         const p = parseLink(it.url, state.loop);
         if (p.error) return showError(p.error);
         play(p, it.label);
@@ -2919,14 +2947,14 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
       <article class="hb-card"><h2>Backup & restore</h2><p>Includes sessions, mistakes, plans, original desk logs, Kaguya’s journal, both companions’ chats, and music preferences. Weekly backup reminders appear on Today.</p><div class="hb-actions">${button('Download complete backup','backup','class="hb-primary"')}</div><label>Restore a previous backup (replaces this browser’s desk data)<input type="file" id="hb-restore" accept="application/json,.json"></label><p id="hb-restore-status" role="status"></p><p class="hb-caption">Keep the backup file somewhere safe. Use a complete backup to move between files, browsers, or a hosted site. The older “Download log” in Trial contains only the original schedule logs.</p></article>
       <article class="hb-card"><h2>A shortcut that’s easy to find</h2><p>On a hosted page: iPhone Safari → Share → Add to Home Screen. Android Chrome → menu → Add to Home screen. For a downloaded HTML file, keep it in Files and open it from there; home-screen installation needs a web address.</p>${button('Download desktop shortcut','shortcut')}<p>All study features work locally. AI chat, GIFs, fonts and external music need internet.</p></article>
       <article class="hb-card"><h2>How your chain works</h2><p>A study day counts once you log 80% of its plan: 576 of 720 minutes, or 384 of 480 on the 8-hour fallback. One marked rest day counts each Monday–Sunday week. Freezes are earned: one for every 7 counted days in a row and one for every chapter medal, up to 3 banked. A missed day spends a banked freeze automatically. An unfinished current day never breaks the chain early.</p><p>Quality XP: 2 for showing up + 15 for recall close-out + 5 for light review, 15 for active recall or mocks, or 20 for mistake review. Hard topics add 10; returning after a lapse adds 15. No XP below five minutes. Milestone confetti appears only at 7, 30 and 100 days.</p></article></div>`; }
-  let audio, audioNodes=[], melodyTimer=0, melodyIndex=0;
-  function stopAudio() { clearInterval(melodyTimer); melodyTimer=0; audioNodes.forEach(n=>{try{n.stop?.();n.disconnect();}catch(_){}}); audioNodes=[]; }
+  let audio, audioNodes=[], melodyTimer=0, melodyIndex=0, audioRun=0;
+  function stopAudio() { audioRun++; clearInterval(melodyTimer); melodyTimer=0; audioNodes.forEach(n=>{try{n.stop?.();n.disconnect();}catch(_){}}); audioNodes=[]; }
   async function startAudio() {
-    stopAudio();
-    if (!desk().sound || !h.active?.running || h.break || h.active.phase==='closeout') return;
+    stopAudio(); const run=audioRun;
+    if (!desk().sound || window.__kgOnBreak || !h.active?.running || h.break || h.active.phase==='closeout') return;
     try {
       audio ||= new (window.AudioContext || window.webkitAudioContext)(); await audio.resume();
-      if(audio.state!=='running')return;
+      if(run!==audioRun || audio.state!=='running')return;
       const amb=settings().ambient, duration=audio.sampleRate*2, buffer=audio.createBuffer(1,duration,audio.sampleRate), data=buffer.getChannelData(0);
       let smooth=0; for(let i=0;i<duration;i++) {smooth=(smooth+Math.random()*.04-.02)/1.02;data[i]=smooth*3;}
       for(const [name,freq] of [['rain',2300],['hush',330]]) if(Number(amb[name])>0) {
@@ -3072,7 +3100,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
       if(settings().coStudy && reached.length && !document.hidden){a.checkpoints=[...(a.checkpoints || []),...reached];save();say(({5:'five minutes! you showed up. stay with this one task.',15:'fifteen minutes. loosen your shoulders, bring your eyes back.',25:'twenty-five! finish the thought, then take a real break.'})[reached.at(-1)]);if(reached.at(-1)===15)window.__irohaSay?.('Halfway check: units, signs, assumptions. Fix them now, not at the end.',{face:'stern'});}
     }
     if(priorDay!==today()){priorDay=today();if(!document.activeElement?.closest('form'))render();}
-    if(!desk().sound && melodyTimer)stopAudio();
+    if((!desk().sound || window.__kgOnBreak) && melodyTimer)stopAudio();
   },1000);
   // Keep the original schedule, floating companion and dashboard on the same rule.
   window.HabitDesk={
@@ -3084,7 +3112,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
   window.addEventListener('storage',e=>{if(e.key===C.KEY){h=C.normalize(read(C.KEY,null));if(!document.activeElement?.closest('#habit-desk form'))render();}if(e.key===DK && !document.activeElement?.closest('#habit-desk form'))render();});
   window.addEventListener('pagehide',()=>{stopAudio();});
   // Wake the schedule once its bundled store is ready, without rewriting saved days.
-  let attempts=0;const attach=setInterval(()=>{const store=window.DeskStore;if(!store?.getState().hydrated){if(++attempts>100)clearInterval(attach);return;}clearInterval(attach);store.setState({habitRevision:Date.now()});store.subscribe((s,p)=>{if(s.sound!==p.sound)startAudio();if(s.days!==p.days){const map=$('hb-day-map');if(map)map.outerHTML=dayMap();}});render();if(h.active)focus(true);},100);
+  let attempts=0;const attach=setInterval(()=>{const store=window.DeskStore;if(!store?.getState().hydrated){if(++attempts>100)clearInterval(attach);return;}clearInterval(attach);store.setState({habitRevision:Date.now()});store.subscribe((s,p)=>{if(s.sound!==p.sound){startAudio();if(!s.sound){window.DeskMusic?.stop();window.__kgAmbientOff?.();}}if(s.days!==p.days){const map=$('hb-day-map');if(map)map.outerHTML=dayMap();}});render();if(h.active)focus(true);},100);
   render();
 })();
 
@@ -3558,11 +3586,17 @@ body.kg-shell .kl-big{line-height:1.1}
   #kg-nav a span{font-size:17px}
   #kg-main{width:calc(100% - 24px);margin:14px auto 150px}
   #ame-widget{bottom:76px!important}#iroha-widget{bottom:76px!important}
-  #mp-widget{bottom:78px!important}
   #ame-widget #ame-chat,#iroha-chat{bottom:186px!important;height:min(400px,58vh)!important}
   .kl-skyrow{grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){.kl-breath{transition:none}}
+#kg-mstop{display:none;order:2;flex:none;padding:6px 12px;border-radius:999px;border:1px solid #ff6fae;background:transparent;color:#ff9cc8;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+#mp-widget.mp-live~#kg-mstop{display:inline-block}
+body.kg-light #kg-mstop{color:#c2337c}
+.mp-volrow{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:12px}
+.mp-volrow input{flex:1;min-width:0}
+.mp-volnote{margin:8px 0;font-size:12px;opacity:.8}
+.mp-volrow[hidden],.mp-volnote[hidden]{display:none}
 </style>
 <script id="moon-lab-script">
 /* ===== Moon Lab: chapter tracker, boss battles, Iroha's recall, doubts, weekly rank, stickers, bond, voyage, kindness ===== */
@@ -4916,8 +4950,9 @@ body.kg-shell .kl-big{line-height:1.1}
       amb = { kind, nodes };
     } catch (e) { amb = null; }
   }
+  window.__kgAmbientOff = () => { stopAmbient(); if (L.cset.ambient) { L.cset.ambient = false; save(); M.render(); } };
   function ambientTick(force) {
-    const b = M.block(), want = L.cset.ambient && b && b.kind === 'study' && !document.body.classList.contains('habit-shh') ? AMB[b.id] || 'hush' : '';
+    const b = M.block(), want = L.cset.ambient && b && b.kind === 'study' && !window.__kgOnBreak && !document.body.classList.contains('habit-shh') ? AMB[b.id] || 'hush' : '';
     if (!want) return stopAmbient();
     if (force || !amb || amb.kind !== want) startAmbient(want);
   }
@@ -6022,6 +6057,9 @@ body.kg-shell .kl-big{line-height:1.1}
   const bar = document.createElement('header'); bar.id = 'kg-bar';
   bar.innerHTML = `<div class="kg-brand"><b>Kaguya Desk</b><span id="kg-status" aria-live="polite"></span></div><nav id="kg-nav" aria-label="Pages">${NAV.map(([id, ic, label]) => `<a href="#${id}" data-sec="${id}"><span aria-hidden="true">${window.__kgIcon?.(id) || ic}</span><em>${label}</em><i class="kg-dot" hidden></i></a>`).join('')}</nav>`;
   const mp = $('mp-widget'); if (mp) bar.append(mp); // the music button lives in the top bar, off the content
+  // while music plays, stopping it is one tap away even with the player hidden
+  const mstop = document.createElement('button'); mstop.id = 'kg-mstop'; mstop.type = 'button'; mstop.textContent = '■ stop'; mstop.setAttribute('aria-label', 'stop music');
+  mstop.onclick = () => window.DeskMusic?.stop(); if (mp) bar.append(mstop);
   const main = document.createElement('main'); main.id = 'kg-main';
   const first = hd || lab; first.parentNode.insertBefore(bar, first); first.parentNode.insertBefore(main, first);
 
