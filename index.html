@@ -1278,6 +1278,18 @@ window.__KG_BUILTIN = {
     }
   };
 
+  // A failed call: a crisis message gets a real person to call, and a break or a dark day gets no study nudge.
+  const CRISIS_RE = /\b(kill(ing)? myself|suicid\w*|end(ing)? (it all|my life)|take my (own )?life|(don'?t|do not) want to (be here|live|be alive|exist|go on|wake up)|wanna die|want to die|hurt(ing)? myself|self[- ]?harm\w*|(no|see the|what'?s the) point (of|in) (living|going on|being alive|life)|better off without me|can'?t go on)\b/i;
+  function failLine(who, r, text) {
+    if (CRISIS_RE.test(text)) {
+      const help = window.__kgSupport?.() || "India: Tele-MANAS 14416 (free, 24/7)";
+      return who === "iroha" ? "My connection failed, but I read what you said, and it matters more than anything on the plan. Please call someone now. " + help + ". Please don't stay alone with this."
+        : "my connection dropped, but i read what you said and it matters more than anything here. please call someone now. " + help + ". please don't stay alone with this.";
+    }
+    if (window.__kgOnBreak || window.__kgLowest) return who === "iroha" ? "I can't reach the connection right now. It isn't your problem. Try again in a little while." : "my connection's being weird right now! not your problem. try me again in a little while?";
+    return ERR[who][r.error](r.detail);
+  }
+
   async function sendMessage() {
     const text = input.value.trim();
     if (!text || isSending) return;
@@ -1299,7 +1311,7 @@ window.__KG_BUILTIN = {
         conversation.push({ role: "assistant", content: r.reply });
         saveConversation();
         window.__kgAfterReply?.("kaguya", text, r.reply);
-      } else addMessage("ame", ERR.kaguya[r.error](r.detail));
+      } else addMessage("ame", failLine("kaguya", r, text));
     } finally {
       isSending = false;
       sendBtn.disabled = false;
@@ -1835,7 +1847,7 @@ window.__KG_BUILTIN = {
       const r = await postChat(withActivity(iconv, "iroha"), ameContext(), "iroha", image ? 45000 : 15000, image);
       typing.remove();
       if (r.reply) { iAdd("ame", r.reply); iconv.push({ role: "assistant", content: r.reply }); saveI(); face(talkFace(r.reply), 8000); window.__kgAfterReply?.("iroha", text, r.reply); }
-      else { iAdd("ame", ERR.iroha[r.error](r.detail)); face("stern", 4000); }
+      else { iAdd("ame", failLine("iroha", r, text)); face("stern", 4000); }
     } finally { typing.remove(); iSending = false; isend.disabled = false; }
   }
   isend.addEventListener("click", () => iSend());
@@ -4714,6 +4726,7 @@ body.kg-shell .kl-big{line-height:1.1}
   const moodToday = () => L.mood[today()];
   const recentMoods = () => { const d = today(); return Object.entries(L.mood).filter(([k]) => gap(d, k) < 7 && gap(d, k) >= 0).map(([, v]) => v); };
   const helpline = () => L.support.helpline || 'India: Tele-MANAS 14416 or 1-800-891-4416 (free, 24/7)';
+  window.__kgSupport = () => (L.support.person ? L.support.person + (L.support.contact ? ' ' + L.support.contact : '') + ', or ' : '') + helpline();
 
   /* ---------- company mode: what Kaguya and Iroha are told when you want company ---------- */
   let company = false;
