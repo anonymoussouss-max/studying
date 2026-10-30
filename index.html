@@ -1854,7 +1854,7 @@ window.__KG_BUILTIN = {
     catch (e) { iAdd("ame", "I couldn't read that image. Try a JPG or PNG."); }
   });
   iinput.addEventListener("keydown", e => { if (e.key === "Enter") iSend(); });
-  [["drill me", "drill me: one hard exam-style question on what i'm studying right now. no hints until i answer."], ["check my work", "i'm going to paste my working. check units, signs and assumptions, and tell me exactly where it breaks."], ["plan my next hour", "plan my next hour from my schedule and what's left today. concrete tasks, exact minutes."], ["i'm slacking", "i'm slacking. give me one task and a time limit, no sympathy."]].forEach(([l, q]) => {
+  [["drill me", "drill me: one hard exam-style question on what i'm studying right now. no hints until i answer."], ["check my work", "i'm going to paste my working. check units, signs and assumptions, and tell me exactly where it breaks."], ["plan my next hour", "plan my next hour from my schedule and what's left today. concrete tasks, exact minutes."], ["school days", "look at my schedule today and give me one piece of advice on it from your school days."], ["i'm slacking", "i'm slacking. give me one task and a time limit, no sympathy."]].forEach(([l, q]) => {
     const b = document.createElement("button"); b.type = "button"; b.textContent = l; b.onclick = async () => { if (l === "drill me" && window.__kgDrill && !window.__kgOnBreak) { const note = await window.__kgDrill(); if (note) window.__kgOnce = note; } iSend(q); }; ichips.appendChild(b);
   });
 
@@ -2025,6 +2025,45 @@ window.__KG_BUILTIN = {
     ]
   };
   for (const [kind, list] of Object.entries(FILM)) BANTER[kind].push(...list);
+  // ---------- school days: now and then Dr. Iroha advises on the schedule from what she got wrong at 17 ----------
+  const SCHOOL = {
+    morning: ["In school I wasted the first hour deciding what to do. Choose your first task now, before you sit down.", "I used to skip breakfast to save ten minutes. I lost far more than that by noon. Eat before your first block."],
+    gap: ["In school I spent breaks on my phone and came back more tired. Get up. Look at something far away.", "I ate lunch over my notes for a year. It helped neither. Eat away from the desk.", "Before a shift I'd write my next step on a sticky note, so I never restarted cold. Do that before your next break.", "I used to plan by hours. Then I planned by exact tasks and got more done. Name one task for your next block.", "In school I saved my hardest subject for the night, when I was at my worst. Look at where yours falls today."],
+    behind: ["Behind? In school I tried to win lost hours back at night. It cost me the next morning. Don't add hours. Do the next block properly.", "I used to rewrite my whole timetable whenever I fell behind. That took an hour I didn't have. Keep the plan. Start the next block."],
+    tired: ["You slept badly. In school I pretended that didn't matter, then made the same mistakes all day. Take the short plan if you need it. It still counts."],
+    late: ["In school I revised until three and forgot it by noon. Close the books at 1:00.", "Decide tomorrow's first task tonight. I did that every night in school. It saved me every morning."],
+    sunday: ["I refused days off in school, then lost three days to a cold. Take your Sunday."],
+    rest: ["In school I treated rest as lost time. I was wrong. Follow your doctor's plan.", "At seventeen I didn't stop until I had no choice. You've been told to stop. That's the easier way. Take it.", "I never took a proper holiday in school. I'd do that differently. Do something today that has nothing to do with books."]
+  };
+  const SCHOOL_KEY = "iroha-school-v1", schoolFrom = Date.now() + 600000;
+  function schoolPool() {
+    const c = ameContext(), s = deskSummary() || {}, h = new Date().getHours();
+    if (window.__kgOnBreak) return "rest";
+    if (c.mode === "study") return null; // focus law: nothing unprompted inside a study block
+    if (c.mode === "winddown" || c.blockId === "sleep") return "late";
+    if (c.day === "Sunday") return "sunday";
+    if (Number.isFinite(s.sleepHours) && s.sleepHours < 6) return "tired";
+    if (c.blockId === "wake") return "morning";
+    if (h >= 18 && s.pctOfStudyDone < 50) return "behind";
+    return "gap";
+  }
+  function schoolTip(now) {
+    let st = {}; try { st = JSON.parse(localStorage.getItem(SCHOOL_KEY) || "{}") || {}; } catch (e) {}
+    const d = dayKey(), sameDay = st.d === d, used = sameDay ? st.n || 0 : 0, seen = Array.isArray(st.seen) ? st.seen : [];
+    if (!now) {
+      if (muted || document.hidden || iOpen || iw.hidden || banterBusy || iSending || readDesk()?.focusMode) return;
+      if (window.__kgGentle || window.__kgLowest || /^#company/.test(location.hash)) return; // a hard day or company time isn't the moment
+      if (Date.now() < schoolFrom || Date.now() - lastAct > 120000 || Date.now() - iLast < 300000) return;
+      if (used >= (window.__kgOnBreak ? 1 : 2) || (sameDay && Date.now() - (st.at || 0) < 3 * 3600000)) return;
+    }
+    const kind = schoolPool(); if (!kind) return;
+    const fresh = SCHOOL[kind].filter(l => !seen.includes(l)), line = pick(fresh.length ? fresh : SCHOOL[kind]);
+    irohaSay(line, { breakOk: kind === "rest", face: "talking", habit: true });
+    try { localStorage.setItem(SCHOOL_KEY, JSON.stringify({ d, n: used + 1, at: Date.now(), seen: seen.filter(l => l !== line).concat(line).slice(-12) })); } catch (e) {}
+    return line;
+  }
+  setInterval(() => schoolTip(), 60000);
+  window.__kgSchoolTip = () => schoolTip(true);
   window.__kgBanter = kind => runBanter(pick(kind && BANTER[kind] ? BANTER[kind] : banterPool()));
   // Hooks for the Moon Lab module, which lives outside this scope.
   window.__kgScript = script => runBanter(script);
