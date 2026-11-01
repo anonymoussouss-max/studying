@@ -1230,6 +1230,16 @@ window.__KG_BUILTIN = {
     };
   }
 
+  // The backend's rate limit lines arrive as normal replies. They are errors, never something a companion said.
+  const isBusyLine = t => /too many requests at once|too many viewers at once/i.test(String(t));
+  let busyUntil = 0; // while the limit is hit, the companions don't start anything on their own
+  // Your own messages wait a moment and try once more before showing the notice.
+  async function postMine(messages, context, who, ms, image) {
+    const r = await postChat(messages, context, who, ms, image);
+    if (r.error !== "busy") return r;
+    await new Promise(ok => setTimeout(ok, 7000));
+    return postChat(messages, context, who, ms, image);
+  }
   // One backend call shared by Kaguya and Iroha. Resolves to { reply } or { error, detail }.
   // `image` ({ media_type, data }) attaches a screenshot to the last user message, for Iroha's screen watch.
   async function postChat(messages, context, who, ms = 15000, image, long) {
@@ -1246,12 +1256,14 @@ window.__KG_BUILTIN = {
         let bodyText = "";
         try { bodyText = (await res.text()).slice(0, 300); } catch (e) {}
         console.error("[companion backend] HTTP " + res.status + " " + res.statusText, bodyText);
+        if (res.status === 429) { busyUntil = Date.now() + 45000; return { error: "busy" }; }
         return { error: "http", detail: res.status };
       }
       let data;
       try { data = await res.json(); }
       catch (e) { console.error("[companion backend] response was not valid JSON", e); return { error: "json" }; }
       if (!data || !data.reply) { console.error("[companion backend] response had no \"reply\" field", data); return { error: "noreply", detail: JSON.stringify(data).slice(0, 200) }; }
+      if (isBusyLine(data.reply)) { busyUntil = Date.now() + 45000; return { error: "busy" }; }
       return { reply: cleanReply(data.reply) };
     } catch (err) {
       const isTimeout = err && (err.name === "AbortError" || err === "timeout");
@@ -1286,6 +1298,7 @@ window.__KG_BUILTIN = {
       return who === "iroha" ? "My connection failed, but I read what you said, and it matters more than anything on the plan. Please call someone now. " + help + ". Please don't stay alone with this."
         : "my connection dropped, but i read what you said and it matters more than anything here. please call someone now. " + help + ". please don't stay alone with this.";
     }
+    if (r.error === "busy") return "⏳ Too busy right now. Wait about a minute, then send that again.";
     if (window.__kgOnBreak || window.__kgLowest) return who === "iroha" ? "I can't reach the connection right now. It isn't your problem. Try again in a little while." : "my connection's being weird right now! not your problem. try me again in a little while?";
     return ERR[who][r.error](r.detail);
   }
@@ -1307,7 +1320,7 @@ window.__KG_BUILTIN = {
 
     const dots = document.createElement("div"); dots.className = "ame-msg ame kg-typing"; dots.textContent = "..."; messagesEl.appendChild(dots); messagesEl.scrollTop = messagesEl.scrollHeight;
     try {
-      const r = await postChat(withActivity(conversation, "kaguya"), ameContext(), "kaguya");
+      const r = await postMine(withActivity(conversation, "kaguya"), ameContext(), "kaguya");
       dots.remove();
       if (r.reply) {
         addMessage("ame", r.reply);
@@ -1907,7 +1920,7 @@ window.__KG_BUILTIN = {
     try {
       const msgs = withActivity(iconv, "iroha");
       if (ipdf && !image) { const last = msgs.pop(); last.content = last.content.slice(0, 3000) + `\n\n[Use the PDF parts above when they help, and name the page. Only part of the PDF is sent each time, so if the answer isn't there, say which topic I should ask about instead of guessing.]`; msgs.push(...pdfParts(text), last); }
-      const r = await postChat(msgs, ameContext(), "iroha", image ? 45000 : ipdf ? 30000 : 15000, image);
+      const r = await postMine(msgs, ameContext(), "iroha", image ? 45000 : ipdf ? 30000 : 15000, image);
       typing.remove();
       if (r.reply) { iAdd("ame", r.reply); popAdd("i", r.reply); iconv.push({ role: "assistant", content: r.reply }); saveI(); face(talkFace(r.reply), 8000); window.__kgAfterReply?.("iroha", text, r.reply); }
       else { iAdd("ame", failLine("iroha", r, text)); face("stern", 4000); }
@@ -2101,7 +2114,7 @@ window.__KG_BUILTIN = {
   }
   // A doctor's-orders break: nothing scripted may mention study, except lines written for the break.
   const baseSay = say;
-  say = function (text, o = {}) { if (window.__kgOnBreak && !o.force && text && STUDY_RE.test(text)) return; return baseSay(text, o); };
+  say = function (text, o = {}) { if (isBusyLine(text)) { busyUntil = Date.now() + 45000; return; } if (window.__kgOnBreak && !o.force && text && STUDY_RE.test(text)) return; return baseSay(text, o); };
   function runBanter(script, irohaFace) {
     if (!script || !script.length) return;
     if (window.__kgOnBreak && !script.kgBreak && script.some(l => STUDY_RE.test(l[1]))) return;
@@ -2225,7 +2238,8 @@ window.__KG_BUILTIN = {
   }
   const waBase = withActivity;
   withActivity = function (conv, who = "kaguya") {
-    const out = waBase(conv, who), i = out.length - 1;
+    // old rate limit lines saved in the chat are not part of the conversation
+    const out = waBase(conv.filter(m => !isBusyLine(m.content)), who), i = out.length - 1;
     // on a doctor's-orders break they don't get the plan's hours and minutes to talk about
     if (i >= 0 && out[i].role === "user" && window.__kgOnBreak) out[i].content = out[i].content.split("\n\n[desk page status")[0];
     // plus company mode / memories / the "not okay" note set by the company module
@@ -2238,7 +2252,7 @@ window.__KG_BUILTIN = {
   let lastChime = 0;
   async function chimeIn(from, userText, reply) {
     const to = from === "kaguya" ? "iroha" : "kaguya", fromName = from === "kaguya" ? "Kaguya" : "Iroha";
-    if (muted || window.__kgGentle && to === "iroha" || Math.random() > .4 || Date.now() - lastChime < 8 * 60000) return;
+    if (muted || Date.now() < busyUntil || window.__kgGentle && to === "iroha" || Math.random() > .4 || Date.now() - lastChime < 8 * 60000) return;
     lastChime = Date.now();
     const own = (to === "iroha" ? iconv : conversation).slice(-10).map(m => ({ role: m.role, content: m.content }));
     own.push({ role: "user", content: `[site event, not typed by me: I just told ${fromName}: "${String(userText).slice(0, 400)}". ${fromName} replied: "${String(reply).slice(0, 500)}". Jump in with ONE short line reacting to what ${fromName} said, in character, talking to me and/or ${fromName}.]\n\n${to === "iroha" ? IROHA_NOTE : KAGUYA_NOTE}` });
@@ -2274,7 +2288,7 @@ window.__KG_BUILTIN = {
   }
   let talking = false;
   async function talkTogether(from, userText, firstReply, turns = 3) {
-    if (talking || muted) return; talking = true; lean(true);
+    if (talking || muted || Date.now() < busyUntil) return; talking = true; lean(true);
     const log = firstReply ? [(from === "kaguya" ? "Kaguya: " : "Iroha: ") + firstReply] : [];
     let who = firstReply ? (from === "kaguya" ? "iroha" : "kaguya") : from;
     const box = () => isOpen ? messagesEl : iOpen ? imsgs : null;
