@@ -4222,6 +4222,100 @@ body.kg-light .kg-saved{background:#f7f3fb}
 .kg-plan-row small{font-size:11.5px;font-weight:500;opacity:.85}
 #moon-lab .kg-plan-row [aria-pressed="true"]{background:var(--kg-a2,#ff6fae);border-color:var(--kg-a2,#ff6fae);color:#1a1433}
 </style>
+<style id="kg-restyle">
+/* ===== Polished moonlit: one shared look for every page. Loaded last, so it wins. ===== */
+:root{
+  --kd-r:18px;
+  --kd-surface:linear-gradient(180deg,rgba(42,35,86,.6),rgba(19,16,42,.74));
+  --kd-line:rgba(196,182,255,.13);
+  --kd-line-top:rgba(255,255,255,.07);
+  --kd-shadow:0 18px 40px -24px rgba(0,0,0,.75);
+  --kd-glow:var(--kg-a2,#ff6fae);
+  --kd-ease:cubic-bezier(.2,.7,.2,1);
+  --kd-muted:rgba(221,214,255,.7);
+}
+
+/* cards: the lab, the desk and the plan all share one surface */
+body:not(.kg-light) #kg-main :is(.kl-card,.hb-card,#habit-original section.rounded-3xl){
+  background:var(--kd-surface)!important;border:1px solid var(--kd-line)!important;border-radius:var(--kd-r)!important;
+  box-shadow:inset 0 1px 0 var(--kd-line-top),var(--kd-shadow)!important;transition:border-color .25s var(--kd-ease),box-shadow .25s var(--kd-ease)}
+body:not(.kg-light) #kg-main :is(.kl-card,.hb-card):hover{border-color:color-mix(in srgb,var(--kd-glow) 32%,transparent)!important}
+#kg-main :is(.kl-card,.hb-card){padding:20px 22px}
+#kg-main .kl-card.kl-mini{padding:12px 18px}
+#kg-main .kg-labnote{border-color:rgba(127,227,255,.3)!important}
+body:not(.kg-light) #habit-original li.rounded-3xl{background:rgba(24,20,52,.7)!important;border-color:var(--kd-line)!important}
+
+/* type: serif headings, rounded body, one small scale */
+#kg-main :is(h1,h2,h3):not(.kgs-hello *){font-family:"Shippori Mincho B1",serif;letter-spacing:.005em;line-height:1.25;text-wrap:balance}
+#kg-main :is(.kl-card,.hb-card) h2{font-size:clamp(19px,2.1vw,22px)}
+#kg-main :is(.kl-card,.hb-card) h3{font-size:clamp(16.5px,1.9vw,18px)}
+#kg-main :is(.kl-card,.hb-card) p{line-height:1.6;text-wrap:pretty}
+body:not(.kg-light) #kg-main :is(.kl-small,.hb-caption){color:var(--kd-muted)}
+#kg-main :is(.kl-small,.hb-caption){font-size:12.5px;line-height:1.55}
+
+/* eyebrows: a thin gold rule in front, like a film title card */
+#kg-main :is(.kl-card,.hb-card) :is(.kl-eyebrow,.hb-eyebrow){display:flex;align-items:center;gap:9px;font-size:11px!important;letter-spacing:.2em!important}
+#kg-main :is(.kl-card,.hb-card) :is(.kl-eyebrow,.hb-eyebrow)::before{content:"";flex:none;width:18px;height:1px;background:linear-gradient(90deg,transparent,currentColor);opacity:.8}
+
+/* buttons: same height, shape and feel everywhere */
+#kg-main :is(#moon-lab .kl-body,#habit-desk) button:not([data-a="conf"]):not([data-a="kgplan"]){
+  min-height:38px;border-radius:12px;font-family:"M PLUS Rounded 1c",sans-serif;font-weight:700;
+  transition:transform .18s var(--kd-ease),box-shadow .25s var(--kd-ease),border-color .2s,background-color .2s,filter .2s}
+#kg-main :is(#moon-lab .kl-body,#habit-desk) button:not([data-a="conf"]):not(:disabled):hover{transform:translateY(-1px)}
+#kg-main :is(#moon-lab .kl-body,#habit-desk) button:not([data-a="conf"]):not(:disabled):active{transform:translateY(0)}
+#kg-main :is(.kl-primary,.hb-primary):not(:disabled){
+  background:linear-gradient(180deg,color-mix(in srgb,var(--kd-glow) 100%,#fff 12%),var(--kd-glow))!important;border-color:transparent!important;color:#1a1033!important;
+  box-shadow:0 10px 24px -12px var(--kd-glow),inset 0 1px 0 rgba(255,255,255,.35)!important}
+#kg-main :is(.kl-primary,.hb-primary):not(:disabled):hover{filter:brightness(1.06);box-shadow:0 14px 30px -12px var(--kd-glow),inset 0 1px 0 rgba(255,255,255,.4)!important}
+#kg-main button:focus-visible,#kg-main summary:focus-visible{outline:2px solid var(--kd-glow)!important;outline-offset:2px}
+
+/* fields: calm, deep and clearly focused */
+body:not(.kg-light) #kg-main :is(input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea){
+  background:rgba(9,7,26,.55)!important;border:1px solid var(--kd-line)!important;border-radius:12px!important;transition:border-color .2s,box-shadow .2s}
+body:not(.kg-light) #kg-main :is(input,select,textarea):focus{border-color:color-mix(in srgb,var(--kd-glow) 70%,transparent)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--kd-glow) 22%,transparent)!important;outline:none}
+
+/* progress bars: a slim moonlit track */
+#kg-main progress{appearance:none;-webkit-appearance:none;height:8px;border:0;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.08)}
+#kg-main progress::-webkit-progress-bar{background:rgba(255,255,255,.08);border-radius:99px}
+#kg-main progress::-webkit-progress-value{background:linear-gradient(90deg,var(--kg-a1,#9d7bff),var(--kd-glow));border-radius:99px;box-shadow:0 0 12px -2px var(--kd-glow)}
+#kg-main progress::-moz-progress-bar{background:linear-gradient(90deg,var(--kg-a1,#9d7bff),var(--kd-glow));border-radius:99px}
+
+/* folds */
+#kg-main details>summary{cursor:pointer;transition:color .2s}
+#kg-main details>summary:hover{color:color-mix(in srgb,var(--kd-glow) 55%,#fff)}
+
+/* chapter rows: a soft lift on hover */
+body:not(.kg-light) #kg-main .kl-ch{transition:background-color .2s,border-color .2s}
+body:not(.kg-light) #kg-main .kl-ch:hover{background-color:rgba(60,50,120,.32)!important;border-color:color-mix(in srgb,var(--kd-glow) 25%,transparent)!important}
+
+/* portraits: a thin double frame with a glow, like a framed still */
+#kg-main :is(.kg-labnote img,#kg-strip img){border:0!important;box-shadow:0 0 0 1px rgba(255,255,255,.22),0 0 0 4px #120f2c,0 0 0 5px color-mix(in srgb,var(--kd-glow) 55%,transparent),0 0 24px -2px color-mix(in srgb,var(--kd-glow) 45%,transparent)}
+#kg-main .kg-labnote img{box-shadow:0 0 0 1px rgba(255,255,255,.22),0 0 0 4px #120f2c,0 0 0 5px rgba(127,227,255,.55),0 0 24px -2px rgba(127,227,255,.45)}
+
+/* page banner: one slow light flare drifting across */
+#kg-strip{position:relative;overflow:hidden}
+#kg-strip::after{content:"";position:absolute;top:-60%;left:-30%;width:45%;height:220%;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(255,240,250,.22),transparent);transform:rotate(18deg);animation:kd-flare 14s ease-in-out infinite}
+@keyframes kd-flare{0%,100%{transform:translateX(0) rotate(18deg);opacity:.35}50%{transform:translateX(260%) rotate(18deg);opacity:.75}}
+
+/* arriving on a page: cards rise in one after another (only on a page change, never on every update) */
+#kg-main.kd-enter :is(.kl-card,.hb-card){animation:kd-rise .55s var(--kd-ease) both}
+#kg-main.kd-enter :is(.kl-card,.hb-card):nth-child(2){animation-delay:.05s}
+#kg-main.kd-enter :is(.kl-card,.hb-card):nth-child(3){animation-delay:.1s}
+#kg-main.kd-enter :is(.kl-card,.hb-card):nth-child(4){animation-delay:.15s}
+#kg-main.kd-enter :is(.kl-card,.hb-card):nth-child(n+5){animation-delay:.2s}
+@keyframes kd-rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* quieter motion when asked for */
+@media(prefers-reduced-motion:reduce){#kg-strip::after,#kg-main.kd-enter :is(.kl-card,.hb-card){animation:none!important}#kg-main button{transition:none!important}}
+body.kg-calm #kg-strip::after,body.kg-calm #kg-main.kd-enter :is(.kl-card,.hb-card){animation:none!important}
+
+@media(max-width:720px){
+  #kg-main :is(.kl-card,.hb-card){padding:18px}
+  #kg-strip::after{display:none}
+}
+@media print{#kg-strip::after{display:none}#kg-main :is(.kl-card,.hb-card){box-shadow:none!important}}
+</style>
 <script id="moon-lab-script">
 /* ===== Moon Lab: chapter tracker, boss battles, Iroha's recall, doubts, weekly rank, stickers, bond, voyage, kindness ===== */
 (function () {
@@ -6755,7 +6849,7 @@ body.kg-light .kg-saved{background:#f7f3fb}
     for (const a of bar.querySelectorAll('[data-sec]')) a.setAttribute('aria-current', a.dataset.sec === sec ? 'page' : 'false');
     place(sec); M.show(sec, tab || last[sec]);
     window.__kgTitle = (sec === 'today' ? '' : NAV.find(n => n[0] === sec)[2] + ' · ') + 'Kaguya Desk'; if (!document.hidden) document.title = window.__kgTitle;
-    if (changed) { main.classList.remove('kg-page-in'); void main.offsetWidth; main.classList.add('kg-page-in'); }
+    if (changed) { main.classList.remove('kg-page-in'); void main.offsetWidth; main.classList.add('kg-page-in'); main.classList.add('kd-enter'); clearTimeout(main._kdEnter); main._kdEnter = setTimeout(() => main.classList.remove('kd-enter'), 900); }
     if (location.hash.slice(1) !== sec) history.replaceState(null, '', '#' + sec);
     if (changed) window.scrollTo({ top: 0 });
     status();
