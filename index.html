@@ -619,10 +619,11 @@ body.habit-shh #hb-session-card {text-align:center;}
   // Short days have no separate focus, error or recall blocks: that time goes to lectures and their revision.
   function fallback(dow){
     if(!focus[dow])return [];
-    const six=shortHours()===6,main=six?80:110,rev=six?40:50;
-    const rows=[['wake','Wake, water, breakfast','life',20],['free-morning','Slow start, lunch, your own time','rest',six?280:220],['maths','Maths · lectures','study',main,'maths'],['maths-rev','Maths · revise that lecture','study',rev,'maths'],['physics','Physics · lectures','study',main,'physics'],['physics-rev','Physics · revise that lecture','study',rev,'physics'],['dinner','Dinner','life',20],['chem','Chemistry · lectures','study',main,'chemistry'],['chem-rev','Chemistry · revise that lecture','study',rev,'chemistry'],['free-evening','Evening is yours','rest',six?100:40],['wind','Wind down','life',90],['sleep','Sleep','sleep',570]];
+    // 6h: 20-minute revisions, the saved time goes to lectures. The late 6h day starts at 17:00 and has no free evening.
+    const six=shortHours()===6,late=six&&!!labData().planLate,main=six?100:110,rev=six?20:50;
+    const rows=[['wake','Wake, water, breakfast','life',20],['free-morning','Slow start, lunch, your own time','rest',late?370:six?280:220],['maths','Maths · lectures','study',main,'maths'],['maths-rev','Maths · revise that lecture','study',rev,'maths'],['physics','Physics · lectures','study',main,'physics'],['physics-rev','Physics · revise that lecture','study',rev,'physics'],['dinner','Dinner','life',late?30:20],['chem','Chemistry · lectures','study',main,'chemistry'],['chem-rev','Chemistry · revise that lecture','study',rev,'chemistry'],['free-evening','Evening is yours','rest',late?0:six?100:40],['wind','Wind down','life',90],['sleep','Sleep','sleep',570]];
     let offset=0;
-    return rows.map(([id,title,kind,minutes,bucket=null])=>{const start=offset;offset+=minutes;return {id,title,kind,minutes,bucket,start,end:offset,how:id.endsWith('-rev')?'Close the video. Recall it, then check your notes and try a few questions.':kind==='study'?'Watch the lecture and make notes. Stand up for 2 minutes about every 50.':id==='free-morning'?'No study yet. Eat, rest and do something you like.':id==='sleep'?'9.5 hours in bed. Sleep at 01:00, wake at 10:30.':id==='free-evening'?'Study is done. Rest tonight; no catch-up required.':'Leave the books closed. This time is part of the plan.'};});
+    return rows.filter(r=>r[3]>0).map(([id,title,kind,minutes,bucket=null])=>{const start=offset;offset+=minutes;return {id,title,kind,minutes,bucket,start,end:offset,how:id.endsWith('-rev')?'Close the video. Recall it, then check your notes and try a few questions.':kind==='study'?'Watch the lecture and make notes. Stand up for 2 minutes about every 50.':id==='free-morning'?'No study yet. Eat, rest and do something you like.':id==='sleep'?'9.5 hours in bed. Sleep at 01:00, wake at 10:30.':id==='free-evening'?'Study is done. Rest tonight; no catch-up required.':'Leave the books closed. This time is part of the plan.'};});
   }
   const api={focus,limits,full,fallback,need,hours,shortHours};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
@@ -4217,7 +4218,8 @@ body.kg-light .kg-saved{background:#f7f3fb}
 .kg-chat-down:focus-visible{outline:2px solid #f5d27a;outline-offset:2px}
 /* room for the meter above Iroha on phones */
 @media(max-width:720px){#kg-scene:has(.kgs-meter:not([hidden])){height:352px}}
-.kg-plan-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 8px}
+.kg-plan-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:6px 0 8px}
+@media(max-width:520px){.kg-plan-row{grid-template-columns:repeat(2,1fr)}}
 #moon-lab .kg-plan-row button{display:flex;flex-direction:column;align-items:center;gap:2px;min-height:56px;padding:8px 4px;line-height:1.25}
 .kg-plan-row small{font-size:11.5px;font-weight:500;opacity:.85}
 #moon-lab .kg-plan-row [aria-pressed="true"]{background:var(--kg-a2,#ff6fae);border-color:var(--kg-a2,#ff6fae);color:#1a1433}
@@ -6771,8 +6773,11 @@ body.kg-calm #kg-strip::after,body.kg-calm #kg-main.kd-enter :is(.kl-card,.hb-ca
   'use strict';
   const M = window.MoonLab; if (!M) return;
   const { L, save, today } = M;
-  const PLANS = [[6, '3:30 PM', 'Lectures, then revise them'], [8, '2:30 PM', 'Lectures, then revise them'], [12, '11:00 AM', 'The full day']];
+  // [key, hours, label, start, note]. The late 6 hour day is the same plan, only starting at 5 PM.
+  const PLANS = [['6', 6, '6 hours', '3:30 PM', 'Lectures, then 20 minutes of revision each'], ['6L', 6, '6 hours late', '5:00 PM', 'A late start: lectures, then 20 minutes of revision each'], ['8', 8, '8 hours', '2:30 PM', 'Lectures, then revise them'], ['12', 12, '12 hours', '11:00 AM', 'The full day']];
   if (![6, 8, 12].includes(L.planHours)) L.planHours = 6;
+  if (L.planHours !== 6) L.planLate = false;
+  const current = () => L.planHours === 6 && L.planLate ? '6L' : String(L.planHours);
   L.planLog = L.planLog || {};
   save();
   // A 6 or 8 hour plan marks each day as a short day, and remembers its size so past days stay counted fairly.
@@ -6783,13 +6788,14 @@ body.kg-calm #kg-strip::after,body.kg-calm #kg-main.kd-enter :is(.kl-card,.hb-ca
     if (!s.days?.[d]?.shortDay) s.patchDay(d, { shortDay: true });
   }
   const card = () => `<section class="kl-card kg-plan"><p class="kl-eyebrow">YOUR STUDY DAY</p>
-    <div class="kg-plan-row" role="group" aria-label="Hours of study per day">${PLANS.map(([h, at]) => `<button data-a="kgplan" data-v="${h}" aria-pressed="${L.planHours === h}"><b>${h} hours</b><small>from ${at}</small></button>`).join('')}</div>
-    <p class="kl-small">${window.__kgOnBreak ? 'Starts when your break ends. ' : ''}${PLANS.find(p => p[0] === L.planHours)[2]}. Sleep stays at 1:00.</p></section>`;
+    <div class="kg-plan-row" role="group" aria-label="Hours of study per day">${PLANS.map(([k, , label, at]) => `<button data-a="kgplan" data-v="${k}" aria-pressed="${current() === k}"><b>${label}</b><small>from ${at}</small></button>`).join('')}</div>
+    <p class="kl-small">${window.__kgOnBreak ? 'Starts when your break ends. ' : ''}${PLANS.find(p => p[0] === current())[4]}. Sleep stays at 1:00.</p></section>`;
   const todayPanel = M.PANELS.today;
   M.PANELS.today = () => card() + todayPanel();
   M.ACTIONS.kgplan = b => {
-    const h = Number(b.dataset.v); if (h === L.planHours) return;
-    L.planHours = h;
+    const p = PLANS.find(x => x[0] === b.dataset.v); if (!p || p[0] === current()) return;
+    const h = p[1];
+    L.planHours = h; L.planLate = p[0] === '6L';
     const d = today();
     if (h === 12) { delete L.planLog[d]; window.DeskStore?.getState?.().patchDay?.(d, { shortDay: false }); }
     save(); apply();
