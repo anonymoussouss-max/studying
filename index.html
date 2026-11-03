@@ -4223,6 +4223,16 @@ body.kg-light .kg-saved{background:#f7f3fb}
 #moon-lab .kg-plan-row button{display:flex;flex-direction:column;align-items:center;gap:2px;min-height:56px;padding:8px 4px;line-height:1.25}
 .kg-plan-row small{font-size:11.5px;font-weight:500;opacity:.85}
 #moon-lab .kg-plan-row [aria-pressed="true"]{background:var(--kg-a2,#ff6fae);border-color:var(--kg-a2,#ff6fae);color:#1a1433}
+/* Ring on: countdown, then the video over everything */
+#kg-ring-play{position:fixed;inset:0;z-index:2147483000;background:#05040d;color:#f3eeff;display:grid;place-items:center;cursor:pointer}
+#kg-ring-play .kgr-count{text-align:center;padding:24px;font-family:"Shippori Mincho B1",serif}
+#kg-ring-play .kgr-line{font-size:clamp(18px,3.4vw,26px);margin:0 0 18px;letter-spacing:.02em}
+#kg-ring-play .kgr-num{display:block;font-size:clamp(88px,22vw,180px);line-height:1;color:var(--kg-a2,#ff6fae);text-shadow:0 0 40px color-mix(in srgb,var(--kg-a2,#ff6fae) 60%,transparent)}
+#kg-ring-play .kgr-hint{margin:22px 0 0;font:500 13px "M PLUS Rounded 1c",sans-serif;opacity:.6}
+#kg-ring-play video{display:none;width:100%;height:100%;object-fit:contain;background:#000}
+#kg-ring-play.kgr-video .kgr-count{display:none}
+#kg-ring-play.kgr-video video{display:block;position:absolute;inset:0}
+#kg-ring-play .kgr-x{position:absolute;top:14px;right:14px;z-index:1;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.45);color:#fff;font-size:18px;cursor:pointer}
 </style>
 <style id="kg-restyle">
 /* ===== Polished moonlit: one shared look for every page. Loaded last, so it wins. ===== */
@@ -6805,6 +6815,88 @@ body.kg-calm #kg-strip::after,body.kg-calm #kg-main.kd-enter :is(.kl-card,.hb-ca
   window.addEventListener('moonlab:render', apply);
   setInterval(apply, 60000);
   apply();
+})();
+
+</script>
+<script id="kg-ring-script">
+/* ===== Ring on: a start ritual. Countdown, your video full screen, then Kaguya and Iroha get you going ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab; if (!M) return;
+  const { L, save } = M;
+  // The video stays on this device only (IndexedDB), never in the page or on GitHub.
+  const DB = 'kg-ring', STORE = 'clip';
+  const db = () => new Promise((ok, no) => { const r = indexedDB.open(DB, 1); r.onupgradeneeded = () => r.result.createObjectStore(STORE); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+  const idb = async (mode, fn) => { const d = await db(); return new Promise((ok, no) => { const t = d.transaction(STORE, mode), q = fn(t.objectStore(STORE)); t.oncomplete = () => { d.close(); ok(q && q.result); }; t.onerror = t.onabort = () => { d.close(); no(t.error); }; }); };
+  let memo = null; // if storage is blocked, the video still works until the page closes
+  const getClip = async () => { try { return (await idb('readonly', s => s.get('video'))) || memo; } catch (e) { return memo; } };
+  const putClip = async blob => { memo = blob; try { await idb('readwrite', s => s.put(blob, 'video')); return true; } catch (e) { return false; } };
+
+  const COUNT = 10;
+  const card = () => `<section class="kl-card kl-mini kg-ring"><p class="kl-eyebrow">FEELING LOW?</p>
+    <div class="kl-row"><button class="kl-primary" data-a="kgring">💍 ${L.ringName ? 'Ring on' : 'Choose your ring video'}</button>${L.ringName ? '<button class="kl-ghost" data-a="kgringpick">Change video</button>' : ''}</div>
+    <p class="kl-small">${L.ringName ? 'Your ring is in your pen box. Press, put it on, and the video plays.' : 'Pick the video once. It stays on this device.'}</p></section>`;
+  const todayPanel = M.PANELS.today;
+  M.PANELS.today = () => card() + todayPanel();
+
+  function pick() {
+    const f = document.createElement('input'); f.type = 'file'; f.accept = 'video/*';
+    f.onchange = async () => {
+      const file = f.files && f.files[0]; if (!file) return;
+      const kept = await putClip(file);
+      L.ringName = file.name; save(); M.render();
+      if (!kept) window.__kgPop?.('k', "saved it for now, but this browser won't keep it after you close the page.");
+    };
+    f.click();
+  }
+
+  let on = null;
+  async function start() {
+    if (on) return;
+    const o = document.createElement('div'); o.id = 'kg-ring-play'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-label', 'Ring on');
+    o.innerHTML = `<div class="kgr-count"><p class="kgr-line">Your ring is in your pen box. Put it on.</p><b class="kgr-num">${COUNT}</b><p class="kgr-hint">Tap to start now</p></div><video playsinline preload="auto"></video><button class="kgr-x" aria-label="Stop">✕</button>`;
+    document.body.append(o);
+    // full screen has to be asked for straight from the click, so the countdown runs inside it
+    o.requestFullscreen?.().catch(() => {});
+    const v = o.querySelector('video'), num = o.querySelector('.kgr-num');
+    on = { o, v, url: '', tick: 0, done: false };
+    const blob = await getClip();
+    if (!blob) { stop(false); L.ringName = ''; save(); M.render(); return; }
+    on.url = URL.createObjectURL(blob); v.src = on.url;
+    let n = COUNT;
+    const play = () => {
+      if (!on || on.playing) return; on.playing = true; clearInterval(on.tick);
+      o.classList.add('kgr-video');
+      v.play().catch(() => { v.muted = true; v.play().catch(() => stop(true)); });
+    };
+    on.tick = setInterval(() => { n--; if (n <= 0) play(); else num.textContent = n; }, 1000);
+    o.querySelector('.kgr-x').addEventListener('click', e => { e.stopPropagation(); stop(!!on?.playing); });
+    o.addEventListener('click', () => { if (on && !on.playing) play(); });
+    v.onended = () => stop(true);
+    v.onerror = () => stop(true);
+  }
+
+  function stop(talk) {
+    if (!on || on.done) return; on.done = true;
+    const { o, v, url, tick } = on; clearInterval(tick); v.pause();
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    o.remove(); if (url) URL.revokeObjectURL(url); on = null;
+    if (!talk) return;
+    M.go('today');
+    const b = M.block?.(), study = b && b.kind === 'study';
+    const script = window.__kgOnBreak
+      ? [['k', "ring's on. you look cool, not gonna lie."], ['i', "You're still on your break. If you open a book anyway, keep it light."], ['k', "let's get this over with... gently. i'm right here."]]
+      : [['k', "ring's on. okay, No.1. let's get this over with."], ['i', `Agreed. Let's get this over with. ${study ? b.title.split(' · ')[0] + ' first. ' : ''}Open it and do the first five minutes. That's all.`], ['k', "together. i'm counting with you."]];
+    script.kgBreak = true;
+    setTimeout(() => window.__kgScript?.(script), 500);
+  }
+
+  // leaving full screen (Esc) ends it; after the video has started, they still talk
+  document.addEventListener('fullscreenchange', () => { if (on && !document.fullscreenElement) stop(!!on.playing); });
+  document.addEventListener('keydown', e => { if (on && e.key === 'Escape') stop(!!on.playing); });
+  M.ACTIONS.kgring = () => L.ringName ? start() : pick();
+  M.ACTIONS.kgringpick = pick;
+  window.__kgRing = { start, stop, getClip, putClip };
 })();
 
 </script>
