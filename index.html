@@ -4226,7 +4226,8 @@ body.kg-light .kg-saved{background:#f7f3fb}
 /* Ring on: countdown, then the video over everything */
 #kg-ring-play{position:fixed;inset:0;z-index:2147483000;background:#05040d;color:#f3eeff;display:grid;place-items:center;cursor:pointer}
 #kg-ring-play .kgr-count{text-align:center;padding:24px;font-family:"Shippori Mincho B1",serif}
-#kg-ring-play .kgr-line{font-size:clamp(18px,3.4vw,26px);margin:0 0 18px;letter-spacing:.02em}
+#kg-ring-play .kgr-quote{font-size:clamp(26px,5.2vw,44px);line-height:1.3;margin:0 0 20px;letter-spacing:.03em;text-wrap:balance;text-shadow:0 0 28px rgba(196,182,255,.35)}
+#kg-ring-play .kgr-line{font-size:clamp(15px,2.4vw,19px);margin:0 0 18px;letter-spacing:.02em;opacity:.75}
 #kg-ring-play .kgr-num{display:block;font-size:clamp(88px,22vw,180px);line-height:1;color:var(--kg-a2,#ff6fae);text-shadow:0 0 40px color-mix(in srgb,var(--kg-a2,#ff6fae) 60%,transparent)}
 #kg-ring-play .kgr-hint{margin:22px 0 0;font:500 13px "M PLUS Rounded 1c",sans-serif;opacity:.6}
 #kg-ring-play video{display:none;width:100%;height:100%;object-fit:contain;background:#000}
@@ -6832,7 +6833,7 @@ body.kg-calm #kg-strip::after,body.kg-calm #kg-main.kd-enter :is(.kl-card,.hb-ca
   const getClip = async () => { try { return (await idb('readonly', s => s.get('video'))) || memo; } catch (e) { return memo; } };
   const putClip = async blob => { memo = blob; try { await idb('readwrite', s => s.put(blob, 'video')); return true; } catch (e) { return false; } };
 
-  const COUNT = 10;
+  const COUNT = 3;
   const card = () => `<section class="kl-card kl-mini kg-ring"><p class="kl-eyebrow">FEELING LOW?</p>
     <div class="kl-row"><button class="kl-primary" data-a="kgring">💍 ${L.ringName ? 'Ring on' : 'Choose your ring video'}</button>${L.ringName ? '<button class="kl-ghost" data-a="kgringpick">Change video</button>' : ''}</div>
     <p class="kl-small">${L.ringName ? 'Your ring is in your pen box. Press, put it on, and the video plays.' : 'Pick the video once. It stays on this device.'}</p></section>`;
@@ -6854,7 +6855,7 @@ body.kg-calm #kg-strip::after,body.kg-calm #kg-main.kd-enter :is(.kl-card,.hb-ca
   async function start() {
     if (on) return;
     const o = document.createElement('div'); o.id = 'kg-ring-play'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-label', 'Ring on');
-    o.innerHTML = `<div class="kgr-count"><p class="kgr-line">Your ring is in your pen box. Put it on.</p><b class="kgr-num">${COUNT}</b><p class="kgr-hint">Tap to start now</p></div><video playsinline preload="auto"></video><button class="kgr-x" aria-label="Stop">✕</button>`;
+    o.innerHTML = `<div class="kgr-count"><p class="kgr-quote">Pen drawn. Ring on.<br>I never fight alone.</p><p class="kgr-line">Your ring is in your pen box. Put it on.</p><b class="kgr-num">${COUNT}</b><p class="kgr-hint">Tap to start now</p></div><video playsinline preload="auto"></video><button class="kgr-x" aria-label="Stop">✕</button>`;
     document.body.append(o);
     // full screen has to be asked for straight from the click, so the countdown runs inside it
     o.requestFullscreen?.().catch(() => {});
