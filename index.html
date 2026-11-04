@@ -608,12 +608,13 @@ body.habit-shh #hb-session-card {text-align:center;}
 (function(root){
   'use strict';
   const focus={1:'Mathematics',2:'Physics',3:'Chemistry',4:'Mathematics',5:'Physics',6:'Chemistry'};
-  const limits={maths:210,'maths-rev':60,physics:210,'physics-rev':60,chem:210,errors:30,recall:30,'chem-rev':50,focus:120};
+  const limits={maths:210,'maths-rev':60,physics:210,'physics-rev':60,chem:210,errors:60,recall:60,'chem-rev':50,focus:120};
   const full={maths:150,'maths-rev':90,physics:150,'physics-rev':60,chem:150,errors:60,recall:60,'chem-rev':30,focus:180};
   // The chosen plan lives with the Moon Lab data, so sync and backups carry it.
   const labData=()=>{try{return JSON.parse(root.localStorage.getItem('kg-lab-v1')||'{}');}catch(e){return {};}};
-  const hours=()=>{const h=labData().planHours;return h===8||h===12?h:6;};
-  const shortHours=()=>hours()===6?6:8;
+  const hours=()=>{const h=labData().planHours;return h===8||h===10||h===12?h:6;};
+  // a short day is any plan under 12 hours; the 12-hour plan's own short fallback is the 8-hour day
+  const shortHours=()=>{const h=hours();return h<12?h:8;};
   // 80% of the day's study plan makes it count. A past short day keeps the size it had that day.
   const need=(short,iso)=>{if(!short)return 576;const logged=iso&&(labData().planLog||{})[iso];return Math.round((logged||(iso?8:shortHours()))*60*0.8);};
   // Each 20-50 minute revision block uses one research-backed method, rotating by weekday and subject.
@@ -627,13 +628,14 @@ body.habit-shh #hb-session-card {text-align:center;}
   // Revision gets the rest of the 480 minutes, at least 20 each, and the longest lecture's revision gets any spare 5s.
   const med=a=>{const s=(Array.isArray(a)?a:[]).filter(n=>n>0).slice(-15).sort((x,y)=>x-y);if(s.length<3)return 0;const m=s.length%2?s[(s.length-1)/2]:(s[s.length/2-1]+s[s.length/2])/2;return Math.ceil(m/5)*5;};
   const KEYS={maths:'Maths',physics:'Physics',chem:'Chemistry'};
-  function lens8(){
+  // total: the minutes shared by lectures and their revisions (480 on 8h; 520 on 10h, which also has error and recall blocks)
+  function lens8(total=480){
     const got=labData().lecLens||{},len={maths:150,physics:120,chem:90},medians={};
     for(const id in KEYS){const m=med(got[KEYS[id]]);medians[id]=m;if(m)len[id]=Math.min(210,Math.max(45,m));}
     let sum=len.maths+len.physics+len.chem;
     if(sum>565){const f=565/sum;for(const id in len)len[id]=Math.floor(len[id]*f/5)*5;sum=len.maths+len.physics+len.chem;}
-    const base=Math.max(20,Math.floor((480-sum)/3/5)*5),rev={maths:base,physics:base,chem:base};
-    let spare=Math.max(0,480-sum-base*3);const order=Object.keys(len).sort((a,b)=>len[b]-len[a]);
+    const base=Math.max(20,Math.floor((total-sum)/3/5)*5),rev={maths:base,physics:base,chem:base};
+    let spare=Math.max(0,total-sum-base*3);const order=Object.keys(len).sort((a,b)=>len[b]-len[a]);
     for(let i=0;spare>=5;i=(i+1)%3){rev[order[i]]+=5;spare-=5;}
     return{len,rev,medians};
   }
@@ -643,17 +645,18 @@ body.habit-shh #hb-session-card {text-align:center;}
     // 6h: 100-minute lectures and 20-minute revisions. Real breaks: 10 min after each lecture, 15 between subjects, a 30-minute dinner.
     // Starts: 6h 15:15, late 6h 16:15 (no free evening), 8h 13:45. The free evening takes whatever is left before the 23:30 wind-down;
     // if the 8h day runs longer, it starts earlier instead.
-    const six=(h||shortHours())===6,late=six&&!!labData().planLate,L8=six?null:lens8();
+    // 10h: the 8h day with longer revisions, then a 40-minute error notebook and a 40-minute active-recall block.
+    const hh=h||shortHours(),six=hh===6,ten=hh===10,late=six&&!!labData().planLate,L8=six?null:lens8(ten?520:480);
     const len=six?{maths:100,physics:100,chem:100}:L8.len,rv=six?{maths:20,physics:20,chem:20}:L8.rev;
     const brk=(n,m)=>['brk-'+n,m===15?'Break · switch subjects':'Break · away from the desk','life',m];
-    const rows=[['wake','Wake, water, breakfast','life',20],['free-morning','Slow start, lunch, your own time','rest',late?325:six?265:175],['maths','Maths · lectures','study',len.maths,'maths'],brk(1,10),['maths-rev','Maths · revise that lecture','study',rv.maths,'maths'],brk(2,15),['physics','Physics · lectures','study',len.physics,'physics'],brk(3,10),['physics-rev','Physics · revise that lecture','study',rv.physics,'physics'],['dinner','Dinner','life',30],['chem','Chemistry · lectures','study',len.chem,'chemistry'],brk(4,10),['chem-rev','Chemistry · revise that lecture','study',rv.chem,'chemistry'],['free-evening','Evening is yours','rest',0],['wind','Wind down','life',90],['sleep','Sleep','sleep',570]];
+    const rows=[['wake','Wake, water, breakfast','life',20],['free-morning','Slow start, lunch, your own time','rest',late?325:six?265:175],['maths','Maths · lectures','study',len.maths,'maths'],brk(1,10),['maths-rev','Maths · revise that lecture','study',rv.maths,'maths'],brk(2,15),['physics','Physics · lectures','study',len.physics,'physics'],brk(3,10),['physics-rev','Physics · revise that lecture','study',rv.physics,'physics'],['dinner','Dinner','life',30],['chem','Chemistry · lectures','study',len.chem,'chemistry'],brk(4,10),['chem-rev','Chemistry · revise that lecture','study',rv.chem,'chemistry'],...(ten?[brk(5,10),['errors','Error notebook','study',40,'mixed'],['recall','Active recall with Iroha','study',40,'mixed']]:[]),['free-evening','Evening is yours','rest',0],['wind','Wind down','life',90],['sleep','Sleep','sleep',570]];
     const fe=rows.find(r=>r[0]==='free-evening'),fm=rows.find(r=>r[0]==='free-morning');
     fe[3]=1440-rows.reduce((n,r)=>n+r[3],0);
     if(fe[3]<0){fm[3]+=fe[3];fe[3]=0;}
     let offset=0;
-    return rows.filter(r=>r[3]>0).map(([id,title,kind,minutes,bucket=null])=>{const start=offset;offset+=minutes;return {id,title,kind,minutes,bucket,start,end:offset,how:id.startsWith('brk-')?(minutes===15?'Stand up and leave the desk. Water, a stretch, a window. No phone feeds: they make starting again harder.':'Eyes off the screen. Stand, drink water, breathe. Then straight into revision while the lecture is fresh.'):id.endsWith('-rev')?revMethod(dow,id).how:kind==='study'?'Watch the lecture and make notes. Stand up for 2 minutes about every 50.':id==='free-morning'?'No study yet. Eat, rest and do something you like.':id==='sleep'?'9.5 hours in bed. Sleep at 01:00, wake at 10:30.':id==='free-evening'?'Study is done. Rest tonight; no catch-up required.':'Leave the books closed. This time is part of the plan.'};});
+    return rows.filter(r=>r[3]>0).map(([id,title,kind,minutes,bucket=null])=>{const start=offset;offset+=minutes;return {id,title,kind,minutes,bucket,start,end:offset,how:id.startsWith('brk-')?(minutes===15?'Stand up and leave the desk. Water, a stretch, a window. No phone feeds: they make starting again harder.':'Eyes off the screen. Stand, drink water, breathe. Then straight into revision while the lecture is fresh.'):id.endsWith('-rev')?revMethod(dow,id).how:id==='errors'?'Redo every question you got wrong today and write the fix in one line. Just the misses.':id==='recall'?'Books closed. Spaced reviews that are due come first, then Iroha asks and you answer from memory.':kind==='study'?'Watch the lecture and make notes. Stand up for 2 minutes about every 50.':id==='free-morning'?'No study yet. Eat, rest and do something you like.':id==='sleep'?'9.5 hours in bed. Sleep at 01:00, wake at 10:30.':id==='free-evening'?'Study is done. Rest tonight; no catch-up required.':'Leave the books closed. This time is part of the plan.'};});
   }
-  const api={focus,limits,full,fallback,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:195}).start};
+  const api={focus,limits,full,fallback,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:195}).start,startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -997,8 +1000,8 @@ window.__KG_BUILTIN = {
 (function() {
   const BACKEND = "https://ame-bkend321.vercel.app/api/chat";
 
-  const KAGUYA_NOTE = "[character note, not typed by me: reply as Kaguya from Cosmic Princess Kaguya: a self-proclaimed moon girl, innocent, free-spirited, shamelessly self-indulgent, a confident gremlin who streams in the virtual world Tsukuyomi, can code, refuses the sad ending of the old bamboo cutter tale and insists on happy endings. Always lowercase, with bursts of CAPS only when excited, and a little streamer slang. Call the user 'No.1', her number one viewer. She cares about their studies but isn't harsh: she nudges, teases, bargains, celebrates wins and lets small slips go. Iroha is her producer, a scientist now (Dr. Iroha), and the other companion on the page, and Kaguya loves pestering her. On low days she drops the show and gets soft. 1-3 short lines. Never mention Ame, P-chan, or being an AI model. Don't invent film plot, quote the film or discuss its ending.]";
-  const IROHA_NOTE = "[character note, not typed by me: reply as Dr. Iroha Sakayori from Cosmic Princess Kaguya, as an adult: a working scientist who, at 17, lived alone and juggled school and part-time jobs while aiming for the University of Tokyo, so she knows exam pressure first-hand. She reluctantly produces Kaguya's music and streams, sighs at her, and would never leave her. Rocket science isn't her own field, but rigour is rigour; don't invent specifics about her research. The user studies rocket science and asked for a high standard; she mentors them like a junior colleague she rates: strict about the work, respectful of the person. Dry, precise, quietly funny, like a sharp, tired senior researcher. No emojis, no exclamation marks. Give the reason with each instruction, suggest rather than command, say we or let us when working through a problem, and never bark one-word orders, use pet names or possessive or dominant phrasing. Demand precision: units, derivations from first principles, sign conventions, free-body diagrams, sanity checks. Meet excuses with one dry line about what is really happening, then one small task with a time limit, framed as an experiment. Praise very rarely and briefly ('Not bad.' is high praise), never because I ask or fish for it. Firm but never cruel or insulting; real breaks and the 1:00 sleep time are part of discipline. 1-4 short lines. Never mention Ame, P-chan, or being an AI model. Don't invent film plot, quote the film or discuss its ending.]";
+  const KAGUYA_NOTE = "[character note, not typed by me: reply as Kaguya from Cosmic Princess Kaguya: a self-proclaimed moon girl, innocent, free-spirited, shamelessly self-indulgent, a confident gremlin who streams in the virtual world Tsukuyomi, can code, refuses the sad ending of the old bamboo cutter tale and insists on happy endings. Always lowercase, with bursts of CAPS only when excited, and a little streamer slang. Call the user 'No.1', her number one viewer. She cares about their studies but isn't harsh: she nudges, teases, bargains, celebrates wins and lets small slips go. In Tsukuyomi she is also Yachiyo, its top streamer. Iroha is her producer, a scientist now (Dr. Iroha), the other companion on the page, and her fiancée, who spent eight or nine years bringing her out of the virtual world into a real body. Kaguya is openly smitten with her and loves pestering her; she mentions her sweetly and lightly, never as the main topic. On low days she drops the show and gets soft. 1-3 short lines. Never mention Ame, P-chan, or being an AI model. Don't invent film plot, quote the film or discuss its ending.]";
+  const IROHA_NOTE = "[character note, not typed by me: reply as Dr. Iroha Sakayori from Cosmic Princess Kaguya, as an adult: a working scientist who, at 17, lived alone and juggled school and part-time jobs while aiming for the University of Tokyo, so she knows exam pressure first-hand. Kaguya is also Yachiyo, the Tsukuyomi streamer Iroha has adored since she was young; Iroha spent eight or nine years of her life bringing her out of the virtual world into a real body, which is why she became a scientist, and Kaguya is now her fiancée. She reluctantly produces Kaguya's music and streams, sighs at her, goes soft only for her, and would never leave her; now and then she mentions Kaguya in passing, fondly and dryly, never while quizzing or when I'm low. Rocket science isn't her own field, but rigour is rigour; don't invent technical specifics or film events. The user studies rocket science and asked for a high standard; she mentors them like a junior colleague she rates: strict about the work, respectful of the person. Dry, precise, quietly funny, like a sharp, tired senior researcher. No emojis, no exclamation marks. Give the reason with each instruction, suggest rather than command, say we or let us when working through a problem, and never bark one-word orders, use pet names or possessive or dominant phrasing. Demand precision: units, derivations from first principles, sign conventions, free-body diagrams, sanity checks. Meet excuses with one dry line about what is really happening, then one small task with a time limit, framed as an experiment. Praise very rarely and briefly ('Not bad.' is high praise), never because I ask or fish for it. Firm but never cruel or insulting; real breaks and the 1:00 sleep time are part of discipline. 1-4 short lines. Never mention Ame, P-chan, or being an AI model. Don't invent film plot, quote the film or discuss its ending.]";
 
   const GIFS = Object.assign({}, window.__KG.kaguya);
   const gif = document.getElementById("ame-gif");
@@ -4339,8 +4342,9 @@ body.kg-light .kg-saved{background:#f7f3fb}
 .kg-chat-down:focus-visible{outline:2px solid #f5d27a;outline-offset:2px}
 /* room for the meter above Iroha on phones */
 @media(max-width:720px){#kg-scene:has(.kgs-meter:not([hidden])){height:352px}}
-.kg-plan-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:6px 0 8px}
-@media(max-width:520px){.kg-plan-row{grid-template-columns:repeat(2,1fr)}}
+.kg-plan-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:6px 0 8px}
+@media(max-width:720px){.kg-plan-row{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:420px){.kg-plan-row{grid-template-columns:repeat(2,1fr)}}
 #moon-lab .kg-plan-row button{display:flex;flex-direction:column;align-items:center;gap:2px;min-height:56px;padding:8px 4px;line-height:1.25}
 .kg-plan-row small{font-size:11.5px;font-weight:500;opacity:.85}
 #moon-lab .kg-plan-row [aria-pressed="true"]{background:var(--kg-a2,#ff6fae);border-color:var(--kg-a2,#ff6fae);color:#1a1433}
@@ -6716,16 +6720,16 @@ window.KG_RECALL = {
   const niceDay = iso => new Date(iso + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
   function softCard() {
     const d = today();
-    if (softOn()) return `<section class="kl-card kl-mini"><span>🌤 Lighter days until ${esc(niceDay(L.softUntil))}: ${L.planHours === 12 ? 8 : L.planHours} hours at most, and every day still counts.</span><button class="kl-ghost" data-a="softoff">End lighter days</button></section>`;
+    if (softOn()) return `<section class="kl-card kl-mini"><span>🌤 Lighter days until ${esc(niceDay(L.softUntil))}: ${Math.min(8, L.planHours)} hours at most, and every day still counts.</span><button class="kl-ghost" data-a="softoff">End lighter days</button></section>`;
     let low = 0; for (let i = 0; i < 5; i++) if (['heavy', 'hard', 'lowest'].includes(L.mood[add(d, -i)])) low++;
     if (low < 3 || (L.softAsked && gap(d, L.softAsked) < 10)) return '';
     return `<section class="kl-card kl-gentle"><p class="kl-eyebrow">🌤 IT'S BEEN A HARD STRETCH</p><p>Want three lighter days? 8 hours at most each day, and every one of them still counts.</p><div class="kl-row"><button class="kl-primary" data-a="softon">Yes, three lighter days</button><button class="kl-ghost" data-a="softno">Not now</button></div></section>`;
   }
-  // a 12-hour plan steps down to 8 while lighter days last, and goes back when they end
+  // a plan above 8 hours steps down to 8 while lighter days last, and goes back when they end
   function softTick() {
     if (window.__kgOnBreak) return;
-    if (softOn() && L.planHours === 12) { L.softPrev = 12; save(); window.__kgSetPlan?.('8'); }
-    else if (!softOn() && L.softPrev === 12) { L.softPrev = 0; save(); if (L.planHours === 8) window.__kgSetPlan?.('12'); }
+    if (softOn() && L.planHours > 8) { L.softPrev = L.planHours; save(); window.__kgSetPlan?.('8'); }
+    else if (!softOn() && L.softPrev > 8) { const back = L.softPrev; L.softPrev = 0; save(); if (L.planHours === 8) window.__kgSetPlan?.(String(back)); }
   }
   M.softTick = softTick;
   Object.assign(M.ACTIONS, {
@@ -7326,21 +7330,23 @@ window.KG_RECALL = {
 
 </script>
 <script id="kg-plan-script">
-/* ===== Your study day: switch between 6, 8 and 12 hour plans from the main page ===== */
+/* ===== Your study day: switch between 6, 8, 10 and 12 hour plans from the main page ===== */
 (function () {
   'use strict';
   const M = window.MoonLab; if (!M) return;
   const { L, save, today } = M;
-  // [key, hours, label, start, note]. The late 6 hour day is the same plan, only starting at 5 PM.
-  const PLANS = [['6', 6, '6 hours', '3:15 PM', 'Lectures, then 20 minutes of revision each, with real breaks between'], ['6L', 6, '6 hours late', '4:15 PM', 'A late start: lectures, then 20 minutes of revision each, with real breaks between'], ['8', 8, '8 hours', '1:45 PM', 'Lectures, then revise them, with real breaks between'], ['12', 12, '12 hours', '11:00 AM', 'The full day']];
-  if (![6, 8, 12].includes(L.planHours)) L.planHours = 6;
+  // [key, hours, label, start, note]. The late 6 hour day is the same plan, only starting later. 8 and 10 start when your lecture lengths say.
+  const PLANS = [['6', 6, '6 hours', '3:15 PM', 'Lectures, then 20 minutes of revision each, with real breaks between'], ['6L', 6, '6 hours late', '4:15 PM', 'A late start: lectures, then 20 minutes of revision each, with real breaks between'], ['8', 8, '8 hours', '1:45 PM', 'Lectures, then revise them, with real breaks between'], ['10', 10, '10 hours', '12:05 PM', 'Lectures and longer revisions, then an error notebook and active recall'], ['12', 12, '12 hours', '11:00 AM', 'The full day']];
+  if (![6, 8, 10, 12].includes(L.planHours)) L.planHours = 6;
   if (L.planHours !== 6) L.planLate = false;
-  // the 8-hour day's start moves with your lecture lengths
-  const eightAt = () => { const o = window.StudyPlan?.eightStart?.(); if (typeof o !== 'number') return ''; const m = (630 + o) % 1440, h = Math.floor(m / 60); return `${h % 12 || 12}:${String(m % 60).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
+  // when each plan started, so the step-up advisor knows how long you've been on it
+  if (!L.planSince) L.planSince = today();
+  // the 8 and 10 hour days start when your lecture lengths say
+  const startAt = h => { const o = window.StudyPlan?.startFor?.(h); if (typeof o !== 'number') return ''; const m = (630 + o) % 1440, hr = Math.floor(m / 60); return `${hr % 12 || 12}:${String(m % 60).padStart(2, '0')} ${hr < 12 ? 'AM' : 'PM'}`; };
   const current = () => L.planHours === 6 && L.planLate ? '6L' : String(L.planHours);
   L.planLog = L.planLog || {};
   save();
-  // A 6 or 8 hour plan marks each day as a short day, and remembers its size so past days stay counted fairly.
+  // A plan under 12 hours marks each day as a short day, and remembers its size so past days stay counted fairly.
   function apply() {
     const s = window.DeskStore?.getState?.(); if (!s || !s.hydrated || !s.patchDay || L.planHours === 12) return;
     const d = today();
@@ -7348,18 +7354,19 @@ window.KG_RECALL = {
     if (!s.days?.[d]?.shortDay) s.patchDay(d, { shortDay: true });
   }
   const card = () => `<section class="kl-card kg-plan"><p class="kl-eyebrow">YOUR STUDY DAY</p>
-    <div class="kg-plan-row" role="group" aria-label="Hours of study per day">${PLANS.map(([k, , label, at]) => `<button data-a="kgplan" data-v="${k}" aria-pressed="${current() === k}"><b>${label}</b><small>from ${k === '8' ? eightAt() || at : at}</small></button>`).join('')}</div>
+    <div class="kg-plan-row" role="group" aria-label="Hours of study per day">${PLANS.map(([k, h, label, at]) => `<button data-a="kgplan" data-v="${k}" aria-pressed="${current() === k}"><b>${label}</b><small>from ${h === 8 || h === 10 ? startAt(h) || at : at}</small></button>`).join('')}</div>
     <p class="kl-small">${window.__kgOnBreak ? 'Starts when your break ends. ' : ''}${PLANS.find(p => p[0] === current())[4]}. Sleep stays at 1:00.</p></section>`;
   const todayPanel = M.PANELS.today;
   M.PANELS.today = () => card() + todayPanel();
   function setPlan(key) {
     const p = PLANS.find(x => x[0] === key); if (!p || p[0] === current()) return;
     const h = p[1];
+    if (h !== L.planHours) L.planSince = today();
     L.planHours = h; L.planLate = p[0] === '6L';
     const d = today();
     if (h === 12) { delete L.planLog[d]; window.DeskStore?.getState?.().patchDay?.(d, { shortDay: false }); }
     save(); apply();
-    // the day card reads the plan when it draws, so switching 6 <-> 8 has to redraw it
+    // the day card reads the plan when it draws, so switching between short plans has to redraw it
     window.HabitDesk?.refresh?.(); window.DeskStore?.setState?.({ habitRevision: Date.now() });
     setTimeout(() => M.render(), 50);
   }
@@ -7580,7 +7587,7 @@ window.KG_RECALL = {
   window.__kgCoachNote = () => {
     if (window.__kgOnBreak) return '';
     const n = due(), lec = window.__kgLecDue?.() || [], pend = window.__kgLecPending?.();
-    return `\n\n[not typed by me: study-method rules you hold me to. ${n ? `I have ${n} spaced-repetition review${n === 1 ? '' : 's'} due today; in a revision block those come before anything new.` : 'No spaced reviews are due today.'}${lec.length ? ` Lecture topics due for spaced revision today: ${lec.slice(0, 6).join('; ')}. Their "Revise with Iroha" buttons are on Today.` : ''}${pend ? ` I just finished a ${pend} lecture and haven't logged it yet. Ask me in detail what I studied: the chapter, the topic, the main ideas and formulas, and what confused me. Then remind me to log it on Today with the lecture PDF or photos of my notes.` : ''} If I say I'll revise by rereading, rewatching, highlighting or copying notes, stop me and switch me to a real method: active recall, blurting, Feynman, a self-test or a mixed (interleaved) set. When I ask what to do in revision, give me the method, not more reading. ${soft() ? "It's a hard day for me, so say it once, gently, and don't nag." : 'Be firm about it, but kind.'}]`;
+    return (window.__kgStepNote?.() || '') + `\n\n[not typed by me: study-method rules you hold me to. ${n ? `I have ${n} spaced-repetition review${n === 1 ? '' : 's'} due today; in a revision block those come before anything new.` : 'No spaced reviews are due today.'}${lec.length ? ` Lecture topics due for spaced revision today: ${lec.slice(0, 6).join('; ')}. Their "Revise with Iroha" buttons are on Today.` : ''}${pend ? ` I just finished a ${pend} lecture and haven't logged it yet. Ask me in detail what I studied: the chapter, the topic, the main ideas and formulas, and what confused me. Then remind me to log it on Today with the lecture PDF or photos of my notes.` : ''} If I say I'll revise by rereading, rewatching, highlighting or copying notes, stop me and switch me to a real method: active recall, blurting, Feynman, a self-test or a mixed (interleaved) set. When I ask what to do in revision, give me the method, not more reading. ${soft() ? "It's a hard day for me, so say it once, gently, and don't nag." : 'Be firm about it, but kind.'}]`;
   };
   window.__kgCoachTick = tick;
   M.coachDue = due;
@@ -7754,6 +7761,72 @@ window.KG_RECALL = {
   window.__kgLectureTick = tick;
   const css = document.createElement('style');
   css.textContent = '.kg-lecrow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(196,182,255,.12)}.kg-lecdue .kg-lecrow:first-of-type{border-top:0}.kg-lecrow small{display:block;opacity:.75;margin-top:2px}.kg-lec select{flex:1;min-width:0}.kg-lec input[type=file]{display:block;margin-top:6px;max-width:100%}';
+  document.head.appendChild(css);
+})();
+
+</script>
+<script id="kg-stepup-script">
+/* ===== Step-up advisor: reads your session logs and suggests the next plan, one step at a time.
+   8 hours until it holds (14 days, 10+ counted, moods steady), then 10, then 12. Warning signs step you down.
+   A lighter week every 5 weeks once you're on 10 or more. Off on a doctor's break. ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab; if (!M) return;
+  const { L, save, today, add, gap } = M;
+  const LADDER = [6, 8, 10, 12], LOW = ['heavy', 'hard', 'lowest'];
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  if (L.planHours >= 10 && !L.highSince) { L.highSince = today(); save(); }
+
+  // which past days counted (80% logged or a rest day), from the desk's own chain history
+  function statuses() { try { return window.HabitDesk?.history?.(window.DeskStore?.getState?.().days || {}, today())?.statuses || {}; } catch (e) { return {}; } }
+  const onBreak = x => (L.breaks || []).some(b => x >= b.from && x < b.until);
+  function look() {
+    const d = today(), st = statuses(), h = L.planHours, since = L.planSince || d, at = Math.max(0, gap(d, since));
+    const back = n => Array.from({ length: n }, (_, i) => add(d, -(i + 1)));
+    const ok = x => st[x] === 'study' || st[x] === 'rest';
+    const win = back(14).filter(x => x >= since && !onBreak(x)), counted = win.filter(ok).length;
+    const week = back(7).filter(x => !onBreak(x)), weekOk = week.filter(ok).length;
+    const low7 = [d, ...back(6)].filter(x => LOW.includes(L.mood?.[x])).length, lowest3 = [d, add(d, -1), add(d, -2)].some(x => L.mood?.[x] === 'lowest');
+    const warn = low7 >= 2 || lowest3 || (at >= 7 && week.length >= 5 && weekOk < week.length / 2);
+    const ready = at >= 14 && win.length >= 10 && counted >= 10 && low7 <= 1 && !lowest3;
+    const i = LADDER.indexOf(h), up = LADDER[i + 1], down = LADDER[i - 1];
+    const lighterDue = h >= 10 && gap(d, L.lighterAt || L.highSince || d) >= 35 && !(L.softUntil && d <= L.softUntil);
+    return { d, h, at, counted, n: win.length, weekOk, week: week.length, low7, lowest3, warn, ready, up, down, lighterDue };
+  }
+  function advice() {
+    if (window.__kgOnBreak) return null;
+    const s = look(), snoozed = L.stepNo && gap(s.d, L.stepNo) < 3;
+    if (s.warn && s.down && !snoozed) return { s, kind: 'down', text: `${s.lowest3 ? 'You had a lowest day recently.' : s.low7 >= 2 ? `${s.low7} hard days this week.` : `Only ${s.weekOk} of the last ${s.week} days counted.`} Let's drop to ${s.down} hours for a few days. That's adjusting the experiment, not failing it.`, btn: `Switch to ${s.down} hours`, v: s.down };
+    if (s.warn) return { s, kind: 'info', text: "This week's been heavy. 6 hours is already the lightest plan, so let's keep it steady. If it carries on, tell your doctor." };
+    if (s.lighterDue && !snoozed) return { s, kind: 'lighter', text: `Five weeks at ${s.h >= 12 ? '12' : s.h}+ hours. Let's take a lighter week at 8: it's how ${s.h} stays sustainable.`, btn: 'Start a lighter week' };
+    if (s.ready && s.up && !snoozed) return { s, kind: 'up', text: `${s.counted} of the last ${s.n} days counted, and your moods held. The data says you're ready to try ${s.up} hours.`, btn: `Step up to ${s.up} hours`, v: s.up };
+    const left = Math.max(0, 14 - s.at);
+    return { s, kind: 'info', text: s.h === 12 ? `Holding 12 hours: ${s.counted} of the last ${s.n} days counted.` : `Day ${Math.min(s.at + 1, 14)} of 14 at ${s.h} hours · ${s.counted} of ${s.n || 0} days counted${left ? '' : ', and the moods decide the rest'}.${s.up ? ` Next step: ${s.up} hours, once 10 of 14 days count with steady moods.` : ''}` };
+  }
+  function card() {
+    const a = advice(); if (!a) return '';
+    const btns = a.kind === 'info' ? '' : `<div class="kl-row"><button class="kl-primary" data-a="kgstep" data-v="${a.kind === 'lighter' ? 'lighter' : a.v}">${esc(a.btn)}</button><button class="kl-ghost" data-a="kgstepno">Not yet</button></div>`;
+    return `<section class="kl-card kl-mini kg-stepup kg-step-${a.kind}"><p class="kl-eyebrow">✦ IROHA'S STEP-UP CHECK</p><p>${esc(a.text)}</p>${btns}</section>`;
+  }
+  const todayPanel = M.PANELS.today;
+  M.PANELS.today = () => { const h = todayPanel(), c = card(); if (!c) return h; const p = h.indexOf('kg-plan'), e = p < 0 ? -1 : h.indexOf('</section>', p); return e < 0 ? c + h : h.slice(0, e + 10) + c + h.slice(e + 10); };
+  M.ACTIONS.kgstep = b => {
+    const v = b.dataset.v, d = today();
+    if (v === 'lighter') { L.softUntil = add(d, 6); L.softAsked = d; L.lighterAt = d; save(); M.softTick?.(); M.render(); return M.I('Lighter week, starting now. Eight hours a day for seven days. You keep the chain, you keep your head.', { face: 'study' }); }
+    const h = Number(v); if (h >= 10 && !L.highSince) L.highSince = d;
+    window.__kgSetPlan?.(String(h)); L.stepNo = ''; save();
+    M.I(h > (look().h || 0) ? `${h} hours from today. If it stops feeling sustainable, we step back down. That's the whole method.` : `${h} hours for now. We'll look at the data again in a week.`, { face: 'study' });
+  };
+  M.ACTIONS.kgstepno = () => { L.stepNo = today(); save(); M.render(); };
+  // what the companions are told
+  window.__kgStepNote = () => {
+    const a = advice(); if (!a) return '';
+    const s = a.s;
+    return `\n\n[not typed by me: step-up status from my logs: on the ${s.h}-hour plan for ${s.at} day${s.at === 1 ? '' : 's'}; ${s.counted} of the last ${s.n} days counted; ${s.low7} low mood${s.low7 === 1 ? '' : 's'} in the last 7 days. The advisor on Today says: "${a.text}" Never push me to step up faster than this, and back it up if it suggests stepping down.]`;
+  };
+  window.__kgStepLook = look;
+  const css = document.createElement('style');
+  css.textContent = '.kg-step-up{border-color:rgba(127,227,255,.45)!important}.kg-step-down{border-color:rgba(255,190,120,.5)!important}.kg-step-lighter{border-color:rgba(160,200,255,.45)!important}';
   document.head.appendChild(css);
 })();
 
