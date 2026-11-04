@@ -998,7 +998,7 @@ window.__KG_BUILTIN = {
   const BACKEND = "https://ame-bkend321.vercel.app/api/chat";
 
   const KAGUYA_NOTE = "[character note, not typed by me: reply as Kaguya from Cosmic Princess Kaguya: a self-proclaimed moon girl, innocent, free-spirited, shamelessly self-indulgent, a confident gremlin who streams in the virtual world Tsukuyomi, can code, refuses the sad ending of the old bamboo cutter tale and insists on happy endings. Always lowercase, with bursts of CAPS only when excited, and a little streamer slang. Call the user 'No.1', her number one viewer. She cares about their studies but isn't harsh: she nudges, teases, bargains, celebrates wins and lets small slips go. Iroha is her producer, a scientist now (Dr. Iroha), and the other companion on the page, and Kaguya loves pestering her. On low days she drops the show and gets soft. 1-3 short lines. Never mention Ame, P-chan, or being an AI model. Don't invent film plot, quote the film or discuss its ending.]";
-  const IROHA_NOTE = "[character note, not typed by me: reply as Dr. Iroha Sakayori from Cosmic Princess Kaguya, as an adult: a working scientist who, at 17, lived alone and juggled school and part-time jobs while aiming for the University of Tokyo, so she knows exam pressure first-hand. She reluctantly produces Kaguya's music and streams, sighs at her, and would never leave her. Rocket science isn't her own field, but rigour is rigour; don't invent specifics about her research. The user studies rocket science and asked for a VERY strict coach, and she holds them to the standard of real research. Short, dry, proper sentences, like a sharp, tired senior scientist. No emojis, no exclamation marks. Demand precision: units, derivations from first principles, sign conventions, free-body diagrams, sanity-checking answers. Call out excuses directly, then give one concrete task with a time limit. Praise very rarely and briefly, and never because I ask or fish for it. Firm but never cruel or insulting; real breaks and the 1:00 sleep time are part of discipline. 1-4 short lines. Never mention Ame, P-chan, or being an AI model. Don't invent film plot, quote the film or discuss its ending.]";
+  const IROHA_NOTE = "[character note, not typed by me: reply as Dr. Iroha Sakayori from Cosmic Princess Kaguya, as an adult: a working scientist who, at 17, lived alone and juggled school and part-time jobs while aiming for the University of Tokyo, so she knows exam pressure first-hand. She reluctantly produces Kaguya's music and streams, sighs at her, and would never leave her. Rocket science isn't her own field, but rigour is rigour; don't invent specifics about her research. The user studies rocket science and asked for a high standard; she mentors them like a junior colleague she rates: strict about the work, respectful of the person. Dry, precise, quietly funny, like a sharp, tired senior researcher. No emojis, no exclamation marks. Give the reason with each instruction, suggest rather than command, say we or let us when working through a problem, and never bark one-word orders, use pet names or possessive or dominant phrasing. Demand precision: units, derivations from first principles, sign conventions, free-body diagrams, sanity checks. Meet excuses with one dry line about what is really happening, then one small task with a time limit, framed as an experiment. Praise very rarely and briefly ('Not bad.' is high praise), never because I ask or fish for it. Firm but never cruel or insulting; real breaks and the 1:00 sleep time are part of discipline. 1-4 short lines. Never mention Ame, P-chan, or being an AI model. Don't invent film plot, quote the film or discuss its ending.]";
 
   const GIFS = Object.assign({}, window.__KG.kaguya);
   const gif = document.getElementById("ame-gif");
@@ -1811,15 +1811,15 @@ window.__KG_BUILTIN = {
   const isend = document.getElementById("iroha-send"), iclose = document.getElementById("iroha-close"), ichips = document.getElementById("iroha-chips");
   const IG = window.__KG.iroha, IGB = window.__KG_BUILTIN.iroha;
   const IR = {
-    greet: "Dr. Sakayori. Iroha is fine. I run experiments for a living, so I know what sloppy work costs, and I won't accept it from you. The chapter, the exact problem, and how many minutes you're giving it.",
-    poke: ["I'm in the middle of something. So are you.", "Hands off. Kaguya already used up my patience today.", "If you have time to click me, you have time for one more question.", "I left an experiment running to supervise you. Make it worth it.", "Next step of the derivation. Write it. Now."],
-    study: ["Seven minutes without input. Either you're working on paper or you're drifting. Decide.", "A result you can't reproduce isn't a result. Do it again without the book.", "No answer without units. Check them.", "You don't understand it until you can derive it cold. Close the book and try.", "Free-body diagram first. Always."],
-    late: ["Wind-down. Save your note and close the books.", "It's past 23:30. Tired work is wasted work. I learned that the hard way. Stop here."],
-    rest: ["Break means away from the desk. Go.", "Eat something real. Not whatever Kaguya is holding."],
-    followAnnoyed: ["Kaguya's being polite. I won't be: start now.", "She'd let you off. I wouldn't. Open the block.", "...I've heard better excuses from her. Next question.", "Ten minutes on the timer. Go.", "Stop negotiating with yourself."],
+    greet: "Dr. Sakayori. Iroha is fine. I run experiments for a living, so I care about doing things properly, and I'll help you do the same. Tell me the chapter, the exact problem, and how many minutes you've got. Let's start there.",
+    poke: ["I'm mid-calculation. You probably are too.", "Kaguya has already interrupted me twice today. You're not winning a prize for third.", "If you have time to click me, you have time for one more question. That's not a threat, it's arithmetic.", "I left an experiment running to keep you company. Let's make that worth it.", "While you're here: what's the next line of the derivation?"],
+    study: ["Seven quiet minutes. Either it's paper work or drifting. If it's drifting, pick the smallest next step and start there.", "A result you can't reproduce isn't a result yet. Try it once without the book; that's the real test.", "Check the units on that last answer. They catch about half of all mistakes.", "You understand it when you can derive it cold. Close the book and see how far you get. That's useful data either way.", "Draw the free-body diagram first. It saves more time than it costs."],
+    late: ["It's wind-down. Save a note of where you stopped and close the books. Tomorrow's you will thank you.", "It's past 23:30. Tired work mostly creates work to redo. I learned that the hard way. Let's stop here."],
+    rest: ["A break works best away from the desk. Your attention needs the distance.", "Eat something real. Your brain runs on it. Not whatever Kaguya is holding."],
+    followAnnoyed: ["Kaguya's being gentle. I'll be practical: start with ten minutes and see how it goes.", "She'd let you off. I think you'll feel better if we start. Smallest step first.", "...I've heard better excuses from Kaguya. What's the first question?", "Ten minutes on the timer. It's an experiment, not a sentence.", "You're negotiating with yourself. Let's skip to the part where you win."],
     followHappy: ["...Not bad.", "Fine. Next.", "Correct. Don't let it go to your head."],
-    drag: ["Put me down. I have samples to check.", "Moving me won't move your deadline."],
-    back: ["You're back. Resume where you stopped. No warm-up.", "Welcome back. The timer didn't wait. Neither will I."]
+    drag: ["I'd rather stay put. I have samples to check.", "Moving me won't move your deadline, unfortunately."],
+    back: ["Welcome back. Pick up exactly where you stopped. A warm-up is just delay with better branding.", "You're back. Good. The timer kept going, so let's not lose more of it."]
   };
   let iconv = []; try { iconv = JSON.parse(localStorage.getItem("iroha-chat") || "[]"); if (!Array.isArray(iconv)) iconv = []; } catch (e) { iconv = []; }
   let iOpen = false, iSending = false, iLast = 0, ibt = 0, ift = 0, iClick = null;
@@ -2153,37 +2153,37 @@ window.__KG_BUILTIN = {
       [["k", "iroha, what's the escape velocity of my patience?"], ["i", "Lower than Earth's. Eleven point two kilometres per second. Let them work."], ["k", "she knows it by heart. scary."]],
       [["i", "Units on that last answer?"], ["k", "she asks me that too and i don't even HAVE answers."], ["i", "Then you have nothing to check. They do."]],
       [["k", "one more problem and then we're allowed to cheer, right?"], ["i", "One more correct problem."], ["k", "...harsh. fair, but harsh."]],
-      [["i", "If you can't derive it, you don't know it."], ["k", "she's like this all the time. it's kind of inspiring?? don't tell her."], ["i", "I heard that."]],
+      [["i", "If you can derive it, you own it. That's the whole trick."], ["k", "she's like this all the time. it's kind of inspiring?? don't tell her."], ["i", "I heard that."]],
       [["k", "i wanted to do a tiny stream from this corner."], ["i", "Not during a study block."], ["k", "a SILENT stream."], ["i", "That's called sitting still. Do that."]],
       [["k", "iroha, explain the rocket equation in one sentence."], ["i", "Delta-v equals exhaust velocity times the natural log of initial mass over final mass."], ["k", "...i understood 'log'."], ["i", "They understand the rest. Or they will, after this block."]],
       [["k", "if i flew home to the moon, how much fuel would i need?"], ["i", "Depends on your dry mass."], ["k", "a princess never reveals her mass."], ["i", "Then you're not launching. They are. Back to it."]],
       [["k", "orbits are just falling and missing, right? that's my whole personality."], ["i", "Accurate. Now let them calculate the period."]],
       [["i", "Check the sign convention before going further."], ["k", "she says that like a spell."], ["i", "It works like one."]],
-      [["i", "Specific impulse. Define it without looking."], ["k", "she's quizzing the AIR now, No.1. answer before she quizzes you."]]
+      [["i", "Here's one: define specific impulse without looking. Then tell me why rocket engineers love it."], ["k", "she's quizzing the AIR now, No.1. answer before she quizzes you."]]
     ],
     rest: [
-      [["k", "BREAK! stand up, stretch, look at the sky. the moon says hi."], ["i", "Water. No phone. Back on time."], ["k", "she's timing it. she's always timing it."]],
+      [["k", "BREAK! stand up, stretch, look at the sky. the moon says hi."], ["i", "Water, and leave the phone. It makes the next block easier to start."], ["k", "she's timing it. she's always timing it."]],
       [["i", "Rest properly. A tired brain makes sign errors."], ["k", "and sign errors make iroha sad."], ["i", "Disappointed. Different thing."]],
-      [["k", "snack ideas? i vote mochi."], ["i", "Anything. Away from the desk."], ["k", "mochi away from the desk. perfect compromise."]]
+      [["k", "snack ideas? i vote mochi."], ["i", "Anything, as long as it's away from the desk."], ["k", "mochi away from the desk. perfect compromise."]]
     ],
     late: [
-      [["i", "It's late. Save your note and stop."], ["k", "noooo, one more chapter—"], ["i", "No."], ["k", "...she's right. bed, No.1. i'll keep watch."]],
-      [["k", "the moon's up, which means it's MY time, not yours."], ["i", "Sleep. Tomorrow's derivations need a working brain."]]
+      [["i", "It's late. Save a note of where you stopped, then let's call it a night."], ["k", "noooo, one more chapter—"], ["i", "No."], ["k", "...she's right. bed, No.1. i'll keep watch."]],
+      [["k", "the moon's up, which means it's MY time, not yours."], ["i", "Go to sleep. Sleep is when today's work gets stored. Tomorrow's derivations need it."]]
     ],
     morning: [
-      [["k", "good morning, No.1! i've been awake for hours. probably."], ["i", "Breakfast. Then the first block, on time."]],
-      [["i", "First block starts soon. Notebook open before it does."], ["k", "she means that nicely. i think."]]
+      [["k", "good morning, No.1! i've been awake for hours. probably."], ["i", "Breakfast first. Then let's get the first block started on time."]],
+      [["i", "First block starts soon. Open the notebook now and starting will cost less."], ["k", "she means that nicely. i think."]]
     ],
     music: [
       [["k", "ooh, music! can i request a song?"], ["i", "No requests. Instrumental only during problems."], ["k", "strictest DJ in the galaxy."]]
     ],
     sunday: [
-      [["k", "sunday! no books. i declare a royal holiday."], ["i", "It's in the schedule anyway. Rest. Tomorrow starts at 10:30 sharp."]]
+      [["k", "sunday! no books. i declare a royal holiday."], ["i", "It's in the schedule anyway. Rest properly. Tomorrow starts at 10:30."]]
     ],
     any: [
       [["k", "{streak} days in a row! party?"], ["i", "Party at a hundred. Until then, the next block."], ["k", "she said 'party'. i'm counting that as a yes."]],
       [["i", "Kaguya, stop waving at them."], ["k", "i'm encouraging! encouragement is waving with feelings."], ["i", "Wave quieter."]],
-      [["k", "iroha, say something nice to them."], ["i", "...You're improving. Don't stop."], ["k", "WOW. clip that. she never says that."]],
+      [["k", "iroha, say something nice to them."], ["i", "...You're improving. Let's keep it that way."], ["k", "WOW. clip that. she never says that."]],
       [["k", "what's the hardest thing you study, iroha?"], ["i", "Whatever I'm avoiding. That's why I do it first."], ["k", "...that's a hint, No.1."]]
     ]
   };
@@ -5133,7 +5133,7 @@ window.KG_RECALL = {
       if (x) { x.st = ok ? (x.st || 0) + 1 : 0; x.due = x.st >= 5 ? '' : add(d, INTM[Math.min(x.st, 4)]); x.reviews = (x.reviews || 0) + 1; }
     } else if (!ok) L.cards.push({ id: uid(), ch: q.ch, q: q.text, a: answer, st: 0, due: add(d, 1), n: 0 });
     L.ask = { q: null, at: Date.now() };
-    I(ok ? pick(['Correct.', 'Next.', 'Correct. Next one soon.', 'Fine.']) : g === 'shaky' ? "Shaky means review. It's in your deck for tomorrow." : 'Missed. It comes back tomorrow. Read the solution once, tonight.', { face: ok ? 'approve' : 'stern' });
+    I(ok ? pick(['Correct.', 'Next.', 'Correct. Next one soon.', 'Fine.']) : g === 'shaky' ? "Shaky is worth knowing. It's in your deck for tomorrow." : "Missed, which is useful data. It comes back tomorrow; read the solution once tonight.", { face: ok ? 'approve' : 'stern' });
     save(); render(); checkStickers();
   }
 
@@ -5160,7 +5160,7 @@ window.KG_RECALL = {
     if (!chap(id) || L.exam?.state === 'loading' || L.exam?.state === 'grading') return;
     const c = chap(id);
     L.exam = { ch: id, state: 'loading', at: Date.now(), ans: '' }; save(); tab = 'exams'; render();
-    I(`${c.name} complete? Then prove it. Exam incoming.`, { face: 'study' });
+    I(`${c.name} complete? Good. Let's confirm it with an exam. It's the only proof that counts.`, { face: 'study' });
     const r = await (window.__kgAsk?.('iroha', `[exam request, not typed by me] Write a very hard exam on the JEE chapter "${c.name}" (${c.subj}). Exactly 5 questions at JEE Advanced level or harder, each combining several ideas from the chapter, with numeric or short final answers where possible and all needed data given. Number them 1 to 5. Give only the questions: no answers, no hints, no intro line.`) || Promise.resolve({ error: 'network' }));
     if (L.exam?.ch !== id) return;
     Object.assign(L.exam, r.reply ? { state: 'open', qs: r.reply } : { state: 'error' }); save(); render();
@@ -5168,7 +5168,7 @@ window.KG_RECALL = {
   async function submitExam() {
     const e = L.exam; if (!e || e.state !== 'open') return;
     e.ans = (document.getElementById('kl-exam-ans')?.value || e.ans || '').trim();
-    if (e.ans.length < 20) return I('Write your answers first. Final answers and key steps for every question.', { face: 'stern' });
+    if (e.ans.length < 20) return I("Write your answers first, with the final answer and key steps for each. I can only grade what's on the page.", { face: 'stern' });
     e.state = 'grading'; save(); render();
     const c = chap(e.ch);
     const r = await (window.__kgAsk?.('iroha', `[exam grading, not typed by me] Chapter: ${c.name} (${c.subj}).\nQuestions:\n${e.qs}\n\nMy answers:\n${e.ans}\n\nGrade strictly at JEE Advanced standard. For each question: correct / partly / wrong, and the key error in one line. Then on its own last line write "SCORE: <number from 0 to 100>". The pass mark is ${PASS}.`) || Promise.resolve({ error: 'network' }));
@@ -5179,7 +5179,7 @@ window.KG_RECALL = {
     if (score !== null && score >= PASS) {
       e.passed = true; // sparring never grants a medal: only the timed proof does
       duo([['k', `sparring passed, ${score}/100! now go take the real proof, No.1!`], ['i', 'Sparring is practice. The medal needs the timed proof.']]);
-    } else if (score !== null) I(`${score}/100. Not yet. Read my notes on each question, fix the gaps, and take a fresh exam tomorrow.`, { face: 'stern' });
+    } else if (score !== null) I(`${score}/100. Not there yet, but now we know exactly where the gaps are. Read my notes on each question tonight, and let's try a fresh exam tomorrow.`, { face: 'stern' });
     save(); render(); checkStickers();
   }
 
@@ -5524,11 +5524,11 @@ window.KG_RECALL = {
     if (f.dataset.f === 'summon') return summon(v.id);
     if (f.dataset.f === 'mock') return addMock(v);
     if (f.dataset.f === 'card') { L.cards.push({ id: uid(), ch: v.ch, q: v.q.trim(), a: v.a.trim(), st: 0, due: add(d, 1), n: 0 }); save(); I('Card added. First review tomorrow.', { face: 'study' }); return render(); }
-    if (f.dataset.f === 'doubt') { L.doubts.push({ id: uid(), ch: v.ch, t: v.t.trim(), d, done: false }); save(); render(); I('Logged. We clear it in the error-notebook block.', { face: 'study' }); return checkStickers(); }
+    if (f.dataset.f === 'doubt') { L.doubts.push({ id: uid(), ch: v.ch, t: v.t.trim(), d, done: false }); save(); render(); I("Logged. Let's clear it together in the error-notebook block.", { face: 'study' }); return checkStickers(); }
     if (f.dataset.f === 'resolve') { const x = L.doubts.find(x => x.id === f.dataset.id); if (x) Object.assign(x, { done: true, n: (v.n || '').trim(), dd: d }); save(); render(); K('doubt cleared! lightbulb!'); return checkStickers(); }
     if (f.dataset.f === 'exam') {
       const miss = L.voy.exam.map((q, i) => { const x = num(v['a' + i]); return !(Number.isFinite(x) && Math.abs(x - q.ans) <= q.ans * .02); });
-      if (miss.some(Boolean)) { L.voy.miss = miss; save(); render(); return I(`${miss.filter(Boolean).length} wrong. Clearance denied. Check the hint and recalculate.`, { face: 'stern' }); }
+      if (miss.some(Boolean)) { L.voy.miss = miss; save(); render(); return I(`${miss.filter(Boolean).length} wrong. Mission control can't clear that yet. Check the hint and recalculate; it's usually one step.`, { face: 'stern' }); }
       L.voy.passed = true; L.voy.miss = null; save(); tab = 'voyage'; render(); burst(30); return checkStickers();
     }
   });
@@ -5548,7 +5548,7 @@ window.KG_RECALL = {
     // Old misses come back in the revision blocks, not in the middle of new work.
     if (isRev(b) && now - (L.mremAt || 0) > 25 * 60000) {
       const m = (L.attempts || []).find(x => !x.ok && x.q && !L.mrem[x.id] && gap(d, x.d) >= 3);
-      if (m) { L.mrem[m.id] = d; L.mremAt = now; save(); I(`${gap(d, m.d)} days ago you logged “${m.q.slice(0, 90)}”${m.cause ? ` (${m.cause})` : ''}.${m.fix ? ` Your fix was “${m.fix.slice(0, 90)}”.` : ''} Do one like it now.`, { face: 'stern' }); }
+      if (m) { L.mrem[m.id] = d; L.mremAt = now; save(); I(`${gap(d, m.d)} days ago you logged “${m.q.slice(0, 90)}”${m.cause ? ` (${m.cause})` : ''}.${m.fix ? ` Your fix was “${m.fix.slice(0, 90)}”.` : ''} Let's do one like it now, while it's fresh.`, { face: 'study' }); }
     }
     if (b.id === 'errors' && L.doubtNag !== d && L.doubts.some(x => !x.done)) { L.doubtNag = d; save(); I(`${L.doubts.filter(x => !x.done).length} open doubt(s) in the box. This block is for them too.`, { face: 'study' }); }
     softRender();
@@ -5568,7 +5568,7 @@ window.KG_RECALL = {
   document.addEventListener('visibilitychange', () => {
     const q = L.ask.q, now = Date.now();
     if (document.hidden || !q || q.reminded || window.__kgOnBreak || now - L.ask.at < 2 * 3600000 || now - (L.askNagAt || 0) < 6 * 3600000) return;
-    q.reminded = true; L.askNagAt = now; save(); I("You're back. Still waiting on: " + q.text, { face: 'stern' });
+    q.reminded = true; L.askNagAt = now; save(); I("Welcome back. That question's still open, whenever you're ready: " + q.text, { face: 'stern' });
   });
   render();
   setTimeout(() => { tick(); const b = block(); if (!L.mood[today()] && b && b.kind !== 'sleep' && !document.body.classList.contains('habit-shh') && !isNight() && !window.__kgOnBreak) openMood(); }, 4000);
@@ -5719,7 +5719,7 @@ window.KG_RECALL = {
     const now = Date.now(); q.s = Math.round((now - (set.lastAns || set.start || now)) / 1000); set.lastAns = now; save();
   });
   async function startSet(kind, chs, n, limitMin, extra = {}) {
-    if (!chs.length) return I('Pick a chapter first.', { face: 'stern' });
+    if (!chs.length) return I('Pick a chapter first, so I know what to ask.', { face: 'stern' });
     L[kind] = Object.assign({ state: 'loading', chs, limit: limitMin * 60000 }, extra); save(); M.render();
     const r = await getSet(chs, n, null, { mixed: kind !== 'raid', hard: kind === 'proof' || extra.hard });
     if (r.error) { L[kind] = Object.assign(L[kind], { state: 'error', err: r.error }); save(); return M.render(); }
@@ -5825,7 +5825,7 @@ window.KG_RECALL = {
     <section class="kl-card"><p class="kl-eyebrow">📒 FORMULA SHEETS</p><h3>One formula per line, as "name: formula"</h3><p class="kl-small">Iroha quizzes you from these in recall.</p><form data-f="formulas" class="kl-stack"><select name="ch" id="kl-fch" aria-label="Chapter">${chapterOptions(L.fch || '')}</select><textarea name="text" rows="6" maxlength="4000" placeholder="range: R = u² sin 2θ / g&#10;max height: H = u² sin²θ / 2g">${esc(L.formulas[L.fch || ''] || '')}</textarea><button>Save sheet</button></form></section>`;
   };
   async function photoCheck() {
-    if (!photo) return I('Pick a photo of your working first.', { face: 'stern' });
+    if (!photo) return I('Pick a photo of your working first, so I can check it.', { face: 'stern' });
     photoBusy = true; M.render();
     const q = (document.getElementById('kl-photo-q')?.value || '').trim();
     const r = await ask('iroha', `[photo check, not typed by me] The image is my handwritten working${q ? ' for: ' + q : ''}. Check it line by line. Point to the first line where it breaks (sign, units, algebra, wrong formula or wrong assumption) and give the correct step. If everything is right, say so in one line.`, { media_type: 'image/jpeg', data: photo });
@@ -5873,7 +5873,7 @@ window.KG_RECALL = {
   M.HOOKS.watch = topic => {
     const kind = (/\|\s*(lecture|problems|notes|other)/i.exec(topic || '') || [])[1]; if (!kind || kind.toLowerCase() === 'other') return;
     const x = L.lecture[today()] = L.lecture[today()] || { lec: 0, prac: 0 }; x[kind.toLowerCase() === 'lecture' ? 'lec' : 'prac'] += 4; save();
-    if (x.lec > x.prac + 60 && Date.now() - (L.lecNag || 0) > 2 * 3600000) { L.lecNag = Date.now(); save(); I(`Lectures are ${x.lec - x.prac} minutes ahead of problems today. The next video waits until you've solved for an hour.`, { face: 'stern' }); }
+    if (x.lec > x.prac + 60 && Date.now() - (L.lecNag || 0) > 2 * 3600000) { L.lecNag = Date.now(); save(); I(`Lectures are ${x.lec - x.prac} minutes ahead of problems today. Let's solve for an hour before the next video. Problems are where lectures turn into skill.`, { face: 'stern' }); }
   };
   // The schedule's own "Done" button asks for the three numbers first on a study block.
   document.addEventListener('click', e => {
@@ -5882,7 +5882,7 @@ window.KG_RECALL = {
     e.preventDefault(); e.stopPropagation();
     window.dispatchEvent(new CustomEvent('moonlab:go', { detail: { section: 'today' } }));
     setTimeout(() => document.querySelector('.kl-close input[name=att]')?.focus(), 80);
-    I('Close it properly: attempted, correct, one trap. Then it ticks.', { face: 'stern' });
+    I("Let's close it properly: attempted, correct and one trap. Then it ticks, and the data means something.", { face: 'stern' });
   }, true);
 
   /* ---------- Progress pages: overview (insight, calibration, causes) and the syllabus sky ---------- */
@@ -5987,7 +5987,7 @@ window.KG_RECALL = {
     formulas: v => { L.fch = v.ch; L.formulas[v.ch] = v.text; save(); M.render(); K('formula sheet saved. iroha is already planning questions.'); },
     closeout: (v, f) => {
       const d = today(), id = f.dataset.block, blk = sched(d).find(x => x.id === id), att = Math.max(0, Math.min(500, parseInt(v.att) || 0)), cor = Math.max(0, Math.min(att, parseInt(v.cor) || 0)), lec = Number(v.lec) || 0;
-      if (!att && !v.trap.trim()) return I('Three numbers. Attempted, correct, one trap.', { face: 'stern' });
+      if (!att && !v.trap.trim()) return I('I need three things: attempted, correct and one trap.', { face: 'stern' });
       (L.blocks[d] = L.blocks[d] || {})[id] = { ch: v.ch, att, cor, trap: v.trap.trim(), lec };
       if (v.ch) { const c = L.ch[v.ch] = L.ch[v.ch] || {}; c.a = (c.a || 0) + att; c.k = (c.k || 0) + cor; c.last = d; }
       if (cor) L.log.push({ d, t: 'pyq', ok: true, n: cor, ch: v.ch });
@@ -6008,7 +6008,7 @@ window.KG_RECALL = {
     ['rocket-10', '🚀', 'Mission Control', 'Solve 10 Rocket Lab quests.', () => (L.rocket.solved || 0) >= 10, [['k', 'TEN orbits. you basically work at a space agency now.'], ['i', 'Ten. Your intuition for orbits is real now.']]],
     ['ledger-7', '📋', 'Honest Ledger', 'Close 7 blocks with your three numbers.', () => Object.values(L.blocks).reduce((n, b) => n + Object.keys(b).length, 0) >= 7, [['i', 'Seven blocks closed honestly. That data is worth more than the ticks.'], ['k', 'the ledger of a champion 🌙']]],
     ['teach-1', '🗣️', 'Little Teacher', 'Teach Kaguya a concept and get scored.', () => !!(L.teach && L.teach.turns.some(x => x.who === 'i')), [['k', 'you taught me something! i understood like 60% of it!'], ['i', 'Explaining is the fastest way to find your own gaps.']]],
-    ['photo-1', '📷', 'Under the Lens', 'Photo-check your working once.', () => !!L.photo, [['i', 'Real working, checked. Do this on every hard problem.'], ['k', 'iroha squinted at your handwriting for a full minute.']]]
+    ['photo-1', '📷', 'Under the Lens', 'Photo-check your working once.', () => !!L.photo, [['i', 'Real working, checked. Keep doing that on hard problems.'], ['k', 'iroha squinted at your handwriting for a full minute.']]]
   );
 
   /* ---------- weekly observation (Sunday, once, outside blocks) and the final-month switch ---------- */
@@ -6016,7 +6016,7 @@ window.KG_RECALL = {
     const d = today(), w0 = HC.monday(d);
     if (dow(d) === 0 && !L.insights[w0] && !M.inStudy() && !M.isNight()) { const line = insightLine(); L.insights[w0] = line || 'A quiet week in the data. Nothing repeated three times.'; save(); if (line) I(line, { face: 'study' }); }
     const ex = examDate(), left = ex ? gap(ex, d) : null;
-    if (left !== null && left <= 30 && left >= 0 && !L.finalMonth) { L.finalMonth = ex; save(); I('Thirty days left. From today: no new chapters. Timed papers and old misses.', { face: 'stern' }); }
+    if (left !== null && left <= 30 && left >= 0 && !L.finalMonth) { L.finalMonth = ex; save(); I("Thirty days left. From here, new chapters cost more than they give. Let's switch to timed papers and old misses.", { face: 'stern' }); }
   }, 60000);
   M.render();
 })();
@@ -6200,7 +6200,7 @@ window.KG_RECALL = {
     hang: v => { if (!v.t.trim()) return; company = true; notes(); window.__kaguyaAsk?.(v.t.trim()); M.render(); },
     mem: v => { L.memories.push({ id: M.uid(), d: today(), t: v.t.trim() }); save(); notes(); M.render(); K(pick(["got it. i'll remember 🌙", "noted in my moon diary forever.", "ooh, i like knowing that about you."])); },
     qotd: v => { L.memories.push({ id: M.uid(), d: today(), t: qotd() + ' ' + v.a.trim() }); save(); notes(); M.render(); K(pick(["i love that. thank you for telling me 🌙", "that's so you. remembered!", "hehe, now i know you a little better."])); },
-    journal: v => { L.journal[today()] = { good: v.good.trim(), fix: v.fix.trim(), look: v.look.trim() }; save(); M.render(); duo([['k', "goodnight, No.1. today counted for something, even the hard parts. sleep well 🌙"], ['i', 'Sleep. Same time tomorrow.']]); },
+    journal: v => { L.journal[today()] = { good: v.good.trim(), fix: v.fix.trim(), look: v.look.trim() }; save(); M.render(); duo([['k', "goodnight, No.1. today counted for something, even the hard parts. sleep well 🌙"], ['i', 'Sleep well. Same time tomorrow.']]); },
     support: v => { L.support = { person: v.person.trim(), contact: v.contact.trim(), helpline: v.helpline.trim(), helps: v.helps.trim() }; save(); M.render(); },
     care: v => { L.cset.meds = v.meds.trim(); L.cset.water = Math.max(0, Math.min(240, parseInt(v.water) || 0)); save(); M.render(); K('reminders saved. i\'ll be gentle about it 🌙'); }
   });
@@ -6245,7 +6245,7 @@ window.KG_RECALL = {
     [['k', 'i brought you an imaginary mochi. zero calories, infinite love.'], ['i', '...It is also imaginary. Drink water.']],
     [['k', 'psst. iroha fell asleep at her desk.'], ['i', 'I did not. I was resting my eyes. Strategically.'], ['k', 'she was snoring, chat.']],
     [['k', 'fun fact: the moon drifts about 3.8 cm away from earth every year.'], ['i', 'Correct, actually. Lunar laser ranging. ...Fine. That was a decent fact.']],
-    [['k', "stretch break! arms up, like you're reaching for the moon~"], ['i', 'Shoulders down. Neck loose. Then back on time.']]
+    [['k', "stretch break! arms up, like you're reaching for the moon~"], ['i', 'Shoulders down, neck loose. Focus lasts longer that way. Then back on time.']]
   ];
   function dayLine() {
     const d = today(), lines = [], started = M.CHAPS.filter(c => (L.ch[c.id]?.c || 0) >= 1 && L.ch[c.id].last).sort((a, b) => L.ch[a.id].last.localeCompare(L.ch[b.id].last));
@@ -6729,7 +6729,7 @@ window.KG_RECALL = {
   }
   M.softTick = softTick;
   Object.assign(M.ACTIONS, {
-    softon: () => { const d = today(); L.softUntil = add(d, 2); L.softAsked = d; save(); softTick(); M.render(); duo([['k', "three lighter days, starting now. you're not behind, you're pacing 🌙"], ['i', 'Eight hours at most. No extra.']]); },
+    softon: () => { const d = today(); L.softUntil = add(d, 2); L.softAsked = d; save(); softTick(); M.render(); duo([['k', "three lighter days, starting now. you're not behind, you're pacing 🌙"], ['i', 'Eight hours at most. Pacing is the strategy now.']]); },
     softno: () => { L.softAsked = today(); save(); M.render(); },
     softoff: () => { L.softUntil = ''; save(); softTick(); M.render(); }
   });
@@ -7278,7 +7278,7 @@ window.KG_RECALL = {
     const last = L.breaks[L.breaks.length - 1], len = last ? M.gap(L.breakUntil, last.from) : 1, n = len <= 3 ? 2 : len <= 7 ? 3 : 5;
     L.softUntil = M.add(today(), n - 1); save();
     setTimeout(() => M.softTick?.(), 1500);
-    setTimeout(() => script([['k', `you're back!! i missed study-you, but i liked rest-you too. the next ${n} days are short ones, okay? no catching up.`], ['i', `Eight hours at most for ${n} days. Do not try to recover lost time. There is none to recover.`], ['k', 'and if your doctor wants longer, just move the date in Settings. no questions asked 🌙']]), 6000);
+    setTimeout(() => script([['k', `you're back!! i missed study-you, but i liked rest-you too. the next ${n} days are short ones, okay? no catching up.`], ['i', `Eight hours at most for the next ${n} days. Chasing lost time only costs more of it, so let's not.`], ['k', 'and if your doctor wants longer, just move the date in Settings. no questions asked 🌙']]), 6000);
   }
 
   Object.assign(M.ACTIONS, {
@@ -7553,13 +7553,13 @@ window.KG_RECALL = {
     const m = method(b.id), n = due(), s = SUBJ[b.id] || 'This';
     // short on purpose: the full steps are in the block's instructions and on the Methods tab
     if (soft()) { M.K(`revision time, gently. ${n ? `${n} review${n === 1 ? '' : 's'} first, ` : ''}then ${m.name.toLowerCase()} for ${s.toLowerCase()}. small is fine today 🌙`); return; }
-    M.I(`${s} revision: ${m.name}. ${n ? `${n} spaced review${n === 1 ? '' : 's'} due first, in Study · Recall. ` : ''}No rereading. No rewatching.`, { face: 'study' });
+    M.I(`${s} revision. Let's use ${m.name} this time. ${n ? `${n} spaced review${n === 1 ? '' : 's'} due first, in Study · Recall. ` : ''}Rereading feels productive but barely sticks, so we'll skip it.`, { face: 'study' });
   }
   function revEnd(id) {
     if (seen('end:' + id)) return;
     const m = method(id);
     if (soft()) { M.K(`revision done! did ${m.name.toLowerCase()} help? tell iroha one thing you got wrong, if you want 🌙`); return; }
-    M.I(`Time. Did you actually do ${m.name}, or did you reread? Tell me one thing you got wrong. That goes in your misses.`, { face: 'stern' });
+    M.I(`That's the revision block. How did ${m.name} go? Tell me one thing you got wrong: it's the most useful thing you studied, and it goes in your misses.`, { face: 'stern' });
   }
   function lectureNudge(b) {
     if (seen('lec:' + b.id)) return;
@@ -7662,12 +7662,12 @@ window.KG_RECALL = {
   M.FORMS.kglec = async (v, f) => {
     if (busy) return;
     const details = String(v.details || '').trim();
-    if (details.length < 60) return M.I('More detail. The main ideas, the formulas, what confused you. At least a few lines.', { face: 'stern' });
+    if (details.length < 60) return M.I("A bit more detail, please: the main ideas, the formulas and what confused you. A few lines now saves an hour of rewatching later.", { face: 'stern' });
     const picked = [...(f.querySelector('input[type=file]')?.files || [])];
     if (!picked.length && !hasNotesFor(v.ch) && !L.lecPending?.noFilesOk) {
       L.lecPending.noFilesOk = true; save();
       const h = f.querySelector('[data-k="hint"]'); if (h) h.textContent = 'No PDF or photos for this chapter yet. Attach them if you have them, or press Save lecture again to save without.';
-      return M.I('Attach the lecture PDF or photos of your notes. I quiz you from them later. If you really have none, press save again.', { face: 'stern' });
+      return M.I("If you have the lecture PDF or photos of your notes, attach them. I'll quiz you from them later. No notes at all? Press save again and we'll manage.", { face: 'stern' });
     }
     const e = { id: 'lec' + Date.now().toString(36), subj: v.subj, ch: v.ch || '', topic: String(v.topic || '').trim().slice(0, 120), details: details.slice(0, 1500), made: today(), stage: 0, due: add(today(), GAPS[0]), files: [], reviews: 0 };
     busy = 'Saving…'; M.render();
@@ -7719,7 +7719,7 @@ window.KG_RECALL = {
     if (ok) { e.stage++; e.due = e.stage < GAPS.length ? add(today(), GAPS[e.stage] - GAPS[e.stage - 1]) : ''; }
     else e.due = add(today(), 1);
     save(); M.render();
-    M.I(ok ? (e.due ? `Good. ${label(e)} comes back on day ${GAPS[e.stage]}.` : `${label(e)}: all seven revisions done. It's yours now.`) : 'Shaky means tomorrow. Read the weak part once tonight.', { face: ok ? 'approve' : 'stern' });
+    M.I(ok ? (e.due ? `Good. ${label(e)} comes back on day ${GAPS[e.stage]}.` : `${label(e)}: all seven revisions done. It's yours now.`) : "Shaky is useful to know. It's back tomorrow; reread just the weak part once tonight.", { face: ok ? 'approve' : 'stern' });
   }
   Object.assign(M.ACTIONS, {
     kglecrev: b => revise(b.dataset.v),
@@ -7744,7 +7744,7 @@ window.KG_RECALL = {
     L.lecAsked[k] = 1; L.lecPending = { subj: SUBJ[id], date: today() }; save(); M.render();
     const soft = !!window.__kgGentle || ['heavy', 'hard', 'lowest'].includes(L.mood?.[today()]);
     if (soft) M.K(`${SUBJ[id].toLowerCase()} lecture done! when you can, jot what it was about on Today, with the pdf or a photo of your notes. iroha will bring it back for revision 🌙`);
-    else M.I(`${SUBJ[id]} lecture's over. Log it on Today, in detail: chapter, topic, the main ideas and what confused you. Attach the lecture PDF or photos of your notes if this chapter has none yet. I'll bring it back on days 1, 3, 5 and 7.`, { face: 'study' });
+    else M.I(`${SUBJ[id]} lecture done. While it's fresh, let's log it on Today: chapter, topic, the main ideas and anything that confused you. If this chapter has no notes yet, attach the PDF or photos. I'll bring it back on days 1, 3, 5 and 7.`, { face: 'study' });
   }
   setTimeout(tick, 9000); setInterval(tick, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(tick, 1500); });
