@@ -3324,7 +3324,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     if((!desk().sound || window.__kgOnBreak) && melodyTimer)stopAudio();
   },1000);
   // Keep the original schedule, floating companion and dashboard on the same rule.
-  window.HabitDesk={setTheme(t){h.settings.theme=t;save();render();},
+  window.HabitDesk={setTheme(t){h.settings.theme=t;save();render();},refresh(){if(!document.activeElement?.closest('#habit-desk form'))render();},
     minutes:iso=>C.minutes(h,days(),iso),
     history:(d,iso)=>C.history(h,d,iso),
     counted:(iso,d)=>{const status=C.history(h,{...days(),[iso]:d || days()[iso]},iso).statuses[iso];return status==='study'||status==='rest';},
@@ -4398,6 +4398,383 @@ body.kg-calm #kg-strip::after,body.kg-calm #kg-main.kd-enter :is(.kl-card,.hb-ca
 }
 @media print{#kg-strip::after{display:none}#kg-main :is(.kl-card,.hb-card){box-shadow:none!important}}
 </style>
+<script id="kg-recall-script">
+/* ===== 365 recall questions for Iroha: answered from memory, no book. Used when your own misses and cards are done. ===== */
+window.KG_RECALL = {
+  Physics: [
+    'Units and dimensions: write the dimensions of Planck\'s constant and of the gravitational constant G.',
+    'Units and dimensions: check the formula v = √(T/μ) for a string wave dimensionally.',
+    'Errors: how do relative errors combine when you multiply two measured quantities? And when you raise one to a power?',
+    'Kinematics: write the three equations of motion for constant acceleration and say when each one is the fastest to use.',
+    'Kinematics: what does the area under a v–t graph give you, and what does its slope give you?',
+    'Kinematics: derive the range of a projectile on level ground. At what angle is it largest?',
+    'Kinematics: write the maximum height and time of flight of a projectile launched at speed u and angle θ.',
+    'Kinematics: a ball is dropped from a moving train. Describe its path for someone on the train and for someone on the ground.',
+    'Relative motion: a swimmer wants to cross a river by the shortest path. Which way should they head?',
+    'Laws of motion: state Newton\'s three laws in your own words, and give one everyday example of the third.',
+    'Laws of motion: what is a pseudo force, and when do you need to add one?',
+    'Laws of motion: two blocks m₁ and m₂ hang over a frictionless pulley. Write the acceleration and the string tension.',
+    'Laws of motion: what does a weighing scale read in a lift accelerating upward at a? And downward?',
+    'Friction: what is the difference between static and kinetic friction? Which one is usually larger?',
+    'Friction: a block rests on an incline. At what angle does it start to slide? Relate it to μ.',
+    'Friction: what is the angle of repose? Prove that tan of it equals μ.',
+    'Friction: why is it easier to pull a lawn roller than to push it at the same angle?',
+    'Work and energy: state the work–energy theorem. Does it hold when friction acts?',
+    'Work and energy: what makes a force conservative? Name two conservative forces and one that is not.',
+    'Work and energy: write the potential energy of a spring stretched by x, and the work needed to stretch it from x₁ to x₂.',
+    'Work and energy: relate force and potential energy, F = ? in terms of U(x). What does the sign mean?',
+    'Work and energy: what are stable, unstable and neutral equilibrium in terms of U(x)?',
+    'Circular motion: write the centripetal acceleration in terms of v and r, and in terms of ω.',
+    'Circular motion: a car takes a banked curve with no friction. What is the safe speed?',
+    'Circular motion: what is the minimum speed at the top of a vertical circle for a mass on a string? And at the bottom?',
+    'Centre of mass: where is the centre of mass of a uniform semicircular ring? Of a semicircular disc?',
+    'Centre of mass: if no external force acts, what happens to the motion of the centre of mass?',
+    'Collisions: what is conserved in an elastic collision, and what is lost in an inelastic one?',
+    'Collisions: write the final velocities in a 1D elastic collision. What happens when equal masses collide?',
+    'Collisions: define the coefficient of restitution e. What are its values for perfectly elastic and perfectly inelastic collisions?',
+    'Rocket motion: why does a rocket speed up even though nothing outside pushes it?',
+    'Rotation: write the moment of inertia of a ring, a disc, a solid sphere and a hollow sphere about a diameter or their axis.',
+    'Rotation: state the parallel axis theorem and the perpendicular axis theorem. When does the second one apply?',
+    'Rotation: define torque and angular momentum. How are they related?',
+    'Rotation: when is angular momentum conserved? Give the ice-skater example.',
+    'Rotation: a body rolls without slipping. What is the condition, and what is its total kinetic energy?',
+    'Rotation: which reaches the bottom of an incline first, a ring, a disc or a solid sphere? Why?',
+    'Rotation: write the rotational analogues of F = ma, work and power.',
+    'Gravitation: state Newton\'s law of gravitation and give the value of G with units.',
+    'Gravitation: how does g change with height h and with depth d below the surface?',
+    'Gravitation: derive the escape velocity from Earth. Does it depend on the direction you throw?',
+    'Gravitation: write the orbital speed and time period of a satellite at radius r.',
+    'Gravitation: state Kepler\'s three laws. Which one follows from conservation of angular momentum?',
+    'Gravitation: what is the total energy of a satellite in orbit? Why is it negative?',
+    'Gravitation: what is a geostationary orbit? Give its period and roughly its height.',
+    'Gravitation: what is the gravitational field inside a uniform spherical shell?',
+    'Elasticity: define Young\'s modulus, bulk modulus and modulus of rigidity.',
+    'Elasticity: write the elastic potential energy stored per unit volume in a stretched wire.',
+    'Fluids: state Pascal\'s law and explain how a hydraulic lift works.',
+    'Fluids: state Archimedes\' principle. When does a body float?',
+    'Fluids: write Bernoulli\'s equation and give one place it explains lift or flow.',
+    'Fluids: write the equation of continuity. Why does water speed up when you narrow a hose?',
+    'Fluids: write Torricelli\'s result for the speed of liquid leaving a hole at depth h.',
+    'Viscosity: write Stokes\' law and the terminal velocity of a sphere falling through a fluid.',
+    'Surface tension: why is a drop spherical? Write the excess pressure inside a drop and inside a soap bubble.',
+    'Surface tension: write the capillary rise formula. Why does mercury fall in a glass tube?',
+    'Thermal expansion: how are the coefficients of linear, area and volume expansion related?',
+    'Calorimetry: define specific heat and latent heat. Why does temperature stay constant while ice melts?',
+    'Heat transfer: write Fourier\'s law for conduction through a slab.',
+    'Heat transfer: how do thermal resistances combine in series and in parallel?',
+    'Radiation: state the Stefan–Boltzmann law and Wien\'s displacement law.',
+    'Radiation: state Newton\'s law of cooling. When is it a good approximation?',
+    'Radiation: state Kirchhoff\'s law of radiation. Why is a good absorber a good emitter?',
+    'Thermodynamics: state the first law and the sign convention you use for work.',
+    'Thermodynamics: write the work done in isothermal and in adiabatic expansion of an ideal gas.',
+    'Thermodynamics: what is PVᵞ = constant for? Why is the adiabatic curve steeper than the isothermal one?',
+    'Thermodynamics: write Cp − Cv for an ideal gas, and γ for monoatomic and diatomic gases.',
+    'Thermodynamics: write the efficiency of a Carnot engine. Can any engine beat it?',
+    'Thermodynamics: state the second law in the Kelvin–Planck and Clausius forms.',
+    'Thermodynamics: write the coefficient of performance of a refrigerator.',
+    'Kinetic theory: write the pressure of an ideal gas in terms of molecular speed.',
+    'Kinetic theory: write the rms, mean and most probable speeds. Put them in order.',
+    'Kinetic theory: state the law of equipartition of energy. How many degrees of freedom does a diatomic gas have at room temperature?',
+    'SHM: write the defining equation of SHM and its general solution.',
+    'SHM: write the time period of a spring–mass system and of a simple pendulum.',
+    'SHM: how do kinetic and potential energy vary over one oscillation? Where is each a maximum?',
+    'SHM: how do two springs combine in series and in parallel?',
+    'SHM: what happens to a pendulum\'s period in a lift accelerating upward?',
+    'Oscillations: what is resonance? What limits the amplitude at resonance?',
+    'Waves: write the equation of a travelling wave and name each symbol.',
+    'Waves: write the speed of a transverse wave on a string and the speed of sound in a gas.',
+    'Waves: what are nodes and antinodes? Where are they in a string fixed at both ends?',
+    'Waves: write the harmonics of a pipe open at both ends and of a pipe closed at one end.',
+    'Waves: what are beats? Write the beat frequency.',
+    'Waves: write the Doppler formula for sound with both source and observer moving.',
+    'Waves: why did Laplace correct Newton\'s formula for the speed of sound?',
+    'Electrostatics: state Coulomb\'s law and give the value of 1/(4πε₀).',
+    'Electrostatics: write the electric field of a point charge, an infinite line of charge and an infinite sheet.',
+    'Electrostatics: state Gauss\'s law. When is it actually useful for finding E?',
+    'Electrostatics: what is the field inside a conductor, and where does excess charge sit?',
+    'Electrostatics: write the field of a dipole on its axis and on its equatorial line.',
+    'Electrostatics: write the torque and potential energy of a dipole in a uniform field.',
+    'Electrostatics: how are electric field and potential related? Why is the field perpendicular to equipotentials?',
+    'Electrostatics: what is the potential energy of a system of two point charges?',
+    'Capacitors: write the capacitance of a parallel plate capacitor, with and without a dielectric.',
+    'Capacitors: how do capacitors combine in series and in parallel?',
+    'Capacitors: write the energy stored in a capacitor in three forms.',
+    'Capacitors: a charged capacitor is disconnected and a dielectric is inserted. What happens to Q, V and the energy?',
+    'Current electricity: define drift velocity and connect it to current.',
+    'Current electricity: state Ohm\'s law and write resistance in terms of resistivity.',
+    'Current electricity: state Kirchhoff\'s two laws. Which conservation law is behind each?',
+    'Current electricity: write the balance condition of a Wheatstone bridge.',
+    'Current electricity: how is the terminal voltage of a cell related to its emf while it supplies current?',
+    'Current electricity: write the charging equation of a capacitor in an RC circuit. What is the time constant?',
+    'Magnetism: write the Biot–Savart law and the field at the centre of a circular loop.',
+    'Magnetism: state Ampère\'s law and use it for the field inside a long solenoid.',
+    'Magnetism: write the force on a moving charge in a magnetic field. Why does it do no work?',
+    'Magnetism: write the radius and time period of a charge moving in a circle in a uniform field.',
+    'Magnetism: write the force per unit length between two parallel currents. Do like currents attract or repel?',
+    'Magnetism: write the torque on a current loop in a magnetic field.',
+    'EMI: state Faraday\'s law and Lenz\'s law. Which conservation law is Lenz\'s law?',
+    'EMI: write the emf across a rod moving through a magnetic field.',
+    'EMI: write the self-inductance of a solenoid and the energy stored in an inductor.',
+    'AC: write the impedance of a series LCR circuit and its resonance frequency.',
+    'AC: what is the power factor? Why does a pure inductor use no average power?',
+    'EM waves: what does displacement current fix in Ampère\'s law? Write the speed of light in terms of μ₀ and ε₀.',
+    'Ray optics: write the mirror formula, the lens formula and the lensmaker\'s formula.',
+    'Ray optics: what is total internal reflection, and when does it happen? Write the critical angle.',
+    'Ray optics: write the angle of minimum deviation formula for a prism.',
+    'Wave optics: write the fringe width in Young\'s double slit experiment. What happens if the setup is put in water?',
+    'Modern physics: write Einstein\'s photoelectric equation. What does the stopping potential depend on?',
+    'Modern physics: write the de Broglie wavelength of an electron accelerated through V volts.',
+    'Modern physics: write the Bohr model\'s radius and energy of the nth orbit of hydrogen.',
+    'Nuclear physics: write the law of radioactive decay and the half-life in terms of λ.',
+    'Semiconductors: how does a p–n junction diode behave in forward and reverse bias?'
+  ],
+  Chemistry: [
+    'Mole concept: define a mole and give Avogadro\'s number.',
+    'Mole concept: how do you find the limiting reagent in a reaction?',
+    'Mole concept: define molarity, molality and mole fraction. Which one changes with temperature?',
+    'Mole concept: what is the equivalent weight of an acid, a base and an oxidising agent?',
+    'Atomic structure: write the Bohr energy of the nth level of hydrogen and the Rydberg formula.',
+    'Atomic structure: name the hydrogen spectral series and the region of the spectrum for each.',
+    'Atomic structure: state Heisenberg\'s uncertainty principle.',
+    'Atomic structure: what do the four quantum numbers tell you? Give their allowed values.',
+    'Atomic structure: state the Aufbau principle, Pauli\'s exclusion principle and Hund\'s rule.',
+    'Atomic structure: why are Cr and Cu exceptions to the expected electron configuration?',
+    'Atomic structure: how many radial and angular nodes does a 3p orbital have?',
+    'Periodic table: how do atomic radius and ionisation energy change across a period and down a group?',
+    'Periodic table: why is the first ionisation energy of N higher than that of O?',
+    'Periodic table: define electron gain enthalpy. Why is chlorine\'s more negative than fluorine\'s?',
+    'Periodic table: what is the diagonal relationship? Give one pair.',
+    'Periodic table: what is the lanthanoid contraction and what are its effects?',
+    'Bonding: state Fajans\' rules. When does an ionic bond get covalent character?',
+    'Bonding: what does VSEPR predict for the shapes of SF₄, ClF₃ and XeF₄?',
+    'Bonding: give the hybridisation of carbon in CH₄, C₂H₄ and C₂H₂.',
+    'Bonding: write the MO configuration of O₂. Why is it paramagnetic?',
+    'Bonding: define bond order and give the bond orders of N₂, O₂ and O₂⁺.',
+    'Bonding: what is a hydrogen bond? Why does water have a high boiling point?',
+    'Bonding: what is resonance? Draw the resonance structures of the carbonate ion.',
+    'Bonding: which has a dipole moment, CO₂ or SO₂? Why?',
+    'States of matter: write the ideal gas equation and the van der Waals equation. What do a and b correct for?',
+    'States of matter: state Graham\'s law of diffusion.',
+    'States of matter: what is the compressibility factor Z? What does Z > 1 tell you?',
+    'States of matter: what is the critical temperature of a gas?',
+    'Thermodynamics: state Hess\'s law and use it once from memory.',
+    'Thermodynamics: write the relation between ΔH and ΔU for a gas reaction.',
+    'Thermodynamics: write ΔG = ΔH − TΔS. When is a reaction spontaneous at all temperatures?',
+    'Thermodynamics: define enthalpy of formation, combustion and neutralisation.',
+    'Thermodynamics: how is ΔG° related to the equilibrium constant?',
+    'Thermodynamics: what is the entropy change of an isothermal reversible expansion of an ideal gas?',
+    'Equilibrium: write the relation between Kp and Kc.',
+    'Equilibrium: state Le Chatelier\'s principle and apply it to the Haber process.',
+    'Equilibrium: what is the difference between Q and K? What does Q < K tell you?',
+    'Ionic equilibrium: define pH and write the pH of a weak acid in terms of Ka and C.',
+    'Ionic equilibrium: write the Henderson–Hasselbalch equation. What is a buffer?',
+    'Ionic equilibrium: what is the common ion effect? Give one example.',
+    'Ionic equilibrium: how are solubility and Ksp related for AB₂?',
+    'Ionic equilibrium: what is hydrolysis of a salt? Is a solution of CH₃COONa acidic or basic?',
+    'Ionic equilibrium: state the Arrhenius, Brønsted–Lowry and Lewis definitions of acids.',
+    'Redox: define oxidation and reduction in terms of electrons and oxidation number.',
+    'Redox: balance MnO₄⁻ + Fe²⁺ in acidic medium by the ion–electron method.',
+    'Redox: what is a disproportionation reaction? Give one example.',
+    's-block: why do alkali metals give a colour to a flame?',
+    's-block: why is lithium different from the other alkali metals?',
+    's-block: how is sodium carbonate made by the Solvay process?',
+    's-block: why are alkaline earth metal sulphates less soluble down the group?',
+    'p-block: what is the inert pair effect? Show it with lead or thallium.',
+    'p-block: why is boric acid a Lewis acid and not a proton donor?',
+    'p-block: describe the structure of diborane.',
+    'p-block: why does nitrogen form only up to NX₃ while phosphorus forms PCl₅?',
+    'p-block: name the oxoacids of sulphur and draw the structure of H₂SO₄.',
+    'p-block: why is HF a weaker acid than HI?',
+    'p-block: what are interhalogen compounds? Give the shape of ClF₃.',
+    'p-block: why are noble gases unreactive, and which xenon fluorides exist?',
+    'p-block: describe how ammonia is made by the Haber process, with the conditions.',
+    'p-block: describe the contact process for sulphuric acid.',
+    'd-block: why do transition metals show variable oxidation states?',
+    'd-block: why are most transition metal compounds coloured?',
+    'd-block: how do you calculate the spin-only magnetic moment? Do it for Fe³⁺.',
+    'd-block: why does Mn show the most oxidation states in the 3d series?',
+    'd-block: how is potassium dichromate prepared? Write its action on Fe²⁺.',
+    'Coordination: name [Co(NH₃)₅Cl]Cl₂ by IUPAC rules.',
+    'Coordination: what does crystal field theory say about splitting in an octahedral field?',
+    'Coordination: what is the spectrochemical series? Is [Fe(CN)₆]³⁻ high spin or low spin?',
+    'Coordination: what kinds of isomerism do coordination compounds show? Give one example each.',
+    'GOC: define inductive, resonance and hyperconjugation effects.',
+    'GOC: put the stability of primary, secondary and tertiary carbocations in order and explain why.',
+    'GOC: what makes a compound aromatic? State Hückel\'s rule.',
+    'GOC: compare the acidity of phenol, ethanol and acetic acid.',
+    'GOC: compare the basicity of aniline, methylamine and ammonia.',
+    'GOC: what are nucleophiles and electrophiles? Give two of each.',
+    'Isomerism: what is the difference between structural isomers and stereoisomers?',
+    'Isomerism: when does a molecule show optical activity? What is a chiral centre?',
+    'Isomerism: what is geometrical isomerism? Why does but-2-ene show it?',
+    'Isomerism: how do you assign R and S configuration?',
+    'Hydrocarbons: state Markovnikov\'s rule and the peroxide effect.',
+    'Hydrocarbons: what does ozonolysis of an alkene give?',
+    'Hydrocarbons: why are terminal alkynes acidic?',
+    'Hydrocarbons: what are the steps of electrophilic aromatic substitution?',
+    'Hydrocarbons: which groups are ortho/para directors and which are meta directors? Why?',
+    'Hydrocarbons: what is the Wurtz reaction? What is its limitation?',
+    'Haloalkanes: compare SN1 and SN2: rate law, stereochemistry and the substrates they prefer.',
+    'Haloalkanes: why are aryl halides less reactive to nucleophiles than alkyl halides?',
+    'Haloalkanes: what is Saytzeff\'s rule for elimination?',
+    'Haloalkanes: what does a Grignard reagent do with an aldehyde, a ketone and CO₂?',
+    'Alcohols and phenols: how do you tell primary, secondary and tertiary alcohols apart with the Lucas test?',
+    'Alcohols and phenols: what is the Reimer–Tiemann reaction?',
+    'Alcohols and phenols: what does Kolbe\'s reaction make from phenol?',
+    'Ethers: what is the Williamson synthesis? Which halide should you use?',
+    'Carbonyls: why are aldehydes more reactive than ketones to nucleophiles?',
+    'Carbonyls: what is the aldol condensation? What structural feature does it need?',
+    'Carbonyls: what is the Cannizzaro reaction, and which aldehydes undergo it?',
+    'Carbonyls: what do Tollens\' and Fehling\'s tests distinguish?',
+    'Carbonyls: what are the Clemmensen and Wolff–Kishner reductions?',
+    'Carboxylic acids: why do electron-withdrawing groups make a carboxylic acid stronger?',
+    'Carboxylic acids: what is the Hell–Volhard–Zelinsky reaction?',
+    'Amines: what is the Hoffmann bromamide reaction? What does it do to the carbon count?',
+    'Amines: how does the carbylamine test work, and which amines give it?',
+    'Amines: what is diazotisation? What can you make from a diazonium salt?',
+    'Amines: how does the Hinsberg test tell primary, secondary and tertiary amines apart?',
+    'Biomolecules: what is the difference between reducing and non-reducing sugars? Is sucrose reducing?',
+    'Biomolecules: what are the primary, secondary and tertiary structures of a protein?',
+    'Biomolecules: what bases are in DNA and RNA, and how do they pair?',
+    'Polymers: what is the difference between addition and condensation polymers? Give one example each.',
+    'Solutions: state Raoult\'s law. What do positive and negative deviations mean?',
+    'Solutions: write the four colligative properties and their formulas.',
+    'Solutions: what is the van\'t Hoff factor? What is it for NaCl and for acetic acid in benzene?',
+    'Solutions: state Henry\'s law. Why do divers get the bends?',
+    'Electrochemistry: write the Nernst equation for a cell.',
+    'Electrochemistry: how are E°cell and ΔG° related?',
+    'Electrochemistry: state Faraday\'s two laws of electrolysis.',
+    'Electrochemistry: what is Kohlrausch\'s law? How do you use it for a weak electrolyte?',
+    'Electrochemistry: how does molar conductivity change with dilution for strong and weak electrolytes?',
+    'Kinetics: write the integrated rate law and the half-life of a first-order reaction.',
+    'Kinetics: write the Arrhenius equation. How does a catalyst change the rate?',
+    'Kinetics: what is the difference between order and molecularity?'
+  ],
+  Maths: [
+    'Sets: write n(A ∪ B ∪ C) in terms of the individual sets and their intersections.',
+    'Relations: what makes a relation an equivalence relation?',
+    'Functions: what is the difference between one-one, onto and bijective functions?',
+    'Functions: how do you find the domain of √(log(x − 1))?',
+    'Functions: when does a function have an inverse? Find the inverse of f(x) = (2x + 3)/(x − 1).',
+    'Functions: what makes a function even or odd? What is f(x) + f(−x) for an odd function?',
+    'Functions: what is the period of sin²x and of |sin x| + |cos x|?',
+    'Functions: sketch the greatest integer function and the fractional part function.',
+    'Trigonometry: write sin(A + B), cos(A + B) and tan(A + B).',
+    'Trigonometry: write sin 2A, cos 2A and tan 2A, including cos 2A in all three forms.',
+    'Trigonometry: write sin 3A and cos 3A.',
+    'Trigonometry: write the sum-to-product formulas for sin C + sin D and cos C − cos D.',
+    'Trigonometry: write the general solutions of sin x = sin α, cos x = cos α and tan x = tan α.',
+    'Trigonometry: what is the range of a sin x + b cos x?',
+    'Trigonometry: state the sine rule and the cosine rule.',
+    'Trigonometry: write the area of a triangle in three different ways.',
+    'Inverse trig: write the principal value ranges of sin⁻¹, cos⁻¹ and tan⁻¹.',
+    'Inverse trig: write tan⁻¹x + tan⁻¹y and when it needs a correction of π.',
+    'Inverse trig: what is sin⁻¹x + cos⁻¹x? And sin⁻¹(sin x) for x in (π/2, 3π/2)?',
+    'Complex numbers: write the modulus and argument of a + ib. What is the principal argument range?',
+    'Complex numbers: state De Moivre\'s theorem.',
+    'Complex numbers: what are the cube roots of unity, and what are 1 + ω + ω² and ω³?',
+    'Complex numbers: what does |z − z₁| = |z − z₂| represent in the plane?',
+    'Complex numbers: write the triangle inequality for complex numbers.',
+    'Complex numbers: what are the nth roots of unity? What is their sum?',
+    'Quadratics: write the sum and product of roots, and the condition for real roots.',
+    'Quadratics: when are both roots of ax² + bx + c = 0 positive?',
+    'Quadratics: what condition makes two quadratics share a common root?',
+    'Quadratics: when is ax² + bx + c > 0 for all real x?',
+    'Quadratics: how do you find the range of a rational function like (x² + 1)/(x² + x + 1)?',
+    'Sequences: write the nth term and the sum of n terms of an AP and of a GP.',
+    'Sequences: write the sum of an infinite GP and the condition for it to exist.',
+    'Sequences: state the AM ≥ GM ≥ HM inequality and when equality holds.',
+    'Sequences: write the sums of the first n natural numbers, their squares and their cubes.',
+    'Sequences: how do you sum an arithmetico-geometric series?',
+    'Sequences: how do you sum 1/(1·2) + 1/(2·3) + … by the method of differences?',
+    'P&C: write nPr and nCr. Why is nCr = nC(n−r)?',
+    'P&C: how many ways can n people sit around a round table? And beads on a necklace?',
+    'P&C: how many arrangements of MISSISSIPPI are there?',
+    'P&C: how many ways can n identical items go into r distinct boxes?',
+    'P&C: what is a derangement? Write the number of derangements of 4 objects.',
+    'P&C: how many diagonals does an n-sided polygon have?',
+    'Binomial: write the general term of (a + b)ⁿ.',
+    'Binomial: how do you find the middle term(s) of (a + b)ⁿ?',
+    'Binomial: what is the sum of all binomial coefficients? And of the even-positioned ones?',
+    'Binomial: how do you find the term independent of x in (x + 1/x²)⁹?',
+    'Binomial: how do you find the greatest term in a binomial expansion?',
+    'Matrices: when can two matrices be multiplied? Is AB = BA in general?',
+    'Matrices: define symmetric and skew-symmetric matrices. Can every square matrix be split into the two?',
+    'Matrices: write the inverse of a 2×2 matrix. When does it not exist?',
+    'Matrices: what is (AB)⁻¹ and (AB)ᵀ?',
+    'Determinants: what happens to a determinant when you swap two rows, or multiply a row by k?',
+    'Determinants: what is |kA| for an n×n matrix, and what is |adj A|?',
+    'Determinants: when does a system of linear equations have a unique solution, none, or infinitely many?',
+    'Determinants: how do you find the area of a triangle using a determinant?',
+    'Straight lines: write the slope–intercept, point–slope, intercept and normal forms of a line.',
+    'Straight lines: write the angle between two lines and the conditions for parallel and perpendicular lines.',
+    'Straight lines: write the distance from a point to a line, and between two parallel lines.',
+    'Straight lines: what is the family of lines through the intersection of two lines?',
+    'Straight lines: how do you find the image of a point in a line?',
+    'Straight lines: write the coordinates of the centroid, incentre and circumcentre of a triangle.',
+    'Circles: write the general equation of a circle and read off its centre and radius.',
+    'Circles: write the equation of the tangent to x² + y² = a² at a point, and in slope form.',
+    'Circles: what is the length of the tangent from an external point?',
+    'Circles: when do two circles touch externally, touch internally or cut orthogonally?',
+    'Circles: what is the radical axis of two circles?',
+    'Parabola: write the focus, directrix and latus rectum of y² = 4ax.',
+    'Parabola: write the tangent to y² = 4ax in slope form and the condition of tangency.',
+    'Parabola: write the parametric form of a point on y² = 4ax and the normal at that point.',
+    'Ellipse: write the eccentricity, foci and directrices of x²/a² + y²/b² = 1.',
+    'Ellipse: what is the sum of the distances from any point on an ellipse to its foci?',
+    'Ellipse: write the condition for y = mx + c to touch an ellipse.',
+    'Hyperbola: write the asymptotes of x²/a² − y²/b² = 1. What is a rectangular hyperbola?',
+    'Hyperbola: what is the difference of the distances from any point on a hyperbola to its foci?',
+    'Conics: how does eccentricity tell you whether a conic is an ellipse, parabola or hyperbola?',
+    'Limits: write the standard limits of sin x / x, (eˣ − 1)/x and (1 + x)^(1/x).',
+    'Limits: when do you use L\'Hôpital\'s rule? Name the indeterminate forms.',
+    'Limits: how do you handle a 1^∞ limit?',
+    'Continuity: what are the three conditions for a function to be continuous at a point?',
+    'Continuity: is |x| differentiable at 0? Explain with the left and right derivatives.',
+    'Differentiation: write the derivatives of tan x, sec x, sin⁻¹x and tan⁻¹x.',
+    'Differentiation: state the product, quotient and chain rules.',
+    'Differentiation: how do you differentiate xˣ?',
+    'Differentiation: how do you find dy/dx for parametric equations, and d²y/dx²?',
+    'Application of derivatives: how do you find the equation of the tangent and normal to a curve at a point?',
+    'Application of derivatives: how do you find where a function is increasing or decreasing?',
+    'Application of derivatives: state the first and second derivative tests for maxima and minima.',
+    'Application of derivatives: state Rolle\'s theorem and the mean value theorem.',
+    'Application of derivatives: what is the maximum area of a rectangle inscribed in a circle of radius r?',
+    'Integration: write the integrals of tan x, sec x, cosec x and cot x.',
+    'Integration: write the integrals of 1/(x² + a²), 1/(x² − a²) and 1/√(a² − x²).',
+    'Integration: state the rule for integration by parts. How do you choose u (ILATE)?',
+    'Integration: how do you integrate eˣ[f(x) + f′(x)]?',
+    'Integration: how do you integrate 1/(a + b cos x)?',
+    'Integration: how do you split (x + 1)/((x − 1)(x + 2)) into partial fractions?',
+    'Integration: how do you integrate √(x² + a²)?',
+    'Definite integrals: write the property ∫₀ᵃ f(x) dx = ∫₀ᵃ f(a − x) dx and use it on one example.',
+    'Definite integrals: what is ∫₋ₐᵃ f(x) dx for even and for odd functions?',
+    'Definite integrals: state the Newton–Leibniz rule for differentiating an integral with variable limits.',
+    'Definite integrals: what is ∫₀^(π/2) sinⁿx dx (Walli\'s formula)?',
+    'Definite integrals: how do you write a definite integral as the limit of a sum?',
+    'Area: how do you find the area between two curves? Find the area between y = x² and y = x.',
+    'Differential equations: define the order and degree of a differential equation.',
+    'Differential equations: how do you solve a variable separable equation?',
+    'Differential equations: how do you solve a homogeneous differential equation?',
+    'Differential equations: write the integrating factor of dy/dx + Py = Q.',
+    'Vectors: write the dot product and the cross product. What does each tell you geometrically?',
+    'Vectors: how do you find the projection of a on b?',
+    'Vectors: what is the scalar triple product, and what does it mean when it is zero?',
+    'Vectors: write the vector triple product a × (b × c).',
+    'Vectors: when are three vectors coplanar? When are three points collinear?',
+    '3D geometry: write the equation of a line in vector and Cartesian form.',
+    '3D geometry: write the shortest distance between two skew lines.',
+    '3D geometry: write the equation of a plane in normal form and through three points.',
+    '3D geometry: write the angle between a line and a plane, and between two planes.',
+    '3D geometry: write the distance from a point to a plane.',
+    'Probability: state the addition rule and the conditional probability formula.',
+    'Probability: state Bayes\' theorem and give one situation where you would use it.',
+    'Probability: write the binomial distribution, its mean and its variance.',
+    'Statistics: write the mean, variance and standard deviation of a data set. How does variance change if every value is multiplied by k?'
+  ]
+};
+
+</script>
 <script id="moon-lab-script">
 /* ===== Moon Lab: chapter tracker, boss battles, Iroha's recall, doubts, weekly rank, stickers, bond, voyage, kindness ===== */
 (function () {
@@ -4661,9 +5038,29 @@ body.kg-calm #kg-strip::after,body.kg-calm #kg-main.kd-enter :is(.kl-card,.hb-ca
     }
     let pool = CHAPS.filter(c => L.ch[c.id]?.last === d);
     if (!pool.length) pool = CHAPS.filter(c => L.ch[c.id]?.last && gap(d, L.ch[c.id].last) <= 3);
+    // then the 365-question bank, in the subject you studied when there is one
+    const fromBank = bankQuestion(pool.length ? pick(pool).subj : null);
+    if (fromBank) return fromBank;
     if (pool.length) { const c = pick(pool); return { kind: 'tpl', ch: c.id, text: pick(TPL[c.subj]).replace('{ch}', c.name) }; }
     return { kind: 'tpl', ch: '', text: pick(GENERIC) };
   }
+  // Each bank question comes once, in a shuffled order, before any repeats. The order is kept, so it carries across days.
+  function bankQuestion(subj) {
+    const B = window.KG_RECALL; if (!B) return null;
+    const all = Object.entries(B).flatMap(([s, qs]) => qs.map(q => [s, q]));
+    if (!Array.isArray(L.recallOrder) || L.recallOrder.length !== all.length || !(L.recallPos >= 0) || L.recallPos >= all.length) {
+      const o = all.map((_, i) => i); for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; }
+      L.recallOrder = o; L.recallPos = 0;
+    }
+    // take the next unasked one, preferring the subject you studied if it turns up within the next 40
+    let k = L.recallPos;
+    if (subj) for (let i = L.recallPos; i < Math.min(all.length, L.recallPos + 40); i++) if (all[L.recallOrder[i]][0] === subj) { k = i; break; }
+    [L.recallOrder[L.recallPos], L.recallOrder[k]] = [L.recallOrder[k], L.recallOrder[L.recallPos]];
+    const [s, q] = all[L.recallOrder[L.recallPos]]; L.recallPos++;
+    return { kind: 'tpl', ch: '', text: q, subj: s };
+  }
+  // a question still pending from the old generic four is swapped for a bank question
+  if (L.ask?.q && GENERIC.includes(L.ask.q.text)) { const nq = bankQuestion(null); if (nq) { L.ask.q = nq; save(); } }
   function askNow(speak) {
     L.ask = { q: nextQuestion(), at: Date.now(), rev: false }; save();
     if (speak) I(L.ask.q.text + ' (Answer in Study · Recall.)', { face: 'study' });
@@ -5098,9 +5495,12 @@ body.kg-calm #kg-strip::after,body.kg-calm #kg-main.kd-enter :is(.kl-card,.hb-ca
     setSubj(s) { if (CH[s]) subj = s; }
   };
   window.addEventListener('moonlab:go', e => { if (!window.KGShell) window.MoonLab.show(e.detail.section, e.detail.tab); });
-  // A pending question is repeated when you come back to the page, not while you're working.
+  // A pending question is repeated when you come back to the page, not while you're working:
+  // only once per question, only after two hours, and at most once every six hours.
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && L.ask.q && Date.now() - L.ask.at > 5 * 60000) { L.ask.at = Date.now(); save(); I("You're back. Still waiting on: " + L.ask.q.text, { face: 'stern' }); }
+    const q = L.ask.q, now = Date.now();
+    if (document.hidden || !q || q.reminded || window.__kgOnBreak || now - L.ask.at < 2 * 3600000 || now - (L.askNagAt || 0) < 6 * 3600000) return;
+    q.reminded = true; L.askNagAt = now; save(); I("You're back. Still waiting on: " + q.text, { face: 'stern' });
   });
   render();
   setTimeout(() => { tick(); const b = block(); if (!L.mood[today()] && b && b.kind !== 'sleep' && !document.body.classList.contains('habit-shh') && !isNight() && !window.__kgOnBreak) openMood(); }, 4000);
@@ -5720,7 +6120,7 @@ body.kg-calm #kg-strip::after,body.kg-calm #kg-main.kd-enter :is(.kl-card,.hb-ca
     hang: b => { company = true; notes(); window.__kaguyaAsk?.(b.dataset.q); },
     stay: () => { notes(); window.__irohaAsk?.("i'm really not okay today. can you just stay with me for a bit?"); },
     breathe,
-    lighter: () => { M.toFallback?.(); K("8-hour day it is. 80% of it counts, and that's a real day, No.1."); M.render(); },
+    lighter: () => { if (L.planHours === 12) window.__kgSetPlan?.('8'); K(`${L.planHours}-hour day it is. 80% of it counts, and that's a real day, No.1.`); M.render(); },
     cset: b => { L.cset[b.dataset.k] = b.checked; save(); if (b.dataset.k === 'notify' && b.checked && window.Notification && Notification.permission === 'default') Notification.requestPermission(); if (b.dataset.k === 'ambient') ambientTick(true); if (b.dataset.k === 'sky') skyTick(); },
     cvol: b => { L.cset.vol = Number(b.value); save(); if (amb) amb.nodes[0].gain.value = L.cset.vol; },
     look: b => { window.__kgSetLook?.(b.dataset.v); M.render(); },
@@ -6243,19 +6643,27 @@ body.kg-calm #kg-strip::after,body.kg-calm #kg-main.kd-enter :is(.kl-card,.hb-ca
       <div class="kl-row"><button class="kl-primary" data-a="repprint">🖨 Print or save as PDF</button></div>`;
   };
 
-  /* ---------- lighter days: offered after a hard stretch, never forced ---------- */
+  /* ---------- lighter days: offered after a hard stretch, never forced. They cap the plan switch at 8 hours. ---------- */
+  const softOn = () => !!L.softUntil && today() <= L.softUntil;
+  const niceDay = iso => new Date(iso + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
   function softCard() {
     const d = today();
-    if (L.softUntil && d <= L.softUntil) return `<section class="kl-card kl-mini"><span>🌤 Lighter days until ${esc(L.softUntil)}: the 8-hour plan counts in full.</span><button class="kl-ghost" data-a="softoff">Back to 12 hours</button></section>`;
+    if (softOn()) return `<section class="kl-card kl-mini"><span>🌤 Lighter days until ${esc(niceDay(L.softUntil))}: ${L.planHours === 12 ? 8 : L.planHours} hours at most, and every day still counts.</span><button class="kl-ghost" data-a="softoff">End lighter days</button></section>`;
     let low = 0; for (let i = 0; i < 5; i++) if (['heavy', 'hard', 'lowest'].includes(L.mood[add(d, -i)])) low++;
     if (low < 3 || (L.softAsked && gap(d, L.softAsked) < 10)) return '';
-    return `<section class="kl-card kl-gentle"><p class="kl-eyebrow">🌤 IT'S BEEN A HARD STRETCH</p><p>Want three lighter days? The 8-hour plan each day, and every one of them still counts.</p><div class="kl-row"><button class="kl-primary" data-a="softon">Yes, three lighter days</button><button class="kl-ghost" data-a="softno">Not now</button></div></section>`;
+    return `<section class="kl-card kl-gentle"><p class="kl-eyebrow">🌤 IT'S BEEN A HARD STRETCH</p><p>Want three lighter days? 8 hours at most each day, and every one of them still counts.</p><div class="kl-row"><button class="kl-primary" data-a="softon">Yes, three lighter days</button><button class="kl-ghost" data-a="softno">Not now</button></div></section>`;
   }
-  function softTick() { if (L.softUntil && today() <= L.softUntil && !window.__kgOnBreak) M.toFallback?.(); }
+  // a 12-hour plan steps down to 8 while lighter days last, and goes back when they end
+  function softTick() {
+    if (window.__kgOnBreak) return;
+    if (softOn() && L.planHours === 12) { L.softPrev = 12; save(); window.__kgSetPlan?.('8'); }
+    else if (!softOn() && L.softPrev === 12) { L.softPrev = 0; save(); if (L.planHours === 8) window.__kgSetPlan?.('12'); }
+  }
+  M.softTick = softTick;
   Object.assign(M.ACTIONS, {
-    softon: () => { const d = today(); L.softUntil = add(d, 2); L.softAsked = d; save(); softTick(); M.render(); duo([['k', "three lighter days, starting now. you're not behind, you're pacing 🌙"], ['i', 'Eight hours counts in full. No extra.']]); },
+    softon: () => { const d = today(); L.softUntil = add(d, 2); L.softAsked = d; save(); softTick(); M.render(); duo([['k', "three lighter days, starting now. you're not behind, you're pacing 🌙"], ['i', 'Eight hours at most. No extra.']]); },
     softno: () => { L.softAsked = today(); save(); M.render(); },
-    softoff: () => { L.softUntil = ''; save(); M.render(); }
+    softoff: () => { L.softUntil = ''; save(); softTick(); M.render(); }
   });
   setTimeout(softTick, 3000); setInterval(softTick, 30 * 60000);
 
@@ -6801,7 +7209,7 @@ body.kg-calm #kg-strip::after,body.kg-calm #kg-main.kd-enter :is(.kl-card,.hb-ca
     // return plan: the longer the break, the more short days to come back on
     const last = L.breaks[L.breaks.length - 1], len = last ? M.gap(L.breakUntil, last.from) : 1, n = len <= 3 ? 2 : len <= 7 ? 3 : 5;
     L.softUntil = M.add(today(), n - 1); save();
-    setTimeout(() => M.toFallback?.(), 1500);
+    setTimeout(() => M.softTick?.(), 1500);
     setTimeout(() => script([['k', `you're back!! i missed study-you, but i liked rest-you too. the next ${n} days are short ones, okay? no catching up.`], ['i', `Eight hours at most for ${n} days. Do not try to recover lost time. There is none to recover.`], ['k', 'and if your doctor wants longer, just move the date in Settings. no questions asked 🌙']]), 6000);
   }
 
@@ -6874,15 +7282,19 @@ body.kg-calm #kg-strip::after,body.kg-calm #kg-main.kd-enter :is(.kl-card,.hb-ca
     <p class="kl-small">${window.__kgOnBreak ? 'Starts when your break ends. ' : ''}${PLANS.find(p => p[0] === current())[4]}. Sleep stays at 1:00.</p></section>`;
   const todayPanel = M.PANELS.today;
   M.PANELS.today = () => card() + todayPanel();
-  M.ACTIONS.kgplan = b => {
-    const p = PLANS.find(x => x[0] === b.dataset.v); if (!p || p[0] === current()) return;
+  function setPlan(key) {
+    const p = PLANS.find(x => x[0] === key); if (!p || p[0] === current()) return;
     const h = p[1];
     L.planHours = h; L.planLate = p[0] === '6L';
     const d = today();
     if (h === 12) { delete L.planLog[d]; window.DeskStore?.getState?.().patchDay?.(d, { shortDay: false }); }
     save(); apply();
+    // the day card reads the plan when it draws, so switching 6 <-> 8 has to redraw it
+    window.HabitDesk?.refresh?.(); window.DeskStore?.setState?.({ habitRevision: Date.now() });
     setTimeout(() => M.render(), 50);
-  };
+  }
+  M.ACTIONS.kgplan = b => setPlan(b.dataset.v);
+  window.__kgSetPlan = setPlan;
   window.__kgPlanGo = () => M.go('today');
   window.addEventListener('moonlab:render', apply);
   setInterval(apply, 60000);
