@@ -2090,6 +2090,8 @@ window.__KG_BUILTIN = {
     if (chars < 40) { const page = await pdf.getPage(1), vp0 = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: Math.min(2, 1400 / Math.max(vp0.width, vp0.height)) }), c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height; await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise; page1 = { media_type: "image/jpeg", data: c.toDataURL("image/jpeg", .8).split(",")[1] }; }
     return { pages: total, parts: chars < 40 ? [] : parts, page1 };
   };
+  // the last thing in her chat, so screen watch knows whether her question is still unanswered
+  window.__kgIrohaLast = () => String(iconv[iconv.length - 1]?.content || "");
   window.__kgAttachPdf = p => { ipdf = p; showChip(`📄 ${p.name} · ${p.pages} pages`, true); };
   window.__kgShrink = shrink;
   window.__irohaAskImg = (text, image) => iSend(text, image);
@@ -5190,27 +5192,43 @@ window.KG_RECALL = {
       const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.srcObject = stream; await v.play();
       watch = { stream, v, timer: setInterval(snap, 4 * 60000) };
       stream.getVideoTracks()[0].addEventListener('ended', stopWatch);
-      I("Screen watch on. I check what you're studying every few minutes. Nothing is stored except one line about the topic.", { face: 'study' });
+      I("Screen watch on. I check what you're studying every few minutes and ask you about it. Nothing is stored except one line about the topic.", { face: 'study' });
+      // her questions arrive while you're in another tab, so ask once to show them as notifications
+      try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
       setTimeout(snap, 15000); render(); dispatchEvent(new Event('kg:watch'));
     } catch (e) { /* sharing was cancelled */ }
   }
   function stopWatch() { if (!watch) return; clearInterval(watch.timer); watch.stream.getTracks().forEach(t => t.stop()); watch = null; window.__kgScreen = ''; render(); dispatchEvent(new Event('kg:watch')); }
   // Iroha's chat header has its own eye button for this
-  window.__kgWatch = { on: () => !!watch, toggle: () => watch ? stopWatch() : startWatch() };
+  window.__kgWatch = { on: () => !!watch, toggle: () => watch ? stopWatch() : startWatch(), check: () => snap(), state: () => watch };
+  // While you study, a check either asks one question about what's on screen (study with me) or just notes the topic.
+  // At most one question every 12 minutes (25 on a hard day), never while the last one is unanswered, none on a break.
   async function snap() {
     const v = watch?.v; if (!v || !v.videoWidth) return;
     const w = 768, h = Math.round(v.videoHeight * w / v.videoWidth), cv = document.createElement('canvas'); cv.width = w; cv.height = h;
     cv.getContext('2d').drawImage(v, 0, 0, w, h);
     const data = cv.toDataURL('image/jpeg', .6).split(',')[1];
-    const r = await window.__kgAsk?.('iroha', '[screen check, not typed by me] The attached image is a screenshot of what I am watching or doing right now. Reply in exactly two lines. Line 1: "WATCHING: " then the subject and chapter or lecture topic (or "not study"), then " | " and one of: lecture, problems, notes, other. Line 2: one short in-character remark to me about it.', { media_type: 'image/jpeg', data });
+    const gap = (L.gentle[today()] ? 25 : 12) * 60000, waiting = !!watch.pending || (watch.q && window.__kgIrohaLast?.() === watch.q);
+    const quiz = !window.__kgOnBreak && !waiting && Date.now() - (watch.qAt || 0) >= gap;
+    const r = await window.__kgAsk?.('iroha', '[screen check, not typed by me] The attached image is a screenshot of what I am watching or doing right now. Reply in exactly two lines. Line 1: "WATCHING: " then the subject and chapter or lecture topic (or "not study"), then " | " and one of: lecture, problems, notes, other. '
+      + (quiz ? 'Line 2: if it is study, "QUESTION: " then ONE short question that checks I understand exactly what is on the screen right now (the next step, why it works, what a symbol or term means, or a quick variation), answerable in under a minute, in your own voice. Do not answer it. If it is not study, one short in-character line telling me to get back to it.'
+        : 'Line 2: if it is not study, one short in-character line telling me to get back to it; otherwise just write "OK".'), { media_type: 'image/jpeg', data });
     if (!r?.reply || !watch) return;
-    const m = /WATCHING:\s*(.+)/i.exec(r.reply), topic = m ? m[1].trim().slice(0, 120) : '';
+    const m = /WATCHING:\s*(.+)/i.exec(r.reply), topic = m ? m[1].trim().slice(0, 120) : '', study = topic && !/not study/i.test(topic);
     window.__kgScreen = topic; L.watch = { at: Date.now(), topic }; save();
     window.MoonLab?.HOOKS.watch?.(topic);
-    const remark = r.reply.replace(/^.*WATCHING:.*$/im, '').trim();
-    if (remark) I(remark, { face: /not study/i.test(topic) ? 'stern' : 'study' });
+    const line = r.reply.replace(/^.*WATCHING:.*$/im, '').trim(), q = /QUESTION:\s*([\s\S]+)/i.exec(line);
+    const say = (t, face) => {
+      // you're usually in another tab while she watches: the line waits in her chat for you, with a desktop notification if allowed
+      if (!document.hidden) return I(t, { face });
+      watch.pending = { t, face };
+      try { if (window.Notification && Notification.permission === 'granted') { if (navigator.serviceWorker?.controller) navigator.serviceWorker.ready.then(s => s.showNotification('Dr. Iroha', { body: t, icon: 'icon-192.png', tag: 'kg-watch' })); else new Notification('Dr. Iroha', { body: t, tag: 'kg-watch' }); } } catch (e) {}
+    };
+    if (q && study) { watch.q = q[1].trim(); watch.qAt = Date.now(); say(watch.q, 'study'); }
+    else if (!study && line && !/^OK\.?$/i.test(line)) say(line.replace(/^QUESTION:\s*/i, ''), 'stern');
     softRender();
   }
+  document.addEventListener('visibilitychange', () => { const p = watch?.pending; if (document.hidden || !p) return; watch.pending = null; setTimeout(() => I(p.t, { face: p.face }), 600); });
 
   /* ---------- kindness: mood check-in, hard day, wins ---------- */
   function setMood(m) {
