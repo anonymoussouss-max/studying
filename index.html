@@ -616,6 +616,13 @@ body.habit-shh #hb-session-card {text-align:center;}
   const shortHours=()=>hours()===6?6:8;
   // 80% of the day's study plan makes it count. A past short day keeps the size it had that day.
   const need=(short,iso)=>{if(!short)return 576;const logged=iso&&(labData().planLog||{})[iso];return Math.round((logged||(iso?8:shortHours()))*60*0.8);};
+  // Each 20-50 minute revision block uses one research-backed method, rotating by weekday and subject.
+  const REV=[['Blurting','Blurting: close everything and write all you remember from the lecture on a blank page for 8 minutes. Then open your notes and fill the gaps in another colour.'],
+    ['Feynman','Feynman: explain the lecture’s main idea in plain words, as if to a 12-year-old (or to Kaguya). Where you get stuck or use jargon is what to re-learn.'],
+    ['Self-test','Self-test: without notes, solve 3 questions on this lecture. Check each one and log any miss.'],
+    ['Ask why','Ask why: for each key formula or fact, ask why it is true and when it fails. Answer from memory, then check.'],
+    ['Draw it','Draw it: make one diagram or flowchart of the lecture from memory, with labels. Then compare it with your notes.']];
+  const revMethod=(dow,id)=>{const k=['maths-rev','physics-rev','chem-rev'].indexOf(id);const m=REV[((dow||0)+Math.max(0,k)*2)%REV.length];return{name:m[0],how:m[1]};};
   // Short days have no separate focus, error or recall blocks: that time goes to lectures and their revision.
   function fallback(dow){
     if(!focus[dow])return [];
@@ -623,9 +630,9 @@ body.habit-shh #hb-session-card {text-align:center;}
     const six=shortHours()===6,late=six&&!!labData().planLate,main=six?100:110,rev=six?20:50;
     const rows=[['wake','Wake, water, breakfast','life',20],['free-morning','Slow start, lunch, your own time','rest',late?370:six?280:220],['maths','Maths · lectures','study',main,'maths'],['maths-rev','Maths · revise that lecture','study',rev,'maths'],['physics','Physics · lectures','study',main,'physics'],['physics-rev','Physics · revise that lecture','study',rev,'physics'],['dinner','Dinner','life',late?30:20],['chem','Chemistry · lectures','study',main,'chemistry'],['chem-rev','Chemistry · revise that lecture','study',rev,'chemistry'],['free-evening','Evening is yours','rest',late?0:six?100:40],['wind','Wind down','life',90],['sleep','Sleep','sleep',570]];
     let offset=0;
-    return rows.filter(r=>r[3]>0).map(([id,title,kind,minutes,bucket=null])=>{const start=offset;offset+=minutes;return {id,title,kind,minutes,bucket,start,end:offset,how:id.endsWith('-rev')?'Close the video. Recall it, then check your notes and try a few questions.':kind==='study'?'Watch the lecture and make notes. Stand up for 2 minutes about every 50.':id==='free-morning'?'No study yet. Eat, rest and do something you like.':id==='sleep'?'9.5 hours in bed. Sleep at 01:00, wake at 10:30.':id==='free-evening'?'Study is done. Rest tonight; no catch-up required.':'Leave the books closed. This time is part of the plan.'};});
+    return rows.filter(r=>r[3]>0).map(([id,title,kind,minutes,bucket=null])=>{const start=offset;offset+=minutes;return {id,title,kind,minutes,bucket,start,end:offset,how:id.endsWith('-rev')?revMethod(dow,id).how:kind==='study'?'Watch the lecture and make notes. Stand up for 2 minutes about every 50.':id==='free-morning'?'No study yet. Eat, rest and do something you like.':id==='sleep'?'9.5 hours in bed. Sleep at 01:00, wake at 10:30.':id==='free-evening'?'Study is done. Rest tonight; no catch-up required.':'Leave the books closed. This time is part of the plan.'};});
   }
-  const api={focus,limits,full,fallback,need,hours,shortHours};
+  const api={focus,limits,full,fallback,need,hours,shortHours,revMethod};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -1941,7 +1948,8 @@ window.__KG_BUILTIN = {
     const typing = document.createElement("div"); typing.className = "ame-msg ame kg-typing"; typing.dataset.who = "iroha"; typing.textContent = "..."; imsgs.appendChild(typing); imsgs.scrollTop = imsgs.scrollHeight;
     try {
       const msgs = withActivity(iconv, "iroha");
-      if (ipdf && !image) { const last = msgs.pop(); last.content = last.content.slice(0, 3000) + `\n\n[Use the PDF parts above when they help, and name the page. Only part of the PDF is sent each time, so if the answer isn't there, say which topic I should ask about instead of guessing.]`; msgs.push(...pdfParts(text), last); }
+      // the site's own notes ride on your message, so the cap leaves room for them as well as your words
+      if (ipdf && !image) { const last = msgs.pop(); last.content = last.content.slice(0, 10000) + `\n\n[Use the PDF parts above when they help, and name the page. Only part of the PDF is sent each time, so if the answer isn't there, say which topic I should ask about instead of guessing.]`; msgs.push(...pdfParts(text), last); }
       const r = await postMine(msgs, ameContext(), "iroha", image ? 45000 : ipdf ? 30000 : 15000, image);
       typing.remove();
       if (r.reply) { iAdd("ame", r.reply); popAdd("i", r.reply); iconv.push({ role: "assistant", content: r.reply }); saveI(); face(talkFace(r.reply), 8000); window.__kgAfterReply?.("iroha", text, r.reply); }
@@ -2046,6 +2054,24 @@ window.__KG_BUILTIN = {
       iAdd("ame", e && e.name === "PasswordException" ? "That PDF has a password. Remove it and send it again." : e && e.message === "offline" ? "I need the internet to open a PDF. Try again when you're online." : "I couldn't read that PDF. The file may be damaged.");
     }
   });
+  // For the lecture log: read a PDF into parts, attach saved notes to her chat, and send with a picture.
+  window.__kgPdfParts = async f => {
+    const pdf = await (await loadPdfLib()).getDocument({ data: await f.arrayBuffer() }).promise;
+    const total = Math.min(pdf.numPages, 400), parts = []; let cur = "", from = 1, chars = 0;
+    for (let n = 1; n <= total; n++) {
+      const tc = await (await pdf.getPage(n)).getTextContent();
+      const words = tc.items.map(it => it.str + (it.hasEOL ? "\n" : " ")).join("").replace(/[ \t]+/g, " ").replace(/\n{2,}/g, "\n").trim();
+      chars += words.length;
+      for (let at = 0; at < words.length; at += PDF_PART) { const bit = words.slice(at, at + PDF_PART); if (cur.length + bit.length > PDF_PART && cur) { parts.push({ text: cur, from, to: n }); cur = ""; from = n; } cur += (cur ? "\n" : "") + bit; }
+    }
+    if (cur) parts.push({ text: cur, from, to: total });
+    let page1 = null;
+    if (chars < 40) { const page = await pdf.getPage(1), vp0 = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: Math.min(2, 1400 / Math.max(vp0.width, vp0.height)) }), c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height; await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise; page1 = { media_type: "image/jpeg", data: c.toDataURL("image/jpeg", .8).split(",")[1] }; }
+    return { pages: total, parts: chars < 40 ? [] : parts, page1 };
+  };
+  window.__kgAttachPdf = p => { ipdf = p; showChip(`📄 ${p.name} · ${p.pages} pages`, true); };
+  window.__kgShrink = shrink;
+  window.__irohaAskImg = (text, image) => iSend(text, image);
   iinput.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); iSend(); } });
   [["real exam", "i have a real exam or viva i can't move. help me get ready for it without burning out."], ["drill me","drill me: one hard exam-style question on what i'm studying right now. no hints until i answer."], ["check my work", "i'm going to paste my working. check units, signs and assumptions, and tell me exactly where it breaks."], ["plan my next hour", "plan my next hour from my schedule and what's left today. concrete tasks, exact minutes."], ["school days", "look at my schedule today and give me one piece of advice on it from your school days."], ["i'm slacking", "i'm slacking. give me one task and a time limit, no sympathy."]].forEach(([l, q]) => {
     const b = document.createElement("button"); b.type = "button"; b.textContent = l; b.onclick = async () => { if (l === "drill me" && window.__kgDrill && !window.__kgOnBreak) { const note = await window.__kgDrill(); if (note) window.__kgOnce = note; } iSend(q); }; ichips.appendChild(b);
@@ -2286,10 +2312,11 @@ window.__KG_BUILTIN = {
   // The real blocks and their lengths, so neither of them makes up a duration. Not sent on a doctor's-orders break.
   function planNote() {
     if (window.__kgOnBreak) return "";
-    const iso = dayKey(), blocks = planFor(iso, !!readDesk()?.days?.[iso]?.shortDay).blocks, c = ameContext();
+    const iso = dayKey(), plan = planFor(iso, !!readDesk()?.days?.[iso]?.shortDay), blocks = plan.blocks, c = ameContext();
     const study = blocks.filter(b => b[2] === "study").map(b => `${b[1]} ${b[3]} min`).join(", ");
     const cur = blocks.find(b => b[0] === c.blockId);
-    return `\n\n[not typed by me: today's study blocks and their exact lengths: ${study}. Right now: ${cur ? `${cur[1]}, ${cur[3]} min long, ${c.minutesLeft} min left` : "no block"}. Only use these lengths; never make up a block length.]`;
+    const m = cur && /-rev$/.test(cur[0]) && plan.blocks !== AME_WEEK && plan.blocks !== AME_SUNDAY ? window.StudyPlan?.revMethod?.(plan.dow, cur[0]) : null;
+    return `\n\n[not typed by me: today's study blocks and their exact lengths: ${study}. Right now: ${cur ? `${cur[1]}, ${cur[3]} min long, ${c.minutesLeft} min left` : "no block"}.${m ? ` This revision block's method is ${m.name}: ${m.how} Coach me through it if I ask.` : ""} Only use these lengths; never make up a block length.]`;
   }
   // Replies are shown as plain text, so markdown marks are taken out instead of showing as ** and #.
   // Divider lines (---) and a dash opening a line go too.
@@ -2323,7 +2350,7 @@ window.__KG_BUILTIN = {
     // plus company mode / memories / the "not okay" note set by the company module
     if (i >= 0 && out[i].role === "user" && wantsTalk(who, String(conv[conv.length - 1]?.content || ""))) out[i].content += `\n\n[I'm bringing ${who === "iroha" ? "Kaguya" : "Iroha"} into this. She will answer right after you, so speak to her as well as to me.]`;
     if (i >= 0 && out[i].role === "user" && !window.__kgOnBreak && window.StudyPlan) out[i].content += `\n\n[not typed by me: I'm on the ${window.StudyPlan.hours()}-hour study plan.]`;
-    if (i >= 0 && out[i].role === "user") out[i].content += planNote() + sessionNote() + dreamNote();
+    if (i >= 0 && out[i].role === "user") out[i].content += planNote() + sessionNote() + dreamNote() + (window.__kgCoachNote?.() || "");
     if (i >= 0 && out[i].role === "user" && who === "iroha" && window.__kgOnce) { out[i].content += "\n\n" + window.__kgOnce; window.__kgOnce = null; }
     if (i >= 0 && out[i].role === "user") out[i].content += crossNote(who) + (window.__kgNoteExtra && window.__kgNoteExtra[who] ? "\n\n" + window.__kgNoteExtra[who] : "");
     return out;
@@ -7412,6 +7439,256 @@ window.KG_RECALL = {
   window.__kgDream = () => L.dream || '';
   const css = document.createElement('style');
   css.textContent = '.kg-dream summary{cursor:pointer;list-style:none}.kg-dream summary::-webkit-details-marker{display:none}.kg-dream-text{font-family:"Shippori Mincho B1",serif;font-size:15.5px;line-height:1.6;margin:8px 0 6px}.kg-dream-edit{min-height:30px!important;padding:2px 12px;font-size:12px}.kg-dream textarea{width:100%;box-sizing:border-box}';
+  document.head.appendChild(css);
+})();
+
+</script>
+<script id="kg-methods-script">
+/* ===== Study methods: what the learning research says works, and a one-tap way to use each one here ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab; if (!M) return;
+  // [id, name, evidence, what it is, how to do it here, button label, who, prompt]. Evidence follows Dunlosky et al. (2013) and later retrieval/spacing research.
+  const METHODS = [
+    ['recall', 'Retrieval practice (active recall)', 'Strong evidence', 'Pull the idea out of your memory instead of reading it again. The effort of remembering is what makes it stick.', 'Close the book and answer a question cold. Iroha\'s recall questions and the 20-minute revision blocks are built on this.', 'Quiz me now', 'iroha', "Quiz me with retrieval practice: ask me 5 short questions, one at a time, on what I studied most recently. Don't give the answer until I've tried. After each one, tell me if I'm right and the one thing I missed."],
+    ['spaced', 'Spaced repetition', 'Strong evidence', 'Review the same thing over growing gaps: 1 day, 2, 4, 8 and so on. Forgetting a little before each review makes the memory stronger.', 'Cards you miss in Recall come back on a spaced schedule automatically. Your logged misses come back after 1, 3, 7, 14 and 30 days.', 'Open Recall', 'go', 'study:recall'],
+    ['interleave', 'Interleaving', 'Good evidence, especially for maths and physics', 'Mix different problem types in one sitting instead of doing ten of the same kind. You learn to spot which method a problem needs.', 'After you\'ve learned a few chapters, do mixed sets instead of chapter-wise ones.', 'Give me a mixed set', 'iroha', "Give me an interleaved practice set: 5 JEE-style questions from 5 different chapters I've studied, mixed in random order, one at a time. Don't tell me the chapter. After I answer, tell me which idea it needed."],
+    ['feynman', 'Feynman technique (self-explanation)', 'Good evidence', 'Explain the idea in plain words, as if to a 12-year-old. The places where you get stuck or hide behind jargon are exactly what you don\'t understand yet.', 'Explain a topic to Kaguya. She plays a curious student and asks "why?" whenever you skip a step.', 'Explain it to Kaguya', 'kaguya', "feynman time! i'm going to explain a topic to you like you're a curious 12-year-old. ask me what the topic is first. then be my student: say \"wait, why?\" whenever i skip a step or use a word without explaining it. don't explain it for me, just ask. at the end tell me the 1-2 spots where i got vague."],
+    ['why', 'Elaborative interrogation (asking why)', 'Moderate evidence', 'For each fact or formula, ask why it\'s true, where it comes from and when it fails. Linking it to what you already know makes it easier to remember.', 'Iroha asks you why and how questions about one topic.', 'Ask me why', 'iroha', "Use elaborative interrogation on me: ask me what topic, then ask me 4 'why is this true?' or 'when does this fail?' questions about it, one at a time. Push me to connect it to things I already know. Correct me briefly after each answer."],
+    ['blurt', 'Blurting (free recall)', 'Builds on retrieval practice', 'Write down everything you remember about a topic on a blank page, from memory. Then check your notes and fill the gaps in another colour.', 'Blurt for 8 minutes, then send Iroha what you wrote. She tells you what\'s missing.', 'Blurt to Iroha', 'iroha', "Blurting: I'm going to write everything I remember about a topic from memory, without notes. Ask me the topic first. When I send my blurt, list the important points I missed or got wrong, most important first. Keep it short."],
+    ['worked', 'Worked examples, then solve one yourself', 'Good evidence for beginners', 'Study a fully solved problem step by step, then solve a similar one on your own. As you get better, rely on the examples less.', 'Ask Iroha for a worked example, then a matching problem to solve.', 'Worked example', 'iroha', "Teach me with a worked example: ask me the topic first. Then show one fully solved JEE-level problem with every step and why it's done. Then give me a similar problem to solve on my own, and check my answer."],
+    ['dual', 'Dual coding (words + pictures)', 'Moderate evidence', 'Pair words with a diagram, graph or flowchart. Two ways of holding the same idea give you two ways to recall it.', 'Draw a diagram of a topic from memory, then send Iroha a photo (📷) to check it.', 'Check my diagram', 'iroha', "Dual coding: I'm going to draw a diagram or flowchart of a topic from memory and send you a photo. Check it for mistakes and missing parts, and tell me one thing to add."],
+    ['errors', 'Learning from mistakes', 'Good evidence', 'Every wrong answer is the most useful thing you studied today. Write what went wrong and the fix, then retry it later.', 'Log misses in Practice. They come back on a spaced schedule until you get them right.', 'Open Practice', 'go', 'study:practice'],
+    ['pomodoro', 'Focused time blocks with real breaks', 'Practical, widely used', 'Work in focused blocks (25–50 minutes) with short breaks away from the screen. It keeps attention fresh and makes starting easier.', 'Start a session from the desk on Today. Stand up for 2 minutes about every 50.', 'Go to Today', 'go', 'today']
+  ];
+  const WEAK = 'Rereading, highlighting and rewatching a lecture feel productive but help much less on their own. Use them only as a first pass, then switch to something on this list.';
+  const SLEEP = 'Sleep is part of studying: memories from the day are consolidated while you sleep. Your 1:00 bedtime is study time too.';
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  M.PANELS.methods = () => {
+    const brk = !!window.__kgOnBreak;
+    return `<section class="kl-card"><p class="kl-eyebrow">STUDY METHODS</p><h2>What actually works</h2><p>These are the methods learning research supports best, strongest first. Each one has a button to try it here.${brk ? ' The buttons come back when your break ends.' : ''}</p></section>`
+      + METHODS.map(([id, name, ev, what, how, label]) => `<section class="kl-card kg-method"><h3>${esc(name)}</h3><p class="kg-ev">${esc(ev)}</p><p>${esc(what)}</p><p class="kl-small">${esc(how)}</p>${brk ? '' : `<button data-a="kgmethod" data-v="${id}">${esc(label)}</button>`}</section>`).join('')
+      + `<section class="kl-card kl-mini"><p class="kl-small"><b>Less useful on their own:</b> ${esc(WEAK)}</p><p class="kl-small">${esc(SLEEP)}</p></section>`;
+  };
+  M.SECTIONS.study.splice(4, 0, ['methods', '🧪 Methods']);
+  M.ACTIONS.kgmethod = b => {
+    const m = METHODS.find(x => x[0] === b.dataset.v); if (!m || window.__kgOnBreak) return;
+    const [, , , , , , who, what] = m;
+    if (who === 'go') { const [s, t] = what.split(':'); M.go(s, t); }
+    else if (who === 'kaguya') window.__kaguyaAsk?.(what);
+    else window.__irohaAsk?.(what);
+  };
+  window.__kgMethods = METHODS;
+  const css = document.createElement('style');
+  css.textContent = '.kg-method h3{margin-bottom:2px}.kg-method .kg-ev{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--kg-a1,#9d7bff);margin:0 0 8px}';
+  document.head.appendChild(css);
+})();
+
+</script>
+<script id="kg-coach-script">
+/* ===== Method coach: Kaguya and Iroha make revision active. Spaced reviews first, a method every revision block,
+   a check at the end, and recall pauses during lectures. Off on a doctor's break; softer on a hard day. ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab; if (!M) return;
+  const { L, save, today } = M;
+  L.coach = L.coach || {};
+  const SUBJ = { 'maths-rev': 'Maths', 'physics-rev': 'Physics', 'chem-rev': 'Chemistry', maths: 'Maths', physics: 'Physics', chem: 'Chemistry' };
+  // spaced-repetition reviews waiting today: Recall cards and logged misses
+  function due() {
+    const d = today();
+    return (L.cards || []).filter(c => c.due && c.due <= d).length + (L.attempts || []).filter(x => !x.ok && x.due && x.due <= d).length + (window.__kgLecDue?.().length || 0);
+  }
+  const dow = () => new Date(today() + 'T12:00:00').getDay();
+  // the 12-hour day's revision blocks are timed practice, so they always get a timed self-test
+  const method = id => window.StudyPlan?.hours?.() === 12
+    ? { name: 'Self-test', how: 'Timed self-test: questions under time, no notes. Check every answer and log every miss.' }
+    : window.StudyPlan?.revMethod?.(dow(), id) || { name: 'Self-test', how: 'Self-test: without notes, solve 3 questions on this lecture. Check each one and log any miss.' };
+  const soft = () => !!window.__kgGentle || ['heavy', 'hard', 'lowest'].includes(L.mood?.[today()]);
+  const seen = key => { const k = today() + ':' + key; if (L.coach[k]) return true; L.coach[k] = 1; for (const x of Object.keys(L.coach)) if (x.slice(0, 10) < today()) delete L.coach[x]; save(); return false; };
+
+  function revStart(b) {
+    if (seen('start:' + b.id)) return;
+    const m = method(b.id), n = due(), s = SUBJ[b.id] || 'This';
+    // short on purpose: the full steps are in the block's instructions and on the Methods tab
+    if (soft()) { M.K(`revision time, gently. ${n ? `${n} review${n === 1 ? '' : 's'} first, ` : ''}then ${m.name.toLowerCase()} for ${s.toLowerCase()}. small is fine today 🌙`); return; }
+    M.I(`${s} revision: ${m.name}. ${n ? `${n} spaced review${n === 1 ? '' : 's'} due first, in Study · Recall. ` : ''}No rereading. No rewatching.`, { face: 'study' });
+  }
+  function revEnd(id) {
+    if (seen('end:' + id)) return;
+    const m = method(id);
+    if (soft()) { M.K(`revision done! did ${m.name.toLowerCase()} help? tell iroha one thing you got wrong, if you want 🌙`); return; }
+    M.I(`Time. Did you actually do ${m.name}, or did you reread? Tell me one thing you got wrong. That goes in your misses.`, { face: 'stern' });
+  }
+  function lectureNudge(b) {
+    if (seen('lec:' + b.id)) return;
+    M.K(`lecture time! every 15 minutes or so, pause and say the last idea out loud without looking. that's how it sticks, not by watching 🌙`);
+  }
+
+  let last = null;
+  function tick() {
+    if (document.hidden || window.__kgOnBreak || !window.StudyPlan) return;
+    const b = M.block(), id = b?.id || null;
+    if (last && last !== id && /-rev$/.test(last)) revEnd(last);
+    if (b && b.kind === 'study') { if (/-rev$/.test(b.id)) revStart(b); else if (SUBJ[b.id]) lectureNudge(b); }
+    last = id;
+  }
+  setTimeout(tick, 8000); setInterval(tick, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(tick, 1500); });
+  // what the companions are told: the rules they hold you to
+  window.__kgCoachNote = () => {
+    if (window.__kgOnBreak) return '';
+    const n = due(), lec = window.__kgLecDue?.() || [], pend = window.__kgLecPending?.();
+    return `\n\n[not typed by me: study-method rules you hold me to. ${n ? `I have ${n} spaced-repetition review${n === 1 ? '' : 's'} due today; in a revision block those come before anything new.` : 'No spaced reviews are due today.'}${lec.length ? ` Lecture topics due for spaced revision today: ${lec.slice(0, 6).join('; ')}. Their "Revise with Iroha" buttons are on Today.` : ''}${pend ? ` I just finished a ${pend} lecture and haven't logged it yet. Ask me in detail what I studied: the chapter, the topic, the main ideas and formulas, and what confused me. Then remind me to log it on Today with the lecture PDF or photos of my notes.` : ''} If I say I'll revise by rereading, rewatching, highlighting or copying notes, stop me and switch me to a real method: active recall, blurting, Feynman, a self-test or a mixed (interleaved) set. When I ask what to do in revision, give me the method, not more reading. ${soft() ? "It's a hard day for me, so say it once, gently, and don't nag." : 'Be firm about it, but kind.'}]`;
+  };
+  window.__kgCoachTick = tick;
+  M.coachDue = due;
+})();
+
+</script>
+<script id="kg-lectures-script">
+/* ===== Lecture log: after each lecture Iroha asks what you studied, keeps the PDF or note photos on this device,
+   and brings the topic back on days 1, 3, 5 and 7, then 14, 30 and 60. ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab; if (!M) return;
+  const { L, save, today, add, chName, chapterOptions } = M;
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const GAPS = [1, 3, 5, 7, 14, 30, 60];
+  const SUBJ = { maths: 'Maths', physics: 'Physics', chem: 'Chemistry' };
+  L.lectures = Array.isArray(L.lectures) ? L.lectures : [];
+
+  /* the files stay in this browser (IndexedDB), never in the page, on GitHub or in sync */
+  const db = () => new Promise((ok, no) => { const r = indexedDB.open('kg-notes', 1); r.onupgradeneeded = () => r.result.createObjectStore('files'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+  const idb = async (mode, fn) => { const d = await db(); return new Promise((ok, no) => { const t = d.transaction('files', mode), q = fn(t.objectStore('files')); t.oncomplete = () => { d.close(); ok(q && q.result); }; t.onerror = t.onabort = () => { d.close(); no(t.error); }; }); };
+  const putFile = (id, v) => idb('readwrite', s => s.put(v, id));
+  const getFile = id => idb('readonly', s => s.get(id)).catch(() => null);
+  const delFile = id => idb('readwrite', s => s.delete(id)).catch(() => {});
+
+  const isDue = e => e.due && e.due <= today();
+  const dueList = () => L.lectures.filter(isDue).sort((a, b) => a.due.localeCompare(b.due));
+  const label = e => [e.subj, e.ch ? chName(e.ch) : '', e.topic].filter(Boolean).join(' · ');
+  const hasNotesFor = ch => !!ch && L.lectures.some(e => e.ch === ch && e.files?.length);
+  let busy = '';
+
+  /* ---------- Today: the log form after a lecture, and today's due revisions ---------- */
+  function logForm() {
+    const p = L.lecPending; if (!p || p.date !== today()) return '';
+    return `<section class="kl-card kg-lec"><p class="kl-eyebrow">✦ IROHA WANTS YOUR LECTURE</p><h3>What did you just study?</h3>
+      <form data-f="kglec" class="kl-stack">
+        <div class="kl-row"><select name="subj" aria-label="Subject">${['Maths', 'Physics', 'Chemistry'].map(s => `<option ${s === p.subj ? 'selected' : ''}>${s}</option>`).join('')}</select>
+        <select name="ch" aria-label="Chapter">${chapterOptions(p.ch || '', 'Chapter')}</select></div>
+        <input name="topic" required maxlength="120" placeholder="Topic of this lecture, e.g. Integration by parts" aria-label="Topic">
+        <textarea name="details" required minlength="60" maxlength="1500" rows="4" placeholder="In detail: the main ideas, formulas and examples, and anything that confused you." aria-label="What you studied, in detail"></textarea>
+        <label class="kl-small">Lecture PDF or photos of your notes <input type="file" name="files" accept="application/pdf,.pdf,image/*" multiple></label>
+        <p class="kl-small" data-k="hint">Iroha keeps them on this device and quizzes you from them on days 1, 3, 5, 7, 14, 30 and 60.</p>
+        <div class="kl-row"><button class="kl-primary" ${busy ? 'disabled' : ''}>${busy || 'Save lecture'}</button><button type="button" class="kl-ghost" data-a="kglecskip">Not now</button></div>
+      </form></section>`;
+  }
+  function dueCard() {
+    const list = dueList(); if (!list.length) return '';
+    return `<section class="kl-card kg-lecdue"><p class="kl-eyebrow">✦ SPACED REVISION DUE</p><h3>${list.length} lecture${list.length === 1 ? '' : 's'} to revise today</h3>
+      ${list.map(e => `<div class="kg-lecrow"><div><b>${esc(label(e))}</b><small>Day ${GAPS[e.stage] || ''} review${e.files?.length ? ` · ${e.files.length} file${e.files.length === 1 ? '' : 's'} saved` : ' · no files'}</small></div>
+        <div class="kl-row"><button class="kl-primary" data-a="kglecrev" data-v="${e.id}">Revise with Iroha</button><button data-a="kglecok" data-v="${e.id}" title="Moves it to the next gap">Stuck ✓</button><button class="kl-ghost" data-a="kglecshaky" data-v="${e.id}" title="Back tomorrow">Shaky ↺</button></div></div>`).join('')}</section>`;
+  }
+  const todayPanel = M.PANELS.today;
+  M.PANELS.today = () => { if (window.__kgOnBreak) return todayPanel(); const h = todayPanel(), c = logForm() + dueCard(); const i = h.indexOf('</section>'); return i < 0 ? c + h : h.slice(0, i + 10) + c + h.slice(i + 10); };
+
+  /* ---------- Study · Notes: every lecture you've logged ---------- */
+  M.PANELS.notes = () => {
+    const list = L.lectures.slice().sort((a, b) => b.made.localeCompare(a.made));
+    return `<section class="kl-card"><p class="kl-eyebrow">LECTURE NOTES</p><h2>Your lectures, on a spaced schedule</h2><p>Each lecture comes back after 1, 3, 5, 7, 14, 30 and 60 days. Files stay on this device.</p><button data-a="kglecnew">+ Log a lecture</button></section>`
+      + (list.length ? list.map(e => `<section class="kl-card kl-mini kg-lecrow"><div><b>${esc(label(e))}</b><small>${e.due ? `Next revision ${e.due <= today() ? 'today' : esc(e.due)}` : 'Done: all 7 revisions'} · ${e.files?.length || 0} file${e.files?.length === 1 ? '' : 's'}</small></div>
+        <div class="kl-row"><button data-a="kglecrev" data-v="${e.id}">Revise now</button><button class="kl-ghost" data-a="kglecdel" data-v="${e.id}">Delete</button></div></section>`).join('')
+        : '<section class="kl-card kl-mini"><p class="kl-small">Nothing yet. After your next lecture, Iroha will ask you to log it.</p></section>');
+  };
+  M.SECTIONS.study.splice(1, 0, ['notes', '📚 Notes']);
+
+  /* ---------- saving a lecture ---------- */
+  M.FORMS.kglec = async (v, f) => {
+    if (busy) return;
+    const details = String(v.details || '').trim();
+    if (details.length < 60) return M.I('More detail. The main ideas, the formulas, what confused you. At least a few lines.', { face: 'stern' });
+    const picked = [...(f.querySelector('input[type=file]')?.files || [])];
+    if (!picked.length && !hasNotesFor(v.ch) && !L.lecPending?.noFilesOk) {
+      L.lecPending.noFilesOk = true; save();
+      const h = f.querySelector('[data-k="hint"]'); if (h) h.textContent = 'No PDF or photos for this chapter yet. Attach them if you have them, or press Save lecture again to save without.';
+      return M.I('Attach the lecture PDF or photos of your notes. I quiz you from them later. If you really have none, press save again.', { face: 'stern' });
+    }
+    const e = { id: 'lec' + Date.now().toString(36), subj: v.subj, ch: v.ch || '', topic: String(v.topic || '').trim().slice(0, 120), details: details.slice(0, 1500), made: today(), stage: 0, due: add(today(), GAPS[0]), files: [], reviews: 0 };
+    busy = 'Saving…'; M.render();
+    try {
+      for (const file of picked.slice(0, 12)) {
+        const id = e.id + '-' + e.files.length;
+        if (/pdf/i.test(file.type) || /\.pdf$/i.test(file.name)) {
+          if (file.size > 40 * 1024 * 1024) { M.I(`${file.name} is over 40 MB. I skipped it.`, { face: 'stern' }); continue; }
+          busy = 'Reading ' + file.name + '…'; M.render();
+          const p = await window.__kgPdfParts(file);
+          await putFile(id, { kind: 'pdf', name: file.name, pages: p.pages, parts: p.parts, page1: p.page1, blob: file });
+        } else {
+          await putFile(id, { kind: 'img', name: file.name, img: await window.__kgShrink(file) });
+        }
+        e.files.push(id);
+      }
+    } catch (err) { M.I(err && err.message === 'offline' ? 'I need the internet to read a PDF. The lecture is saved; add the PDF later from Study · Notes.' : "I couldn't read one of those files. The rest is saved.", { face: 'stern' }); }
+    busy = '';
+    L.lectures.push(e); L.lecPending = null; save(); M.render();
+    M.I(`Logged: ${label(e)}. First revision tomorrow, then days 3, 5, 7, 14, 30 and 60.${e.files.length ? ` ${e.files.length} file${e.files.length === 1 ? '' : 's'} kept.` : ''}`, { face: 'approve' });
+  };
+
+  /* ---------- revising: Iroha quizzes you from your own notes ---------- */
+  async function revise(id) {
+    const e = L.lectures.find(x => x.id === id); if (!e) return;
+    const files = (await Promise.all((e.files || []).map(getFile))).filter(Boolean);
+    const pdfs = files.filter(x => x.kind === 'pdf' && x.parts?.length), imgs = files.filter(x => x.kind === 'img').map(x => x.img).concat(files.filter(x => x.kind === 'pdf' && x.page1).map(x => x.page1));
+    const day = GAPS[e.stage] || 'extra';
+    window.__kgOnce = `[spaced revision, not typed by me: day-${day} review of ${label(e)}, logged on ${e.made}. What I wrote right after the lecture: "${e.details}". Quiz me on it: 5 questions, one at a time, hardest ideas first, from my notes${pdfs.length ? ' (the PDF parts above)' : imgs.length ? ' (the attached photo)' : ''} and what I wrote. Don't give an answer until I've tried. At the end, tell me whether to mark it Stuck or Shaky.]`;
+    if (pdfs.length) window.__kgAttachPdf({ name: e.topic || 'lecture notes', pages: pdfs.reduce((n, p) => n + p.pages, 0), parts: pdfs.flatMap(p => p.parts) });
+    const ask = `Revision time: ${label(e)}. Quiz me from my saved notes.`;
+    if (!pdfs.length && imgs.length) window.__irohaAskImg?.(ask, imgs[0]); else window.__irohaAsk?.(ask);
+    e.lastRev = today(); save();
+  }
+  function grade(id, ok) {
+    const e = L.lectures.find(x => x.id === id); if (!e) return;
+    e.reviews = (e.reviews || 0) + 1;
+    if (ok) { e.stage++; e.due = e.stage < GAPS.length ? add(today(), GAPS[e.stage] - GAPS[e.stage - 1]) : ''; }
+    else e.due = add(today(), 1);
+    save(); M.render();
+    M.I(ok ? (e.due ? `Good. ${label(e)} comes back on day ${GAPS[e.stage]}.` : `${label(e)}: all seven revisions done. It's yours now.`) : 'Shaky means tomorrow. Read the weak part once tonight.', { face: ok ? 'approve' : 'stern' });
+  }
+  Object.assign(M.ACTIONS, {
+    kglecrev: b => revise(b.dataset.v),
+    kglecok: b => grade(b.dataset.v, true),
+    kglecshaky: b => grade(b.dataset.v, false),
+    kglecskip: () => { L.lecPending = null; save(); M.render(); },
+    kglecnew: () => { L.lecPending = { subj: 'Maths', date: today() }; save(); M.go('today'); },
+    kglecdel: b => { const e = L.lectures.find(x => x.id === b.dataset.v); if (!e || !confirm(`Delete ${label(e)} and its saved files?`)) return; (e.files || []).forEach(delFile); L.lectures = L.lectures.filter(x => x !== e); save(); M.render(); }
+  });
+
+  /* ---------- after each lecture block, Iroha asks ---------- */
+  let last = null;
+  function tick() {
+    if (document.hidden || window.__kgOnBreak) return;
+    const id = M.block()?.id || null;
+    if (last && last !== id && SUBJ[last]) lectureEnd(last);
+    last = id;
+  }
+  function lectureEnd(id) {
+    const k = today() + ':' + id; L.lecAsked = L.lecAsked || {}; if (L.lecAsked[k]) return;
+    for (const x of Object.keys(L.lecAsked)) if (x.slice(0, 10) < today()) delete L.lecAsked[x];
+    L.lecAsked[k] = 1; L.lecPending = { subj: SUBJ[id], date: today() }; save(); M.render();
+    const soft = !!window.__kgGentle || ['heavy', 'hard', 'lowest'].includes(L.mood?.[today()]);
+    if (soft) M.K(`${SUBJ[id].toLowerCase()} lecture done! when you can, jot what it was about on Today, with the pdf or a photo of your notes. iroha will bring it back for revision 🌙`);
+    else M.I(`${SUBJ[id]} lecture's over. Log it on Today, in detail: chapter, topic, the main ideas and what confused you. Attach the lecture PDF or photos of your notes if this chapter has none yet. I'll bring it back on days 1, 3, 5 and 7.`, { face: 'study' });
+  }
+  setTimeout(tick, 9000); setInterval(tick, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(tick, 1500); });
+
+  window.__kgLecDue = () => window.__kgOnBreak ? [] : dueList().map(label);
+  window.__kgLecPending = () => !window.__kgOnBreak && L.lecPending?.date === today() ? L.lecPending.subj : '';
+  window.__kgLectureTick = tick;
+  const css = document.createElement('style');
+  css.textContent = '.kg-lecrow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(196,182,255,.12)}.kg-lecdue .kg-lecrow:first-of-type{border-top:0}.kg-lecrow small{display:block;opacity:.75;margin-top:2px}.kg-lec select{flex:1;min-width:0}.kg-lec input[type=file]{display:block;margin-top:6px;max-width:100%}';
   document.head.appendChild(css);
 })();
 
