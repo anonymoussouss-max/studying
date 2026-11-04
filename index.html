@@ -2281,6 +2281,8 @@ window.__KG_BUILTIN = {
     return `\n\n[not typed by me: you can see my screen's session timer. I'm in a timed study session right now: ${what}. ${sessionMins(a)} of ${Math.round(a.targetMs / 60000)} minutes done, ${state}. Session minutes go into my log when I end the session, so an empty log during a session is normal, not a missed block.${window.__kgWatch?.on() ? " Iroha's screen watch is on." : ""}]`;
   }
   window.__kgSession = activeSession;
+  // the dream from Today's "Why I'm doing this" card: a reason to hold on to on hard days, never a push to study more
+  const dreamNote = () => { const d = window.__kgDream?.(); return d ? `\n\n[not typed by me: my long-term dream, in my words: "${d.slice(0, 400)}". I'm scared burnout could make me give it up. Bring it up only when I'm low, doubting myself or burnt out, gently and briefly, as a reason to rest and keep going steadily. Never use it to push me to study more.]` : ""; };
   // The real blocks and their lengths, so neither of them makes up a duration. Not sent on a doctor's-orders break.
   function planNote() {
     if (window.__kgOnBreak) return "";
@@ -2321,7 +2323,7 @@ window.__KG_BUILTIN = {
     // plus company mode / memories / the "not okay" note set by the company module
     if (i >= 0 && out[i].role === "user" && wantsTalk(who, String(conv[conv.length - 1]?.content || ""))) out[i].content += `\n\n[I'm bringing ${who === "iroha" ? "Kaguya" : "Iroha"} into this. She will answer right after you, so speak to her as well as to me.]`;
     if (i >= 0 && out[i].role === "user" && !window.__kgOnBreak && window.StudyPlan) out[i].content += `\n\n[not typed by me: I'm on the ${window.StudyPlan.hours()}-hour study plan.]`;
-    if (i >= 0 && out[i].role === "user") out[i].content += planNote() + sessionNote();
+    if (i >= 0 && out[i].role === "user") out[i].content += planNote() + sessionNote() + dreamNote();
     if (i >= 0 && out[i].role === "user" && who === "iroha" && window.__kgOnce) { out[i].content += "\n\n" + window.__kgOnce; window.__kgOnce = null; }
     if (i >= 0 && out[i].role === "user") out[i].content += crossNote(who) + (window.__kgNoteExtra && window.__kgNoteExtra[who] ? "\n\n" + window.__kgNoteExtra[who] : "");
     return out;
@@ -7381,6 +7383,36 @@ window.KG_RECALL = {
   M.ACTIONS.kgring = () => L.ringName ? start() : pick();
   M.ACTIONS.kgringpick = pick;
   window.__kgRing = { start, stop, getClip, putClip };
+})();
+
+</script>
+<script id="kg-dream-script">
+/* ===== Why I'm doing this: your dream, kept on Today. Small on normal days, open on hard ones. ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab; if (!M) return;
+  const { L, save, today } = M;
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const DEFAULT = "After ISRO, I'll open a free school with no entrance exam, only an interview to find people who love to learn. Money should never stop anyone from working for their dream.";
+  if (typeof L.dream !== 'string') { L.dream = DEFAULT; save(); }
+  let editing = false;
+  const low = () => ['heavy', 'hard', 'lowest'].includes(L.mood[today()]);
+  const card = () => {
+    if (!L.dream && !editing) return '';
+    const body = editing
+      ? `<form data-f="kgdream" class="kl-stack"><textarea name="t" rows="3" maxlength="400" aria-label="Your dream">${esc(L.dream)}</textarea><div class="kl-row"><button class="kl-primary">Save</button><button type="button" class="kl-ghost" data-a="kgdreamx">Cancel</button></div></form>`
+      : `<p class="kg-dream-text">${esc(L.dream)}</p>${low() ? '<p class="kl-small">Burnout isn\'t giving up. Resting is how you get there. Steady beats maximum.</p>' : ''}<button class="kl-ghost kg-dream-edit" data-a="kgdreamedit">Edit</button>`;
+    return `<details class="kl-card kl-mini kg-dream" ${low() || editing ? 'open' : ''}><summary class="kl-eyebrow">🌙 WHY I'M DOING THIS</summary>${body}</details>`;
+  };
+  const todayPanel = M.PANELS.today;
+  M.PANELS.today = () => { const h = todayPanel(), c = card(); const i = h.indexOf('</section>'); return i < 0 ? c + h : h.slice(0, i + 10) + c + h.slice(i + 10); };
+  M.ACTIONS.kgdreamedit = () => { editing = true; M.render(); setTimeout(() => document.querySelector('.kg-dream textarea')?.focus(), 60); };
+  M.ACTIONS.kgdreamx = () => { editing = false; M.render(); };
+  M.FORMS.kgdream = v => { L.dream = String(v.t || '').trim().slice(0, 400); editing = false; save(); M.render(); };
+  window.__kgDream = () => L.dream || '';
+  const css = document.createElement('style');
+  css.textContent = '.kg-dream summary{cursor:pointer;list-style:none}.kg-dream summary::-webkit-details-marker{display:none}.kg-dream-text{font-family:"Shippori Mincho B1",serif;font-size:15.5px;line-height:1.6;margin:8px 0 6px}.kg-dream-edit{min-height:30px!important;padding:2px 12px;font-size:12px}.kg-dream textarea{width:100%;box-sizing:border-box}';
+  document.head.appendChild(css);
 })();
 
 </script>
