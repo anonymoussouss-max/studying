@@ -1320,7 +1320,7 @@ window.__KG_BUILTIN = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: ctrl.signal,
-        body: JSON.stringify(Object.assign({ messages, context, character: who }, image ? { image } : {}, long ? { long: true } : {}))
+        body: JSON.stringify(Object.assign({ messages, context, character: who }, image ? { image } : {}, long ? { long: true } : {}, image && window.__kgBulk ? { bulk: true } : {}))
       });
       if (!res.ok) {
         let bodyText = "";
@@ -2129,6 +2129,25 @@ window.__KG_BUILTIN = {
   };
   // the last thing in her chat, so screen watch knows whether her question is still unanswered
   window.__kgIrohaLast = () => String(iconv[iconv.length - 1]?.content || "");
+  // every page of a PDF as a picture, for scanned notes that have no text inside
+  window.__kgPdfPageImages = async (blob, max = 30) => {
+    const pdf = await (await loadPdfLib()).getDocument({ data: await blob.arrayBuffer() }).promise, out = [];
+    for (let n = 1; n <= Math.min(pdf.numPages, max); n++) {
+      const page = await pdf.getPage(n), vp0 = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: Math.min(2, 1400 / Math.max(vp0.width, vp0.height)) }), c = document.createElement("canvas");
+      c.width = vp.width; c.height = vp.height; await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+      out.push({ media_type: "image/jpeg", data: c.toDataURL("image/jpeg", .75).split(",")[1] });
+    }
+    return { images: out, total: pdf.numPages };
+  };
+  // open a PDF once and render pages one at a time (long scanned notes would not fit in memory all at once)
+  window.__kgPdfOpen = async blob => {
+    const pdf = await (await loadPdfLib()).getDocument({ data: await blob.arrayBuffer() }).promise;
+    return { total: pdf.numPages, render: async n => {
+      const page = await pdf.getPage(n), vp0 = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: Math.min(2, 1400 / Math.max(vp0.width, vp0.height)) }), c = document.createElement("canvas");
+      c.width = vp.width; c.height = vp.height; await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+      const img = { media_type: "image/jpeg", data: c.toDataURL("image/jpeg", .75).split(",")[1] }; c.width = c.height = 0; page.cleanup(); return img;
+    } };
+  };
   window.__kgAttachPdf = p => { ipdf = p; showChip(`📄 ${p.name} · ${p.pages} pages`, true); };
   window.__kgShrink = shrink;
   window.__irohaAskImg = (text, image) => iSend(text, image);
@@ -7699,7 +7718,7 @@ window.KG_RECALL = {
   function dueCard() {
     const list = dueList(); if (!list.length) return '';
     return `<section class="kl-card kg-lecdue"><p class="kl-eyebrow">✦ SPACED REVISION DUE</p><h3>${list.length} lecture${list.length === 1 ? '' : 's'} to revise today</h3>
-      ${list.map(e => `<div class="kg-lecrow"><div><b>${esc(label(e))}</b><small>Day ${GAPS[e.stage] || ''} review${e.files?.length ? ` · ${e.files.length} file${e.files.length === 1 ? '' : 's'} saved` : ' · no files'}</small></div>
+      ${list.map(e => `<div class="kg-lecrow"><div><b>${esc(label(e))}</b><small>Day ${GAPS[e.stage] || ''} review${e.files?.length ? ` · ${e.files.length} file${e.files.length === 1 ? '' : 's'} saved` : ' · no files'}${progressText(e)}</small></div>
         <div class="kl-row"><button class="kl-primary" data-a="kglecrev" data-v="${e.id}">Revise with Iroha</button><button data-a="kglecok" data-v="${e.id}" title="Moves it to the next gap">Stuck ✓</button><button class="kl-ghost" data-a="kglecshaky" data-v="${e.id}" title="Back tomorrow">Shaky ↺</button></div></div>`).join('')}</section>`;
   }
   const todayPanel = M.PANELS.today;
@@ -7715,7 +7734,7 @@ window.KG_RECALL = {
         <p class="kl-small">${(L.lecLens[s] || []).length >= 3 ? `Median ${hm(median(L.lecLens[s]))} from ${Math.min(15, L.lecLens[s].length)} lectures → ${P.len[ids[s]]}-minute lecture block, ${P.rev[ids[s]]}-minute revision` : 'Needs 3 lectures before it changes the plan.'}</p>`).join('')}
         <button>Save lengths</button></form></section>`;
     return `<section class="kl-card"><p class="kl-eyebrow">LECTURE NOTES</p><h2>Your lectures, on a spaced schedule</h2><p>Each lecture comes back after 1, 3, 5, 7, 14, 30 and 60 days. Files stay on this device.</p><button data-a="kglecnew">+ Log a lecture</button></section>` + lensCard
-      + (list.length ? list.map(e => `<section class="kl-card kl-mini kg-lecrow"><div><b>${esc(label(e))}</b><small>${e.due ? `Next revision ${e.due <= today() ? 'today' : esc(e.due)}` : 'Done: all 7 revisions'} · ${e.files?.length || 0} file${e.files?.length === 1 ? '' : 's'}</small></div>
+      + (list.length ? list.map(e => `<section class="kl-card kl-mini kg-lecrow"><div><b>${esc(label(e))}</b><small>${e.due ? `Next revision ${e.due <= today() ? 'today' : esc(e.due)}` : 'Done: all 7 revisions'} · ${e.files?.length || 0} file${e.files?.length === 1 ? '' : 's'}${progressText(e)}</small></div>
         <div class="kl-row"><button data-a="kglecrev" data-v="${e.id}">Revise now</button><button class="kl-ghost" data-a="kglecdel" data-v="${e.id}">Delete</button></div></section>`).join('')
         : '<section class="kl-card kl-mini"><p class="kl-small">Nothing yet. After your next lecture, Iroha will ask you to log it.</p></section>');
   };
@@ -7752,7 +7771,56 @@ window.KG_RECALL = {
     addLen(e.subj, Number(v.mins));
     L.lectures.push(e); L.lecPending = null; save(); refreshPlan(); M.render();
     M.I(`Logged: ${label(e)}. First revision tomorrow, then days 3, 5, 7, 14, 30 and 60.${e.files.length ? ` ${e.files.length} file${e.files.length === 1 ? '' : 's'} kept.` : ''}`, { face: 'approve' });
+    // scanned pages and photos are read into text now, in the background, so tomorrow's revision is ready
+    setTimeout(() => readNotes(e).catch(() => {}), 1500);
   };
+
+  /* ---------- reading notes: pictures (scanned PDF pages, photos) become text Iroha can quiz from ---------- */
+  // Up to 100 pages, two at a time. Each page becomes a few lines of key content; they're grouped into parts for the quiz,
+  // plus a one-line-per-page outline. Progress is saved every few pages, so a reload picks up where it stopped.
+  const MAX_PAGES = 100, POOL = 2, reading = {}, progress = {};
+  const PROMPT = '[note transcription, not typed by me] This image is one page of my own lecture notes. Write its key content as plain text in at most 8 short lines: the heading, definitions, formulas in plain-text maths, and the key step of each worked example. No commentary, no greeting, no character voice. If the page is blank or only a title, write just the title.';
+  // bulk: the backend can send these to free vision instead of paid credits
+  const ask = async img => { window.__kgBulk = (window.__kgBulk || 0) + 1; try { for (let i = 0; i < 2; i++) { const r = await window.__kgAsk?.('iroha', PROMPT, img); if (r && r.reply) return r.reply.trim(); await new Promise(ok => setTimeout(ok, 8000)); } return ''; } finally { window.__kgBulk--; } };
+  // a file needs reading if it's pictures without text: a scanned PDF, or a photo
+  const needsRead = rec => rec && !rec.read && (rec.kind === 'img' || (rec.kind === 'pdf' && !(rec.parts?.length && !rec.pageNotes) && rec.blob));
+  const firstLine = s => String(s || '').split('\n').map(x => x.trim()).find(Boolean) || '';
+  function group(notes) {
+    const parts = []; let cur = '', from = 1;
+    notes.forEach((n, i) => { if (!n) return; const bit = `[page ${i + 1}] ${n}`; if (cur && cur.length + bit.length > 3400) { parts.push({ text: cur, from, to: i }); cur = ''; } if (!cur) from = i + 1; cur += (cur ? '\n' : '') + bit.slice(0, 3400); });
+    if (cur) parts.push({ text: cur, from, to: notes.length });
+    return parts;
+  }
+  async function readNotes(e) {
+    if (reading[e.id]) return reading[e.id];
+    return (reading[e.id] = (async () => {
+      const recs = []; for (const id of e.files || []) { const rec = await getFile(id); if (needsRead(rec)) recs.push([id, rec]); }
+      let total = 0; const docs = [];
+      for (const [id, rec] of recs) { if (rec.kind === 'img') { docs.push({ id, rec, total: 1, render: async () => rec.img }); total += 1; } else { try { const d = await window.__kgPdfOpen(rec.blob), n = Math.min(MAX_PAGES, d.total); docs.push({ id, rec, total: n, render: d.render }); total += n; } catch (err) { /* offline or damaged: try again next time */ } } }
+      let done = docs.reduce((s, d) => s + (d.rec.pageNotes || []).filter(x => x != null).length, 0);
+      progress[e.id] = { done, total }; M.softRender?.();
+      for (const d of docs) {
+        const notes = d.rec.pageNotes || (d.rec.pageNotes = []), todo = [];
+        for (let i = 0; i < d.total; i++) if (notes[i] == null) todo.push(i);
+        let since = 0;
+        const worker = async () => { while (todo.length) { const i = todo.shift(); notes[i] = await ask(await d.render(i + 1)); progress[e.id].done = ++done; if (++since % 4 === 0) { await putFile(d.id, d.rec); M.softRender?.(); } } };
+        await Promise.all(Array.from({ length: POOL }, worker));
+        Object.assign(d.rec, { parts: group(notes), outline: notes.map((n, i) => n ? `p${i + 1}: ${firstLine(n).slice(0, 70)}` : '').filter(Boolean).join('\n'), pages: d.total, read: true });
+        await putFile(d.id, d.rec);
+      }
+      delete progress[e.id]; delete reading[e.id]; M.softRender?.();
+    })());
+  }
+  // lectures due soon with unread notes carry on reading in the background (one at a time), so a reload never loses progress
+  async function resume() {
+    if (window.__kgOnBreak) return;
+    for (const e of L.lectures.filter(x => x.due && x.due <= add(today(), 2))) {
+      const recs = (await Promise.all((e.files || []).map(getFile))).filter(Boolean);
+      if (recs.some(needsRead)) { await readNotes(e).catch(() => {}); }
+    }
+  }
+  setTimeout(resume, 20000);
+  const progressText = e => progress[e.id] ? ` · reading notes: ${progress[e.id].done} of ${progress[e.id].total} pages` : '';
 
   // lengths typed by hand on Study · Notes, e.g. "150, 2h 30m, 165"
   M.FORMS.kglens = v => {
@@ -7767,11 +7835,17 @@ window.KG_RECALL = {
   /* ---------- revising: Iroha quizzes you from your own notes ---------- */
   async function revise(id) {
     const e = L.lectures.find(x => x.id === id); if (!e) return;
-    const files = (await Promise.all((e.files || []).map(getFile))).filter(Boolean);
-    const pdfs = files.filter(x => x.kind === 'pdf' && x.parts?.length), imgs = files.filter(x => x.kind === 'img').map(x => x.img).concat(files.filter(x => x.kind === 'pdf' && x.page1).map(x => x.page1));
-    const day = GAPS[e.stage] || 'extra';
-    window.__kgOnce = `[spaced revision, not typed by me: day-${day} review of ${label(e)}, logged on ${e.made}. What I wrote right after the lecture: "${e.details}". Quiz me on it: 5 questions, one at a time, hardest ideas first, from my notes${pdfs.length ? ' (the PDF parts above)' : imgs.length ? ' (the attached photo)' : ''} and what I wrote. Don't give an answer until I've tried. At the end, tell me whether to mark it Stuck or Shaky.]`;
-    if (pdfs.length) window.__kgAttachPdf({ name: e.topic || 'lecture notes', pages: pdfs.reduce((n, p) => n + p.pages, 0), parts: pdfs.flatMap(p => p.parts) });
+    // notes saved before this, or still being read: read them first, so the quiz covers every page
+    let files = (await Promise.all((e.files || []).map(getFile))).filter(Boolean);
+    if (files.some(needsRead) || reading[e.id]) {
+      const pr = progress[e.id]; M.I(`Reading your notes first, every page, so the quiz covers all of it.${pr ? ` ${pr.done} of ${pr.total} pages done.` : ''} Long notes take a few minutes; I'll start the quiz as soon as it's ready.`, { face: 'study' });
+      await readNotes(e);
+      files = (await Promise.all((e.files || []).map(getFile))).filter(Boolean);
+    }
+    const pdfs = files.filter(x => x.parts?.length), imgs = files.filter(x => !x.parts?.length).map(x => x.img || x.page1).filter(Boolean);
+    const day = GAPS[e.stage] || 'extra', outline = files.map(x => x.outline).filter(Boolean).join('\n').slice(0, 5000);
+    window.__kgOnce = `[spaced revision, not typed by me: day-${day} review of ${label(e)}, logged on ${e.made}. What I wrote right after the lecture: "${e.details}". Quiz me on it: 5 questions, one at a time, hardest ideas first, from my notes${pdfs.length ? ' (the note pages above, read from my PDF or photos)' : imgs.length ? ' (the attached photo)' : ''} and what I wrote. Spread the questions across the whole lecture, not just the first page.${outline ? ` Outline of the whole lecture, one line per page, so you can pick topics from all of it:\n${outline}` : ''} Don't give an answer until I've tried. At the end, tell me whether to mark it Stuck or Shaky.]`;
+    if (pdfs.length) window.__kgAttachPdf({ name: e.topic || 'lecture notes', pages: pdfs.reduce((n, p) => n + (p.pages || p.parts.length), 0), parts: pdfs.flatMap(p => p.parts) });
     const ask = `Revision time: ${label(e)}. Quiz me from my saved notes.`;
     if (!pdfs.length && imgs.length) window.__irohaAskImg?.(ask, imgs[0]); else window.__irohaAsk?.(ask);
     e.lastRev = today(); save();
