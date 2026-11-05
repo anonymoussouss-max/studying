@@ -1320,7 +1320,7 @@ window.__KG_BUILTIN = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: ctrl.signal,
-        body: JSON.stringify(Object.assign({ messages, context, character: who }, image ? { image } : {}, long ? { long: true } : {}, image && window.__kgBulk ? { bulk: true } : {}))
+        body: JSON.stringify(Object.assign({ messages, context, character: who }, image ? (Array.isArray(image) ? { images: image } : { image }) : {}, long ? { long: true } : {}, image && window.__kgBulk ? { bulk: true } : {}))
       });
       if (!res.ok) {
         let bodyText = "";
@@ -7776,12 +7776,20 @@ window.KG_RECALL = {
   };
 
   /* ---------- reading notes: pictures (scanned PDF pages, photos) become text Iroha can quiz from ---------- */
-  // Up to 100 pages, two at a time. Each page becomes a few lines of key content; they're grouped into parts for the quiz,
+  // Up to 100 pages, 3 per request (the most Groq's vision model takes) and 2 requests at a time. Each page becomes a few lines of key content; they're grouped into parts for the quiz,
   // plus a one-line-per-page outline. Progress is saved every few pages, so a reload picks up where it stopped.
-  const MAX_PAGES = 100, POOL = 2, reading = {}, progress = {};
+  const MAX_PAGES = 100, POOL = 2, BATCH = 3, reading = {}, progress = {};
   const PROMPT = '[note transcription, not typed by me] This image is one page of my own lecture notes. Write its key content as plain text in at most 8 short lines: the heading, definitions, formulas in plain-text maths, and the key step of each worked example. No commentary, no greeting, no character voice. If the page is blank or only a title, write just the title.';
   // bulk: the backend can send these to free vision instead of paid credits
-  const ask = async img => { window.__kgBulk = (window.__kgBulk || 0) + 1; try { for (let i = 0; i < 2; i++) { const r = await window.__kgAsk?.('iroha', PROMPT, img); if (r && r.reply) return r.reply.trim(); await new Promise(ok => setTimeout(ok, 8000)); } return ''; } finally { window.__kgBulk--; } };
+  const ask = async (img, text = PROMPT) => { window.__kgBulk = (window.__kgBulk || 0) + 1; try { for (let i = 0; i < 2; i++) { const r = await window.__kgAsk?.('iroha', text, img); if (r && r.reply) return r.reply.trim(); await new Promise(ok => setTimeout(ok, 8000)); } return ''; } finally { window.__kgBulk--; } };
+  // several pages in one request: the reply is split on "=== PAGE n ===" markers; a page missing from it gets an empty slot
+  async function askPages(imgs, first) {
+    if (imgs.length === 1) return [await ask(imgs[0])];
+    const reply = await ask(imgs, `[note transcription, not typed by me] These ${imgs.length} images are pages ${first}-${first + imgs.length - 1} of my own lecture notes, in order. For EACH page write a line "=== PAGE n ===" (n is its page number), then its key content as plain text in at most 8 short lines: the heading, definitions, formulas in plain-text maths, and the key step of each worked example. No commentary, no greeting, no character voice. A blank or title-only page gets just its title.`);
+    const out = imgs.map(() => null), re = /===\s*PAGE\s*(\d+)\s*===/gi, hits = [...reply.matchAll(re)];
+    hits.forEach((m, k) => { const n = +m[1] - first; if (n >= 0 && n < imgs.length) out[n] = reply.slice(m.index + m[0].length, k + 1 < hits.length ? hits[k + 1].index : undefined).trim(); });
+    return out;
+  }
   // a file needs reading if it's pictures without text: a scanned PDF, or a photo
   // a scanned PDF read by the earlier 30-page version is marked read but has no per-page notes: read it again in full
   const needsRead = rec => rec && ((!rec.read && (rec.kind === 'img' || (rec.kind === 'pdf' && !(rec.parts?.length && !rec.pageNotes) && rec.blob))) || (rec.kind === 'pdf' && rec.read && !rec.pageNotes && rec.blob));
@@ -7804,7 +7812,15 @@ window.KG_RECALL = {
         const notes = d.rec.pageNotes || (d.rec.pageNotes = []), todo = [];
         for (let i = 0; i < d.total; i++) if (notes[i] == null) todo.push(i);
         let since = 0;
-        const worker = async () => { while (todo.length) { const i = todo.shift(); notes[i] = await ask(await d.render(i + 1)); progress[e.id].done = ++done; if (++since % 4 === 0) { await putFile(d.id, d.rec); M.softRender?.(); } } };
+        // take up to 3 consecutive unread pages per request; anything the reply missed is read again on its own
+        const take = () => { const b = [todo.shift()]; while (b.length < BATCH && todo.length && todo[0] === b[b.length - 1] + 1) b.push(todo.shift()); return b; };
+        const worker = async () => { while (todo.length) {
+          const b = take(), imgs = []; for (const i of b) imgs.push(await d.render(i + 1));
+          const got = await askPages(imgs, b[0] + 1);
+          for (let k = 0; k < b.length; k++) notes[b[k]] = got[k] != null ? got[k] : await ask(imgs[k]);
+          done += b.length; progress[e.id].done = done; since += b.length;
+          if (since >= 6) { since = 0; await putFile(d.id, d.rec); M.softRender?.(); }
+        } };
         await Promise.all(Array.from({ length: POOL }, worker));
         Object.assign(d.rec, { parts: group(notes), outline: notes.map((n, i) => n ? `p${i + 1}: ${firstLine(n).slice(0, 70)}` : '').filter(Boolean).join('\n'), pages: d.total, read: true });
         await putFile(d.id, d.rec);
