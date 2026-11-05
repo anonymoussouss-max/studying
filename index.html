@@ -7783,7 +7783,8 @@ window.KG_RECALL = {
   // bulk: the backend can send these to free vision instead of paid credits
   const ask = async img => { window.__kgBulk = (window.__kgBulk || 0) + 1; try { for (let i = 0; i < 2; i++) { const r = await window.__kgAsk?.('iroha', PROMPT, img); if (r && r.reply) return r.reply.trim(); await new Promise(ok => setTimeout(ok, 8000)); } return ''; } finally { window.__kgBulk--; } };
   // a file needs reading if it's pictures without text: a scanned PDF, or a photo
-  const needsRead = rec => rec && !rec.read && (rec.kind === 'img' || (rec.kind === 'pdf' && !(rec.parts?.length && !rec.pageNotes) && rec.blob));
+  // a scanned PDF read by the earlier 30-page version is marked read but has no per-page notes: read it again in full
+  const needsRead = rec => rec && ((!rec.read && (rec.kind === 'img' || (rec.kind === 'pdf' && !(rec.parts?.length && !rec.pageNotes) && rec.blob))) || (rec.kind === 'pdf' && rec.read && !rec.pageNotes && rec.blob));
   const firstLine = s => String(s || '').split('\n').map(x => x.trim()).find(Boolean) || '';
   function group(notes) {
     const parts = []; let cur = '', from = 1;
