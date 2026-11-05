@@ -7253,6 +7253,8 @@ window.KG_RECALL = {
     const on = onBreak(), was = !!window.__kgOnBreak;
     window.__kgOnBreak = on; window.__kgBreakUntil = on ? pretty(L.breakUntil) : '';
     document.body.classList.toggle('kg-break', on);
+    // a session still running keeps the desk visible on a break, so it can be finished or left (otherwise Today goes blank)
+    try { document.body.classList.toggle('kg-session', !!JSON.parse(localStorage.getItem('ame-habit-v1') || 'null')?.active); } catch (e) {}
     if (on) markRest();
     M.HOOKS.notes?.();
     if (was !== on) M.render();
@@ -7353,11 +7355,11 @@ window.KG_RECALL = {
   });
 
   const css = document.createElement('style');
-  css.textContent = '.kl-breakcard{border-color:#8fb7ff!important;background:linear-gradient(160deg,#1c2146,#17142f)!important}.kl-bday{border-color:#ff9cc8!important;background:linear-gradient(160deg,#3a1d44,#17142f)!important}.kl-pre{white-space:pre-wrap}body.kg-break #moon-lab [data-a="hard"],body.kg-break #moon-lab [data-a="watch"]{display:none}body.kg-break .kl-mood-opts small{display:none}body.kg-break.kg-today #habit-desk{display:none!important}';
+  css.textContent = '.kl-breakcard{border-color:#8fb7ff!important;background:linear-gradient(160deg,#1c2146,#17142f)!important}.kl-bday{border-color:#ff9cc8!important;background:linear-gradient(160deg,#3a1d44,#17142f)!important}.kl-pre{white-space:pre-wrap}body.kg-break #moon-lab [data-a="hard"],body.kg-break #moon-lab [data-a="watch"]{display:none}body.kg-break .kl-mood-opts small{display:none}body.kg-break.kg-today:not(.habit-shh):not(.kg-session) #habit-desk{display:none!important}';
   document.head.appendChild(css);
   window.addEventListener('moonlab:render', e => document.body.classList.toggle('kg-today', e.detail.section === 'today'));
   sync();
-  setInterval(sync, 60000); setTimeout(sync, 1500); setTimeout(sync, 5000);
+  setInterval(sync, 60000); setTimeout(sync, 1500); setTimeout(sync, 5000); window.addEventListener('habit:change', () => setTimeout(sync, 50));
   setTimeout(bdayHello, 3500); setInterval(bdayHello, 60000);
   setTimeout(backCheck, 3000);
   M.render();
