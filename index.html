@@ -2143,11 +2143,14 @@ window.__KG_BUILTIN = {
   window.__kgPdfOpen = async blob => {
     const pdf = await (await loadPdfLib()).getDocument({ data: await blob.arrayBuffer() }).promise;
     return { total: pdf.numPages, render: async n => {
-      const page = await pdf.getPage(n), vp0 = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: Math.min(2, 1400 / Math.max(vp0.width, vp0.height)) }), c = document.createElement("canvas");
+      // 1100 px on the long side: notes stay readable, and paid vision costs about half of 1400 px
+      const page = await pdf.getPage(n), vp0 = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: Math.min(2, 1100 / Math.max(vp0.width, vp0.height)) }), c = document.createElement("canvas");
       c.width = vp.width; c.height = vp.height; await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
       const img = { media_type: "image/jpeg", data: c.toDataURL("image/jpeg", .75).split(",")[1] }; c.width = c.height = 0; page.cleanup(); return img;
     } };
   };
+  // reading note pages: just the instruction and the pictures, no character note (the backend uses a short brief for these)
+  window.__kgAskBare = (text, image) => postChat([{ role: "user", content: text }], {}, "iroha", 30000, image);
   window.__kgAttachPdf = p => { ipdf = p; showChip(`📄 ${p.name} · ${p.pages} pages`, true); };
   window.__kgShrink = shrink;
   window.__irohaAskImg = (text, image) => iSend(text, image);
@@ -7781,7 +7784,7 @@ window.KG_RECALL = {
   const MAX_PAGES = 100, POOL = 2, BATCH = 3, reading = {}, progress = {};
   const PROMPT = '[note transcription, not typed by me] This image is one page of my own lecture notes. Write its key content as plain text in at most 8 short lines: the heading, definitions, formulas in plain-text maths, and the key step of each worked example. No commentary, no greeting, no character voice. If the page is blank or only a title, write just the title.';
   // bulk: the backend can send these to free vision instead of paid credits
-  const ask = async (img, text = PROMPT) => { window.__kgBulk = (window.__kgBulk || 0) + 1; try { for (let i = 0; i < 2; i++) { const r = await window.__kgAsk?.('iroha', text, img); if (r && r.reply) return r.reply.trim(); await new Promise(ok => setTimeout(ok, 8000)); } return ''; } finally { window.__kgBulk--; } };
+  const ask = async (img, text = PROMPT) => { window.__kgBulk = (window.__kgBulk || 0) + 1; try { for (let i = 0; i < 2; i++) { const r = await (window.__kgAskBare || ((t, i) => window.__kgAsk?.('iroha', t, i)))(text, img); if (r && r.reply) return r.reply.trim(); await new Promise(ok => setTimeout(ok, 8000)); } return ''; } finally { window.__kgBulk--; } };
   // several pages in one request: the reply is split on "=== PAGE n ===" markers; a page missing from it gets an empty slot
   async function askPages(imgs, first) {
     if (imgs.length === 1) return [await ask(imgs[0])];
