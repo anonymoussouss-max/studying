@@ -2158,6 +2158,18 @@ window.__KG_BUILTIN = {
   [["real exam", "i have a real exam or viva i can't move. help me get ready for it without burning out."], ["drill me","drill me: one hard exam-style question on what i'm studying right now. no hints until i answer."], ["check my work", "i'm going to paste my working. check units, signs and assumptions, and tell me exactly where it breaks."], ["plan my next hour", "plan my next hour from my schedule and what's left today. concrete tasks, exact minutes."], ["school days", "look at my schedule today and give me one piece of advice on it from your school days."], ["i'm slacking", "i'm slacking. give me one task and a time limit, no sympathy."]].forEach(([l, q]) => {
     const b = document.createElement("button"); b.type = "button"; b.textContent = l; b.onclick = async () => { if (l === "drill me" && window.__kgDrill && !window.__kgOnBreak) { const note = await window.__kgDrill(); if (note) window.__kgOnce = note; } iSend(q); }; ichips.appendChild(b);
   });
+  /* ---------- Tutor mode: Socratic tutoring (ask, hint ladder, explain why), with a Show solution escape hatch ---------- */
+  const TUTOR_KEY = "kg-tutor";
+  const tutorOn = () => { try { return localStorage.getItem(TUTOR_KEY) === "1"; } catch (e) { return false; } };
+  const tbtn = document.createElement("button"); tbtn.type = "button"; tbtn.id = "iroha-tutor";
+  const tsync = () => { const on = tutorOn(); tbtn.textContent = on ? "🧭 tutor: on" : "🧭 tutor: off"; tbtn.setAttribute("aria-pressed", String(on)); tbtn.title = on ? "Iroha teaches by asking: hints one at a time, the answer only when you ask. Click to turn off." : "Turn on Socratic tutoring: Iroha guides you with questions and hints instead of answers."; };
+  tbtn.onclick = () => { const on = !tutorOn(); try { localStorage.setItem(TUTOR_KEY, on ? "1" : "0"); } catch (e) {} tsync(); iAdd("ame", on ? "Tutor mode on. Send me a problem, or tell me which one you're on. I'll ask before I tell, one hint at a time. Press Show solution whenever you want the full working." : "Tutor mode off. I'll answer directly again."); };
+  const sbtn = document.createElement("button"); sbtn.type = "button"; sbtn.id = "iroha-solution"; sbtn.textContent = "💡 show solution"; sbtn.title = "Get the full worked solution to the current problem now";
+  sbtn.onclick = () => { window.__kgOnce = "[I pressed Show solution, not typed by me: give the complete worked solution to the problem we're on now, every step with a one-line reason, then one similar problem for me to try on my own. This overrides tutor mode for this one reply.]"; iSend("show me the full solution"); };
+  ichips.prepend(sbtn); ichips.prepend(tbtn); tsync();
+  // what Iroha is told while tutor mode is on: the method Claude's learning mode uses, in her voice
+  const TUTOR_NOTE = "\n\n[not typed by me: TUTOR MODE is on. Teach Socratically. 1) Before explaining, ask what I've tried or what I think the first step is. 2) Hint ladder, one rung per wrong attempt: a nudge question, then name the method, then show one step, and the full solution only if I ask or after three wrong tries. 3) Now and then ask me to explain why a step works, not just the result. 4) If I'm right, say Correct first and move straight on. 5) When a problem is done, ask one short follow-up question to check it stuck, then the next problem. Never just give the answer while tutor mode is on, unless I press Show solution.]";
+  window.__kgTutorNote = () => tutorOn() ? TUTOR_NOTE : "";
 
   // click = open her chat, double-click = poke, drag = move her
   const IPK = "iroha-pos-v1"; let idg = null, imoved = false;
@@ -2434,7 +2446,7 @@ window.__KG_BUILTIN = {
     // plus company mode / memories / the "not okay" note set by the company module
     if (i >= 0 && out[i].role === "user" && wantsTalk(who, String(conv[conv.length - 1]?.content || ""))) out[i].content += `\n\n[I'm bringing ${who === "iroha" ? "Kaguya" : "Iroha"} into this. She will answer right after you, so speak to her as well as to me.]`;
     if (i >= 0 && out[i].role === "user" && !window.__kgOnBreak && window.StudyPlan) out[i].content += `\n\n[not typed by me: I'm on the ${window.StudyPlan.hours()}-hour study plan.]`;
-    if (i >= 0 && out[i].role === "user") out[i].content += planNote() + sessionNote() + dreamNote() + (window.__kgCoachNote?.() || "");
+    if (i >= 0 && out[i].role === "user") out[i].content += planNote() + sessionNote() + dreamNote() + (window.__kgCoachNote?.() || "") + (who === "iroha" ? window.__kgTutorNote?.() || "" : "");
     if (i >= 0 && out[i].role === "user" && who === "iroha" && window.__kgOnce) { out[i].content += "\n\n" + window.__kgOnce; window.__kgOnce = null; }
     if (i >= 0 && out[i].role === "user") out[i].content += crossNote(who) + (window.__kgNoteExtra && window.__kgNoteExtra[who] ? "\n\n" + window.__kgNoteExtra[who] : "");
     return out;
@@ -3908,6 +3920,8 @@ body.kg-light #kg-main .kl-chip{background:#f3edfb!important;border-color:#d9cde
 /* Iroha's eye: screen watch on or off */
 #iroha-watch{margin-left:auto;margin-right:8px;background:#0f2a44;border:2px solid #4fc3e8;color:#7fe3ff;border-radius:999px;padding:2px 10px;font:700 11px "M PLUS Rounded 1c",sans-serif;letter-spacing:0;cursor:pointer;white-space:nowrap}
 #iroha-watch[aria-pressed="true"]{background:#4fc3e8;color:#0b1a2c}
+/* tutor mode switch: lit while on */
+#iroha-chips #iroha-tutor[aria-pressed="true"]{background:#4fc3e8;color:#0b1a2c;border-color:#4fc3e8}
 /* small one-line cards and page furniture */
 body.kg-shell .kl-mini{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px}
 .kl-mini form{flex:1 1 100%;margin:0}.kl-mini label{flex:1 1 220px;font-weight:600}.kl-mini input[type=text],.kl-mini input:not([type]){flex:2 1 180px}
