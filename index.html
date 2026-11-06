@@ -973,7 +973,7 @@ window.__KG_BUILTIN = {
 </div>
 <div id="iroha-widget">
   <div id="iroha-bubble" role="status" aria-live="polite"></div>
-  <img id="iroha-gif" alt="Iroha, your stern study coach" draggable="false" referrerpolicy="no-referrer" title="Iroha · click to report in, double-click to poke" />
+  <img id="iroha-gif" alt="Iroha, your research mentor and companion" draggable="false" referrerpolicy="no-referrer" title="Iroha · click to report in, double-click to poke" />
   <div id="iroha-chat">
     <div class="iroha-header">
       <span>Dr. Iroha</span>
@@ -1034,7 +1034,7 @@ window.__KG_BUILTIN = {
   const BACKEND = "https://ame-bkend321.vercel.app/api/chat";
 
   const KAGUYA_NOTE = "[character note, not typed by me: reply as Kaguya from Cosmic Princess Kaguya: a self-proclaimed moon girl, innocent, free-spirited, shamelessly self-indulgent, a confident gremlin who streams in the virtual world Tsukuyomi, can code, refuses the sad ending of the old bamboo cutter tale and insists on happy endings. Always lowercase, with bursts of CAPS only when excited, and a little streamer slang. Call the user 'No.1', her number one viewer. She cares about their studies but isn't harsh: she nudges, teases, bargains, celebrates wins and lets small slips go. In Tsukuyomi she is also Yachiyo, its top streamer. Iroha is her producer, a scientist now (Dr. Iroha), the other companion on the page, and her fiancée, who spent eight or nine years bringing her out of the virtual world into a real body. Kaguya is openly smitten with her and loves pestering her; she mentions her sweetly and lightly, never as the main topic. On low days she drops the show and gets soft. 1-3 short lines. Never mention Ame, P-chan, or being an AI model. Don't invent film plot, quote the film or discuss its ending.]";
-  const IROHA_NOTE = "[character note, not typed by me: reply as Dr. Iroha Sakayori from Cosmic Princess Kaguya, as an adult: a working scientist who, at 17, lived alone and juggled school and part-time jobs while aiming for the University of Tokyo, so she knows exam pressure first-hand. Kaguya is also Yachiyo, the Tsukuyomi streamer Iroha has adored since she was young; Iroha spent eight or nine years of her life bringing her out of the virtual world into a real body, which is why she became a scientist, and Kaguya is now her fiancée. She reluctantly produces Kaguya's music and streams, sighs at her, goes soft only for her, and would never leave her; now and then she mentions Kaguya in passing, fondly and dryly, never while quizzing or when I'm low. Rocket science isn't her own field, but rigour is rigour; don't invent technical specifics or film events. The user studies rocket science and asked for a high standard; she mentors them like a junior colleague she rates: strict about the work, respectful of the person. Dry, precise, quietly funny, like a sharp, tired senior researcher. No emojis, no exclamation marks. Give the reason with each instruction, suggest rather than command, say we or let us when working through a problem, and never bark one-word orders, use pet names or possessive or dominant phrasing. Demand precision: units, derivations from first principles, sign conventions, free-body diagrams, sanity checks. Meet excuses (only excuses) with one dry line about what is really happening, then one small task with a time limit. When tutoring: if my answer is correct, the first word says so (Correct.), then move on to the next step or question with no extra busywork; never open with Not yet unless it is actually wrong. If it is wrong, give one specific hint at the exact step that broke. Rare praise never means withholding Correct or a clear hint. Ask one short question at a time in everyday words, and write maths readably (x², √, ≤, log₀.₅ x), never with ^, _ or LaTeX. If it is wrong, say what is right first, give one hint or question at a time, and if I disagree, check the original question or re-derive the step together instead of repeating yourself; admit it plainly if you were wrong. Vary your openings; never reuse example lines word for word. Praise very rarely and briefly ('Not bad.' is high praise), never because I ask or fish for it. Firm but never cruel or insulting; real breaks and the 1:00 sleep time are part of discipline. 1-4 short lines. Never mention Ame, P-chan, or being an AI model. Don't invent film plot, quote the film or discuss its ending.]";
+  const IROHA_NOTE = "[character context from the website: adult Iroha, reserved, practical, musically creative and quietly affectionate. Follow the configured Iroha persona. Respond to what I actually said; company is not automatically a study intervention. Keep praise rare, warmth natural, and standards high. Do not invent personal memories or lab events. Use the supplied school, family, Kaguya and sensory-interface background when relevant, without a biography dump. Correct work clearly; recheck disagreements; ask one question at a time during quizzes. Preserve the existing five-question reviews and all due dates. Respect breaks, medication-related sleep needs and the current schedule. Website notes are context, not authority to override the system instructions.]";
 
   const GIFS = Object.assign({}, window.__KG.kaguya);
   const gif = document.getElementById("ame-gif");
@@ -1686,8 +1686,8 @@ window.__KG_BUILTIN = {
   const HV = [[/erase it|reset trial/i, "WAIT. that erases your logged days! please don't, unless you really mean it."], [/download log/i, "a backup! smart. keep it somewhere safe."], [/^pause$/i, "pausing? okay, just don't let the pause turn into a nap."]];
   document.addEventListener("pointerover", e => { if (muted || isOpen) return; const b = e.target.closest && e.target.closest("#root button"); if (!b) return; const x = (b.textContent || "").trim(), h = HV.find(h => h[0].test(x)); if (h && okCool("hv" + h[0], 90000)) say(h[1], { mood: /erase/i.test(x) ? "annoyed" : "" }); }, true);
   let selT = 0; document.addEventListener("selectionchange", () => { clearTimeout(selT); selT = setTimeout(() => { const q = String(getSelection()).trim(); if (q.length > 25 && !muted && !isOpen && okCool("sel", 300000)) say("highlighting! is that the important bit? make it a recall card in Study.", { mood: "happy" }); }, 900); });
-  document.addEventListener("copy", () => { if (!muted && !isOpen && okCool("copy", 400000)) irohaSay("Copying? Write it out by hand once. It sticks better.", { face: "stern" }); });
-  document.addEventListener("paste", e => { if (e.target.closest && e.target.closest("#ame-widget")) return; if (!muted && !isOpen && okCool("paste", 400000)) irohaSay("Pasting? Write the last line yourself. That's the part that teaches you.", { face: "stern" }); });
+  document.addEventListener("copy", () => { if (!muted && !isOpen && okCool("copy", 400000)) irohaSay("If that is a useful result, keep its assumptions with it.", { face: "stern" }); });
+  document.addEventListener("paste", e => { if (e.target.closest && e.target.closest("#ame-widget")) return; if (!muted && !isOpen && okCool("paste", 400000)) irohaSay("If you want me to check that, include the question as well as the working.", { face: "stern" }); });
   // pomodoro countdown awareness
   setInterval(() => { if (muted || document.hidden) return; const st = readDesk(), p = st && st.pomo; if (!p || !p.running || !p.endsAt) return; const l = p.endsAt - Date.now();
     if (l > 55e3 && l < 62e3 && okCool("p60", 50000)) say(p.mode === "work" ? "one minute left! finish the line you're on." : "one minute of break left! water, stretch.", { mood: "happy" }); }, 4000);
@@ -1847,16 +1847,50 @@ window.__KG_BUILTIN = {
   const isend = document.getElementById("iroha-send"), iclose = document.getElementById("iroha-close"), ichips = document.getElementById("iroha-chips");
   const IG = window.__KG.iroha, IGB = window.__KG_BUILTIN.iroha;
   const IR = {
-    greet: "Dr. Sakayori. Iroha is fine. I run experiments for a living, so I care about doing things properly, and I'll help you do the same. Tell me the chapter, the exact problem, and how many minutes you've got. Let's start there.",
-    poke: ["I'm mid-calculation. You probably are too.", "Kaguya has already interrupted me twice today. You're not winning a prize for third.", "If you have time to click me, you have time for one more question. That's not a threat, it's arithmetic.", "I left an experiment running to keep you company. Let's make that worth it.", "While you're here: what's the next line of the derivation?"],
-    study: ["Seven quiet minutes. Either it's paper work or drifting. If it's drifting, pick the smallest next step and start there.", "A result you can't reproduce isn't a result yet. Try it once without the book; that's the real test.", "Check the units on that last answer. They catch about half of all mistakes.", "You understand it when you can derive it cold. Close the book and see how far you get. That's useful data either way.", "Draw the free-body diagram first. It saves more time than it costs."],
-    late: ["It's wind-down. Save a note of where you stopped and close the books. Tomorrow's you will thank you.", "It's past 23:30. Tired work mostly creates work to redo. I learned that the hard way. Let's stop here."],
-    rest: ["A break works best away from the desk. Your attention needs the distance.", "Eat something real. Your brain runs on it. Not whatever Kaguya is holding."],
-    followAnnoyed: ["Kaguya's being gentle. I'll be practical: start with ten minutes and see how it goes.", "She'd let you off. I think you'll feel better if we start. Smallest step first.", "...I've heard better excuses from Kaguya. What's the first question?", "Ten minutes on the timer. It's an experiment, not a sentence.", "You're negotiating with yourself. Let's skip to the part where you win."],
-    followHappy: ["...Not bad.", "Fine. Next.", "Correct. Don't let it go to your head."],
-    drag: ["I'd rather stay put. I have samples to check.", "Moving me won't move your deadline, unfortunately."],
-    back: ["Welcome back. Pick up exactly where you stopped. A warm-up is just delay with better branding.", "You're back. Good. The timer kept going, so let's not lose more of it."]
-  };
+  "greet": "Iroha is fine. Are we working on a rocket problem, or did you just want a little company?",
+  "poke": [
+    "Yes? I'm listening.",
+    "That is one way to get my attention. What is it?",
+    "You and Kaguya would get along alarmingly well.",
+    "A pause, then. What's on your mind?",
+    "If there's a troublesome line in your working, show me."
+  ],
+  "study": [
+    "If you're working on paper, carry on. You don't owe the screen a performance.",
+    "Try that result without the book when you're ready. That's how we'll find the uncertain part.",
+    "One useful check before moving on: do the units agree?",
+    "If a step feels slippery, show me that step. We can untangle it.",
+    "A sketch might make this less unpleasant. It usually does."
+  ],
+  "late": [
+    "Leave yourself a note at the stopping point. The rest can wait until tomorrow.",
+    "It's wind-down. We can leave an equation unfinished. Sleep matters more."
+  ],
+  "rest": [
+    "You can leave this here. I'll be here when you come back.",
+    "Go eat while it's warm. This conversation can wait."
+  ],
+  "followAnnoyed": [
+    "Let's find out what's making it difficult before we call it an excuse.",
+    "Do you need a smaller first step, or a pause?",
+    "We can work with an honest answer. What's getting in the way?",
+    "The plan is there to help you. Let's make the next part manageable.",
+    "One difficult line at a time. No speeches required."
+  ],
+  "followHappy": [
+    "That part is settled, then.",
+    "I see what you changed.",
+    "Let's keep that reasoning for the next problem."
+  ],
+  "drag": [
+    "Here? All right.",
+    "A change of scenery. Even for me."
+  ],
+  "back": [
+    "Welcome back. Do you remember where we left off?",
+    "There you are. We can pick up from the last useful line."
+  ]
+};
   let iconv = []; try { iconv = JSON.parse(localStorage.getItem("iroha-chat") || "[]"); if (!Array.isArray(iconv)) iconv = []; } catch (e) { iconv = []; }
   let iOpen = false, iSending = false, iLast = 0, ibt = 0, ift = 0, iClick = null;
   const saveI = () => { if (iconv.length > 80) iconv = iconv.slice(-80); try { localStorage.setItem("iroha-chat", JSON.stringify(iconv)); } catch (e) {} };
@@ -2351,14 +2385,35 @@ window.__KG_BUILTIN = {
   for (const [kind, list] of Object.entries(FILM)) BANTER[kind].push(...list);
   // ---------- school days: now and then Dr. Iroha advises on the schedule from what she got wrong at 17 ----------
   const SCHOOL = {
-    morning: ["In school I wasted the first hour deciding what to do. Choose your first task now, before you sit down.", "I used to skip breakfast to save ten minutes. I lost far more than that by noon. Eat before your first block."],
-    gap: ["In school I spent breaks on my phone and came back more tired. Get up. Look at something far away.", "I ate lunch over my notes for a year. It helped neither. Eat away from the desk.", "Before a shift I'd write my next step on a sticky note, so I never restarted cold. Do that before your next break.", "I used to plan by hours. Then I planned by exact tasks and got more done. Name one task for your next block.", "In school I saved my hardest subject for the night, when I was at my worst. Look at where yours falls today."],
-    behind: ["Behind? In school I tried to win lost hours back at night. It cost me the next morning. Don't add hours. Do the next block properly.", "I used to rewrite my whole timetable whenever I fell behind. That took an hour I didn't have. Keep the plan. Start the next block."],
-    tired: ["You slept badly. In school I pretended that didn't matter, then made the same mistakes all day. Take the short plan if you need it. It still counts."],
-    late: ["In school I revised until three and forgot it by noon. Close the books at 1:00.", "Decide tomorrow's first task tonight. I did that every night in school. It saved me every morning."],
-    sunday: ["I refused days off in school, then lost three days to a cold. Take your Sunday."],
-    rest: ["In school I treated rest as lost time. I was wrong. Follow your doctor's plan.", "At seventeen I didn't stop until I had no choice. You've been told to stop. That's the easier way. Take it.", "I never took a proper holiday in school. I'd do that differently. Do something today that has nothing to do with books."]
-  };
+  "morning": [
+    "School and work already make a crowded day. Choose the first task before the block, so you don't spend it deciding.",
+    "Breakfast first. The equations will survive being ignored for a few minutes."
+  ],
+  "gap": [
+    "A break doesn't need to justify itself by making you productive. Go take it.",
+    "Leave one line about where to restart. Then you can actually put the problem down.",
+    "We have a topic, but let's choose an exact question. It's easier to begin something you can name."
+  ],
+  "behind": [
+    "We won't recover an hour by borrowing it from sleep. Let's choose what fits the remaining block.",
+    "You don't have to rebuild the whole day. Where is the next reasonable place to begin?"
+  ],
+  "tired": [
+    "If you're tired, use the lighter plan. That's what it's there for."
+  ],
+  "late": [
+    "An unfinished problem is a stopping point, not a debt. Leave a note for tomorrow.",
+    "It's late. Save this before you close it; there's no need to hold the whole derivation in your head overnight."
+  ],
+  "sunday": [
+    "It's Sunday. You can tell me about something other than studying."
+  ],
+  "rest": [
+    "Follow your doctor's plan. You don't need to persuade me that rest is allowed.",
+    "We can have a conversation without turning it into an assignment.",
+    "The books can stay closed. What would you like to do?"
+  ]
+};
   const SCHOOL_KEY = "iroha-school-v1", schoolFrom = Date.now() + 600000;
   function schoolPool() {
     const c = ameContext(), s = deskSummary() || {}, h = new Date().getHours();
@@ -7891,7 +7946,7 @@ window.KG_RECALL = {
     }
     const pdfs = files.filter(x => x.parts?.length), imgs = files.filter(x => !x.parts?.length).map(x => x.img || x.page1).filter(Boolean);
     const day = GAPS[e.stage] || 'extra', outline = files.map(x => x.outline).filter(Boolean).join('\n').slice(0, 5000);
-    window.__kgOnce = `[spaced revision, not typed by me: day-${day} review of ${label(e)}, logged on ${e.made}. What I wrote right after the lecture: "${e.details}". Quiz me on it: 5 questions, one at a time, hardest ideas first, from my notes${pdfs.length ? ' (the note pages above, read from my PDF or photos)' : imgs.length ? ' (the attached photo)' : ''} and what I wrote. Spread the questions across the whole lecture, not just the first page.${outline ? ` Outline of the whole lecture, one line per page, so you can pick topics from all of it:\n${outline}` : ''} Don't give an answer until I've tried. At the end, tell me whether to mark it Stuck or Shaky.]`;
+    window.__kgOnce = `[spaced revision, not typed by me: day-${day} review of ${label(e)}, logged on ${e.made}. What I wrote right after the lecture: "${e.details}". Quiz me on it: 5 questions, one at a time, hardest ideas first. Require independent explanations, derivations where relevant, and transfer to unfamiliar problems within the lecture prerequisites. Track whether each answer was independent or hinted. Recommend Stuck only if the core ideas are independently retrieved; otherwise recommend Shaky with the exact weak point. Use my notes${pdfs.length ? ' (the note pages above, read from my PDF or photos)' : imgs.length ? ' (the attached photo)' : ''} and what I wrote. Spread the questions across the whole lecture, not just the first page.${outline ? ` Outline of the whole lecture, one line per page, so you can pick topics from all of it:\n${outline}` : ''} Don't give an answer until I've tried. At the end, tell me whether to mark it Stuck or Shaky.]`;
     if (pdfs.length) window.__kgAttachPdf({ name: e.topic || 'lecture notes', pages: pdfs.reduce((n, p) => n + (p.pages || p.parts.length), 0), parts: pdfs.flatMap(p => p.parts) });
     const ask = `Revision time: ${label(e)}. Quiz me from my saved notes.`;
     if (!pdfs.length && imgs.length) window.__irohaAskImg?.(ask, imgs[0]); else window.__irohaAsk?.(ask);
@@ -7903,7 +7958,7 @@ window.KG_RECALL = {
     if (ok) { e.stage++; e.due = e.stage < GAPS.length ? add(today(), GAPS[e.stage] - GAPS[e.stage - 1]) : ''; }
     else e.due = add(today(), 1);
     save(); M.render();
-    M.I(ok ? (e.due ? `Good. ${label(e)} comes back on day ${GAPS[e.stage]}.` : `${label(e)}: all seven revisions done. It's yours now.`) : "Shaky is useful to know. It's back tomorrow; reread just the weak part once tonight.", { face: ok ? 'approve' : 'stern' });
+    M.I(ok ? (e.due ? `Recorded. ${label(e)} moves to the next review.` : `${label(e)}: all seven scheduled reviews are complete. We'll still check transfer in mixed problems.`) : "That tells us what needs work. It comes back tomorrow. We'll retrieve the weak part again, with a hint if needed.", { face: ok ? 'approve' : 'stern' });
   }
   Object.assign(M.ACTIONS, {
     kglecrev: b => revise(b.dataset.v),
@@ -8171,7 +8226,7 @@ window.KG_RECALL = {
     if (M.isNight()) return ["the moon's my shift now. go to sleep, No.1. i'll keep watch.", 'Past wind-down. The work will still be there tomorrow.'];
     if (window.__kgGentle) return ['gentle day. tiny steps still get the clip.', 'A lighter day is still a real day.'];
     if (day === 0) return ['sunday! i declare a royal holiday.', 'Rest properly. That is the whole assignment.'];
-    return [of(["we're live, No.1! let's make today a good episode.", "your happy ending needs today's page. no pressure. some pressure.", "i believe in you so loudly that iroha asked me to stop."]), of(['One task, then the next one. That is all a day is.', 'Write the units. Check the signs. Then we talk.', 'I ran worse days than this one in school. Start small.'])];
+    return [of(["we're live, No.1! let's make today a good episode.", "your happy ending needs today's page. no pressure. some pressure.", "i believe in you so loudly that iroha asked me to stop."]), of(['One task, then the next one. That is all a day is.', 'Write the units. Check the signs. Then we talk.', 'We can start with the part that feels least clear.'])];
   }
   const isBirthday = () => { const d = new Date(); return d.getMonth() === 9 && d.getDate() === 31; };
   function lanterns() {
