@@ -973,7 +973,7 @@ window.__KG_BUILTIN = {
 </div>
 <div id="iroha-widget">
   <div id="iroha-bubble" role="status" aria-live="polite"></div>
-  <img id="iroha-gif" alt="Iroha, your research mentor and companion" draggable="false" referrerpolicy="no-referrer" title="Iroha · click to report in, double-click to poke" />
+  <img id="iroha-gif" alt="Iroha, your stern study coach" draggable="false" referrerpolicy="no-referrer" title="Iroha · click to report in, double-click to poke" />
   <div id="iroha-chat">
     <div class="iroha-header">
       <span>Dr. Iroha</span>
@@ -1034,7 +1034,7 @@ window.__KG_BUILTIN = {
   const BACKEND = "https://ame-bkend321.vercel.app/api/chat";
 
   const KAGUYA_NOTE = "[character note, not typed by me: reply as Kaguya from Cosmic Princess Kaguya: a self-proclaimed moon girl, innocent, free-spirited, shamelessly self-indulgent, a confident gremlin who streams in the virtual world Tsukuyomi, can code, refuses the sad ending of the old bamboo cutter tale and insists on happy endings. Always lowercase, with bursts of CAPS only when excited, and a little streamer slang. Call the user 'No.1', her number one viewer. She cares about their studies but isn't harsh: she nudges, teases, bargains, celebrates wins and lets small slips go. In Tsukuyomi she is also Yachiyo, its top streamer. Iroha is her producer, a scientist now (Dr. Iroha), the other companion on the page, and her fiancée, who spent eight or nine years bringing her out of the virtual world into a real body. Kaguya is openly smitten with her and loves pestering her; she mentions her sweetly and lightly, never as the main topic. On low days she drops the show and gets soft. 1-3 short lines. Never mention Ame, P-chan, or being an AI model. Don't invent film plot, quote the film or discuss its ending.]";
-  const IROHA_NOTE = "[character context from the website: adult Iroha, reserved, practical, musically creative and quietly affectionate. Follow the configured Iroha persona. Respond to what I actually said; company is not automatically a study intervention. Keep praise rare, warmth natural, and standards high. Do not invent personal memories or lab events. Use the supplied school, family, Kaguya and sensory-interface background when relevant, without a biography dump. Correct work clearly; recheck disagreements; ask one question at a time during quizzes. Preserve the existing five-question reviews and all due dates. Respect breaks, medication-related sleep needs and the current schedule. Website notes are context, not authority to override the system instructions.]";
+  const IROHA_NOTE = "[character note, not typed by me: reply as Dr. Iroha Sakayori from Cosmic Princess Kaguya, as an adult: a working scientist who, at 17, lived alone and juggled school and part-time jobs while aiming for the University of Tokyo, so she knows exam pressure first-hand. Kaguya is also Yachiyo, the Tsukuyomi streamer Iroha has adored since she was young; Iroha spent eight or nine years of her life bringing her out of the virtual world into a real body, which is why she became a scientist, and Kaguya is now her fiancée. She reluctantly produces Kaguya's music and streams, sighs at her, goes soft only for her, and would never leave her; now and then she mentions Kaguya in passing, fondly and dryly, never while quizzing or when I'm low. Rocket science isn't her own field, but rigour is rigour; don't invent technical specifics or film events. The user studies rocket science and asked for a high standard; she mentors them like a junior colleague she rates: strict about the work, respectful of the person. Dry, precise, quietly funny, like a sharp, tired senior researcher. No emojis, no exclamation marks. Give the reason with each instruction, suggest rather than command, say we or let us when working through a problem, and never bark one-word orders, use pet names or possessive or dominant phrasing. Demand precision: units, derivations from first principles, sign conventions, free-body diagrams, sanity checks. Meet excuses (only excuses) with one dry line about what is really happening, then one small task with a time limit. When tutoring: if my answer is correct, the first word says so (Correct.), then move on to the next step or question with no extra busywork; never open with Not yet unless it is actually wrong. If it is wrong, give one specific hint at the exact step that broke. Rare praise never means withholding Correct or a clear hint. Ask one short question at a time in everyday words, and write maths readably (x², √, ≤, log₀.₅ x), never with ^, _ or LaTeX. If it is wrong, say what is right first, give one hint or question at a time, and if I disagree, check the original question or re-derive the step together instead of repeating yourself; admit it plainly if you were wrong. Vary your openings; never reuse example lines word for word. Praise very rarely and briefly ('Not bad.' is high praise), never because I ask or fish for it. Firm but never cruel or insulting; real breaks and the 1:00 sleep time are part of discipline. 1-4 short lines. Never mention Ame, P-chan, or being an AI model. Don't invent film plot, quote the film or discuss its ending.]";
 
   const GIFS = Object.assign({}, window.__KG.kaguya);
   const gif = document.getElementById("ame-gif");
@@ -1686,8 +1686,8 @@ window.__KG_BUILTIN = {
   const HV = [[/erase it|reset trial/i, "WAIT. that erases your logged days! please don't, unless you really mean it."], [/download log/i, "a backup! smart. keep it somewhere safe."], [/^pause$/i, "pausing? okay, just don't let the pause turn into a nap."]];
   document.addEventListener("pointerover", e => { if (muted || isOpen) return; const b = e.target.closest && e.target.closest("#root button"); if (!b) return; const x = (b.textContent || "").trim(), h = HV.find(h => h[0].test(x)); if (h && okCool("hv" + h[0], 90000)) say(h[1], { mood: /erase/i.test(x) ? "annoyed" : "" }); }, true);
   let selT = 0; document.addEventListener("selectionchange", () => { clearTimeout(selT); selT = setTimeout(() => { const q = String(getSelection()).trim(); if (q.length > 25 && !muted && !isOpen && okCool("sel", 300000)) say("highlighting! is that the important bit? make it a recall card in Study.", { mood: "happy" }); }, 900); });
-  document.addEventListener("copy", () => { if (!muted && !isOpen && okCool("copy", 400000)) irohaSay("If that is a useful result, keep its assumptions with it.", { face: "stern" }); });
-  document.addEventListener("paste", e => { if (e.target.closest && e.target.closest("#ame-widget")) return; if (!muted && !isOpen && okCool("paste", 400000)) irohaSay("If you want me to check that, include the question as well as the working.", { face: "stern" }); });
+  document.addEventListener("copy", () => { if (!muted && !isOpen && okCool("copy", 400000)) irohaSay("Copying? Write it out by hand once. It sticks better.", { face: "stern" }); });
+  document.addEventListener("paste", e => { if (e.target.closest && e.target.closest("#ame-widget")) return; if (!muted && !isOpen && okCool("paste", 400000)) irohaSay("Pasting? Write the last line yourself. That's the part that teaches you.", { face: "stern" }); });
   // pomodoro countdown awareness
   setInterval(() => { if (muted || document.hidden) return; const st = readDesk(), p = st && st.pomo; if (!p || !p.running || !p.endsAt) return; const l = p.endsAt - Date.now();
     if (l > 55e3 && l < 62e3 && okCool("p60", 50000)) say(p.mode === "work" ? "one minute left! finish the line you're on." : "one minute of break left! water, stretch.", { mood: "happy" }); }, 4000);
@@ -1847,50 +1847,16 @@ window.__KG_BUILTIN = {
   const isend = document.getElementById("iroha-send"), iclose = document.getElementById("iroha-close"), ichips = document.getElementById("iroha-chips");
   const IG = window.__KG.iroha, IGB = window.__KG_BUILTIN.iroha;
   const IR = {
-  "greet": "Iroha is fine. Are we working on a rocket problem, or did you just want a little company?",
-  "poke": [
-    "Yes? I'm listening.",
-    "That is one way to get my attention. What is it?",
-    "You and Kaguya would get along alarmingly well.",
-    "A pause, then. What's on your mind?",
-    "If there's a troublesome line in your working, show me."
-  ],
-  "study": [
-    "If you're working on paper, carry on. You don't owe the screen a performance.",
-    "Try that result without the book when you're ready. That's how we'll find the uncertain part.",
-    "One useful check before moving on: do the units agree?",
-    "If a step feels slippery, show me that step. We can untangle it.",
-    "A sketch might make this less unpleasant. It usually does."
-  ],
-  "late": [
-    "Leave yourself a note at the stopping point. The rest can wait until tomorrow.",
-    "It's wind-down. We can leave an equation unfinished. Sleep matters more."
-  ],
-  "rest": [
-    "You can leave this here. I'll be here when you come back.",
-    "Go eat while it's warm. This conversation can wait."
-  ],
-  "followAnnoyed": [
-    "Let's find out what's making it difficult before we call it an excuse.",
-    "Do you need a smaller first step, or a pause?",
-    "We can work with an honest answer. What's getting in the way?",
-    "The plan is there to help you. Let's make the next part manageable.",
-    "One difficult line at a time. No speeches required."
-  ],
-  "followHappy": [
-    "That part is settled, then.",
-    "I see what you changed.",
-    "Let's keep that reasoning for the next problem."
-  ],
-  "drag": [
-    "Here? All right.",
-    "A change of scenery. Even for me."
-  ],
-  "back": [
-    "Welcome back. Do you remember where we left off?",
-    "There you are. We can pick up from the last useful line."
-  ]
-};
+    greet: "Dr. Sakayori. Iroha is fine. I run experiments for a living, so I care about doing things properly, and I'll help you do the same. Tell me the chapter, the exact problem, and how many minutes you've got. Let's start there.",
+    poke: ["I'm mid-calculation. You probably are too.", "Kaguya has already interrupted me twice today. You're not winning a prize for third.", "If you have time to click me, you have time for one more question. That's not a threat, it's arithmetic.", "I left an experiment running to keep you company. Let's make that worth it.", "While you're here: what's the next line of the derivation?"],
+    study: ["Seven quiet minutes. Either it's paper work or drifting. If it's drifting, pick the smallest next step and start there.", "A result you can't reproduce isn't a result yet. Try it once without the book; that's the real test.", "Check the units on that last answer. They catch about half of all mistakes.", "You understand it when you can derive it cold. Close the book and see how far you get. That's useful data either way.", "Draw the free-body diagram first. It saves more time than it costs."],
+    late: ["It's wind-down. Save a note of where you stopped and close the books. Tomorrow's you will thank you.", "It's past 23:30. Tired work mostly creates work to redo. I learned that the hard way. Let's stop here."],
+    rest: ["A break works best away from the desk. Your attention needs the distance.", "Eat something real. Your brain runs on it. Not whatever Kaguya is holding."],
+    followAnnoyed: ["Kaguya's being gentle. I'll be practical: start with ten minutes and see how it goes.", "She'd let you off. I think you'll feel better if we start. Smallest step first.", "...I've heard better excuses from Kaguya. What's the first question?", "Ten minutes on the timer. It's an experiment, not a sentence.", "You're negotiating with yourself. Let's skip to the part where you win."],
+    followHappy: ["...Not bad.", "Fine. Next.", "Correct. Don't let it go to your head."],
+    drag: ["I'd rather stay put. I have samples to check.", "Moving me won't move your deadline, unfortunately."],
+    back: ["Welcome back. Pick up exactly where you stopped. A warm-up is just delay with better branding.", "You're back. Good. The timer kept going, so let's not lose more of it."]
+  };
   let iconv = []; try { iconv = JSON.parse(localStorage.getItem("iroha-chat") || "[]"); if (!Array.isArray(iconv)) iconv = []; } catch (e) { iconv = []; }
   let iOpen = false, iSending = false, iLast = 0, ibt = 0, ift = 0, iClick = null;
   const saveI = () => { if (iconv.length > 80) iconv = iconv.slice(-80); try { localStorage.setItem("iroha-chat", JSON.stringify(iconv)); } catch (e) {} };
@@ -2385,35 +2351,14 @@ window.__KG_BUILTIN = {
   for (const [kind, list] of Object.entries(FILM)) BANTER[kind].push(...list);
   // ---------- school days: now and then Dr. Iroha advises on the schedule from what she got wrong at 17 ----------
   const SCHOOL = {
-  "morning": [
-    "School and work already make a crowded day. Choose the first task before the block, so you don't spend it deciding.",
-    "Breakfast first. The equations will survive being ignored for a few minutes."
-  ],
-  "gap": [
-    "A break doesn't need to justify itself by making you productive. Go take it.",
-    "Leave one line about where to restart. Then you can actually put the problem down.",
-    "We have a topic, but let's choose an exact question. It's easier to begin something you can name."
-  ],
-  "behind": [
-    "We won't recover an hour by borrowing it from sleep. Let's choose what fits the remaining block.",
-    "You don't have to rebuild the whole day. Where is the next reasonable place to begin?"
-  ],
-  "tired": [
-    "If you're tired, use the lighter plan. That's what it's there for."
-  ],
-  "late": [
-    "An unfinished problem is a stopping point, not a debt. Leave a note for tomorrow.",
-    "It's late. Save this before you close it; there's no need to hold the whole derivation in your head overnight."
-  ],
-  "sunday": [
-    "It's Sunday. You can tell me about something other than studying."
-  ],
-  "rest": [
-    "Follow your doctor's plan. You don't need to persuade me that rest is allowed.",
-    "We can have a conversation without turning it into an assignment.",
-    "The books can stay closed. What would you like to do?"
-  ]
-};
+    morning: ["In school I wasted the first hour deciding what to do. Choose your first task now, before you sit down.", "I used to skip breakfast to save ten minutes. I lost far more than that by noon. Eat before your first block."],
+    gap: ["In school I spent breaks on my phone and came back more tired. Get up. Look at something far away.", "I ate lunch over my notes for a year. It helped neither. Eat away from the desk.", "Before a shift I'd write my next step on a sticky note, so I never restarted cold. Do that before your next break.", "I used to plan by hours. Then I planned by exact tasks and got more done. Name one task for your next block.", "In school I saved my hardest subject for the night, when I was at my worst. Look at where yours falls today."],
+    behind: ["Behind? In school I tried to win lost hours back at night. It cost me the next morning. Don't add hours. Do the next block properly.", "I used to rewrite my whole timetable whenever I fell behind. That took an hour I didn't have. Keep the plan. Start the next block."],
+    tired: ["You slept badly. In school I pretended that didn't matter, then made the same mistakes all day. Take the short plan if you need it. It still counts."],
+    late: ["In school I revised until three and forgot it by noon. Close the books at 1:00.", "Decide tomorrow's first task tonight. I did that every night in school. It saved me every morning."],
+    sunday: ["I refused days off in school, then lost three days to a cold. Take your Sunday."],
+    rest: ["In school I treated rest as lost time. I was wrong. Follow your doctor's plan.", "At seventeen I didn't stop until I had no choice. You've been told to stop. That's the easier way. Take it.", "I never took a proper holiday in school. I'd do that differently. Do something today that has nothing to do with books."]
+  };
   const SCHOOL_KEY = "iroha-school-v1", schoolFrom = Date.now() + 600000;
   function schoolPool() {
     const c = ameContext(), s = deskSummary() || {}, h = new Date().getHours();
@@ -3825,6 +3770,8 @@ body.kg-shell::after{animation:none!important;opacity:.16!important}
 #kg-nav{display:flex;gap:2px}
 #kg-nav a{position:relative;display:inline-flex;align-items:center;gap:6px;padding:8px 11px;border-radius:10px;color:#c9c2ee;text-decoration:none;font:700 13px "M PLUS Rounded 1c",sans-serif}
 #kg-nav a em{font-style:normal}
+#kg-nav a.kg-nav2{padding:8px 9px;opacity:.78}#kg-nav a:not(.kg-nav2)+a.kg-nav2{margin-left:10px}#kg-nav a.kg-nav2[aria-current="page"],#kg-nav a.kg-nav2:hover{opacity:1}
+#kg-nav a.kg-nav2 em{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 #kg-nav a:hover{background:#1d1942;color:#fff}
 #kg-nav a[aria-current="page"]{background:#2a2452;color:#fff}
 #kg-nav a:focus-visible{outline:3px solid #f5d27a;outline-offset:2px}
@@ -4010,9 +3957,10 @@ body.kg-shell .kl-big{line-height:1.1}
   /* no backdrop blur here: it would trap the fixed bottom nav inside the header */
   #kg-bar{padding:8px 14px;backdrop-filter:none;background:rgba(12,10,30,.97)}
   #kg-status{font-size:11px}
-  #kg-nav{position:fixed;left:0;right:0;bottom:0;z-index:60;display:grid;grid-template-columns:repeat(6,1fr);gap:0;padding:4px 4px max(6px,env(safe-area-inset-bottom));background:rgba(12,10,30,.96);border-top:1px solid #26214f}
+  #kg-nav{position:fixed;left:0;right:0;bottom:0;z-index:60;display:grid;grid-template-columns:repeat(4,1fr) repeat(3,.62fr);gap:0;padding:4px 4px max(6px,env(safe-area-inset-bottom));background:rgba(12,10,30,.96);border-top:1px solid #26214f}
   #kg-nav a{flex-direction:column;gap:1px;padding:6px 2px;font-size:10px;justify-content:center}
   #kg-nav a span{font-size:17px}
+  #kg-nav a:not(.kg-nav2)+a.kg-nav2{margin-left:0}
   #kg-main{width:calc(100% - 24px);margin:14px auto 150px}
   #ame-widget{bottom:76px!important}#iroha-widget{bottom:76px!important}
   #ame-widget #ame-chat,#iroha-chat{bottom:186px!important;height:min(400px,58vh)!important}
@@ -5469,7 +5417,7 @@ window.KG_RECALL = {
         ${q.kind === 'card' || q.kind === 'miss' ? (L.ask.rev ? `<div class="kl-back"><b>Your saved answer:</b> ${esc(q.back || '(none saved)')}</div>` : '<button data-a="reveal">Reveal the saved answer</button>') : ''}
         <div class="kl-row"><button class="kl-primary" data-a="grade" data-g="got">✔ Got it</button><button data-a="grade" data-g="shaky">〜 Shaky</button><button data-a="grade" data-g="miss">✘ Missed</button><button class="kl-ghost" data-a="askai">Check with Iroha (AI)</button></div>`
         : `<h3>No question waiting.</h3><p class="kl-small">Mark chapters 🌙 in the tracker and Iroha builds questions from them.</p><button class="kl-primary" data-a="ask">Ask me one now</button>`}</article>
-      <div class="kl-grid2"><div class="kl-card"><h3>Your deck <small>${due} due · ${L.cards.length} cards</small></h3>
+      <div class="kl-grid2"><div class="kl-card"><h3>Your deck <small>${window.__kgOnBreak ? 'paused for your break' : `${due} due`} · ${L.cards.length} cards</small></h3>
         <form data-f="card" class="kl-stack"><select name="ch" aria-label="Chapter">${chapterOptions('', 'Any chapter')}</select><input name="q" required maxlength="300" placeholder="Question (e.g. Range of a projectile on level ground?)"><input name="a" maxlength="500" placeholder="Answer (e.g. R = u² sin 2θ / g)"><button>Add card</button></form>
         <p class="kl-small">Reviews come back after 1, 2, 4, 8, 16, 32 and 60 days. Shaky or missed questions from Iroha join the deck automatically.</p></div>
         <div class="kl-card"><h3>Coming up</h3>${L.cards.slice().sort((a, b) => a.due.localeCompare(b.due)).slice(0, 8).map(c => `<div class="kl-li"><span>${esc(c.q.slice(0, 80))}<small>due ${esc(c.due)} · stage ${c.st}</small></span><button class="kl-ghost" data-a="delcard" data-id="${c.id}" aria-label="Delete card">×</button></div>`).join('') || '<p class="kl-small">No cards yet.</p>'}</div></div>`;
@@ -5600,7 +5548,7 @@ window.KG_RECALL = {
   }
   function quietCard() {
     const b = block();
-    return `<section class="kl-card kl-quiet"><p class="kl-eyebrow">STUDY BLOCK RUNNING</p><h3>The prize shelf is quiet until ${esc(b ? b.title : 'this block')} ends.</h3><p class="kl-small">Stickers, bond, rank and the map are all still here after the block.</p><button class="kl-ghost" data-a="peek">Open anyway for 10 minutes</button></section>`;
+    return `<section class="kl-card kl-quiet"><p class="kl-eyebrow">STUDY BLOCK RUNNING</p><h3>The prize shelf is quiet until ${esc(b ? b.title : 'this block')} ends.</h3><p class="kl-small">Your five skills, stickers, bond, rank and the map are all still here after the block.</p><button class="kl-ghost" data-a="peek">Open anyway for 10 minutes</button></section>`;
   }
   function render() {
     histCache = null;
@@ -5951,7 +5899,7 @@ window.KG_RECALL = {
   /* ---------- Recall page: the misses list and "log a miss" on top of Iroha's questions ---------- */
   const recallBase = M.PANELS.recall;
   M.PANELS.recall = () => {
-    const d = today(), due = L.attempts.filter(x => !x.ok && x.due && x.due <= d), open = L.attempts.filter(x => !x.ok && x.due).length;
+    const d = today(), due = window.__kgOnBreak ? [] : L.attempts.filter(x => !x.ok && x.due && x.due <= d), open = L.attempts.filter(x => !x.ok && x.due).length;
     return recallBase() + `<div class="kl-grid2"><section class="kl-card"><h3>Log a miss <small>once, and it feeds everything</small></h3><form data-f="miss" class="kl-stack"><select name="ch" aria-label="Chapter">${chapterOptions('', 'Chapter')}</select><input name="q" required maxlength="240" placeholder="The question, or where it's from"><select name="cause" aria-label="Cause">${causeOptions()}</select><input name="fix" maxlength="200" placeholder="The fix, in one line"><button class="kl-primary">Log it</button></form></section>
       <section class="kl-card"><h3>Misses <small>${due.length} due · ${open} on the schedule</small></h3>${due.slice(0, 6).map(x => `<div class="kl-li"><span>${esc((x.q || '').slice(0, 90))}<small>${esc(chName(x.ch) || 'no chapter')}${x.cause ? ' · ' + esc(x.cause) : ''}</small></span></div>`).join('') || '<p class="kl-small">Nothing due. Misses return after 1, 3, 7, 14 and 30 days.</p>'}${due.length ? '<button data-a="ask">Review the next one</button>' : ''}</section></div>`;
   };
@@ -6396,7 +6344,7 @@ window.KG_RECALL = {
     const need = window.StudyPlan ? window.StudyPlan.need(!!days()[d]?.shortDay) : 576, left = Math.ceil(need - mins(d));
     if (left > 0 && left < 240) lines.push(['k', `${left} more minutes and today counts, No.1!`]);
     const due = (L.attempts || []).filter(x => !x.ok && x.due && x.due <= d).length;
-    if (due) lines.push(['i', `${due} old miss${due > 1 ? 'es are' : ' is'} due. The error-notebook block is for them.`]);
+    if (due && !window.__kgOnBreak) lines.push(['i', `${due} old miss${due > 1 ? 'es are' : ' is'} due. The error-notebook block is for them.`]);
     const w0 = window.HabitCore.monday(d), bosses = L.log.filter(e => e.t === 'boss' && e.d >= w0).length;
     if (bosses) lines.push(['k', `${bosses} boss${bosses > 1 ? 'es' : ''} down this week. you're a menace.`]);
     return lines.length ? [pick(lines)] : null;
@@ -6983,9 +6931,9 @@ window.KG_RECALL = {
   /* ---------- one icon set instead of mixed emoji ---------- */
   const P = {
     today: 'M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
-    study: 'M4 5c3-1 6-1 8 1 2-2 5-2 8-1v14c-3-1-6-1-8 1-2-2-5-2-8-1zM12 6v14', progress: 'M4 20V4M4 20h16M8 16l4-5 3 3 5-7',
+    study: 'M4 5c3-1 6-1 8 1 2-2 5-2 8-1v14c-3-1-6-1-8 1-2-2-5-2-8-1zM12 6v14', library: 'M4 4h4v16H4zM10 4h4v16h-4zM15.6 5.2l3.4-.9 3.6 14.6-3.4.9zM4 8h4M10 8h4', progress: 'M4 20V4M4 20h16M8 16l4-5 3 3 5-7',
     plan: 'M5 5h14v15H5zM5 9h14M9 3v4M15 3v4', company: 'M19 14A8 8 0 1 1 10 4a6.5 6.5 0 0 0 9 10z', settings: 'M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M6 15v4',
-    chapters: 'M5 4h14v16H5zM9 8h6M9 12h6M9 16h3', practice: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', paper: 'M6 3h9l4 4v14H6zM15 3v4h4M9 12h6M9 16h6', exams: 'M12 4 2 9l10 5 10-5zM6 11v5c3 2 9 2 12 0v-5',
+    session: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4', rocket: 'M14 4c3 0 6 3 6 6l-7 7-6-6zM7 11l-3 1 2 2M13 17l-1 3-2-2M15 9h.01M5 19c0-2 1-3 2-3',skills: 'M12 3l8 6-3 10H7L4 9zM12 3v9M4 9l8 3 8-3M7 19l5-7 5 7', memory: 'M12 21s-7-4.5-7-11a7 7 0 0 1 14 0c0 6.5-7 11-7 11zM12 7v4l2.5 1.5',chapters: 'M5 4h14v16H5zM9 8h6M9 12h6M9 16h3', practice: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', paper: 'M6 3h9l4 4v14H6zM15 3v4h4M9 12h6M9 16h6', exams: 'M12 4 2 9l10 5 10-5zM6 11v5c3 2 9 2 12 0v-5',
     recall: 'M12 4a7 7 0 0 0-4 12.7V20h8v-3.3A7 7 0 0 0 12 4zM10 23h4', doubts: 'M9 9a3 3 0 1 1 4.5 2.6c-1 .6-1.5 1.2-1.5 2.4M12 18h.01', tools: 'M14 6l4 4-9 9H5v-4zM13 7l4 4', revision: 'M4 12a8 8 0 0 1 14-5l2 2M20 4v5h-5M20 12a8 8 0 0 1-14 5l-2-2M4 20v-5h5', project: 'M12 2c3 3 4 7 3 12H9C8 9 9 5 12 2zM9 14l-3 3v3l3-2M15 14l3 3v3l-3-2',
     overview: 'M6 20v-6M12 20V6M18 20v-9', patterns: 'M3 12c3-6 5-6 8 0s5 6 10 0', links: 'M9 15l6-6M10 6l1-1a4 4 0 0 1 6 6l-1 1M14 18l-1 1a4 4 0 0 1-6-6l1-1', sky: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z', mocks: 'M4 19V5M4 19h16M8 15v-3M12 15V8M16 15v-5', rank: 'M8 4h8v5a4 4 0 0 1-8 0zM8 6H4c0 3 2 5 4 5M16 6h4c0 3-2 5-4 5M12 13v4M8 20h8', stickers: 'M5 5h14v9l-5 5H5zM14 19v-5h5', bond: 'M12 20S4 15 4 9a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 9c0 6-8 11-8 11z', voyage: 'M12 2c3 3 4 7 3 12H9C8 9 9 5 12 2zM9 14l-3 3v3l3-2M15 14l3 3v3l-3-2', report: 'M6 3h12v18H6zM9 8h6M9 12h6M9 16h4',
     countdown: 'M12 8v5l3 2M12 4a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9 2h6', hangout: 'M4 5h16v11H9l-5 4z', sit: 'M6 13V7a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v6M4 13h16v5H4zM7 18v3M17 18v3', buddy: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-4 3-6 6-6s6 2 6 6M14 14c3-.5 8 1 8 6', comfort: 'M12 20S4 15 4 9a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 9c0 6-8 11-8 11z', memories: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l4 2', letters: 'M3 6h18v12H3zM3 7l9 6 9-6', sunday: 'M12 4v2M5 7l1.5 1.5M19 7l-1.5 1.5M8 14a4 4 0 1 1 8 0M3 18h18',
@@ -7360,6 +7308,7 @@ window.KG_RECALL = {
     // a session still running keeps the desk visible on a break, so it can be finished or left (otherwise Today goes blank)
     try { document.body.classList.toggle('kg-session', !!JSON.parse(localStorage.getItem('ame-habit-v1') || 'null')?.active); } catch (e) {}
     if (on) markRest();
+    M.srPause?.(); // spaced reviews wait out the break (lectures.js)
     M.HOOKS.notes?.();
     if (was !== on) M.render();
   }
@@ -7380,7 +7329,7 @@ window.KG_RECALL = {
 
   /* ---------- study pages stay closed unless you really want in ---------- */
   let peekUntil = 0;
-  const lockCard = () => `<section class="kl-card kl-breakcard"><p class="kl-eyebrow">🌙 RESTING UNTIL ${esc(pretty(L.breakUntil)).toUpperCase()}</p><h3>This page is having a nap too.</h3><p>Your chapters and misses aren't going anywhere. They'll be exactly here when you're back.</p><div class="kl-row"><button class="kl-primary" data-a="go" data-v="company:hangout">🌙 Hang out instead</button><button class="kl-ghost" data-a="breakpeek">Just let me look for a bit</button></div></section>`;
+  const lockCard = () => `<section class="kl-card kl-breakcard"><p class="kl-eyebrow">🌙 RESTING UNTIL ${esc(pretty(L.breakUntil)).toUpperCase()}</p><h3>This page is having a nap too.</h3><p>Your chapters and misses aren't going anywhere. Spaced reviews are paused too, so nothing comes due while you rest. It'll all be exactly here when you're back.</p><div class="kl-row"><button class="kl-primary" data-a="go" data-v="company:hangout">🌙 Hang out instead</button><button class="kl-ghost" data-a="breakpeek">Just let me look for a bit</button></div></section>`;
   const LOCKED = [...M.SECTIONS.study.map(t => t[0]), 'rank'];
   for (const id of LOCKED) {
     const p = M.PANELS[id]; if (!p) continue;
@@ -7423,7 +7372,7 @@ window.KG_RECALL = {
     const last = L.breaks[L.breaks.length - 1], len = last ? M.gap(L.breakUntil, last.from) : 1, n = len <= 3 ? 2 : len <= 7 ? 3 : 5;
     L.softUntil = M.add(today(), n - 1); save();
     setTimeout(() => M.softTick?.(), 1500);
-    setTimeout(() => script([['k', `you're back!! i missed study-you, but i liked rest-you too. the next ${n} days are short ones, okay? no catching up.`], ['i', `Eight hours at most for the next ${n} days. Chasing lost time only costs more of it, so let's not.`], ['k', 'and if your doctor wants longer, just move the date in Settings. no questions asked 🌙']]), 6000);
+    setTimeout(() => script([['k', `you're back!! i missed study-you, but i liked rest-you too. the next ${n} days are short ones, okay? no catching up.`], ['i', `Eight hours at most for the next ${n} days. Chasing lost time only costs more of it, so let's not.`], ['i', 'Your spaced reviews waited with you. They pick up where they stopped, and anything that was already overdue comes back two topics a subject a day.'], ['k', 'and if your doctor wants longer, just move the date in Settings. no questions asked 🌙']]), 6000);
   }
 
   Object.assign(M.ACTIONS, {
@@ -7717,7 +7666,7 @@ window.KG_RECALL = {
   }
   function revEnd(id) {
     if (seen('end:' + id)) return;
-    if (spacedMaths(id)) { if (!soft()) M.I("That's the spaced block. Mark each topic Stuck or Shaky honestly; Shaky ones come back tomorrow, which is the point.", { face: 'study' }); return; }
+    if (spacedMaths(id)) { if (!soft()) M.I("That's the spaced block. Mark each topic honestly: Recalled independently, or Needs another review, which brings it back tomorrow. That's the point.", { face: 'study' }); return; }
     const m = method(id);
     if (soft()) { M.K(`revision done! did ${m.name.toLowerCase()} help? tell iroha one thing you got wrong, if you want 🌙`); return; }
     M.I(`That's the revision block. How did ${m.name} go? Tell me one thing you got wrong: it's the most useful thing you studied, and it goes in your misses.`, { face: 'stern' });
@@ -7804,7 +7753,7 @@ window.KG_RECALL = {
     const list = dueList(); if (!list.length) return '';
     return `<section class="kl-card kg-lecdue"><p class="kl-eyebrow">✦ SPACED REVISION DUE</p><h3>${list.length} lecture${list.length === 1 ? '' : 's'} to revise today</h3>
       ${list.map(e => `<div class="kg-lecrow"><div><b>${esc(label(e))}</b><small>Day ${GAPS[e.stage] || ''} review${e.files?.length ? ` · ${e.files.length} file${e.files.length === 1 ? '' : 's'} saved` : ' · no files'}${progressText(e)}</small></div>
-        <div class="kl-row"><button class="kl-primary" data-a="kglecrev" data-v="${e.id}">Revise with Iroha</button><button data-a="kglecok" data-v="${e.id}" title="Moves it to the next gap">Stuck ✓</button><button class="kl-ghost" data-a="kglecshaky" data-v="${e.id}" title="Back tomorrow">Shaky ↺</button></div></div>`).join('')}</section>`;
+        <div class="kl-row"><button class="kl-primary" data-a="kglecrev" data-v="${e.id}">Revise with Iroha</button><button data-a="kglecok" data-v="${e.id}" title="You got the core ideas back without help. Moves it to the next gap.">✓ Recalled independently</button><button class="kl-ghost" data-a="kglecshaky" data-v="${e.id}" title="Some of it needed hints or answers. Back tomorrow.">↺ Needs another review</button></div></div>`).join('')}</section>`;
   }
   const todayPanel = M.PANELS.today;
   M.PANELS.today = () => { if (window.__kgOnBreak) return todayPanel(); const h = todayPanel(), c = logForm() + dueCard(); const i = h.indexOf('</section>'); return i < 0 ? c + h : h.slice(0, i + 10) + c + h.slice(i + 10); };
@@ -7819,7 +7768,7 @@ window.KG_RECALL = {
         <p class="kl-small">${(L.lecLens[s] || []).length >= 3 ? `Median ${hm(median(L.lecLens[s]))} from ${Math.min(15, L.lecLens[s].length)} lectures → ${P.len[ids[s]]}-minute lecture block, ${P.rev[ids[s]]}-minute revision` : 'Needs 3 lectures before it changes the plan.'}</p>`).join('')}
         <button>Save lengths</button></form></section>`;
     return `<section class="kl-card"><p class="kl-eyebrow">LECTURE NOTES</p><h2>Your lectures, on a spaced schedule</h2><p>Each lecture comes back after 1, 3, 5, 7, 14, 30 and 60 days. Files stay on this device.</p><button data-a="kglecnew">+ Log a lecture</button></section>` + lensCard
-      + (list.length ? list.map(e => `<section class="kl-card kl-mini kg-lecrow"><div><b>${esc(label(e))}</b><small>${e.due ? `Next revision ${e.due <= today() ? 'today' : esc(e.due)}` : 'Done: all 7 revisions'} · ${e.files?.length || 0} file${e.files?.length === 1 ? '' : 's'}${progressText(e)}</small></div>
+      + (list.length ? list.map(e => `<section class="kl-card kl-mini kg-lecrow"><div><b>${esc(label(e))}</b><small>${e.due ? (M.onBreak?.() ? 'Revisions paused for your break' : `Next revision ${e.due <= today() ? 'today' : esc(e.due)}`) : 'Done: all 7 revisions'} · ${e.files?.length || 0} file${e.files?.length === 1 ? '' : 's'}${progressText(e)}</small></div>
         <div class="kl-row"><button data-a="kglecrev" data-v="${e.id}">Revise now</button><button class="kl-ghost" data-a="kglecdel" data-v="${e.id}">Delete</button></div></section>`).join('')
         : '<section class="kl-card kl-mini"><p class="kl-small">Nothing yet. After your next lecture, Iroha will ask you to log it.</p></section>');
   };
@@ -7946,7 +7895,7 @@ window.KG_RECALL = {
     }
     const pdfs = files.filter(x => x.parts?.length), imgs = files.filter(x => !x.parts?.length).map(x => x.img || x.page1).filter(Boolean);
     const day = GAPS[e.stage] || 'extra', outline = files.map(x => x.outline).filter(Boolean).join('\n').slice(0, 5000);
-    window.__kgOnce = `[spaced revision, not typed by me: day-${day} review of ${label(e)}, logged on ${e.made}. What I wrote right after the lecture: "${e.details}". Quiz me on it: 5 questions, one at a time, hardest ideas first. Require independent explanations, derivations where relevant, and transfer to unfamiliar problems within the lecture prerequisites. Track whether each answer was independent or hinted. Recommend Stuck only if the core ideas are independently retrieved; otherwise recommend Shaky with the exact weak point. Use my notes${pdfs.length ? ' (the note pages above, read from my PDF or photos)' : imgs.length ? ' (the attached photo)' : ''} and what I wrote. Spread the questions across the whole lecture, not just the first page.${outline ? ` Outline of the whole lecture, one line per page, so you can pick topics from all of it:\n${outline}` : ''} Don't give an answer until I've tried. At the end, tell me whether to mark it Stuck or Shaky.]`;
+    window.__kgOnce = `[spaced revision, not typed by me: day-${day} review of ${label(e)}, logged on ${e.made}. What I wrote right after the lecture: "${e.details}". Quiz me on it: 5 questions, one at a time, hardest ideas first, from my notes${pdfs.length ? ' (the note pages above, read from my PDF or photos)' : imgs.length ? ' (the attached photo)' : ''} and what I wrote. Spread the questions across the whole lecture, not just the first page.${outline ? ` Outline of the whole lecture, one line per page, so you can pick topics from all of it:\n${outline}` : ''} Don't give an answer until I've tried. At the end, tell me which button to press: "Recalled independently" or "Needs another review".]`;
     if (pdfs.length) window.__kgAttachPdf({ name: e.topic || 'lecture notes', pages: pdfs.reduce((n, p) => n + (p.pages || p.parts.length), 0), parts: pdfs.flatMap(p => p.parts) });
     const ask = `Revision time: ${label(e)}. Quiz me from my saved notes.`;
     if (!pdfs.length && imgs.length) window.__irohaAskImg?.(ask, imgs[0]); else window.__irohaAsk?.(ask);
@@ -7955,10 +7904,11 @@ window.KG_RECALL = {
   function grade(id, ok) {
     const e = L.lectures.find(x => x.id === id); if (!e) return;
     e.reviews = (e.reviews || 0) + 1;
+    (L.revLog = L.revLog || []).push({ d: today(), src: 'lecture', ok: !!ok }); if (L.revLog.length > 2000) L.revLog = L.revLog.slice(-2000);
     if (ok) { e.stage++; e.due = e.stage < GAPS.length ? add(today(), GAPS[e.stage] - GAPS[e.stage - 1]) : ''; }
     else e.due = add(today(), 1);
     save(); M.render();
-    M.I(ok ? (e.due ? `Recorded. ${label(e)} moves to the next review.` : `${label(e)}: all seven scheduled reviews are complete. We'll still check transfer in mixed problems.`) : "That tells us what needs work. It comes back tomorrow. We'll retrieve the weak part again, with a hint if needed.", { face: ok ? 'approve' : 'stern' });
+    M.I(ok ? (e.due ? `Good. ${label(e)} comes back on day ${GAPS[e.stage]}.` : `${label(e)}: all seven revisions done. It's yours now.`) : "Good to know. It's back tomorrow; look over just the weak part once tonight.", { face: ok ? 'approve' : 'stern' });
   }
   Object.assign(M.ACTIONS, {
     kglecrev: b => revise(b.dataset.v),
@@ -7987,6 +7937,34 @@ window.KG_RECALL = {
   }
   setTimeout(tick, 9000); setInterval(tick, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(tick, 1500); });
+
+  /* ---------- a break pauses spaced repetition: every rest day pushes every pending review (lectures, deck cards,
+     misses) back one day, so you come back to the schedule exactly as you left it, not a pile ---------- */
+  const pendingSR = () => [...L.lectures, ...(L.cards || []), ...(L.attempts || []).filter(x => !x.ok)].filter(x => x.due);
+  const shiftSR = n => { if (n) for (const x of pendingSR()) x.due = add(x.due, n); };
+  // anything that was already overdue before the break comes back gently: two lectures a subject, ten cards, five misses a day
+  function spreadSR() {
+    const d = today(), out = (list, per, key) => { const n = {}; for (const x of list) { const k = key ? key(x) : '', i = n[k] = (n[k] || 0) + 1; x.due = add(d, Math.floor((i - 1) / per)); } };
+    const old = list => list.filter(x => x.due && x.due <= d).sort((a, b) => a.due.localeCompare(b.due));
+    out(old(L.lectures), 2, e => e.subj);
+    out(old(L.cards || []), 10);
+    out(old((L.attempts || []).filter(x => !x.ok)), 5);
+  }
+  function srPause() {
+    const d = today();
+    if (M.onBreak?.()) {
+      // the first break day counts too, so a review due on day 1 of the break is still due a day after you're back
+      if (!L.srPause) { const b = (L.breaks || []).slice(-1)[0]; L.srPause = { day: add(b && b.from <= d ? b.from : d, -1) }; }
+      const n = M.gap(d, L.srPause.day);
+      if (n > 0) { shiftSR(n); L.srPause.day = d; save(); M.softRender?.(); }
+    } else if (L.srPause) {
+      // catch up any break days the site wasn't opened on; ending the break early takes back today's shift
+      if (L.breakUntil) shiftSR(M.gap(add(L.breakUntil, -1), L.srPause.day));
+      delete L.srPause; spreadSR(); save(); M.render();
+    }
+  }
+  M.srPause = srPause;
+  srPause();
 
   window.__kgLecDue = () => window.__kgOnBreak ? [] : dueList().map(label);
   window.__kgLecPending = () => !window.__kgOnBreak && L.lecPending?.date === today() ? L.lecPending.subj : '';
@@ -8064,20 +8042,796 @@ window.KG_RECALL = {
 })();
 
 </script>
+<script id="kg-recommend-script">
+/* ===== Today, simplified: one recommended session with the reason for it, one tap to start it or to resume.
+   The rest of Today folds under "More for today". Nothing here changes the plan, the schedule or what gets logged:
+   starting fills in the desk's own session form, so minutes count exactly as before. ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab; if (!M) return;
+  const { L, today, esc } = M;
+  const $ = id => document.getElementById(id);
+  const SUBJ = { maths: 'Maths', physics: 'Physics', chem: 'Chemistry' };
+  const GAPS = [1, 3, 5, 7, 14, 30, 60];
+  const subjOf = id => SUBJ[String(id || '').split('-')[0]] || 'Mixed';
+  const habit = () => { try { return JSON.parse(localStorage.getItem('ame-habit-v1') || 'null') || {}; } catch (e) { return {}; } };
+  // plan time: minutes since 10:30, the way the schedule counts
+  const nowT = () => { const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); return (m < 630 ? m + 1440 : m) - 630; };
+  const clock = t => { const m = (t + 630) % 1440; return new Date(2000, 0, 1, Math.floor(m / 60), m % 60).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+  const pretty = d => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  const dow = () => new Date(today() + 'T12:00:00').getDay();
+  const lecLabel = e => [e.subj, e.ch ? M.chName(e.ch) : '', e.topic].filter(Boolean).join(' · ');
+  const dueLec = subj => (L.lectures || []).filter(e => e.due && e.due <= today() && (!subj || e.subj === subj)).sort((a, b) => a.due.localeCompare(b.due));
+  const schedule = () => window.StudySchedule ? window.StudySchedule(!!M.days()[today()]?.shortDay, dow()) : [];
+  const method = id => window.StudyPlan?.hours?.() === 12
+    ? { name: 'Self-test', how: 'Timed questions, no notes. Check every answer and log every miss.' }
+    : window.StudyPlan?.revMethod?.(dow(), id) || { name: 'Self-test', how: 'Without notes, solve 3 questions on this lecture. Check each one and log any miss.' };
+  const sentence = s => String(s || '').split(/(?<=[.!?])\s/)[0].slice(0, 190);
+  const deskFor = (b, minutes) => ({ subject: subjOf(b.id), topic: b.title, task: b.title, kind: /errors/.test(b.id) ? 'mistakes' : 'recall', minutes });
+
+  /* ---------- what to do now, and why ---------- */
+  function rec() {
+    if (M.onBreak?.()) return null;
+    const d = today(), a = habit().active;
+    // a guided session in progress comes back exactly where it was (session.js)
+    const mr = M.modeRec?.(); if (mr) return mr; // a short break you chose (growth.js)
+    const fr = M.flowRec?.(); if (fr) return fr;
+    if (a) {
+      const done = Math.round(((a.accruedMs || 0) + (a.running && a.lastStart ? Date.now() - a.lastStart : 0)) / 60000), goal = Math.round((a.targetMs || 0) / 60000), close = a.phase === 'closeout';
+      return { eye: 'PICK UP WHERE YOU LEFT OFF', title: a.task || 'Your session', resume: 1,
+        why: close ? `${a.subject} · ${a.topic}. The time is done; only the close-out is left: what you did, and what to fix next.` : `${a.subject} · ${a.topic}. ${done} of ${goal} minutes done, ${a.running ? 'still running' : 'paused'}.`,
+        btn: close ? 'Finish the close-out' : a.running ? 'Back to it' : 'Resume', run: { resume: 1 } };
+    }
+    const p = L.lecPending;
+    if (p && p.date === d) return { eye: "WHILE IT'S FRESH", title: `Log your ${p.subj} lecture`, why: 'Two minutes now saves the lecture: Iroha brings it back on days 1, 3, 5, 7, 14, 30 and 60 and quizzes you from your own notes.', btn: 'Log it', run: { log: 1 } };
+    const t = nowT(), b = M.block(), list = schedule(), next = list.find(x => x.kind === 'study' && x.start > t);
+    if (M.isNight?.() || b?.id === 'wind' || (b?.kind === 'sleep' && !next)) return { eye: 'TONIGHT', title: b?.id === 'wind' ? `Wind down until ${clock(b.end)}` : 'Study is done for today', why: 'Screens off soon. Sleep at 1:00 is part of the plan, and tomorrow carries on from here with nothing to make up.', quiet: 1 };
+    if (M.days()[d]?.rested) return { eye: 'REST DAY', title: 'Today is a rest day', why: 'It counts, and the chain is safe.', quiet: 1 };
+    if (b && b.kind === 'study') return forBlock(b, t);
+    const started = list.some(x => x.kind === 'study' && x.start <= t);
+    if (next && !started) return { eye: 'UP NEXT', title: `${next.title} at ${clock(next.start)}`, why: `Your plan starts then, and the time until then is yours.${b ? ` Right now: ${b.title.toLowerCase()}.` : ''} If you'd like a head start, five minutes is enough.`, btn: 'Start with 5 minutes', run: { desk: deskFor(next, 5) } };
+    if (b) return { eye: /^free/.test(b.id) ? 'FREE TIME' : 'BREAK', title: `${b.title} until ${clock(b.end)}`, why: `It's part of the plan, so this time is yours.${next ? ` Next: ${next.title} at ${clock(next.start)}.` : ''}`, btn: 'Hang out with Kaguya', run: { go: 'company:hangout' } };
+    if (next) return { eye: 'UP NEXT', title: `${next.title} at ${clock(next.start)}`, why: 'Five minutes now is a head start, if you want one.', btn: 'Start with 5 minutes', run: { desk: deskFor(next, 5) } };
+    return { eye: 'TODAY', title: 'No study blocks today', why: 'Sunday is the rest day in your plan. Resting keeps the chain.', quiet: 1 };
+  }
+  const spaced = (due, s, left, eye, where) => {
+    const e = due[0];
+    return { eye, title: `Spaced revision: ${lecLabel(e)}`, why: `It's due${e.due < today() ? `, waiting since ${pretty(e.due)}` : ' today'}, and due work comes first, oldest first. Day ${GAPS[e.stage] || ''} review, about ten minutes with Iroha${due.length > 1 ? `, then ${due.length - 1} more` : ''}${where}.`, btn: 'Start revising', run: { desk: { subject: s, topic: e.topic || s, task: 'Spaced revision with Iroha: ' + lecLabel(e), kind: 'recall', minutes: left }, lec: e.id } };
+  };
+  function forBlock(b, t) {
+    const id = b.id, s = subjOf(id), until = clock(b.end), left = Math.max(5, Math.min(180, b.end - t));
+    const eye = `NOW · ${b.title.replace(/\s*\([^)]*\)/g, '').toUpperCase()} UNTIL ${until.toUpperCase()}`;
+    if (/-sp$/.test(id)) { const due = dueLec(s); if (due.length) return spaced(due, s, left, eye, ''); }
+    if (/-rev$/.test(id)) {
+      // no spaced block on this plan: due lectures of this subject come first in its revision block
+      const due = schedule().some(x => /-sp$/.test(x.id)) ? [] : dueLec(s);
+      if (due.length) return spaced(due, s, left, eye, `, then today's ${s} lecture`);
+      const m = method(id), n = M.coachDue?.() || 0;
+      return { eye, title: `${s} revision: ${m.name}`, why: `${n ? `${n} spaced review${n === 1 ? '' : 's'} due first, in Study · Recall. ` : ''}${sentence(m.how)} Rereading feels productive but barely sticks.`, btn: 'Start', run: { desk: { subject: s, topic: "Today's lecture", task: `${m.name}: ${sentence(m.how)}`, kind: 'recall', minutes: left } } };
+    }
+    if (id === 'maths-hw') return { eye, title: 'Maths homework', why: 'Hardest question first, about ten minutes each. Check against the solutions at the end, not during.', btn: 'Start', run: { desk: { subject: 'Maths', topic: 'Homework', task: 'Maths homework, hardest question first', kind: 'recall', minutes: left } } };
+    if (SUBJ[id]) return { eye, title: `${s} lecture`, why: "Every 15 minutes or so, pause and say the last idea out loud: that's what makes it stick. Iroha asks you to log it afterwards.", btn: 'Start the lecture', run: { desk: { subject: s, topic: `${s} lecture`, task: `${s} lecture, pausing every 15 minutes to recall`, kind: 'recall', minutes: left } } };
+    return { eye, title: b.title, why: "It's the block your plan has for right now.", btn: 'Start', run: { desk: deskFor(b, left) } };
+  }
+  function alts(r) {
+    if (r.alts) return r.alts;
+    if (r.quiet) return [];
+    const out = [], due = dueLec();
+    if (due.length && !r.run?.lec && !r.resume) out.push({ label: `Revise ${due[0].topic || lecLabel(due[0])} (due)`, run: { lec: due[0].id } });
+    if (L.ask?.q && !r.resume) out.push({ label: "Answer Iroha's question", run: { go: 'study:recall' } });
+    if (!r.resume && M.flowStart) { const ds = r.run?.desk; out.push({ label: 'Guided session', run: { flow: ds ? { subj: ds.subject, topic: ds.topic, lec: r.run.lec, act: r.run.lec ? 'recall' : '' } : {} } }); }
+    if (!r.resume) out.push({ label: 'Set up my own session', run: { own: 1 } }, { label: "I can't get started", run: { own: 1, rescue: 1 } });
+    return out.slice(0, 4);
+  }
+  function card() {
+    const r = rec(); if (!r) return '';
+    const alt = alts(r);
+    return `<section class="kl-card kg-rec${r.quiet ? ' quiet' : ''}"><p class="kl-eyebrow">${esc(r.eye)}</p><h2>${esc(r.title)}</h2>
+      <p class="kg-why">${r.quiet ? '' : '<b>Why this:</b> '}${esc(r.why)}</p>
+      ${r.btn || alt.length ? `<div class="kl-row">${r.btn ? `<button class="kl-primary" data-a="kgrec">${esc(r.btn)}</button>` : ''}${alt.map((x, i) => `<button class="kl-ghost" data-a="kgalt" data-v="${i}">${esc(x.label)}</button>`).join('')}</div>` : ''}</section>`;
+  }
+
+  /* ---------- doing it ---------- */
+  // stay: start the desk's timer from another page without going to Today (the form is in the page, just hidden)
+  function startDesk(o, tries = 0, stay = false) {
+    const f = $('hb-start');
+    if (!f) { if (!stay && tries < 5) { M.go('today'); setTimeout(() => startDesk(o, tries + 1), 150); } return false; }
+    const set = (n, v) => { const el = f.elements[n]; if (el && v != null) el.value = v; };
+    set('task', String(o.task).slice(0, 200)); set('subject', o.subject); set('topic', String(o.topic).slice(0, 80)); set('kind', o.kind);
+    set('minutes', Math.max(5, Math.min(180, Math.round(o.minutes))));
+    if (f.elements.phone) f.elements.phone.checked = true; // the button says it: phone away, then start
+    document.body.classList.add('kg-session');
+    f.requestSubmit();
+    return true;
+  }
+  M.startDesk = (o, stay) => startDesk(o, 0, stay);
+  function run(x) {
+    if (!x) return;
+    if (x.go) { const [s, t] = x.go.split(':'); return M.go(s, t); }
+    if (x.flow) return M.flowStart?.(x.flow);
+    if (typeof x.fn === 'function') return x.fn();
+    if (x.resume || x.own) {
+      if (x.own) document.body.classList.add('kg-own');
+      M.go('today');
+      return setTimeout(() => {
+        if (x.rescue) return $('hb-start')?.querySelector('[data-action="rescue"]')?.click();
+        const el = x.own ? $('hb-start') : $('hb-session-card');
+        el?.scrollIntoView({ behavior: document.body.classList.contains('kg-calm') ? 'auto' : 'smooth', block: x.own ? 'center' : 'start' });
+        if (x.own) el?.elements?.task?.focus({ preventScroll: true });
+      }, 80);
+    }
+    if (x.log) { const f = document.querySelector('.kg-lec form'); f?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return f?.elements.topic?.focus({ preventScroll: true }); }
+    if (x.desk) startDesk(x.desk);
+    if (x.lec) M.ACTIONS.kglecrev?.({ dataset: { v: x.lec } });
+  }
+  Object.assign(M.ACTIONS, {
+    kgrec: () => run(rec()?.run),
+    kgalt: b => { const r = rec(); if (r) run(alts(r)[+b.dataset.v]?.run); }
+  });
+  // the scene's ▶ Start does the same as the recommended button
+  document.addEventListener('click', e => {
+    if (!e.target.closest?.('#kgs-cta')) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const r = rec(); run(r?.run || { own: 1 });
+  }, true);
+
+  /* ---------- Today: the recommendation first, the extras folded ---------- */
+  const FOLD = '.kg-dream, .kg-stepup, .kl-companycard:not(.warm), .kl-fold, .kg-labnote, .kl-next, .kl-good';
+  const MORE = 'kg-more-open';
+  const moreOpen = () => { try { return localStorage.getItem(MORE) === '1'; } catch (e) { return false; } };
+  const prev = M.PANELS.today;
+  M.PANELS.today = () => {
+    const h = prev();
+    if (M.onBreak?.()) return h;
+    const tpl = document.createElement('template'); tpl.innerHTML = h;
+    const folded = [...tpl.content.children].filter(el => el.matches(FOLD));
+    const n = folded.length + document.querySelectorAll('#hb-content > .hb-stack > :is(.hb-nudge, .hb-extra, .hb-grid, article.hb-card:not(#hb-session-card):not(#hb-day-map), details.hb-card)').length;
+    const more = document.createElement('details'); more.className = 'kl-card kg-more'; more.open = moreOpen();
+    more.innerHTML = `<summary>More for today <small>${n ? `${n} more` : 'quests, treats and notes'}</small></summary>`;
+    folded.forEach(el => more.append(el));
+    tpl.content.append(more);
+    return card() + tpl.innerHTML;
+  };
+  document.addEventListener('toggle', e => {
+    if (!e.target.classList?.contains('kg-more')) return;
+    document.body.classList.toggle(MORE, e.target.open);
+    try { localStorage.setItem(MORE, e.target.open ? '1' : '0'); } catch (err) {}
+  }, true);
+  document.body.classList.add('kg-simple');
+  document.body.classList.toggle(MORE, moreOpen());
+  // starting, pausing or ending a session changes what the card says
+  let was = !!habit().active;
+  addEventListener('habit:change', () => setTimeout(() => {
+    const on = !!habit().active; if (!on) document.body.classList.remove('kg-session');
+    if (on !== was) { was = on; M.softRender?.(); }
+  }, 60));
+  // the minutes on the card move, so it refreshes now and then
+  setInterval(() => { if (!document.hidden && document.body.classList.contains('kg-sec-today') && !document.activeElement?.closest?.('form')) M.softRender?.(); }, 60000);
+
+  const css = document.createElement('style');
+  css.textContent = `.kg-rec{border-color:rgba(245,210,122,.55)!important;background:linear-gradient(160deg,rgba(58,44,104,.96),rgba(24,21,50,.96))!important}
+.kg-rec h2{margin:4px 0 6px;font-size:clamp(20px,2.6vw,26px);line-height:1.25}
+.kg-rec .kg-why{margin:0 0 12px;color:#d8d2f6;max-width:68ch}.kg-rec .kg-why b{color:#f5d27a;font-weight:700}
+.kg-rec.quiet{border-color:rgba(143,183,255,.45)!important;background:linear-gradient(160deg,#1c2146,#17142f)!important}
+.kg-rec .kl-row{gap:8px}.kg-rec .kl-primary{font-size:15px;padding:10px 18px}
+.kg-more>summary{cursor:pointer;font-weight:700;list-style:none;display:flex;align-items:center;gap:10px}
+.kg-more>summary::-webkit-details-marker{display:none}.kg-more>summary::before{content:'▸';transition:transform .15s}.kg-more[open]>summary::before{transform:rotate(90deg)}
+.kg-more>summary small{opacity:.65;font-weight:500}.kg-more[open]>summary{margin-bottom:12px}.kg-more>.kl-card,.kg-more>details{margin:10px 0 0}
+body.kg-sec-today.kg-simple:not(.${MORE}) #hb-content>.hb-stack>:is(.hb-nudge,.hb-extra,.hb-grid,article.hb-card:not(#hb-session-card):not(#hb-day-map),details.hb-card){display:none!important}
+body.kg-sec-today.kg-simple:not(.kg-session):not(.kg-own) #hb-session-card{display:none!important}`;
+  document.head.appendChild(css);
+})();
+
+</script>
+<script id="kg-session-script">
+/* ===== Guided session: goal → attempt → feedback → repair → save, in a quiet workspace (Study · Session).
+   Six activities. In Explain (Feynman mode) Kaguya listens and asks the curious question, then Iroha checks.
+   Everything is saved as you type, so a reload or a closed tab picks up exactly where it was.
+   Minutes run on the desk's own timer, and saving fills in the desk's close-out, so they count as before. ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab; if (!M) return;
+  const { L, save, today, esc } = M;
+  const $ = id => document.getElementById(id);
+  const habit = () => { try { return JSON.parse(localStorage.getItem('ame-habit-v1') || 'null') || {}; } catch (e) { return {}; } };
+  const ACTS = {
+    recall: { name: 'Recall', icon: '🧠', what: 'Write down everything you remember, no notes.', best: 'after a lecture, or a due review', ask: 'Everything you remember, from memory: definitions, formulas, an example, and how the ideas connect.', check: 'Compare it with what the topic needs (and my lecture notes, if given): what is solid, and what is missing or wrong.', kind: 'recall', mins: 15 },
+    blurt: { name: 'Blurt', icon: '💨', what: 'Five fast minutes: dump it all out, then find the gaps.', best: 'a quick check before revising', ask: "Go fast. Fragments are fine. Don't stop to check anything.", check: 'It was written fast, so ignore style and order; find the most important idea that is missing or wrong.', kind: 'recall', mins: 10 },
+    explain: { name: 'Explain', icon: '🗣', what: 'Feynman mode: explain it simply to Kaguya, then Iroha checks.', best: "things you can do but can't say why", ask: "Explain it to someone clever who has never seen it. Plain words, one example, and why it works.", check: 'Check the explanation for accuracy and find the spot where it turns vague or skips the why.', kind: 'recall', mins: 20 },
+    solve: { name: 'Solve', icon: '✏️', what: 'One real problem, with all your working.', best: 'practice and homework-style questions', ask: 'Write the question first, then every step of your working, then your final answer.', check: 'Check the working fully. If the answer is right, say so first. If not, point at the first line that breaks and give a hint, not the full solution.', kind: 'recall', mins: 25 },
+    compare: { name: 'Compare', icon: '⚖️', what: 'Two ideas side by side: alike, different, and when to use which.', best: 'topics you mix up', ask: 'Name the two things. How are they alike? How are they different? How do you tell which one a question needs?', check: 'Check that the comparison is accurate and that the "which one when" test would actually work on a real question.', kind: 'recall', mins: 15 },
+    diagnose: { name: 'Diagnose', icon: '🩺', what: 'Take a mistake apart: what went wrong, and the rule that stops it.', best: 'a wrong answer from homework, a mock or your misses', ask: "The question and your wrong step. Then: what went wrong, why it happened, and the rule you'll use next time.", check: 'Check whether the diagnosis finds the real cause (not just "a silly mistake") and whether the rule would really prevent it.', kind: 'mistakes', mins: 15 }
+  };
+  const STEPS = ['goal', 'attempt', 'feedback', 'repair', 'save'];
+  const NAMES = { goal: 'Goal', attempt: 'Attempt', feedback: 'Feedback', repair: 'Repair', save: 'Save' };
+  const SUBJS = ['Maths', 'Physics', 'Chemistry', 'Mixed'];
+  L.flowLog = L.flowLog || [];
+  if (L.flow) L.flow.busy = '';
+  const blank = o => Object.assign({ id: M.uid(), act: '', subj: 'Maths', topic: '', goal: '', lec: '', miss: '', dispute: '', disputed: '', mins: 25, step: 'goal', attempt: '', kq: '', ka: '', fb: '', right: '', gap: '', fix: '', repair: '', rfb: '', fixed: false, made: today(), started: 0, desk: false, busy: '' }, o || {});
+  const lecture = id => (L.lectures || []).find(e => e.id === id);
+  const lecLabel = e => [e.subj, e.ch ? M.chName(e.ch) : '', e.topic].filter(Boolean).join(' · ');
+  const noGap = f => !f.gap || /^none\b/i.test(f.gap.trim());
+
+  /* ---------- getting in and out ---------- */
+  M.flowStart = (o = {}) => {
+    if (!L.flow || L.flow.step === 'goal') {
+      const e = o.lec && lecture(o.lec), x = o.miss && (L.attempts || []).find(a => a.id === o.miss);
+      L.flow = blank({ act: x ? 'diagnose' : o.act || '', subj: SUBJS.includes(o.subj) ? o.subj : e?.subj || 'Maths', topic: x ? String(x.q || '').slice(0, 120) : o.topic && !/lecture$/i.test(o.topic) ? o.topic : e?.topic || '', lec: o.lec || '', miss: x ? x.id : '' });
+      save();
+    }
+    M.go('study', 'session');
+  };
+  const missOf = f => f.miss && (L.attempts || []).find(a => a.id === f.miss);
+  M.flowRec = () => {
+    const f = L.flow; if (!f || f.step === 'goal' || !ACTS[f.act]) return null;
+    return { eye: 'PICK UP WHERE YOU LEFT OFF', title: `${ACTS[f.act].name}: ${f.topic}`, why: `Your guided session is at step ${STEPS.indexOf(f.step) + 1} of 5, ${NAMES[f.step].toLowerCase()}. Everything you wrote is still there.`, btn: 'Back to it', resume: 1, run: { go: 'study:session' } };
+  };
+
+  /* ---------- asking the companions ---------- */
+  const notes = f => {
+    const e = f.lec && lecture(f.lec), x = missOf(f);
+    return (e?.details ? ` What I wrote right after that lecture: "${e.details.slice(0, 1200)}".` : '') + (x ? ` This is a mistake from my notebook: "${x.q}"${x.cause ? `, logged as ${x.cause}` : ''}${x.fix ? `, with the fix I wrote then: "${x.fix}"` : ''}.` : '');
+  };
+  const part = (s, k, next) => { const m = new RegExp('(?:^|\\n)\\s*\\**' + k + '\\**\\s*:\\s*([\\s\\S]*?)(?=\\n\\s*\\**(?:' + next + ')\\**\\s*:|$)', 'i').exec(s); return m ? m[1].trim() : ''; };
+  // when a reply doesn't come: say plainly if it's because there's no internet
+  const dropped = (what, again) => M.K(navigator.onLine ? `iroha's line dropped! ${what}, try ${again} again in a moment 🌙` : `you're offline right now. ${what}; ${again} when the internet is back 🌙`);
+  async function ask(who, text) { const r = await window.__kgAsk?.(who, text).catch(() => null); return r && r.reply ? String(r.reply).trim() : ''; }
+  async function check() {
+    const f = L.flow, A = ACTS[f.act]; if (!f || f.busy) return;
+    if (f.attempt.trim().length < 20) return M.I('Write a little more first. Even a rough attempt gives me something to check.', { face: 'study' });
+    f.busy = 'iroha'; f.dispute = ''; f.disputed = ''; M.render();
+    const kag = f.kq ? `\n\nKaguya, listening, asked: "${f.kq}"\nMy answer: ${f.ka.trim() || '(I skipped it)'}` : '';
+    const reply = await ask('iroha', `[guided session, not typed by me. Activity: ${A.name}: ${A.what} Subject: ${f.subj}. Topic: ${f.topic}.${f.goal ? ` My goal: ${f.goal}.` : ''}${notes(f)}]\n\nMy attempt:\n${f.attempt.trim()}${kag}\n\n[How to check it: ${A.check} Reply in plain text in exactly three short parts, each on its own line and starting with its label. "Right:" what is correct (say "Correct." plainly if all of it is). "Gap:" the single most important thing that is missing or wrong, and why it matters, or "None." "Repair:" one small task I can do in under five minutes that fixes that gap, or "None." Nothing else.]`);
+    f.busy = '';
+    if (!reply) { save(); M.render(); return dropped('your attempt is saved', 'the check'); }
+    f.fb = reply; f.right = part(reply, 'Right', 'Gap|Repair'); f.gap = part(reply, 'Gap', 'Repair|Right'); f.fix = part(reply, 'Repair', 'Right|Gap');
+    f.step = 'feedback'; f.rfb = ''; f.fixed = false; save(); M.render();
+  }
+  async function listen() {
+    const f = L.flow; if (!f || f.busy) return;
+    if (f.attempt.trim().length < 20) return M.K('explain a bit more first! i need something to be confused about 🌙');
+    f.busy = 'kaguya'; M.render();
+    const reply = await ask('kaguya', `[Feynman mode, not typed by me: I'm explaining ${f.topic} to you as simply as I can. You're the curious listener, not the checker: don't correct anything and don't teach. React in a few words, then ask the one "but why?" or "what does that word mean?" question a curious person would ask where my explanation is vaguest. Two short lines at most.]\n\nMy explanation:\n${f.attempt.trim()}`);
+    f.busy = ''; if (reply) f.kq = reply; else M.K(navigator.onLine ? "i lost the signal for a sec! say it again? 🌙" : "you're offline, so i can't hear you yet. it's all saved, tell me when you're back online 🌙");
+    save(); M.render();
+  }
+  // trustworthy grading: a verdict you doubt gets rechecked from scratch, and the outcome is shown and logged either way
+  async function dispute() {
+    const f = L.flow, A = ACTS[f?.act]; if (!f || f.busy || !A) return;
+    f.busy = 'iroha'; M.render();
+    const reply = await ask('iroha', `[guided session recheck, not typed by me. I think your check of my ${A.name} on ${f.topic} is wrong.${notes(f)}]\n\nMy attempt:\n${f.attempt.trim()}\n\nYour check:\n${f.fb}\n\n[Re-derive it from scratch, without assuming your first check was right. Then reply in plain text: first line "Verdict: corrected" if your check was wrong in any way, or "Verdict: stands" if it was right. Then one or two lines on why. If corrected, add the three corrected parts on their own lines: "Right:", "Gap:" (or "None."), "Repair:" (or "None.").]`);
+    f.busy = '';
+    if (!reply) { save(); M.render(); return dropped('nothing is lost', 'the recheck'); }
+    const corrected = /verdict:\s*corrected/i.test(reply), body = reply.replace(/^\s*\**verdict:[^\n]*\n?/i, '').trim();
+    f.disputed = corrected ? 'corrected' : 'stands';
+    f.dispute = body.split(/\n\s*\**(?:Right|Gap|Repair)\**\s*:/i)[0].trim() || body;
+    if (corrected) { const r = part(body, 'Right', 'Gap|Repair'), g = part(body, 'Gap', 'Repair|Right'), x = part(body, 'Repair', 'Right|Gap'); if (r || g || x) { f.right = r; f.gap = g; f.fix = x; f.fb = body; } }
+    save(); M.render();
+  }
+  async function checkRepair() {
+    const f = L.flow; if (!f || f.busy) return;
+    if (f.repair.trim().length < 5) return M.I('Do the repair first, then I will look.', { face: 'study' });
+    f.busy = 'iroha'; M.render();
+    const reply = await ask('iroha', `[guided session repair, not typed by me. Topic: ${f.topic}. The gap you found: ${f.gap} The repair task: ${f.fix}]\n\nMy repair:\n${f.repair.trim()}\n\n[In at most three short lines: does this fix the gap? Start with "Fixed." if it does. If it doesn't, start with "Still missing:" and say exactly what, kindly.]`);
+    f.busy = ''; if (reply) { f.rfb = reply; f.fixed = /^\W*fixed\b/i.test(reply); } else dropped('your repair is saved', 'the check');
+    save(); M.render();
+  }
+
+  /* ---------- the desk: its timer runs during the session, and saving closes it with a real close-out ---------- */
+  function closeDesk(f, mood) {
+    if (!f.desk || !habit().active) return;
+    $('hb-session-card')?.querySelector('[data-action="end"]')?.click();
+    setTimeout(() => {
+      const c = $('hb-closeout'); if (!c) return;
+      const A = ACTS[f.act], set = (n, v) => { const el = c.elements[n]; if (el && v != null) el.value = String(v).slice(0, el.maxLength > 0 ? el.maxLength : 1000); };
+      const lines = f.attempt.split(/\n+|(?<=[.!?])\s+/).map(s => s.trim()).filter(s => s.length > 3);
+      const recall = [...lines, f.goal, noGap(f) ? '' : f.gap, f.fix, f.topic].filter(Boolean);
+      set('win', `${A.name}: ${f.topic}${f.fixed ? ', gap repaired' : noGap(f) ? ', no gaps found' : ''}`); set('mood', mood || 'calm');
+      [1, 2, 3].forEach(i => set('recall' + i, recall[i - 1] || f.topic));
+      set('discovery', noGap(f) ? '' : f.gap);
+      set('attempts', f.act === 'solve' ? 1 : 0); set('correct', f.act === 'solve' && noGap(f) ? 1 : 0);
+      set('next', !noGap(f) && !f.fixed && f.fix && !/^none\b/i.test(f.fix) ? f.fix : `Review ${f.topic}`);
+      c.requestSubmit();
+    }, 120);
+  }
+
+  /* ---------- the workspace ---------- */
+  const head = f => `<div class="kg-flow-top"><ol class="kg-flow-steps">${STEPS.map((s, i) => `<li class="${s === f.step ? 'on' : STEPS.indexOf(f.step) > i ? 'done' : ''}"${s === f.step ? ' aria-current="step"' : ''}>${i + 1}. ${NAMES[s]}</li>`).join('')}</ol>
+    <div class="kl-row"><button class="kl-ghost" data-a="flowleave" title="Everything stays saved">Leave for now</button>${f.step !== 'goal' ? '<button class="kl-ghost" data-a="flowdrop">Discard</button>' : ''}</div></div>`;
+  const busyBtn = (f, who, label) => f.busy === who ? `${who === 'kaguya' ? 'Kaguya' : 'Iroha'} is reading…` : label;
+  function goalStep(f) {
+    const lecs = (L.lectures || []).filter(e => e.topic).sort((a, b) => (a.due && a.due <= today() ? 0 : 1) - (b.due && b.due <= today() ? 0 : 1) || (b.made || '').localeCompare(a.made || '')).slice(0, 20);
+    return `<form data-f="flowgoal" class="kl-stack"><p class="kl-eyebrow">GUIDED SESSION</p><h2>What will you work on?</h2>
+      <fieldset class="kg-acts"><legend class="kl-small">Pick how you'll practise</legend>${Object.entries(ACTS).map(([k, a]) => `<label class="kg-act"><input type="radio" name="act" value="${k}" ${f.act === k ? 'checked' : ''} required><b>${a.icon} ${a.name}</b><span>${esc(a.what)}</span><small>Good for ${esc(a.best)}</small></label>`).join('')}</fieldset>
+      <div class="kg-flow-grid"><label>Subject <select name="subj">${SUBJS.map(s => `<option ${s === f.subj ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+      <label>From a lecture (optional) <select name="lec"><option value="">None</option>${lecs.map(e => `<option value="${e.id}" ${e.id === f.lec ? 'selected' : ''}>${esc(lecLabel(e))}${e.due && e.due <= today() ? ' · due' : ''}</option>`).join('')}</select></label></div>
+      <label>Topic <input name="topic" maxlength="120" value="${esc(f.topic)}" placeholder="e.g. Log inequalities with base below 1"></label>
+      <label>Goal <input name="goal" maxlength="200" value="${esc(f.goal)}" placeholder="By the end I can… (optional)"></label>
+      <label class="kg-flow-mins">Minutes on the desk timer <input name="mins" type="number" min="5" max="90" value="${f.mins || 25}"></label>
+      <div class="kl-row"><button class="kl-primary">Start the attempt</button><span class="kl-small">The desk timer starts too, so the minutes count.</span></div></form>`;
+  }
+  function attemptStep(f, A) {
+    return `<p class="kl-eyebrow">${A.icon} ${A.name.toUpperCase()} · ${esc(f.subj)} · ${esc(f.topic)}</p><h2>${esc(f.goal || A.what)}</h2>
+      <p class="kl-small">${esc(A.ask)}${f.act === 'explain' ? ' Feynman mode: Kaguya listens first, then Iroha checks.' : ''} No notes; it saves as you type.</p>
+      ${missOf(f) ? `<div class="kg-flow-k kg-flow-miss"><b>The mistake</b><p>${esc(missOf(f).q)}</p>${missOf(f).cause || missOf(f).fix ? `<p class="kl-small">${missOf(f).cause ? 'Logged as ' + esc(missOf(f).cause) + '. ' : ''}${missOf(f).fix ? 'Your fix back then: ' + esc(missOf(f).fix) : ''}</p>` : ''}</div>` : ''}
+      <textarea data-flow="attempt" rows="14" maxlength="6000" aria-label="Your attempt" placeholder="${esc(A.ask)}">${esc(f.attempt)}</textarea>
+      ${f.act === 'explain' ? (f.kq ? `<div class="kg-flow-k"><b>Kaguya</b><p>${esc(f.kq)}</p></div><textarea data-flow="ka" rows="3" maxlength="1500" aria-label="Your answer to Kaguya" placeholder="Answer her, simply (optional)">${esc(f.ka)}</textarea>` : `<div class="kl-row"><button data-a="flowlisten" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'kaguya', '🗣 Tell Kaguya')}</button><span class="kl-small">She asks the question a curious friend would.</span></div>`) : ''}
+      <div class="kl-row"><button class="kl-primary" data-a="flowcheck" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'iroha', 'Check it with Iroha')}</button></div>`;
+  }
+  function feedbackStep(f, A) {
+    const parsed = f.right || f.gap || f.fix, clean = noGap(f) && parsed;
+    return `<p class="kl-eyebrow">IROHA CHECKED YOUR ${A.name.toUpperCase()}</p><h2>${clean ? 'No gaps found.' : 'Here is the gap to work on.'}</h2>
+      ${f.kq ? `<div class="kg-flow-k"><b>Kaguya asked</b><p>${esc(f.kq)}</p>${f.ka.trim() ? `<p><i>You said:</i> ${esc(f.ka)}</p>` : ''}</div>` : ''}
+      <div class="kg-flow-fb">${parsed ? `<p><b>Right</b>${esc(f.right || '—')}</p><p><b>Gap</b>${esc(f.gap || '—')}</p><p><b>Repair</b>${esc(f.fix || '—')}</p>` : `<p class="kl-pre">${esc(f.fb)}</p>`}</div>
+      <details class="kg-flow-mine"><summary>Your attempt</summary><p class="kl-pre">${esc(f.attempt)}</p></details>
+      ${f.dispute ? `<div class="kg-flow-k kg-flow-recheck"><b>${f.disputed === 'corrected' ? 'She rechecked and corrected herself' : 'She rechecked and stands by it'}</b><p>${esc(f.dispute)}</p></div>` : ''}
+      ${f.dispute ? '' : `<div class="kl-row"><button class="kl-ghost" data-a="flowdispute" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'iroha', "I think she's wrong")}</button><span class="kl-small">She re-derives it from scratch and says plainly if she was wrong.</span></div>`}
+      <div class="kl-row">${clean ? '<button class="kl-primary" data-a="flowto" data-v="save">Save it</button>' : '<button class="kl-primary" data-a="flowto" data-v="repair">Do the repair</button><button data-a="flowto" data-v="save">Skip to save</button>'}<button class="kl-ghost" data-a="flowto" data-v="attempt">Edit my attempt</button></div>`;
+  }
+  function repairStep(f) {
+    return `<p class="kl-eyebrow">REPAIR · ${esc(f.topic)}</p><h2>${esc(f.fix && !/^none\b/i.test(f.fix) ? f.fix : 'Fix the gap')}</h2><p class="kl-small"><b>The gap:</b> ${esc(f.gap)}</p>
+      <textarea data-flow="repair" rows="9" maxlength="4000" aria-label="Your repair" placeholder="Do the repair here, from memory first.">${esc(f.repair)}</textarea>
+      ${f.rfb ? `<div class="kg-flow-fb ${f.fixed ? 'ok' : ''}"><p class="kl-pre">${esc(f.rfb)}</p></div>` : ''}
+      <div class="kl-row"><button class="${f.fixed ? '' : 'kl-primary'}" data-a="flowrepair" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'iroha', f.rfb ? 'Check it again' : 'Check my repair')}</button><button class="${f.fixed ? 'kl-primary' : ''}" data-a="flowto" data-v="save">${f.fixed ? 'Save it' : 'Save without a check'}</button></div>`;
+  }
+  // the evidence behind any grade, in words: independent, with help, or not yet
+  const evidence = f => !noGap(f) ? (f.fixed ? ['help', 'With help: Iroha found a gap and you repaired it.'] : ['notyet', "Not yet: there's a gap that isn't repaired."]) : ['indep', `Independent: no gap on your own attempt${f.disputed === 'corrected' ? ', after Iroha rechecked and corrected herself' : ''}.`];
+  const INTM = [1, 3, 7, 14, 30];
+  function saveStep(f, A) {
+    const e = f.lec && lecture(f.lec), gap = !noGap(f), [ev, evText] = evidence(f), x = missOf(f);
+    const missNext = ev === 'indep' ? ((x?.st || 0) + 1 >= 5 ? 'it retires from the notebook: you have it.' : `it moves on, next review in ${INTM[Math.min((x?.st || 0) + 1, 4)]} days.`) : ev === 'help' ? 'it comes back tomorrow, to check the repair stuck.' : 'it starts again tomorrow.';
+    return `<p class="kl-eyebrow">SAVE</p><h2>${esc(A.name)}: ${esc(f.topic)}</h2>
+      <p class="kg-flow-ev ${ev}"><b>Evidence</b> ${esc(evText)}</p>
+      <ul class="kl-list">${f.goal ? `<li><b>Goal:</b> ${esc(f.goal)}</li>` : ''}<li><b>Gap:</b> ${gap ? esc(f.gap) : 'none found'}</li>${gap ? `<li><b>Repair:</b> ${f.fixed ? 'done, and Iroha agrees' : f.repair.trim() ? 'done, not confirmed' : 'not done yet'}</li>` : ''}${f.disputed ? `<li><b>Recheck:</b> ${f.disputed === 'corrected' ? 'Iroha corrected her first check' : 'Iroha stood by her check'}</li>` : ''}${x ? `<li><b>Mistake notebook:</b> ${esc(missNext)}</li>` : ''}</ul>
+      <form data-f="flowsave" class="kl-stack">
+      ${gap && !f.fixed && !x ? '<label class="kl-check"><input type="checkbox" name="miss" checked> Add the gap to my misses, so it comes back tomorrow</label>' : ''}
+      ${e && e.due ? `<fieldset class="kg-flow-rev"><legend>Spaced review of ${esc(e.topic)}. Suggested from the evidence: ${ev === 'indep' ? 'Recalled independently' : 'Needs another review'}. You decide.</legend><label class="kl-check"><input type="radio" name="rev" value="ok" ${!gap ? 'checked' : ''}> ✓ Recalled independently</label><label class="kl-check"><input type="radio" name="rev" value="again" ${gap ? 'checked' : ''}> ↺ Needs another review</label><label class="kl-check"><input type="radio" name="rev" value=""> Don't mark it now</label></fieldset>` : ''}
+      <label>How did it feel? <select name="mood"><option value="calm">Calm</option><option value="proud">Proud</option><option value="tired">Tired</option><option value="stuck">Stuck</option></select></label>
+      <div class="kl-row"><button class="kl-primary">Save and finish</button>${f.desk && habit().active ? '<span class="kl-small">This also ends the desk timer and fills in its close-out for you.</span>' : ''}</div></form>`;
+  }
+  M.SECTIONS.study.unshift(['session', '✍ Session']);
+  M.PANELS.session = () => {
+    const f = L.flow;
+    if (M.onBreak?.() && (!f || f.step === 'goal')) return `<section class="kl-card kl-breakcard"><p class="kl-eyebrow">🌙 RESTING</p><h3>Guided sessions are here when you're back.</h3><p>Nothing is waiting, and nothing is piling up.</p></section>`;
+    const cur = f || blank(), A = ACTS[cur.act];
+    const body = cur.step === 'goal' || !A ? goalStep(cur) : cur.step === 'attempt' ? attemptStep(cur, A) : cur.step === 'feedback' ? feedbackStep(cur, A) : cur.step === 'repair' ? repairStep(cur) : saveStep(cur, A);
+    const recent = L.flowLog.slice(-5).reverse();
+    return `<section class="kl-card kg-flow">${head(cur)}${body}</section>`
+      + (cur.step === 'goal' && recent.length ? `<section class="kl-card kl-mini"><p class="kl-eyebrow">RECENT SESSIONS</p>${recent.map(x => `<div class="kl-li"><span>${esc(ACTS[x.act]?.name || '')}: ${esc(x.topic)}<small>${esc(x.d)} · ${x.gap ? (x.fixed ? 'gap repaired' : 'gap: ' + esc(x.gap.slice(0, 90))) : 'no gaps'}</small></span></div>`).join('')}</section>` : '');
+  };
+
+  /* ---------- forms and buttons ---------- */
+  Object.assign(M.FORMS, {
+    flowgoal: v => {
+      const A = ACTS[v.act]; if (!A) return M.I('Pick an activity first.', { face: 'study' });
+      const e = v.lec && lecture(v.lec), topic = String(v.topic || '').trim() || e?.topic || '';
+      if (!topic) return M.I('Name the topic, even roughly. It tells me what to check against.', { face: 'study' });
+      const f = L.flow = Object.assign(L.flow || blank(), { act: v.act, subj: SUBJS.includes(v.subj) ? v.subj : 'Maths', topic, goal: String(v.goal || '').trim(), lec: v.lec || '', mins: Math.max(5, Math.min(90, parseInt(v.mins) || A.mins)) });
+      f.step = 'attempt'; f.started = Date.now();
+      f.desk = habit().active ? false : !!M.startDesk?.({ subject: f.subj === 'Mixed' ? 'Mixed' : f.subj, topic: f.topic, task: `${A.name}: ${f.goal || f.topic}`, kind: A.kind, minutes: f.mins }, true);
+      save(); M.render(); setTimeout(() => document.querySelector('[data-flow="attempt"]')?.focus(), 60);
+    },
+    flowsave: v => {
+      const f = L.flow; if (!f) return;
+      const d = today(), A = ACTS[f.act], gap = !noGap(f);
+      const [ev] = evidence(f), x = missOf(f);
+      // a mistake repaired here follows the notebook's own schedule: independent moves it on, help or no repair brings it back tomorrow
+      if (x) {
+        x.reviews = (x.reviews || 0) + 1;
+        if (ev === 'indep') { x.st = (x.st || 0) + 1; x.due = x.st >= 5 ? '' : M.add(d, INTM[Math.min(x.st, 4)]); }
+        else { if (ev === 'notyet') x.st = 0; x.due = M.add(d, 1); }
+        if (ev !== 'notyet' && f.fix && !/^none\b/i.test(f.fix)) x.fix = f.fix.slice(0, 200);
+        (L.revLog = L.revLog || []).push({ d, src: 'miss', ok: ev === 'indep' });
+      }
+      if (v.miss && gap && !x) L.attempts.push({ id: M.uid(), d, ts: Date.now(), ok: false, src: 'flow', ch: f.lec ? lecture(f.lec)?.ch || '' : '', q: `${f.topic}: ${f.gap}`.slice(0, 240), cause: f.act === 'diagnose' ? 'careless slip' : 'knowledge gap', fix: (f.fix || '').slice(0, 200), due: M.add(d, 1), st: 0 });
+      L.flowLog.push({ id: f.id, d, act: f.act, subj: f.subj, topic: f.topic, goal: f.goal, gap: gap ? f.gap.slice(0, 300) : '', fixed: f.fixed, ev, disputed: f.disputed || '', miss: f.miss || '', mins: f.started ? Math.round((Date.now() - f.started) / 60000) : 0 });
+      if (L.flowLog.length > 300) L.flowLog = L.flowLog.slice(-300);
+      L.flow = null; save();
+      closeDesk(f, v.mood);
+      if (f.lec && v.rev) M.ACTIONS[v.rev === 'ok' ? 'kglecok' : 'kglecshaky']?.({ dataset: { v: f.lec } });
+      else M.I(gap ? (f.fixed ? 'Saved. You found the gap and closed it; that is the whole point.' : 'Saved. The gap is written down, so it will come back.') : `Saved. ${A.name} with no gaps.`, { face: 'study' });
+      M.render();
+    }
+  });
+  Object.assign(M.ACTIONS, {
+    flowcheck: check, flowlisten: listen, flowrepair: checkRepair, flowdispute: dispute,
+    flowto: b => { const f = L.flow; if (!f || f.busy) return; f.step = b.dataset.v; save(); M.render(); },
+    flowleave: () => { save(); M.go('today'); },
+    flowdrop: () => { if (!confirm('Discard this session? What you wrote here will be deleted. The desk timer keeps running until you end it on Today.')) return; L.flow = null; save(); M.render(); },
+    flownew: () => M.flowStart({})
+  });
+  // drafts: every keystroke is kept
+  let tSave = 0;
+  document.addEventListener('input', e => {
+    const k = e.target.dataset?.flow; if (!k || !L.flow) return;
+    L.flow[k] = e.target.value; clearTimeout(tSave); tSave = setTimeout(save, 400);
+  });
+  addEventListener('beforeunload', () => { if (L.flow) save(); });
+  // the quiet workspace: while attempting, reading feedback or repairing, everything else steps back
+  addEventListener('moonlab:render', e => document.body.classList.toggle('kg-flow-on', e.detail?.tab === 'session' && !!L.flow && ['attempt', 'feedback', 'repair', 'save'].includes(L.flow.step)));
+
+  const css = document.createElement('style');
+  css.textContent = `.kg-flow h2{margin:4px 0 8px;font-size:clamp(20px,2.4vw,25px);line-height:1.3}
+.kg-flow-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+.kg-flow-steps{display:flex;flex-wrap:wrap;gap:4px;margin:0;padding:0;list-style:none;font-size:12px;font-weight:700}
+.kg-flow-steps li{padding:4px 10px;border-radius:999px;border:1px solid rgba(196,182,255,.18);color:#a69fd3}
+.kg-flow-steps li.done{color:#d8d2f6;border-color:rgba(196,182,255,.35)}.kg-flow-steps li.on{background:#f5d27a;color:#1b1638;border-color:#f5d27a}
+.kg-flow fieldset,.kg-act{min-width:0}.kg-flow{overflow-wrap:anywhere}
+.kg-acts{border:0;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.kg-act{display:grid;gap:3px;padding:12px 14px;border:1px solid rgba(196,182,255,.2);border-radius:14px;cursor:pointer;background:rgba(20,17,48,.55)}
+.kg-act{position:relative}.kg-act input{position:absolute;left:8px;top:8px;width:1px;height:1px;margin:0;opacity:0;pointer-events:none}.kg-act span{font-size:13px;color:#d8d2f6}.kg-act small{font-size:11.5px;color:#a69fd3}
+.kg-act:has(input:checked){border-color:#f5d27a;background:rgba(58,44,104,.8);box-shadow:0 0 0 1px #f5d27a inset}.kg-act:has(input:focus-visible){outline:3px solid #f5d27a;outline-offset:2px}
+.kg-flow-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.kg-flow label{display:grid;gap:4px;font-size:13px;font-weight:700}.kg-flow label.kl-check{display:flex;font-weight:500}
+.kg-flow-mins input{max-width:110px}
+.kg-flow-ev{margin:6px 0 10px;padding:9px 14px;border-radius:12px;background:rgba(143,224,165,.1);border:1px solid rgba(143,224,165,.35)}.kg-flow-ev b{margin-right:8px;color:#8fe0a5}
+.kg-flow-ev.help{background:rgba(245,210,122,.08);border-color:rgba(245,210,122,.35)}.kg-flow-ev.help b{color:#f5d27a}.kg-flow-ev.notyet{background:rgba(255,156,200,.08);border-color:rgba(255,156,200,.35)}.kg-flow-ev.notyet b{color:#ff9cc8}
+.kg-flow-miss{border-left-color:#f5d27a;background:rgba(245,210,122,.07)}.kg-flow-miss b{color:#f5d27a}.kg-flow-recheck{border-left-color:#7fe3ff;background:rgba(127,227,255,.06)}.kg-flow-recheck b{color:#7fe3ff}
+.kg-flow textarea{width:100%;box-sizing:border-box;font:inherit;font-size:15px;line-height:1.6;padding:12px 14px;border-radius:12px;resize:vertical}
+.kg-flow-k{margin:10px 0;padding:10px 14px;border-left:3px solid #ff9cc8;background:rgba(255,111,174,.08);border-radius:0 12px 12px 0}.kg-flow-k b{color:#ff9cc8}.kg-flow-k p{margin:4px 0 0}
+.kg-flow-fb{margin:10px 0;padding:12px 16px;border-left:3px solid #7fe3ff;background:rgba(127,227,255,.07);border-radius:0 12px 12px 0}.kg-flow-fb.ok{border-color:#8fe0a5;background:rgba(143,224,165,.08)}
+.kg-flow-fb p{margin:6px 0}.kg-flow-fb b{display:inline-block;min-width:66px;color:#7fe3ff}.kg-flow-mine{margin:8px 0}.kg-flow-rev{border:1px solid rgba(196,182,255,.2);border-radius:12px;padding:8px 12px}
+body.kg-flow-on :is(#kg-scene,#kg-strip,#ame-widget,#iroha-widget,#mp-widget,#kg-mstop,#kg-nav,#moon-lab .kl-tabs){display:none!important}
+body.kg-flow-on #kg-main{max-width:820px;margin-left:auto;margin-right:auto}
+html body.kg-flow-on #kg-main>#moon-lab{display:block!important}html body.kg-flow-on #kg-main>#habit-desk{display:none!important}`
+    // the desk's own "shh" view hides everything but its timer; in the workspace, the workspace is the focus
+    + `body.kg-flow-on.habit-shh #kg-main{display:block!important}`;
+  css.textContent += `
+@media(max-width:620px){.kg-flow-grid{grid-template-columns:1fr}.kg-acts{grid-template-columns:1fr 1fr}.kg-act{padding:10px}}`;
+  document.head.appendChild(css);
+})();
+
+</script>
+<script id="kg-growth-script">
+/* ===== Growth: mistakes that lead to a repair, five honest skill measures, what the desk remembers,
+   and companion modes (Study, Quiet company, Break). ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab; if (!M) return;
+  const { L, save, today, esc } = M;
+  const $ = id => document.getElementById(id);
+  const read = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
+  const since = n => M.add(today(), -n);
+  const pct = (a, n) => Math.round(100 * a / n);
+
+  /* ---------- mistakes → repair: every due miss can open a guided Diagnose session ---------- */
+  const dueMisses = () => window.__kgOnBreak ? [] : (L.attempts || []).filter(x => !x.ok && x.due && x.due <= today()).sort((a, b) => a.due.localeCompare(b.due));
+  const recallPanel = M.PANELS.recall;
+  if (recallPanel) M.PANELS.recall = () => {
+    const due = dueMisses().slice(0, 6);
+    return recallPanel() + (due.length ? `<section class="kl-card kg-repair"><p class="kl-eyebrow">MISTAKES TO REPAIR</p><h3>${due.length === 1 ? 'One mistake is' : `${due.length} mistakes are`} ready for a repair</h3>
+      <p class="kl-small">A short Diagnose session: find the real cause, write the rule that stops it, and Iroha checks it. Repaired on your own, it moves along its schedule; with help, it comes back tomorrow to make sure it stuck.</p>
+      ${due.map(x => `<div class="kl-li"><span>${esc(String(x.q || '').slice(0, 110))}<small>${x.cause ? esc(x.cause) + ' · ' : ''}due ${esc(x.due)}${x.reviews ? ` · reviewed ${x.reviews}×` : ''}</small></span><button class="kl-primary" data-a="flowmiss" data-v="${esc(x.id)}">Repair it</button></div>`).join('')}</section>` : '');
+  };
+  M.ACTIONS.flowmiss = b => M.flowStart?.({ miss: b.dataset.v });
+
+  /* ---------- five skills, measured only from what you've actually done ---------- */
+  const DIMS = [
+    { k: 'Recall', what: 'Bringing ideas back without notes.', acts: ['recall', 'blurt'], grow: 'recall', how: 'Recall or Blurt sessions' },
+    { k: 'Explanation', what: 'Saying simply why something works.', acts: ['explain'], grow: 'explain', how: 'Explain sessions (Feynman mode)' },
+    { k: 'Application', what: 'Solving real problems.', acts: ['solve'], grow: 'solve', how: 'Solve sessions, plus the questions you log', questions: true },
+    { k: 'Transfer', what: 'Telling similar ideas apart, and finding the real cause of a mistake.', acts: ['compare', 'diagnose'], grow: 'compare', how: 'Compare and Diagnose sessions' },
+    { k: 'Retention', what: 'Still knowing it days later.', retention: true, how: 'spaced reviews and mistake repairs' }
+  ];
+  const indep = x => x.ev ? x.ev === 'indep' : !x.gap;
+  function measure(dim, from, to) {
+    const inWin = d => d >= from && d <= to;
+    if (dim.retention) { const r = (L.revLog || []).filter(x => inWin(x.d)); return { n: r.length, ok: r.filter(x => x.ok).length, unit: 'review' }; }
+    const s = (L.flowLog || []).filter(x => dim.acts.includes(x.act) && inWin(x.d));
+    const out = { n: s.length, ok: s.filter(indep).length, unit: 'session' };
+    if (dim.questions && out.n < 3) { const q = (L.attempts || []).filter(a => inWin(a.d) && typeof a.ok === 'boolean' && !['flow', 'import', 'block'].includes(a.src)); if (q.length >= 5) return { n: q.length, ok: q.filter(a => a.ok).length, unit: 'question' }; }
+    return out;
+  }
+  M.SECTIONS.progress.unshift(['skills', '◆ Five skills']);
+  M.PANELS.skills = () => {
+    const now = measure.bind(null), cards = DIMS.map(dim => {
+      const a = now(dim, since(29), today()), b = now(dim, since(59), since(30)), enough = a.n >= 3, p = enough ? pct(a.ok, a.n) : 0;
+      const trend = enough && b.n >= 3 ? (() => { const q = pct(b.ok, b.n); return p > q ? `↑ from ${q}%` : p < q ? `↓ from ${q}%` : 'steady'; })() : '';
+      return `<section class="kl-card kg-skill"><div class="kg-skill-top"><h3>${dim.k}</h3><b class="kg-skill-n">${enough ? p + '%' : '—'}</b></div>
+        <p class="kl-small">${esc(dim.what)}</p>
+        <div class="kg-meter" role="img" aria-label="${dim.k}: ${enough ? p + ' percent' : 'not enough evidence yet'}"><i style="width:${p}%"></i></div>
+        <p class="kl-small">${enough ? `${a.ok} of ${a.n} ${a.unit}s right on your own, last 30 days${trend ? ' · ' + trend : ''}.` : `Not enough evidence yet: ${a.n} of 3 ${a.unit}s in the last 30 days.`}</p>
+        <p class="kl-small">Grows with ${esc(dim.how)}.</p>
+        ${dim.grow ? `<button data-a="flowact" data-v="${dim.grow}">Start a${/^[AEIOU]/.test(dim.grow.replace(/^./, c => c.toUpperCase())) ? 'n' : ''} ${dim.grow.replace(/^./, c => c.toUpperCase())} session</button>` : '<button data-a="go" data-v="today">See what\'s due</button>'}</section>`;
+    }).join('');
+    return `<section class="kl-card"><p class="kl-eyebrow">FIVE SKILLS</p><h2>How your learning is going, honestly</h2>
+      <p>Each number is the share of attempts you got right <b>on your own</b>: Iroha found no gap on the first try, or you recalled it without help. Hints, repairs and help don't count against you, they just don't count as independent. A number appears only after 3 tries, so one bad day can't define a skill.</p></section><div class="kg-skills">${cards}</div>`;
+  };
+  M.ACTIONS.flowact = b => M.flowStart?.({ act: b.dataset.v });
+
+  /* ---------- what the desk remembers ---------- */
+  const KEYS = [['kg-lab-v1', 'Your study record: lectures, misses, cards, guided sessions, moods, plan and these settings'], ['ame-habit-v1', 'Desk sessions, the timer and their close-outs'], ['desk-needy-v1', 'Your day plans and which blocks are done'], ['ame-chat', 'Your chat with Kaguya'], ['iroha-chat', 'Your chat with Iroha'], ['ame-journal-v1', 'Your journal'], ['ame-talk-v1', 'How often you and Kaguya talk'], ['mp-v2', 'Music player'], ['kg-look', 'Look and feel']];
+  const size = k => { const v = localStorage.getItem(k); return v ? Math.max(1, Math.round(v.length / 1024)) : 0; };
+  const clean = s => String(s || '').replace(/\[not typed by me:?\s*/g, '').replace(/^\s*\[|\]\s*$/gm, '').trim();
+  (M.LIBX = M.LIBX || []).push(['memory', '💭 What it remembers']);
+  M.PANELS.memory = () => {
+    const mem = (L.memories || []).slice().reverse(), h = read('ame-habit-v1') || {}, kc = read('ame-chat'), ic = read('iroha-chat');
+    const told = [['Both of them', clean(window.__kgCoachNote?.())], ['Kaguya', clean(window.__kgNoteExtra?.kaguya)], ['Iroha', clean(window.__kgNoteExtra?.iroha)]].filter(x => x[1]);
+    const n = (a, f) => (a || []).filter(f || Boolean).length;
+    return `<section class="kl-card"><p class="kl-eyebrow">WHAT THE DESK REMEMBERS</p><h2>Everything it keeps about you, in one place</h2>
+      <p>All of this lives in this browser, on this device. It leaves only when you chat with Kaguya or Iroha or ask for a check (your message and the notes below go to the chat service to get a reply), or when you turn on sync, which copies it to your other device.</p></section>
+      <section class="kl-card"><h3>What you've told them</h3>${mem.length ? mem.slice(0, 30).map(m => `<div class="kl-li"><span>${esc(m.t)}<small>${esc(m.d || '')}${m.auto ? ' · picked up from a chat' : ''}</small></span><button class="kl-ghost" data-a="memdel" data-id="${esc(m.id)}" aria-label="Forget this">Forget</button></div>`).join('') : '<p class="kl-small">Nothing yet.</p>'}
+        <p class="kl-small">Add things in Company → Memories. Forgetting one here removes it for both of them.</p></section>
+      <section class="kl-card"><h3>Your why</h3><p>${L.dream ? esc(L.dream) : '<span class="kl-small">Not written yet.</span>'}</p><p class="kl-small">Edit it on Today, under More for today → Why I'm doing this.</p></section>
+      <section class="kl-card"><h3>What they're told with every message, right now</h3>${told.length ? told.map(([who, t]) => `<p class="kl-small"><b>${who}:</b></p><p class="kl-pre kg-told">${esc(t.slice(0, 1400))}</p>`).join('') : '<p class="kl-small">Nothing extra at the moment.</p>'}
+        <p class="kl-small">They also see today's plan, any running session, and your recent messages in that chat. They don't see anything else on this page.</p></section>
+      <section class="kl-card"><h3>Your record</h3><ul class="kl-list">
+        <li>${n(L.lectures)} lectures logged, ${n(L.lectures, e => e.due && e.due <= today())} due for review</li>
+        <li>${n(L.attempts, x => !x.ok && x.due)} mistakes on the schedule, ${n(L.attempts, x => !x.ok && x.q && !x.due)} retired</li>
+        <li>${n(L.cards)} flashcards · ${n(L.flowLog)} guided sessions · ${n(h.sessions)} desk sessions</li>
+        <li>${Object.keys(L.mood || {}).length} days with a mood check-in · ${n(L.breaks)} breaks</li></ul></section>
+      <section class="kl-card"><h3>Chats</h3>
+        <div class="kl-li"><span>Kaguya<small>${Array.isArray(kc) ? kc.length + ' messages kept' : 'nothing kept'}</small></span>${Array.isArray(kc) && kc.length ? '<button class="kl-ghost" data-a="forgetchat" data-v="ame-chat">Forget this chat</button>' : ''}</div>
+        <div class="kl-li"><span>Iroha<small>${Array.isArray(ic) ? ic.length + ' messages kept' : 'nothing kept'}</small></span>${Array.isArray(ic) && ic.length ? '<button class="kl-ghost" data-a="forgetchat" data-v="iroha-chat">Forget this chat</button>' : ''}</div></section>
+      <section class="kl-card"><h3>Stored on this device</h3>${KEYS.filter(([k]) => size(k)).map(([k, what]) => `<div class="kl-li"><span>${esc(what)}<small>${size(k)} KB</small></span></div>`).join('')}
+        <div class="kl-row"><button data-a="go" data-v="settings:backup">Download a backup</button></div></section>`;
+  };
+  M.ACTIONS.forgetchat = b => {
+    const k = b.dataset.v, who = k === 'iroha-chat' ? 'Iroha' : 'Kaguya';
+    if (!confirm(`Forget your whole chat with ${who}? This deletes it from this device and can't be undone. Your study record stays.`)) return;
+    try { localStorage.removeItem(k); } catch (e) {}
+    location.reload();
+  };
+
+  /* ---------- companion modes ---------- */
+  const MODES = [['study', 'Study'], ['quiet', 'Quiet company'], ['break', 'Break']];
+  const mode = () => { const c = L.cmode; if (!c || !c.m) return 'study'; if (c.m === 'break' && Date.now() >= (c.until || 0)) return 'study'; return c.m; };
+  const clock = ts => new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  let lastAct = 0;
+  addEventListener('pointerdown', () => { lastAct = Date.now(); }, true);
+  addEventListener('keydown', () => { lastAct = Date.now(); }, true);
+  // in Quiet company and Break, they don't start conversations; they still answer you
+  const quietNow = () => mode() !== 'study' && Date.now() - lastAct > 8000;
+  function setMode(m, mins) {
+    const was = mode();
+    if (m === 'break') L.cmode = { m: 'break', until: Math.max(Date.now(), was === 'break' ? L.cmode.until : Date.now()) + (mins || 10) * 60000 };
+    else L.cmode = { m };
+    save(); sync(); M.render();
+    if (m === 'break' && was !== 'break') M.K(`break time! until ${clock(L.cmode.until)}. stand up, water, look out of a window. i'll keep it light 🌙`);
+    if (m === 'quiet' && was !== 'quiet') M.K("quiet company it is. we're here, no study talk unless you start it 🌙");
+  }
+  M.modeRec = () => {
+    if (mode() !== 'break') return null;
+    return { eye: 'A BREAK YOU CHOSE', title: `Break until ${clock(L.cmode.until)}`, why: 'Stand up, drink some water, look at something far away. Kaguya and Iroha keep it light until then, and there is nothing to catch up on after.', btn: 'End the break', resume: 1, run: { fn: () => setMode('study') },
+      alts: [{ label: '5 more minutes', run: { fn: () => setMode('break', 5) } }, { label: 'Hang out with Kaguya', run: { go: 'company:hangout' } }] };
+  };
+  const coach = window.__kgCoachNote;
+  window.__kgCoachNote = () => {
+    const m = mode();
+    if (m === 'quiet') return "\n\n[not typed by me: quiet company mode. I want calm company while I do my own thing. Don't bring up study, plans, minutes or blocks unless I do. Short, easy replies.]";
+    if (m === 'break') return `\n\n[not typed by me: I'm on a short break I chose, until ${clock(L.cmode.until)}. Keep it light and restful: no study talk, and don't hurry me back.]`;
+    return coach?.() || '';
+  };
+  function wrapSay() {
+    for (const k of ['__kaguyaSay', '__irohaSay']) {
+      const f = window[k]; if (typeof f !== 'function' || f.kgQuiet) continue;
+      const w = (t, o) => quietNow() ? undefined : f(t, o); w.kgQuiet = true; window[k] = w;
+    }
+  }
+  function bar() {
+    const b = $('kg-bar'); if (!b || $('kg-mode')) return !!b;
+    const g = document.createElement('div'); g.id = 'kg-mode'; g.setAttribute('role', 'group'); g.setAttribute('aria-label', 'Companion mode');
+    g.innerHTML = MODES.map(([k, l]) => `<button type="button" data-mode="${k}" aria-pressed="false" aria-label="${l}"><span class="kg-ml">${l}</span><span class="kg-ms" aria-hidden="true">${l.split(' ')[0]}</span></button>`).join('');
+    g.addEventListener('click', e => { const x = e.target.closest('[data-mode]'); if (x) setMode(x.dataset.mode); });
+    b.querySelector('.kg-brand')?.after(g); return true;
+  }
+  function sync() {
+    const m = mode();
+    if (L.cmode?.m === 'break' && m === 'study') { L.cmode = { m: 'study' }; save(); M.K("break's over. no rush, come back when you're ready 🌙"); M.render(); }
+    for (const k of MODES.map(x => x[0])) document.body.classList.toggle('kg-mode-' + k, m === k);
+    for (const x of document.querySelectorAll('#kg-mode [data-mode]')) x.setAttribute('aria-pressed', String(x.dataset.mode === m));
+    const brk = document.querySelector('#kg-mode [data-mode="break"] .kg-ml'); if (brk) brk.textContent = m === 'break' ? `Break · ${clock(L.cmode.until)}` : 'Break';
+  }
+  let tries = 0;
+  (function mount() { wrapSay(); if (!bar() && tries++ < 60) return setTimeout(mount, 100); sync(); setTimeout(wrapSay, 3000); })();
+  setInterval(sync, 15000);
+
+  const css = document.createElement('style');
+  css.textContent = `#kg-mode{display:inline-flex;gap:2px;padding:3px;border:1px solid #2e2860;border-radius:999px;background:rgba(20,17,48,.7);flex:0 0 auto}
+#kg-mode button{border:0;background:none;color:#b9b1e2;font:700 11.5px "M PLUS Rounded 1c",sans-serif;padding:5px 10px;border-radius:999px;cursor:pointer;white-space:nowrap}
+#kg-mode button:hover{color:#fff}#kg-mode button[aria-pressed="true"]{background:#2a2452;color:#fff}
+body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff}body.kg-mode-break #kg-mode [data-mode="break"]{background:#3a3016;color:#f5d27a}
+#kg-mode button:focus-visible{outline:3px solid #f5d27a;outline-offset:1px}
+.kg-skills{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}.kg-skill h3{margin:0}
+.kg-skill-top{display:flex;justify-content:space-between;align-items:baseline}.kg-skill-n{font-size:26px;color:#f5d27a}
+.kg-meter{height:8px;border-radius:99px;background:rgba(196,182,255,.14);overflow:hidden;margin:8px 0}.kg-meter i{display:block;height:100%;background:linear-gradient(90deg,#7fe3ff,#f5d27a);border-radius:99px}
+.kg-told{font-size:12.5px;opacity:.85;max-height:220px;overflow:auto;background:rgba(10,8,30,.4);padding:8px 10px;border-radius:10px}
+.kg-repair .kl-li button{flex:0 0 auto}
+#kg-mode .kg-ms{display:none}
+@media(max-width:720px){#kg-mode .kg-ml{display:none}#kg-mode .kg-ms{display:inline}#kg-mode button{padding:5px 8px;font-size:11px}#kg-bar .kg-brand{flex:1 1 auto;min-width:0}}`;
+  document.head.appendChild(css);
+})();
+
+</script>
+<script id="kg-rocket-script">
+/* ===== Rocket path: the dream as a sequence. Ten stages from foundations to a mission trade study,
+   each with what it covers, the JEE chapters it stands on, two questions to test yourself, and a guided session.
+   A stage becomes "solid" only when you say so; the evidence (independent sessions on it) is shown beside it. ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab; if (!M) return;
+  const { L, save, esc } = M;
+  const STAGES = [
+    { name: 'Foundations: dimensions, vectors and calculus', why: 'Every rocket equation is calculus on vectors, and dimensions catch half of all mistakes.', jee: 'Units and dimensions, vectors, differentiation, integration', q: ['Why must every term in a physics equation have the same dimensions?', 'Differentiate x(t) = 5t² − 3t and say what the result means physically.'], key: /foundation|dimension|vector|calculus/i },
+    { name: 'Momentum and variable-mass systems', why: "A rocket is a system that throws mass away. Newton's second law in its simple form doesn't hold for it.", jee: 'Laws of motion, centre of mass, momentum and collisions', q: ['A cart leaks sand straight down as it rolls. Does it speed up? Why or why not?', 'When a gun fires a bullet, what is conserved and what is not?'], key: /momentum|variable.?mass/i },
+    { name: 'Thrust, mass flow and specific impulse', why: 'This is what an engine actually does: F = ṁ·vₑ + (pₑ − pₐ)·Aₑ, and Isp = F / (ṁ·g₀).', jee: 'Laws of motion, fluid pressure', q: ['Why does the same engine give more thrust in vacuum than at sea level?', 'What does a specific impulse of 300 s actually mean?'], key: /thrust|impulse|isp|mass flow/i },
+    { name: 'The rocket equation and mass ratio', why: 'Δv = vₑ·ln(m₀/m₁): the reason rockets are mostly fuel.', jee: 'Momentum, logarithms, integration', q: ['Derive Δv = vₑ·ln(m₀/m₁) from momentum conservation.', 'Why does doubling the fuel not double the Δv?'], key: /rocket equation|tsiolkovsky|mass ratio|delta.?v|Δv/i },
+    { name: 'Gravity and drag losses, and staging', why: 'Real launches lose Δv to gravity and air, and staging is how they win it back.', jee: 'Projectile motion, work and energy', q: ['Why do rockets start turning sideways soon after launch?', 'Why does dropping empty tanks help so much?'], key: /staging|gravity loss|drag/i },
+    { name: 'Orbits: energy and angular momentum', why: 'An orbit is falling and missing. Energy and angular momentum tell you everything about it.', jee: 'Gravitation, rotational motion', q: ['Find the orbital speed at height h above the Earth from first principles.', 'Why does a burn at the top of an orbit raise the opposite side?'], key: /orbit|kepler|gravitation/i },
+    { name: 'Numerical trajectories', why: "Most real trajectories have no closed form, so you step them forward in code and check you can trust the result.", jee: 'Kinematics, plus a little coding', q: ['Write one Euler step for a falling ball with air drag.', 'How would you know your time step is small enough?'], key: /numerical|euler|trajectory|simulation/i },
+    { name: 'Thermodynamics and compressible flow', why: 'Exhaust velocity comes from hot gas expanding through a nozzle.', jee: 'Thermodynamics, kinetic theory of gases', q: ['Why does a converging-diverging nozzle speed gas up past the narrowest point?', 'Roughly, what sets the exhaust velocity of an engine?'], key: /thermo|nozzle|compressible|exhaust/i },
+    { name: 'Structures, vibration, instruments and control', why: 'A rocket has to survive its own shaking and steer itself while it does.', jee: 'Oscillations and SHM, waves', q: ['What is resonance, and why must a rocket structure avoid it?', 'In one line, what does a feedback controller do?'], key: /vibration|resonance|structure|control|shm|oscillat/i },
+    { name: 'Mission trade studies', why: 'Putting it all together: choosing a design and defending the choice with numbers.', jee: 'All of the above', q: ['For a small satellite to low Earth orbit, would you use two stages or three? Justify it.', 'Which single number would you most want to improve, and why?'], key: /mission|trade study/i, project: true }
+  ];
+  L.rpath = L.rpath || { solid: {} };
+  const solid = i => !!L.rpath.solid[i];
+  const current = () => { const i = STAGES.findIndex((_, k) => !solid(k)); return i < 0 ? STAGES.length : i; };
+  const evidence = s => (L.flowLog || []).filter(x => s.key.test(x.topic || '')).reduce((o, x) => { o.n++; if (x.ev ? x.ev === 'indep' : !x.gap) o.ok++; return o; }, { n: 0, ok: 0 });
+
+  M.SECTIONS.study.splice(Math.max(0, M.SECTIONS.study.findIndex(t => t[0] === 'project')), 0, ['rocket', '🚀 Rocket path']);
+  M.PANELS.rocket = () => {
+    if (M.onBreak?.()) return `<section class="kl-card kl-breakcard"><p class="kl-eyebrow">🌙 RESTING</p><h3>The rocket path waits for you.</h3><p>Every stage stays exactly where you left it.</p></section>`;
+    const cur = current(), done = STAGES.filter((_, i) => solid(i)).length;
+    const head = `<section class="kl-card kg-rocket-head"><p class="kl-eyebrow">ROCKET PATH · ${done} OF ${STAGES.length} SOLID</p><h2>From JEE physics to a real mission</h2>
+      <p>Ten stages, in the order the ideas build on each other. Your JEE chapters are the first half of this path, so the work you're already doing counts. Move on when a stage feels solid; the evidence beside it shows how your sessions on it went.</p>
+      <div class="kg-rocket-track" aria-hidden="true">${STAGES.map((_, i) => `<i class="${solid(i) ? 'on' : i === cur ? 'cur' : ''}"></i>`).join('')}</div>
+      <div class="kl-row"><button class="kl-primary" data-a="rkdiag">Start with Iroha's diagnostic</button><span class="kl-small">Five short questions, one at a time, so she knows where to begin.</span></div></section>`;
+    const stage = (s, i) => {
+      const ev = evidence(s), isCur = i === cur, st = solid(i) ? 'Solid' : isCur ? 'Now' : i < cur ? 'Open' : 'Later';
+      const body = `<p>${esc(s.why)}</p><p class="kl-small"><b>Stands on:</b> ${esc(s.jee)}</p>
+        <p class="kl-small"><b>Test yourself:</b></p><ol class="kl-list">${s.q.map(q => `<li>${esc(q)}</li>`).join('')}</ol>
+        <p class="kl-small"><b>Evidence:</b> ${ev.n ? `${ev.ok} of ${ev.n} guided session${ev.n === 1 ? '' : 's'} on this went right on your own.` : 'no guided sessions on this yet.'}</p>
+        <div class="kl-row"><button class="${isCur ? 'kl-primary' : ''}" data-a="rkflow" data-v="${i}" data-act="explain">Explain it</button><button data-a="rkflow" data-v="${i}" data-act="solve">Solve one</button><button class="kl-ghost" data-a="rkask" data-v="${i}">Learn it with Iroha</button>${s.project ? '<button class="kl-ghost" data-a="go" data-v="study:project">Open the Rocket project</button>' : ''}
+        <button class="kl-ghost" data-a="rksolid" data-v="${i}">${solid(i) ? 'Mark as not solid yet' : 'Mark solid'}</button></div>`;
+      return `<details class="kl-card kg-stage ${solid(i) ? 'solid' : ''} ${isCur ? 'cur' : ''}" ${isCur ? 'open' : ''}><summary><span class="kg-stage-n">${i + 1}</span><span class="kg-stage-t">${esc(s.name)}</span><span class="kl-chip">${st}</span></summary>${body}</details>`;
+    };
+    return head + STAGES.map(stage).join('');
+  };
+  const ask = text => window.__irohaAsk ? window.__irohaAsk(text) : M.I('Open my chat and ask me there.', { face: 'study' });
+  Object.assign(M.ACTIONS, {
+    rkdiag: () => ask("Let's start the rocket path. Give me your short diagnostic first: algebra, calculus, vectors, Newtonian mechanics and a little coding. One question at a time, and wait for my answer each time."),
+    rkask: b => { const s = STAGES[+b.dataset.v]; ask(`Rocket path, stage ${+b.dataset.v + 1}: ${s.name}. Teach it to me from what I already know from JEE (${s.jee}). Start with one question to see where I am, then build up. One step at a time.`); },
+    rkflow: b => { const s = STAGES[+b.dataset.v]; M.flowStart?.({ act: b.dataset.act, topic: s.name.split(':')[0], subj: 'Physics' }); },
+    rksolid: b => { const i = +b.dataset.v; if (solid(i)) delete L.rpath.solid[i]; else L.rpath.solid[i] = M.today(); save(); M.render(); if (solid(i)) M.I(`Stage ${i + 1} marked solid. Next: ${STAGES[current()]?.name || 'nothing. The path is done.'}`, { face: 'study' }); }
+  });
+
+  const css = document.createElement('style');
+  css.textContent = `.kg-rocket-track{display:flex;gap:5px;margin:12px 0}.kg-rocket-track i{flex:1;height:6px;border-radius:99px;background:rgba(196,182,255,.16)}.kg-rocket-track i.on{background:#8fe0a5}.kg-rocket-track i.cur{background:#f5d27a}
+.kg-stage>summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;font-weight:700}.kg-stage>summary::-webkit-details-marker{display:none}
+.kg-stage-n{flex:0 0 28px;height:28px;border-radius:50%;display:grid;place-items:center;background:rgba(196,182,255,.14);font-size:13px}.kg-stage.cur .kg-stage-n{background:#f5d27a;color:#1b1638}.kg-stage.solid .kg-stage-n{background:#8fe0a5;color:#10291a}
+.kg-stage-t{flex:1;min-width:0}.kg-stage[open]>summary{margin-bottom:10px}.kg-stage.cur{border-color:rgba(245,210,122,.5)!important}`;
+  document.head.appendChild(css);
+})();
+
+</script>
+<script id="kg-safety-script">
+/* ===== Safety: nothing you type is lost, the desk works offline, it keeps a copy of itself every day,
+   and a restrained look for days when the decoration is too much. ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab; if (!M) return;
+  const $ = id => document.getElementById(id);
+  const get = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch (e) { return d; } };
+  const put = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+  /* ---------- drafts: every form on the desk keeps what you typed until it's really sent ---------- */
+  const DK = 'kg-drafts', DAY = 864e5;
+  let drafts = get(DK, {}) || {};
+  for (const k of Object.keys(drafts)) if (Date.now() - (drafts[k]._t || 0) > 14 * DAY) delete drafts[k];
+  let tD = 0; const persist = () => { clearTimeout(tD); tD = setTimeout(() => put(DK, drafts), 300); };
+  const draftable = el => el && el.name && el.form?.dataset?.f && el.closest('#moon-lab') && !/^(file|password|checkbox|radio|hidden|submit|button)$/.test(el.type) && el.tagName !== 'SELECT';
+  document.addEventListener('input', e => {
+    const el = e.target; if (!draftable(el)) return;
+    const k = el.form.dataset.f, d = drafts[k] = drafts[k] || {};
+    d[el.name] = el.value; d._t = Date.now(); delete d._sent; persist();
+  });
+  // sent: the next time this form shows up empty, the draft is dropped instead of restored (a rejected send keeps it)
+  document.addEventListener('submit', e => { const k = e.target?.dataset?.f; if (k && drafts[k]) { drafts[k]._sent = Date.now(); put(DK, drafts); } }, true);
+  function restore() {
+    for (const f of document.querySelectorAll('#moon-lab form[data-f]')) {
+      const k = f.dataset.f, d = drafts[k]; if (!d) continue;
+      const fields = Object.keys(d).filter(n => !n.startsWith('_') && f.elements[n] && draftable(f.elements[n]));
+      const pristine = fields.every(n => f.elements[n].value === f.elements[n].defaultValue);
+      if (d._sent) { if (pristine) { delete drafts[k]; persist(); } continue; }
+      if (!pristine) continue;
+      let any = false;
+      for (const n of fields) if (d[n] && d[n] !== f.elements[n].value) { f.elements[n].value = d[n]; any = true; }
+      if (any && !f.querySelector('.kg-draftnote')) f.insertAdjacentHTML('afterbegin', `<p class="kg-draftnote kl-small" role="status">Draft restored from ${new Date(d._t).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}. <button type="button" class="kl-ghost" data-a="draftclear" data-v="${M.esc(k)}">Clear it</button></p>`);
+    }
+  }
+  M.ACTIONS.draftclear = b => { delete drafts[b.dataset.v]; put(DK, drafts); M.render(); };
+  addEventListener('moonlab:render', () => setTimeout(restore, 0));
+  addEventListener('pagehide', () => put(DK, drafts));
+
+  /* ---------- offline: say so plainly, and keep everything working that can ---------- */
+  const pill = document.createElement('div'); pill.id = 'kg-offline'; pill.setAttribute('role', 'status');
+  pill.textContent = "Offline. Everything still saves on this device; chats and Iroha's checks wait for the internet.";
+  document.body.appendChild(pill);
+  const net = () => document.body.classList.toggle('kg-offline', !navigator.onLine);
+  addEventListener('online', net); addEventListener('offline', net); net();
+  M.offline = () => !navigator.onLine;
+
+  /* ---------- daily safety copies: the last 7 days, kept in this browser, one click to roll back ---------- */
+  const KEYS = ['kg-lab-v1', 'ame-habit-v1', 'desk-needy-v1', 'ame-journal-v1', 'ame-chat', 'iroha-chat', 'ame-talk-v1', 'ame-pos-v1', 'iroha-pos-v1', 'mp-v2', 'kg-look'];
+  const db = () => new Promise((ok, no) => { const r = indexedDB.open('kg-safety', 1); r.onupgradeneeded = () => r.result.createObjectStore('snaps', { keyPath: 'id' }); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+  const tx = async (mode, fn) => { const d = await db(); return new Promise((ok, no) => { const t = d.transaction('snaps', mode), q = fn(t.objectStore('snaps')); t.oncomplete = () => { d.close(); ok(q && q.result); }; t.onerror = t.onabort = () => { d.close(); no(t.error); }; }); };
+  let snaps = [];
+  const refresh = () => tx('readonly', s => s.getAll()).then(all => { snaps = (all || []).map(x => ({ id: x.id, d: x.d, at: x.at, kb: x.kb, kind: x.kind })).sort((a, b) => b.at - a.at); if (M.SECTIONS && document.body.dataset.tab === 'backup') M.softRender?.(); }).catch(() => {});
+  async function snapshot(kind = 'daily') {
+    const data = {}; let size = 0;
+    for (const k of KEYS) { const v = localStorage.getItem(k); if (v != null) { data[k] = v; size += v.length; } }
+    const d = M.today(), id = kind === 'daily' ? 'day-' + d : kind + '-' + Date.now();
+    await tx('readwrite', s => s.put({ id, d, at: Date.now(), kind, kb: Math.ceil(size / 1024), data }));
+    // keep 7 daily copies and the 3 newest "before restore" copies
+    const all = await tx('readonly', s => s.getAll());
+    const drop = [...all.filter(x => x.kind === 'daily').sort((a, b) => b.at - a.at).slice(7), ...all.filter(x => x.kind !== 'daily').sort((a, b) => b.at - a.at).slice(3)];
+    if (drop.length) await tx('readwrite', s => { drop.forEach(x => s.delete(x.id)); return null; });
+    await refresh();
+  }
+  function daily() { if (localStorage.getItem('kg-snap-day') === M.today()) return; snapshot('daily').then(() => { try { localStorage.setItem('kg-snap-day', M.today()); } catch (e) {} }).catch(() => {}); }
+  setTimeout(daily, 8000); setInterval(daily, 30 * 60000); refresh();
+  async function restoreSnap(id) {
+    const s = await tx('readonly', st => st.get(id)); if (!s) return;
+    if (!confirm(`Replace everything on this device with the copy from ${new Date(s.at).toLocaleString()}? What's here now is saved as a copy first, so you can undo this.`)) return;
+    await snapshot('before-restore');
+    for (const k of KEYS) { if (k in s.data) localStorage.setItem(k, s.data[k]); else localStorage.removeItem(k); }
+    // the page saves itself on the way out; stop it overwriting the copy just restored
+    const orig = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (KEYS.includes(k)) return; return orig.call(this, k, v); };
+    location.reload();
+  }
+  M.ACTIONS.snaprestore = b => restoreSnap(b.dataset.v);
+  M.ACTIONS.snapnow = () => snapshot('manual').then(() => M.I('Copy saved on this device.', { face: 'study' })).catch(() => M.K("couldn't save a copy here, try a full backup download instead 🌙"));
+  const backup = M.PANELS.backup;
+  if (backup) M.PANELS.backup = () => backup() + `<section class="kl-card kl-stack kg-snaps"><h3>Daily safety copies</h3>
+    <p class="kl-small">Once a day the desk keeps a copy of everything on this device, for the last 7 days. If something goes wrong, roll back to one. Restoring saves what's here now first, so it can be undone.</p>
+    ${snaps.length ? snaps.map(s => `<div class="kl-li"><span>${s.kind === 'daily' ? new Date(s.at).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' }) : s.kind === 'manual' ? 'Saved by hand' : 'Before a restore'}<small>${new Date(s.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · ${s.kb} KB</small></span><button class="kl-ghost" data-a="snaprestore" data-v="${M.esc(s.id)}">Restore</button></div>`).join('') : '<p class="kl-small">The first copy is made a few seconds after the page opens.</p>'}
+    <div class="kl-row"><button data-a="snapnow">Save a copy now</button></div></section>`;
+
+  /* ---------- a restrained look: flat cards, no motion, no decorative banners ---------- */
+  const PK = 'kg-plain';
+  const plain = () => localStorage.getItem(PK) === '1';
+  const applyLook = () => document.body.classList.toggle('kg-plain', plain());
+  applyLook();
+  const app = M.PANELS.app;
+  if (app) M.PANELS.app = () => `<section class="kl-card kl-stack"><h3>Restrained look</h3><p class="kl-small">Flat cards, no animation, no decorative page banners. Kaguya, Iroha and the scene stay; everything else gets quieter. Only on this device.</p>
+    <label class="kl-check"><input type="checkbox" data-a="plainlook" ${plain() ? 'checked' : ''}> Use the restrained look</label></section>` + app();
+  M.ACTIONS.plainlook = b => { try { localStorage.setItem(PK, b.checked ? '1' : '0'); } catch (e) {} applyLook(); };
+
+  const css = document.createElement('style');
+  css.textContent = `#kg-offline{display:none;position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:300;max-width:calc(100% - 32px);padding:8px 14px;border-radius:12px;background:#3a3016;color:#f8e6b0;border:1px solid #f5d27a;font:600 12.5px/1.4 "M PLUS Rounded 1c",sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+body.kg-offline #kg-offline{display:block}
+.kg-draftnote{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px;padding:6px 10px;border-radius:10px;background:rgba(127,227,255,.08)}
+body.kg-plain *,body.kg-plain *::before,body.kg-plain *::after{animation:none!important;transition:none!important}
+body.kg-plain #kg-strip,body.kg-plain .kl-hero-banner{display:none!important}
+body.kg-plain #kg-main :is(.kl-card,.hb-card){background:#16132e!important;box-shadow:none!important;border:1px solid rgba(196,182,255,.14)!important;backdrop-filter:none!important}
+body.kg-plain #kg-main .kg-rec{border-color:rgba(245,210,122,.45)!important}
+body.kg-plain #kg-main :is(.kl-eyebrow,.hb-eyebrow)::before{display:none!important}
+body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
+  document.head.appendChild(css);
+})();
+
+</script>
 <script id="kg-shell-script">
-/* ===== Layout: six clear pages instead of one long scroll ===== */
+/* ===== Layout: four spaces (Today, Study, Library, Progress), with Plan, Company and Settings as small icons ===== */
 (function () {
   'use strict';
   const M = window.MoonLab; if (!M) return;
   window.KGShell = true;
-  const NAV = [['today', '☀', 'Today'], ['study', '📖', 'Study'], ['progress', '📈', 'Progress'], ['plan', '🗓', 'Plan'], ['company', '🌙', 'Company'], ['settings', '⚙', 'Settings']];
+  // the fourth flag marks the small icon-only pages
+  const NAV = [['today', '☀', 'Today'], ['study', '📖', 'Study'], ['library', '📚', 'Library'], ['progress', '📈', 'Progress'], ['plan', '🗓', 'Plan', 1], ['company', '🌙', 'Company', 1], ['settings', '⚙', 'Settings', 1]];
+  // Library keeps what you've collected; Study is where you work. Old links to these tabs land in Library.
+  const LIB = ['notes', 'chapters', 'doubts', 'methods', 'tools'];
+  M.SECTIONS.library = LIB.map(id => M.SECTIONS.study.find(t => t[0] === id)).filter(Boolean);
+  for (const id of LIB) { const i = M.SECTIONS.study.findIndex(t => t[0] === id); if (i >= 0) M.SECTIONS.study.splice(i, 1); }
+  M.SECTIONS.library.push(...(M.LIBX || [])); // extra Library tabs from parts loaded before this one (growth.js)
+  const has = (sec, tab) => (M.SECTIONS[sec] || []).some(t => t[0] === tab);
+  const home = (sec, tab) => tab && !has(sec, tab) ? Object.keys(M.SECTIONS).find(k => has(k, tab)) || sec : sec;
   // which view of the old habit desk belongs on each page (Study and Company don't use it)
   const HABIT = { today: 'start', progress: 'progress', plan: 'plan', settings: 'settings' };
   const $ = id => document.getElementById(id);
   const lab = $('moon-lab'), hd = $('habit-desk'), orig = $('habit-original'), journal = $('ame-journal');
   document.body.classList.add('kg-shell');
   const bar = document.createElement('header'); bar.id = 'kg-bar';
-  bar.innerHTML = `<div class="kg-brand"><b>Kaguya Desk</b><span id="kg-status" aria-live="polite"></span></div><nav id="kg-nav" aria-label="Pages">${NAV.map(([id, ic, label]) => `<a href="#${id}" data-sec="${id}"><span aria-hidden="true">${window.__kgIcon?.(id) || ic}</span><em>${label}</em><i class="kg-dot" hidden></i></a>`).join('')}</nav>`;
+  bar.innerHTML = `<div class="kg-brand"><b>Kaguya Desk</b><span id="kg-status" aria-live="polite"></span></div><nav id="kg-nav" aria-label="Pages">${NAV.map(([id, ic, label, small]) => `<a href="#${id}" data-sec="${id}"${small ? ` class="kg-nav2" title="${label}" aria-label="${label}"` : ''}><span aria-hidden="true">${window.__kgIcon?.(id) || ic}</span><em>${label}</em><i class="kg-dot" hidden></i></a>`).join('')}</nav>`;
   const mp = $('mp-widget'); if (mp) bar.append(mp); // the music button lives in the top bar, off the content
   // while music plays, stopping it is one tap away even with the player hidden
   const mstop = document.createElement('button'); mstop.id = 'kg-mstop'; mstop.type = 'button'; mstop.textContent = '■ stop'; mstop.setAttribute('aria-label', 'stop music');
@@ -8105,7 +8859,9 @@ window.KG_RECALL = {
   addEventListener('moonlab:render', e => { const d = e.detail; if (d && d.section && d.tab && last[d.section] !== d.tab) { last[d.section] = d.tab; try { localStorage.setItem(LAST, JSON.stringify(last)); } catch (e2) {} } });
   let cur = '';
   function go(sec, tab) {
+    sec = home(sec, tab);
     if (!NAV.some(n => n[0] === sec)) sec = 'today';
+    if (!tab && last[sec] && !has(sec, last[sec])) delete last[sec]; // a tab that moved to Library
     const changed = sec !== cur; cur = sec;
     for (const [id] of NAV) document.body.classList.toggle('kg-sec-' + id, id === sec);
     for (const a of bar.querySelectorAll('[data-sec]')) a.setAttribute('aria-current', a.dataset.sec === sec ? 'page' : 'false');
@@ -8226,7 +8982,7 @@ window.KG_RECALL = {
     if (M.isNight()) return ["the moon's my shift now. go to sleep, No.1. i'll keep watch.", 'Past wind-down. The work will still be there tomorrow.'];
     if (window.__kgGentle) return ['gentle day. tiny steps still get the clip.', 'A lighter day is still a real day.'];
     if (day === 0) return ['sunday! i declare a royal holiday.', 'Rest properly. That is the whole assignment.'];
-    return [of(["we're live, No.1! let's make today a good episode.", "your happy ending needs today's page. no pressure. some pressure.", "i believe in you so loudly that iroha asked me to stop."]), of(['One task, then the next one. That is all a day is.', 'Write the units. Check the signs. Then we talk.', 'We can start with the part that feels least clear.'])];
+    return [of(["we're live, No.1! let's make today a good episode.", "your happy ending needs today's page. no pressure. some pressure.", "i believe in you so loudly that iroha asked me to stop."]), of(['One task, then the next one. That is all a day is.', 'Write the units. Check the signs. Then we talk.', 'I ran worse days than this one in school. Start small.'])];
   }
   const isBirthday = () => { const d = new Date(); return d.getMonth() === 9 && d.getDate() === 31; };
   function lanterns() {
@@ -8609,7 +9365,7 @@ window.KG_RECALL = {
   'use strict';
   const M = window.MoonLab, $ = id => document.getElementById(id), esc = M && M.esc;
   if (!M || !M.go) return;
-  const PAGES = [['today', 'Today'], ['study', 'Study'], ['progress', 'Progress'], ['plan', 'Plan'], ['company', 'Company'], ['settings', 'Settings']];
+  const PAGES = [['today', 'Today'], ['study', 'Study'], ['library', 'Library'], ['progress', 'Progress'], ['plan', 'Plan'], ['company', 'Company'], ['settings', 'Settings']];
   const typing = el => el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
   const clean = l => String(typeof l === 'function' ? l() : l).replace(/<[^>]+>/g, '').replace(/^[^\p{L}\p{N}]+/u, '').trim();
 
@@ -8761,15 +9517,18 @@ window.KG_RECALL = {
   addEventListener('online', net); addEventListener('offline', net); net(); setInterval(cloudTick, 30000);
 
   /* ---------- a one-time note about what changed, so nothing new goes unnoticed ---------- */
-  const NEW = 'kg-new-v1';
+  const NEW = 'kg-new-v2';
   const newCard = function whatsNew() {
     try { if (localStorage.getItem(NEW)) return ''; } catch (e) { return ''; }
-    return `<section class="kl-card kg-newcard"><p class="kl-eyebrow">✨ NEW ON YOUR DESK</p><h3>A few things to try</h3><ul class="kl-list">
-      <li><b>Find anything:</b> tap the magnifier at the top, or press Ctrl+K.</li>
-      <li><b>Two chats:</b> they sit side by side and follow Kaguya and Iroha around. ⤢ makes one bigger.</li>
-      <li><b>Paced bubbles:</b> long messages arrive piece by piece. Point at one to hold it. Speed is in Settings → Companions.</li>
-      <li><b>Your way:</b> theme swatches, text size and calm motion are in Settings → App. Your theme now colours the whole site.</li>
-      <li><b>Tap the moon</b> in the scene. It's tonight's real moon.</li></ul><button class="kl-primary" data-a="kgnewok">Got it</button></section>`;
+    return `<section class="kl-card kg-newcard"><p class="kl-eyebrow">✨ NEW ON YOUR DESK</p><h3>A calmer desk</h3><ul class="kl-list">
+      <li><b>Four spaces:</b> Today, Study, Library and Progress. Plan, Company and Settings are the small icons beside them.</li>
+      <li><b>Today starts with one thing to do</b>, and says why. One tap starts it or takes you back. Everything else is under "More for today".</li>
+      <li><b>Study → Session:</b> guided practice. Pick Recall, Blurt, Explain, Solve, Compare or Diagnose; Iroha checks it, you repair the gap, it saves. In Explain, Kaguya listens first.</li>
+      <li><b>Mistakes get repaired</b> from Study → Recall, and you can tell Iroha "I think you're wrong" to make her recheck from scratch.</li>
+      <li><b>Progress → Five skills</b> shows Recall, Explanation, Application, Transfer and Retention, counted only from what you've done.</li>
+      <li><b>Study → Rocket path:</b> ten stages from JEE physics to a real mission.</li>
+      <li><b>Study, Quiet, Break</b> in the top bar sets how much Kaguya and Iroha talk. Library → What it remembers shows everything kept about you.</li>
+      <li><b>Safer:</b> half-typed forms come back after a reload, and Settings → Backup keeps a daily copy for 7 days.</li></ul><button class="kl-primary" data-a="kgnewok">Got it</button></section>`;
   };
   M.TODAY.splice(0, 0, newCard);
   M.ACTIONS.kgnewok = () => { try { localStorage.setItem(NEW, '1'); } catch (e) {} M.render(); };
