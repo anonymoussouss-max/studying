@@ -1564,15 +1564,15 @@ window.__KG_BUILTIN = {
   document.addEventListener("pointerdown", e => { lastAct = Date.now(); }, true);
   let clicks = [];
   document.addEventListener("click", e => {
-    if (e.target.closest("#ame-widget,#mp-widget") || !e.target.closest("#root button,#root a,#root summary,#root label")) return;
+    if (e.target.closest("#kg-dock,#ame-widget,#mp-widget") || !e.target.closest("#root button,#root a,#root summary,#root label")) return;
     gif.classList.remove("nod"); void gif.offsetWidth; gif.classList.add("nod");
     const n = Date.now(); clicks = clicks.filter(t => n - t < 6000); clicks.push(n);
     if (clicks.length >= 12 && okCool("mash", 300000)) say(pick(["stop mashing buttons, No.1. what are you looking for?", "so many clicks! nothing's hidden in there. i checked."]), { mood: "annoyed" });
   }, true);
   let typeT = 0;
   document.addEventListener("input", e => {
-    lastAct = Date.now(); const t = e.target; if (t.closest("#ame-widget,#mp-widget") || !/^(TEXTAREA|INPUT)$/.test(t.tagName)) return;
-    clearTimeout(typeT); typeT = setTimeout(() => { if (!muted && !isOpen && okCool("typing", 360000)) say(pick(["ooh, you're typing! taking notes? i love a studious No.1.", "writing in the page and not to me... fine, the page gets you for now."]), { mood: "happy" }); }, 1800);
+    lastAct = Date.now(); const t = e.target; if (t.closest("#kg-dock,#ame-widget,#mp-widget") || !/^(TEXTAREA|INPUT)$/.test(t.tagName)) return;
+    clearTimeout(typeT); typeT = setTimeout(() => { if (!muted && !isOpen && !window.__kgOnBreak && !window.__kgShortBreak && document.body.classList.contains("kg-sec-study") && okCool("typing", 360000)) say(pick(["ooh, you're typing! taking notes? i love a studious No.1.", "writing in the page and not to me... fine, the page gets you for now."]), { mood: "happy" }); }, 1800);
   }, true);
   let sc = [];
   addEventListener("scroll", () => { const n = Date.now(); lastAct = n; sc = sc.filter(t => n - t < 7000); sc.push(n); if (sc.length > 60 && okCool("scroll", 600000)) say(pick(["so much scrolling! are we lost, No.1? the block you need is right there.", "scroll scroll scroll... pick one thing and stay on it, okay?"]), { mood: "annoyed" }); }, { passive: true, capture: true });
@@ -1592,7 +1592,7 @@ window.__KG_BUILTIN = {
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) { hiddenAt = Date.now(); document.title = "...No.1? 🌙"; return; }
     document.title = window.__kgTitle || TITLE; lastAct = Date.now(); if (!hiddenAt) return;
-    const min = Math.round((Date.now() - hiddenAt) / 60000), ctx = ameContext(); hiddenAt = 0; if (min < 2 || muted) return;
+    const min = Math.round((Date.now() - hiddenAt) / 60000), ctx = ameContext(); hiddenAt = 0; if (min < 2 || muted || window.__kgOnBreak || window.__kgShortBreak || ctx.mode !== "study") return;
     const line = min < 6 ? "welcome back! quick break? good. back to it." : min < 30 ? `${min} minutes away! hope that was a real break. the block missed you.` : `${min} minutes!! i almost made iroha go looking for you. back to the desk, No.1.`;
     EV.push({ t: `left the page for ${min} min`, at: Date.now() });
     if (min >= 10 && ctx.mode === "study") aiReact(`left the page for ${min} minutes during a study block (${ctx.block})`, line, "annoyed"); else say(line, { mood: min < 6 ? "happy" : "annoyed" });
@@ -1682,12 +1682,12 @@ window.__KG_BUILTIN = {
     if (kw) say(kw[1], { mood: kw[2] }); else aiReact(`wrote this on the page (${t.placeholder || "a text field"}): "${v.slice(0, 160)}"`, pick(L.note), "happy");
   }, true);
   // what you click, select, copy, paste, hover
-  document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("#root button,#root a"); if (!b || b.closest("#ame-widget")) return; const x = (b.textContent || b.getAttribute("aria-label") || "").trim().replace(/\s+/g, " "); if (x && x.length < 28) { EV.push({ t: `clicked "${x}"`, at: Date.now() }); if (EV.length > 30) EV.shift(); } }, true);
+  document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("#root button,#root a"); if (!b || b.closest("#kg-dock,#ame-widget")) return; const x = (b.textContent || b.getAttribute("aria-label") || "").trim().replace(/\s+/g, " "); if (x && x.length < 28) { EV.push({ t: `clicked "${x}"`, at: Date.now() }); if (EV.length > 30) EV.shift(); } }, true);
   const HV = [[/erase it|reset trial/i, "WAIT. that erases your logged days! please don't, unless you really mean it."], [/download log/i, "a backup! smart. keep it somewhere safe."], [/^pause$/i, "pausing? okay, just don't let the pause turn into a nap."]];
   document.addEventListener("pointerover", e => { if (muted || isOpen) return; const b = e.target.closest && e.target.closest("#root button"); if (!b) return; const x = (b.textContent || "").trim(), h = HV.find(h => h[0].test(x)); if (h && okCool("hv" + h[0], 90000)) say(h[1], { mood: /erase/i.test(x) ? "annoyed" : "" }); }, true);
   let selT = 0; document.addEventListener("selectionchange", () => { clearTimeout(selT); selT = setTimeout(() => { const q = String(getSelection()).trim(); if (q.length > 25 && !muted && !isOpen && okCool("sel", 300000)) say("highlighting! is that the important bit? make it a recall card in Study.", { mood: "happy" }); }, 900); });
   document.addEventListener("copy", () => { if (!muted && !isOpen && okCool("copy", 400000)) irohaSay("Copying? Write it out by hand once. It sticks better.", { face: "stern" }); });
-  document.addEventListener("paste", e => { if (e.target.closest && e.target.closest("#ame-widget")) return; if (!muted && !isOpen && okCool("paste", 400000)) irohaSay("Pasting? Write the last line yourself. That's the part that teaches you.", { face: "stern" }); });
+  document.addEventListener("paste", e => { if (e.target.closest && e.target.closest("#kg-dock,#ame-widget")) return; if (!muted && !isOpen && okCool("paste", 400000)) irohaSay("Pasting? Write the last line yourself. That's the part that teaches you.", { face: "stern" }); });
   // pomodoro countdown awareness
   setInterval(() => { if (muted || document.hidden) return; const st = readDesk(), p = st && st.pomo; if (!p || !p.running || !p.endsAt) return; const l = p.endsAt - Date.now();
     if (l > 55e3 && l < 62e3 && okCool("p60", 50000)) say(p.mode === "work" ? "one minute left! finish the line you're on." : "one minute of break left! water, stretch.", { mood: "happy" }); }, 4000);
@@ -2225,7 +2225,7 @@ window.__KG_BUILTIN = {
     // No idle nags inside study blocks. At wind-down (23:30 to 01:00) she only tells you to stop.
     if (c.mode !== "study" && m >= 23 * 60 + 30 && now - lastAct < 120000 && okCool("ilate", 30 * 60000)) irohaSay(pick(IR.late), { face: "stern" });
   }, 30000);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && hiddenAt === 0 && Date.now() - iLast > 600000 && ameContext().mode === "study" && okCool("iback", 20 * 60000) && Math.random() < .35) setTimeout(() => irohaSay(pick(IR.back), { face: "stern" }), 4200); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && hiddenAt === 0 && !window.__kgOnBreak && !window.__kgShortBreak && Date.now() - iLast > 600000 && ameContext().mode === "study" && okCool("iback", 20 * 60000) && Math.random() < .35) setTimeout(() => irohaSay(pick(IR.back), { face: "stern" }), 4200); });
 
   // ---------- banter: the two of them talking to each other ----------
   // Each script is a list of [speaker, line]; k = Kaguya, i = Iroha. {streak} fills in the live chain.
@@ -2429,7 +2429,9 @@ window.__KG_BUILTIN = {
   // Divider lines (---) and a dash opening a line go too.
   const plain = t => String(t).replace(/^\s*([-*_—–]\s*){3,}$/gm, "").replace(/^(\s*)(?:—|–|-{2,})\s*/gm, "$1").replace(/\n{3,}/g, "\n\n").trim().replace(/\*\*(.+?)\*\*/g, "$1").replace(/__(.+?)__/g, "$1").replace(/^#{1,6}\s+/gm, "").replace(/^\s*[*-]\s+/gm, "• ").replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,!?:;]|$)/g, "$1$2");
   const rawPost = postChat;
-  postChat = async (...a) => { const r = await rawPost(...a); if (r && r.reply) r.reply = plain(r.reply); return r; };
+  // which model answered, for the small label under each reply (dock.js)
+  postChat = async (...a) => { const r = await rawPost(...a); if (a[2] === "kaguya" && !(r && r.reply)) window.__kgBothOnce = false; // a failed "Both" message must not bring the other in later
+    if (r && r.reply) { r.reply = plain(r.reply); window.__kgLastVia = { who: a[2], provider: r.provider || "", model: r.model || "", reply: r.reply, at: Date.now() }; } return r; };
   // when a session starts, Iroha notices it and offers to watch
   let hadSession = !!activeSession();
   window.addEventListener("habit:change", () => {
@@ -2441,7 +2443,8 @@ window.__KG_BUILTIN = {
   // ---------- shared view: each companion can read the other's chat ----------
   const lineOf = (m, other) => (m.role === "user" ? "User → " + other : other) + ": " + String(m.content).slice(0, 220);
   // Naming the other companion (or "you both") brings her into the conversation.
-  function wantsTalk(who, text) { return (who === "iroha" ? /\bkaguya\b/i : /\biroha\b/i).test(text) || /\b(you both|both of you|you two|ask you both)\b/i.test(text); }
+  // the dock's Both tab sets __kgBothOnce for one message, so the existing ask-both path brings the other in
+  function wantsTalk(who, text) { return !!window.__kgBothOnce || (who === "iroha" ? /\bkaguya\b/i : /\biroha\b/i).test(text) || /\b(you both|both of you|you two|ask you both)\b/i.test(text); }
   function crossNote(who) {
     const other = who === "iroha" ? "Kaguya" : "Iroha", src = who === "iroha" ? conversation : iconv;
     const recent = src.slice(-8).map(m => lineOf(m, other)).join("\n");
@@ -2527,7 +2530,8 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
   }
   window.__kgTalk = (topic, first = "kaguya", turns = 3) => talkTogether(first, topic, null, turns);
   window.__kgAfterReply = (from, userText, reply) => {
-    if (wantsTalk(from, userText)) talkTogether(from, userText, reply); else chimeIn(from, userText, reply);
+    const both = wantsTalk(from, userText); window.__kgBothOnce = false;
+    if (both) talkTogether(from, userText, reply); else chimeIn(from, userText, reply);
     window.__kgHeard?.(from, userText);
   };
   const askBoth = text => { if (isOpen) { input.value = text; sendMessage(); } else iSend(text); };
@@ -6375,7 +6379,7 @@ window.KG_RECALL = {
     const d = today(), last = ((M.read('ame-habit-v1', {}) || {}).lastBackup) || 0;
     if (!L.cset.autoBackup || new Date(d + 'T12:00:00').getDay() !== 0 || L.autoBackupDay === d || Date.now() - last < 6 * 864e5) return;
     L.autoBackupDay = d; save();
-    setTimeout(() => { document.querySelector('#habit-desk [data-action="backup"]')?.click(); K('weekly backup saved to your downloads 🌙'); }, 400);
+    setTimeout(() => { document.querySelector('#habit-desk [data-action="backup"]')?.click(); (M.notify || K)('Weekly backup saved to your downloads.'); }, 400);
   }, { capture: true });
 
   // heavy days: Kaguya offers company once, outside study blocks
@@ -8924,7 +8928,7 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
     location.reload();
   }
   M.ACTIONS.snaprestore = b => restoreSnap(b.dataset.v);
-  M.ACTIONS.snapnow = () => snapshot('manual').then(() => M.I('Copy saved on this device.', { face: 'study' })).catch(() => M.K("couldn't save a copy here, try a full backup download instead 🌙"));
+  M.ACTIONS.snapnow = () => snapshot('manual').then(() => (M.notify || M.K)('Recovery copy saved on this device.')).catch(() => M.K("couldn't save a copy here, try a full backup download instead 🌙"));
   const backup = M.PANELS.backup;
   const lastFull = () => { const t = Number(localStorage.getItem('kg-full-backup') || 0); return t ? new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'never'; };
   if (backup) M.PANELS.backup = () => backup() + `<section class="kl-card kl-stack kg-fullbk"><h3>Full backup, attached notes included</h3>
@@ -9562,7 +9566,9 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
       for (const [k, v] of [['position', 'fixed'], ['left', left + 'px'], ['top', Math.max(8, c.bottom - 150) + 'px'], ['right', 'auto'], ['bottom', 'auto'], ['margin-bottom', '0']]) s.setProperty(k, v, 'important');
     }
   }
-  function layout() { place(); bubbles(); document.body.classList.toggle('kg-chat-full', phone() && order.some(p => isOpen(p) && p.big)); }
+  // while the companion dock hosts the chats (dock.js), these floating-window rules stand aside
+  const docked = () => document.body.classList.contains('kg-docked');
+  function layout() { if (docked()) return; place(); bubbles(); document.body.classList.toggle('kg-chat-full', phone() && order.some(p => isOpen(p) && p.big)); }
   function place() {
     const b = bounds(), open = order.filter(isOpen);
     const vv = window.visualViewport, keyboard = phone() && vv && vv.height < innerHeight - 120;
@@ -9602,7 +9608,7 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
       const now = isOpen(p), was = order.includes(p);
       if (now && !was) {
         order.push(p);
-        if (phone()) for (const o of order) if (o !== p && isOpen(o)) o.x?.click();
+        if (phone() && !docked()) for (const o of order) if (o !== p && isOpen(o)) o.x?.click();
         layout();
         window.__kgPopDrop?.(p === WHO[0] ? 'k' : 'i'); // the whole message is right there now, so no leftover pieces
         requestAnimationFrame(() => { if (p.m) p.m.scrollTop = p.m.scrollHeight; }); // always open on the newest message
@@ -9702,11 +9708,11 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
     later();
   });
   /* Esc closes the chat you opened last */
-  addEventListener('keydown', e => { if (e.key !== 'Escape') return; const open = order.filter(isOpen); if (open.length) open[open.length - 1].x?.click(); });
+  addEventListener('keydown', e => { if (e.key !== 'Escape' || docked()) return; const open = order.filter(isOpen); if (open.length) open[open.length - 1].x?.click(); });
   /* tapping a line in the Today scene opens that companion's chat */
   // a line being spoken moves on to the next one; otherwise the box opens her chat
-  $('kgs-say-k')?.addEventListener('click', e => { if (e.currentTarget.classList.contains('live')) window.__kgPopNext?.('k'); else if (!isOpen(WHO[0])) WHO[0].a.click(); });
-  $('kgs-say-i')?.addEventListener('click', e => { if (e.currentTarget.classList.contains('live')) window.__kgPopNext?.('i'); else if (!isOpen(WHO[1])) WHO[1].a.click(); });
+  $('kgs-say-k')?.addEventListener('click', e => { if (e.currentTarget.classList.contains('live')) window.__kgPopNext?.('k'); else if (window.__kgDock?.docked()) window.__kgDock.open('kaguya'); else if (!isOpen(WHO[0])) WHO[0].a.click(); });
+  $('kgs-say-i')?.addEventListener('click', e => { if (e.currentTarget.classList.contains('live')) window.__kgPopNext?.('i'); else if (window.__kgDock?.docked()) window.__kgDock.open('iroha'); else if (!isOpen(WHO[1])) WHO[1].a.click(); });
 
   /* ---------- Settings: send them home ---------- */
   const companions = M.PANELS.companions;
@@ -9726,6 +9732,423 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
     later(); window.__kaguyaSay?.('back in the corner! good view from here.');
   };
   layout();
+})();
+
+</script>
+<script id="kg-dock-script">
+/* ===== The companion dock: one right-docked panel with Iroha / Kaguya / Both tabs, and the desk makes room for it.
+   It hosts the existing chat windows (moved, not rebuilt), so each history, sending, attachments, screen watch,
+   voice, tutor mode and ask-both keep working exactly as before. Floating windows stay available (More → Float). ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab; if (!M) return;
+  const $ = id => document.getElementById(id);
+  const kc = $('ame-chat'), ic = $('iroha-chat'), kw = $('ame-widget'), iw = $('iroha-widget');
+  if (!kc || !ic || !kw || !iw) return;
+  const KG = window.__KG || {};
+  const WHO = {
+    iroha: { chat: ic, widget: iw, gif: $('iroha-gif'), msgs: $('iroha-messages'), input: $('iroha-input'), send: $('iroha-send'), chips: $('iroha-chips'), bubble: $('iroha-bubble'), name: 'Iroha', full: 'Dr. Iroha Sakayori', art: (KG.iroha || {}).desk || (KG.iroha || {}).idle, store: 'iroha-chat', short: 'i' },
+    kaguya: { chat: kc, widget: kw, gif: $('ame-gif'), msgs: $('ame-messages'), input: $('ame-input'), send: $('ame-send'), chips: $('ame-chips'), bubble: $('ame-bubble'), name: 'Kaguya', full: 'Kaguya', art: (KG.kaguya || {}).idle, store: 'ame-chat', short: 'k' }
+  };
+  const P = 'kg-dock-v1', DEF = { layout: 'dock', open: false, tab: 'iroha', wide: false };
+  let st; try { st = Object.assign({}, DEF, JSON.parse(localStorage.getItem(P) || '{}')); } catch (e) { st = Object.assign({}, DEF); }
+  const persist = () => { try { localStorage.setItem(P, JSON.stringify(st)); } catch (e) {} };
+  const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches || document.body.classList.contains('kg-plain');
+  const phone = () => innerWidth <= 720;
+
+  /* ---------- app notices: a quiet toast, never a character's line ---------- */
+  const toastBox = document.createElement('div'); toastBox.id = 'kg-toast'; toastBox.setAttribute('role', 'status'); toastBox.setAttribute('aria-live', 'polite'); document.body.appendChild(toastBox);
+  M.notify = text => { const t = document.createElement('div'); t.className = 'kg-toast-item'; t.textContent = text; toastBox.appendChild(t); setTimeout(() => t.classList.add('out'), 4200); setTimeout(() => t.remove(), 4800); };
+
+  /* ---------- the panel ---------- */
+  const dock = document.createElement('aside'); dock.id = 'kg-dock'; dock.setAttribute('aria-label', 'Companion chat');
+  dock.innerHTML = `<header class="kgd-head">
+      <button type="button" class="kgd-back" data-d="min" aria-label="Back to the desk">← Desk</button>
+      <div class="kgd-tabs" role="tablist" aria-label="Who you're talking to">
+        <button type="button" role="tab" id="kgd-tab-iroha" data-tab="iroha" aria-controls="kgd-body">Iroha</button>
+        <button type="button" role="tab" id="kgd-tab-kaguya" data-tab="kaguya" aria-controls="kgd-body">Kaguya</button>
+        <button type="button" role="tab" id="kgd-tab-both" data-tab="both" aria-controls="kgd-body">Both</button>
+      </div>
+      <div class="kgd-tools">
+        <button type="button" data-d="wide" class="kgd-icon" aria-pressed="false" aria-label="Expand to study view" title="Study view: more room for long explanations and worked problems">⤢</button>
+        <button type="button" data-d="min" class="kgd-icon kgd-minbtn" aria-label="Minimize chat" title="Minimize: tuck the panel away. Nothing is deleted.">–</button>
+        <button type="button" data-d="more" class="kgd-icon" aria-haspopup="menu" aria-expanded="false" aria-label="More options" title="More options">⋯</button>
+      </div>
+      <div class="kgd-menu" role="menu" hidden></div>
+    </header>
+    <div class="kgd-who" aria-live="off"><img class="kgd-face" alt="" draggable="false"><div class="kgd-id"><b class="kgd-name"></b><span class="kgd-sub"></span><span class="kgd-state"></span></div><p class="kgd-aside" hidden></p></div>
+    <div id="kgd-body" class="kgd-body" role="tabpanel">
+      <section class="kgd-pane" data-who="iroha" aria-label="Chat with Iroha"><h3 class="kgd-panename">Iroha</h3></section>
+      <section class="kgd-pane" data-who="kaguya" aria-label="Chat with Kaguya"><h3 class="kgd-panename">Kaguya</h3></section>
+    </div>
+    <div class="kgd-actions" role="group" aria-label="Suggested actions"></div>
+    <form class="kgd-both" hidden><label class="kgd-sr" for="kgd-both-input">Message to both</label><textarea id="kgd-both-input" rows="1" placeholder="Say something to both of them…" title="Enter sends. Shift+Enter starts a new line."></textarea><button type="submit" class="kgd-send">Send</button></form>`;
+  document.body.appendChild(dock);
+  const launch = document.createElement('button'); launch.type = 'button'; launch.id = 'kg-dock-launch'; launch.setAttribute('aria-label', 'Open companion chat');
+  launch.innerHTML = `<img alt="" src="${WHO.iroha.art || ''}"><img alt="" src="${WHO.kaguya.art || ''}"><span>Chat</span><i class="kgd-dot" hidden></i>`;
+  document.body.appendChild(launch);
+  const q = s => dock.querySelector(s), pane = w => q(`.kgd-pane[data-who="${w}"]`);
+  const menu = q('.kgd-menu'), moreBtn = q('[data-d="more"]'), wideBtn = q('[data-d="wide"]'), actions = q('.kgd-actions'), bothForm = q('.kgd-both'), bothInput = $('kgd-both-input');
+
+  // the existing windows move in; a few of their own controls step aside (the dock has its own)
+  const clearInline = el => { for (const k of ['position', 'left', 'top', 'right', 'bottom', 'width', 'height', 'max-width']) el.style.removeProperty(k); };
+  function mount() {
+    for (const w of ['iroha', 'kaguya']) { const o = WHO[w]; clearInline(o.chat); pane(w).appendChild(o.chat); if (o.input) o.input.placeholder = w === 'iroha' ? 'Write to Iroha…' : 'say something to kaguya…'; }
+    document.body.classList.add('kg-docked');
+  }
+  function unmount() {
+    for (const w of ['iroha', 'kaguya']) { const o = WHO[w]; o.widget.appendChild(o.chat); }
+    document.body.classList.remove('kg-docked', 'kg-dock-open', 'kg-dock-wide');
+  }
+  // open a companion's own chat (so it renders its history and greets as it always did), without closing anything
+  let opening = false;
+  function ensureOpen(w) {
+    const o = WHO[w]; if (o.chat.classList.contains('open') || !o.gif) return;
+    opening = true; o.gif.click(); setTimeout(() => { opening = false; }, 600);
+  }
+  const isOpen = () => docked() && st.open;
+  const docked = () => st.layout === 'dock';
+  let returnTo = null;
+  // each chat keeps its reading position when you switch tabs
+  const keepPos = () => { for (const w of ['iroha', 'kaguya']) { const m = WHO[w].msgs; if (m && m.offsetParent) m._pos = m.scrollTop; } };
+  const restorePos = () => { for (const w of ['iroha', 'kaguya']) { const m = WHO[w].msgs; if (m && m._pos != null && m.offsetParent) { m._force = true; m.scrollTop = m._pos; m._force = false; } } };
+  function show(tab, focus = true) {
+    if (!docked()) return;
+    keepPos();
+    if (tab) st.tab = tab;
+    if (!st.open) returnTo = document.activeElement;
+    st.open = true; persist();
+    const needOpen = !WHO.iroha.chat.classList.contains('open') || !WHO.kaguya.chat.classList.contains('open');
+    ensureOpen('iroha'); ensureOpen('kaguya');
+    paint(); requestAnimationFrame(restorePos);
+    // focus the composer you can see; if the chats had to open first, wait for their own opening code (it focuses its own box),
+    // and never pull focus away from something you've moved to in the meantime (a menu, another field)
+    if (focus) setTimeout(() => {
+      const a = document.activeElement, free = !a || a === document.body || a === launch || dock.contains(a) && (a.matches('[role=tab],textarea') && menu.hidden);
+      if (free) (st.tab === 'both' ? bothInput : WHO[st.tab].input)?.focus({ preventScroll: true });
+    }, needOpen ? 650 : 0);
+  }
+  function hide() {
+    st.open = false; persist(); closeMenu(); paint();
+    const back = returnTo && returnTo !== document.body && document.contains(returnTo) && !dock.contains(returnTo) && returnTo.offsetParent ? returnTo : launch;
+    setTimeout(() => back?.focus?.({ preventScroll: true }), 0);
+  }
+  function setLayout(layout) {
+    st.layout = layout; persist(); closeMenu();
+    if (layout === 'dock') { mount(); show(st.tab); } else { unmount(); paint(); M.notify('Chats are floating windows again. More → Dock on the right brings the panel back.'); }
+  }
+  window.__kgDock = { open: w => show(w), close: hide, on: isOpen, docked };
+  // Settings → Companions: the layout choice is always reachable, including from floating windows
+  const companions = M.PANELS.companions;
+  if (companions) M.PANELS.companions = () => `<section class="kl-card"><h3>Chat layout</h3><p class="kl-small">Docked: one panel on the right with Iroha, Kaguya and Both tabs, and the desk makes room for it. Floating: the two separate chat windows.</p><div class="kl-seg" role="group" aria-label="Chat layout"><button data-a="kgdocklayout" data-v="dock" aria-pressed="${docked()}">Docked panel</button><button data-a="kgdocklayout" data-v="float" aria-pressed="${!docked()}">Floating windows</button></div></section>` + companions();
+  M.ACTIONS.kgdocklayout = b => { if (b.dataset.v !== st.layout) setLayout(b.dataset.v); M.render(); };
+
+  /* ---------- painting the current state ---------- */
+  const stateLine = () => {
+    const c = L().cmode, clock = ts => new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (window.__kgOnBreak) return `Time away until ${window.__kgBreakUntil || 'your return date'}`;
+    if (c?.m === 'break' && Date.now() < (c.until || 0)) return `Short break until ${clock(c.until)}`;
+    if (c?.m === 'quiet') return 'Quiet company';
+    const b = M.block?.(); return b && b.kind === 'study' ? `Study · ${b.title}` : 'Study mode';
+  };
+  const L = () => M.L;
+  function paint() {
+    const open = isOpen(), tab = st.tab;
+    document.body.classList.toggle('kg-dock-open', open);
+    document.body.classList.toggle('kg-dock-wide', open && st.wide);
+    dock.hidden = !open; launch.hidden = !docked() || open;
+    dock.dataset.tab = tab;
+    for (const b of dock.querySelectorAll('[role="tab"]')) { const on = b.dataset.tab === tab; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; }
+    q('#kgd-body').setAttribute('aria-labelledby', 'kgd-tab-' + tab);
+    wideBtn.setAttribute('aria-pressed', String(!!st.wide)); wideBtn.setAttribute('aria-label', st.wide ? 'Back to the normal panel' : 'Expand to study view');
+    const who = tab === 'both' ? null : WHO[tab];
+    const face = q('.kgd-face'); face.hidden = !who; if (who && face.getAttribute('src') !== who.art) face.src = who.art || '';
+    q('.kgd-name').textContent = who ? who.full : 'Iroha & Kaguya';
+    q('.kgd-sub').textContent = tab === 'iroha' ? 'field notes' : tab === 'kaguya' ? 'on air' : 'one message, both of them';
+    q('.kgd-state').textContent = stateLine();
+    bothForm.hidden = tab !== 'both';
+    // the suggested actions sit just above whichever composer is in use
+    const area = tab === 'both' ? bothForm : WHO[tab].chat.querySelector('.ame-input-area');
+    if (area && actions.nextElementSibling !== area) area.before(actions);
+    renderActions();
+    sizeToViewport();
+  }
+
+  /* ---------- three relevant actions, everything else under More ---------- */
+  const tutorOn = () => { try { return localStorage.getItem('kg-tutor') === '1'; } catch (e) { return false; } };
+  function context() {
+    const c = L().cmode;
+    if (window.__kgOnBreak || window.__kgShortBreak || (c?.m === 'quiet')) return 'rest';
+    if ((L().flow && L().flow.step !== 'goal') || tutorOn() || M.block?.()?.kind === 'study') return 'study';
+    return 'talk';
+  }
+  const PICK = {
+    iroha: { study: [/check my work/i, /show solution/i, /tutor/i], rest: [/ask you both/i], talk: [/ask you both/i] },
+    kaguya: { study: [/ask you both/i], rest: [/ask you both/i], talk: [/ask you both/i] }
+  };
+  const chipList = w => [...(WHO[w].chips?.querySelectorAll('button') || [])].filter(b => !b.hidden && b.offsetParent !== null || b.closest('#kg-dock'));
+  const label = b => b.textContent.replace(/\s+/g, ' ').trim();
+  function renderActions() {
+    const tab = st.tab, ctx = context(), list = tab === 'both' ? [] : chipList(tab);
+    const picks = [];
+    if (tab !== 'both') for (const re of PICK[tab][ctx]) { const b = list.find(x => re.test(label(x)) && !picks.includes(x)); if (b) picks.push(b); }
+    const extra = ctx === 'rest' ? [{ t: 'Hang out', run: () => M.go('company', 'hangout') }] : [];
+    actions.innerHTML = '';
+    for (const b of picks.slice(0, 3)) { const x = document.createElement('button'); x.type = 'button'; x.className = 'kgd-act'; x.textContent = label(b); if (b.title) x.title = b.title; if (b.getAttribute('aria-pressed')) x.setAttribute('aria-pressed', b.getAttribute('aria-pressed')); x.onclick = () => { b.click(); setTimeout(paint, 60); }; actions.appendChild(x); }
+    for (const e of extra.slice(0, 3 - Math.min(3, picks.length))) { const x = document.createElement('button'); x.type = 'button'; x.className = 'kgd-act'; x.textContent = e.t; x.onclick = e.run; actions.appendChild(x); }
+    actions.hidden = !actions.children.length;
+  }
+  function buildMenu() {
+    const tab = st.tab, items = [];
+    if (tab !== 'both') for (const b of chipList(tab)) items.push({ t: label(b), run: () => b.click() });
+    items.push({ sep: 1 });
+    items.push({ t: 'Mute or unmute their unprompted comments', title: 'Stops Kaguya and Iroha from commenting on their own. They still answer you.', run: () => $('ame-mute')?.click() });
+    items.push({ t: docked() ? 'Float as separate windows' : 'Dock on the right', run: () => setLayout(docked() ? 'float' : 'dock') });
+    items.push({ t: 'Clear a chat… (Settings)', title: 'Clearing a chat is in Settings → Companions and always asks first.', run: () => M.go('settings', 'companions') });
+    menu.innerHTML = items.map((x, i) => x.sep ? '<hr role="separator">' : `<button type="button" role="menuitem" data-i="${i}" ${x.title ? `title="${M.esc(x.title)}"` : ''}>${M.esc(x.t)}</button>`).join('');
+    menu._items = items;
+  }
+  function openMenu() { buildMenu(); menu.hidden = false; moreBtn.setAttribute('aria-expanded', 'true'); menu.querySelector('[role="menuitem"]')?.focus(); }
+  function closeMenu(focusBack) { if (menu.hidden) return; menu.hidden = true; moreBtn.setAttribute('aria-expanded', 'false'); if (focusBack) moreBtn.focus(); }
+  menu.addEventListener('click', e => { const b = e.target.closest('[role="menuitem"]'); if (!b) return; const it = menu._items[+b.dataset.i]; closeMenu(true); it?.run?.(); setTimeout(paint, 80); });
+  menu.addEventListener('keydown', e => {
+    const its = [...menu.querySelectorAll('[role="menuitem"]')], i = its.indexOf(document.activeElement);
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenu(true); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); its[(i + 1) % its.length]?.focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); its[(i - 1 + its.length) % its.length]?.focus(); }
+    else if (e.key === 'Tab') closeMenu(false);
+  });
+  document.addEventListener('pointerdown', e => { if (!menu.hidden && !menu.contains(e.target) && e.target !== moreBtn) closeMenu(false); });
+
+  /* ---------- header controls and tabs ---------- */
+  dock.addEventListener('click', e => {
+    const tb = e.target.closest('[role="tab"]'); if (tb) { show(tb.dataset.tab); return; }
+    const d = e.target.closest('[data-d]')?.dataset.d; if (!d) return;
+    if (d === 'min') hide();
+    else if (d === 'wide') { st.wide = !st.wide; persist(); paint(); }
+    else if (d === 'more') menu.hidden ? openMenu() : closeMenu(true);
+  });
+  q('.kgd-tabs').addEventListener('keydown', e => {
+    const tabs = [...dock.querySelectorAll('[role="tab"]')], i = tabs.indexOf(document.activeElement); if (i < 0) return;
+    const go = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : null;
+    if (go === null) return; e.preventDefault(); const t = tabs[(go + tabs.length) % tabs.length]; t.focus(); show(t.dataset.tab, false);
+  });
+  launch.addEventListener('click', () => show(st.tab));
+  dock.addEventListener('keydown', e => { if (e.key === 'Escape' && menu.hidden && (phone() || innerWidth < 1100)) { e.preventDefault(); hide(); } });
+
+  /* ---------- Both: one message, the existing ask-both path brings the other in (one request each, no repeats) ---------- */
+  bothForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const text = bothInput.value.trim(); if (!text) return;
+    const k = WHO.kaguya, keep = k.input.value;
+    window.__kgBothOnce = true;
+    k.input.value = text; k.send.click();
+    k.input.value = keep; k.input.dispatchEvent(new Event('input', { bubbles: true }));
+    bothInput.value = ''; saveBoth(); fit(bothInput);
+  });
+  bothInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); bothForm.requestSubmit(); } });
+  const BK = 'kg-draft-both', saveBoth = () => { try { bothInput.value ? localStorage.setItem(BK, bothInput.value) : localStorage.removeItem(BK); } catch (e) {} };
+  try { bothInput.value = localStorage.getItem(BK) || ''; } catch (e) {}
+  const fit = t => { t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight + 4, phone() ? 120 : 180) + 'px'; };
+  bothInput.addEventListener('input', () => { saveBoth(); fit(bothInput); });
+
+  /* ---------- entry points elsewhere open the dock on the right companion ---------- */
+  for (const w of ['iroha', 'kaguya']) {
+    const o = WHO[w];
+    o.gif?.addEventListener('click', e => { if (!docked() || opening) return; e.stopImmediatePropagation(); e.preventDefault(); show(w); }, true);
+  }
+  for (const [fn, w] of [['__irohaAsk', 'iroha'], ['__irohaAskImg', 'iroha'], ['__kaguyaAsk', 'kaguya']]) {
+    const f = window[fn]; if (typeof f !== 'function') continue;
+    window[fn] = (...a) => { if (docked()) show(w, false); return f(...a); };
+  }
+
+  /* ---------- reading: don't pull you down while you're reading older messages ---------- */
+  const desc = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+  for (const w of ['iroha', 'kaguya']) {
+    const el = WHO[w].msgs; if (!el || !desc) continue;
+    el._atEnd = true;
+    const gap = () => el.scrollHeight - desc.get.call(el) - el.clientHeight;
+    Object.defineProperty(el, 'scrollTop', { configurable: true, get() { return desc.get.call(this); }, set(v) { if (this._atEnd || this._force || v < desc.get.call(this)) { desc.set.call(this, v); } else { const dn = this.parentNode?.querySelector('.kg-chat-down'); if (dn) { dn.hidden = false; dn.textContent = 'New messages ↓'; } } } });
+    el.addEventListener('scroll', () => { el._atEnd = gap() < 80; if (el._atEnd) { const dn = el.parentNode?.querySelector('.kg-chat-down'); if (dn) dn.textContent = 'Latest ↓'; } }, { passive: true });
+    el.parentNode?.addEventListener('click', e => { if (e.target.closest('.kg-chat-down')) { el._force = true; desc.set.call(el, el.scrollHeight); el._force = false; el._atEnd = true; } });
+  }
+
+  /* ---------- when each message was said, and which model said it ---------- */
+  const MK = 'kg-chat-meta';
+  let meta; try { meta = JSON.parse(localStorage.getItem(MK) || '{}') || {}; } catch (e) { meta = {}; }
+  meta.i = meta.i || {}; meta.k = meta.k || {};
+  const norm = s => String(s || '').replace(/^\s*\[(?:Kaguya|Iroha)\]\s*/i, '').replace(/\s+/g, ' ').trim().slice(0, 120);
+  const sig = (role, text) => (role === 'user' ? 'u' : 'a') + ':' + norm(text);
+  const ORIG = Storage.prototype.setItem;
+  const viaLabel = v => { if (!v) return ''; const m = String(v.model || ''); const n = /haiku/i.test(m) ? 'Haiku' : /sonnet/i.test(m) ? 'Sonnet' : /fable/i.test(m) ? 'Fable' : /gemini/i.test(m) ? 'Gemini' : /qwen/i.test(m) ? 'Qwen' : m.split('/').pop(); return [n, v.provider].filter(Boolean).join(' via '); };
+  function stamp(key, value, fresh) {
+    const s = key === 'iroha-chat' ? 'i' : 'k', m = meta[s], seen = new Set();
+    let arr; try { arr = JSON.parse(value); } catch (e) { return; } if (!Array.isArray(arr)) return;
+    const via = window.__kgLastVia, now = Date.now();
+    for (const x of arr) {
+      const g = sig(x.role, x.content); seen.add(g); if (m[g]) continue;
+      // the label goes only on the reply that model actually wrote, never on a canned line saved around the same time
+      const fromThis = via && now - via.at < 60000 && (via.who === 'iroha') === (s === 'i') && norm(via.reply) === norm(x.content);
+      m[g] = { t: fresh ? now : 0, via: x.role !== 'user' && fresh && fromThis ? viaLabel(via) : '' };
+    }
+    for (const g of Object.keys(m)) if (!seen.has(g)) delete m[g];
+    try { ORIG.call(localStorage, MK, JSON.stringify(meta)); } catch (e) {}
+  }
+  // what's already saved is marked "earlier" (time unknown); from now on each message gets its real time
+  for (const k of ['iroha-chat', 'ame-chat']) { const v = localStorage.getItem(k); if (v) stamp(k, v, false); }
+  Storage.prototype.setItem = function (k, v) { if (this === localStorage && (k === 'ame-chat' || k === 'iroha-chat')) stamp(k, v, true); return ORIG.apply(this, arguments); };
+  const dayName = t => { const d = new Date(t), today = new Date(); const diff = Math.round((new Date(today.toDateString()) - new Date(d.toDateString())) / 864e5); return diff === 0 ? 'Today' : diff === 1 ? 'Yesterday' : d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }); };
+  const textOf = el => { const c = el.cloneNode(true); c.querySelectorAll('.kg-msg-tools,.kgd-ts').forEach(n => n.remove()); return c.textContent; };
+  function decorate(w) {
+    const box = WHO[w].msgs; if (!box) return; const m = meta[WHO[w].short];
+    box.querySelectorAll('.kgd-day').forEach(n => n.remove());
+    let last = null, first = true;
+    for (const el of box.querySelectorAll('.ame-msg:not(.kg-typing)')) {
+      const role = el.classList.contains('user') ? 'user' : 'assistant', info = m[sig(role, textOf(el))] || { t: 0 };
+      const day = info.t ? dayName(info.t) : 'Earlier';
+      if (day !== last) { const sep = document.createElement('div'); sep.className = 'kgd-day'; sep.setAttribute('role', 'separator'); sep.setAttribute('aria-label', day === 'Earlier' ? 'Earlier messages, time not recorded' : day); sep.textContent = day === 'Earlier' ? 'Earlier (time not recorded)' : day; el.before(sep); last = day; }
+      first = false;
+      if (info.t && !el.querySelector('.kgd-ts')) {
+        const t = document.createElement('time'); t.className = 'kgd-ts'; t.dateTime = new Date(info.t).toISOString();
+        const lbl = new Date(info.t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + (info.via ? ' · ' + info.via : '');
+        t.dataset.label = lbl; t.setAttribute('aria-label', (role === 'user' ? 'You, ' : WHO[w].name + ', ') + lbl); t.title = new Date(info.t).toLocaleString();
+        el.appendChild(t);
+      }
+    }
+  }
+  for (const w of ['iroha', 'kaguya']) {
+    const box = WHO[w].msgs; if (!box) continue;
+    let qd = 0; new MutationObserver(muts => {
+      if (muts.every(x => [...x.addedNodes].every(n => n.classList?.contains('kgd-day') || n.classList?.contains('kgd-ts') || n.classList?.contains('kg-msg-tools')))) return;
+      clearTimeout(qd); qd = setTimeout(() => decorate(w), 30);
+      if (!isOpen() || (st.tab !== w && st.tab !== 'both')) launch.querySelector('.kgd-dot').hidden = !docked() || isOpen();
+    }).observe(box, { childList: true });
+    decorate(w);
+  }
+
+  /* ---------- what they say on their own shows in the header while the panel is open ---------- */
+  for (const w of ['iroha', 'kaguya']) {
+    const b = WHO[w].bubble; if (!b) continue;
+    new MutationObserver(() => {
+      if (!isOpen() || !b.textContent.trim()) return;
+      if (st.tab !== w && st.tab !== 'both') return;
+      // only lines that aren't already in the chat itself
+      const lastMsg = [...(WHO[w].msgs?.querySelectorAll('.ame-msg') || [])].pop(), said = b.textContent.trim().slice(0, 40);
+      if (lastMsg && textOf(lastMsg).includes(said)) return;
+      const a = q('.kgd-aside'); a.textContent = (st.tab === 'both' ? WHO[w].name + ': ' : '') + b.textContent.trim(); a.hidden = false;
+      clearTimeout(a._t); a._t = setTimeout(() => { a.hidden = true; }, 9000);
+    }).observe(b, { childList: true, characterData: true, subtree: true });
+  }
+
+  /* ---------- phones: full screen, the composer stays above the keyboard ---------- */
+  function sizeToViewport() {
+    const vv = window.visualViewport;
+    if (phone() && isOpen() && vv) { dock.style.top = Math.round(vv.offsetTop) + 'px'; dock.style.height = Math.round(vv.height) + 'px'; }
+    else { dock.style.removeProperty('top'); dock.style.removeProperty('height'); }
+  }
+  window.visualViewport?.addEventListener('resize', sizeToViewport); window.visualViewport?.addEventListener('scroll', sizeToViewport);
+  addEventListener('resize', () => paint());
+  addEventListener('moonlab:render', () => { if (isOpen()) { q('.kgd-state').textContent = stateLine(); renderActions(); } });
+  setInterval(() => { if (isOpen()) q('.kgd-state').textContent = stateLine(); }, 30000);
+
+  if (docked()) mount();
+  if (docked() && st.open) setTimeout(() => show(st.tab, false), 400); else paint();
+
+  const css = document.createElement('style');
+  css.textContent = `
+#kg-dock{--dw:440px;--ink:#0f1a2c;--ink2:#14223a;--teal:#6fb3ad;--ivory:#efe6d3;--plum:#22132d;--plum2:#2c1838;--rose:#e9a2bd;--gold:#e8d29a;
+  position:fixed;top:0;right:0;bottom:0;width:var(--dw);z-index:120;display:flex;flex-direction:column;background:var(--ink);color:var(--ivory);
+  border-left:1px solid rgba(239,230,211,.12);box-shadow:-18px 0 40px rgba(0,0,0,.28);transition:width .25s ease,background-color .3s ease;font-family:"M PLUS Rounded 1c",system-ui,sans-serif}
+#kg-dock[hidden]{display:none}
+#kg-dock[data-tab=kaguya]{background:var(--plum)}
+#kg-dock[data-tab=both]{background:linear-gradient(180deg,var(--ink) 0,var(--plum) 100%)}
+body.kg-dock-wide #kg-dock{--dw:min(900px,62vw)}
+@media(min-width:1100px){body.kg-docked.kg-dock-open{padding-right:var(--dwb,440px)}body.kg-docked.kg-dock-open.kg-dock-wide{--dwb:min(900px,62vw)}body.kg-docked.kg-dock-open #kg-bar{padding-right:max(16px,calc((100% - 1000px) / 2))}}
+@media(min-width:721px) and (max-width:1099px){#kg-dock{--dw:min(420px,92vw)}body.kg-dock-wide #kg-dock{--dw:min(820px,94vw)}}
+body.kg-docked.kg-dock-open #ame-widget,body.kg-docked.kg-dock-open #iroha-widget{display:none!important}
+.kgd-head{display:flex;align-items:center;gap:8px;padding:10px 12px 8px;border-bottom:1px solid rgba(239,230,211,.08);position:relative}
+.kgd-back{display:none;background:none;border:0;color:inherit;font:700 14px inherit;padding:8px 6px;cursor:pointer}
+.kgd-tabs{display:flex;gap:2px;padding:3px;border-radius:12px;background:rgba(0,0,0,.22);flex:1;min-width:0}
+.kgd-tabs button{flex:1;min-width:0;border:0;background:none;color:rgba(239,230,211,.7);font:700 13px "M PLUS Rounded 1c",sans-serif;padding:8px 6px;border-radius:9px;cursor:pointer}
+.kgd-tabs button[aria-selected=true]{background:rgba(239,230,211,.12);color:#fff}
+#kg-dock[data-tab=iroha] .kgd-tabs button[aria-selected=true]{box-shadow:inset 0 -2px 0 var(--teal)}
+#kg-dock[data-tab=kaguya] .kgd-tabs button[aria-selected=true]{box-shadow:inset 0 -2px 0 var(--rose)}
+#kg-dock[data-tab=both] .kgd-tabs button[aria-selected=true]{box-shadow:inset 0 -2px 0 var(--gold)}
+.kgd-tools{display:flex;gap:2px}
+.kgd-icon{min-width:36px;height:36px;border:0;border-radius:10px;background:none;color:rgba(239,230,211,.8);font-size:17px;cursor:pointer}
+.kgd-icon:hover,.kgd-tabs button:hover{background:rgba(239,230,211,.08);color:#fff}
+#kg-dock :focus-visible,#kg-dock-launch:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.kgd-menu{position:absolute;right:10px;top:52px;z-index:5;min-width:250px;padding:6px;border-radius:12px;background:#1b1830;border:1px solid rgba(239,230,211,.14);box-shadow:0 14px 34px rgba(0,0,0,.45)}
+.kgd-menu button{display:block;width:100%;text-align:left;border:0;background:none;color:#efe6d3;font:500 13.5px "M PLUS Rounded 1c",sans-serif;padding:9px 10px;border-radius:8px;cursor:pointer}
+.kgd-menu button:hover,.kgd-menu button:focus-visible{background:rgba(239,230,211,.1)}.kgd-menu hr{border:0;border-top:1px solid rgba(239,230,211,.12);margin:6px 4px}
+.kgd-who{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:12px;padding:12px 16px 10px}
+.kgd-face{width:64px;height:64px;object-fit:cover;object-position:50% 12%;border-radius:18px;background:rgba(0,0,0,.25)}
+#kg-dock[data-tab=iroha] .kgd-face{border-radius:14px;box-shadow:0 0 0 1px rgba(111,179,173,.45)}
+body.kg-dock-open #kg-mode .kg-ml{display:none}body.kg-dock-open #kg-mode .kg-ms{display:inline}body.kg-dock-open #kg-bar .kg-brand{flex:1 1 auto;min-width:96px}
+.kgd-act{order:0}.kgd-actions{padding:6px 14px 2px}
+#kg-dock[data-tab=kaguya] .kgd-face{object-position:28% 18%;border-radius:50%;box-shadow:0 0 0 2px rgba(233,162,189,.5),0 0 22px rgba(232,210,154,.18)}
+.kgd-face[hidden]{display:none}.kgd-who:has(.kgd-face[hidden]){grid-template-columns:1fr}
+.kgd-id{display:grid;gap:1px;min-width:0}
+.kgd-name{font:800 19px/1.2 "Shippori Mincho B1",Georgia,serif;letter-spacing:.01em}
+.kgd-sub{font:500 13px/1.2 "Segoe Print","Bradley Hand","Comic Neue",cursive;color:var(--teal);opacity:.9}
+#kg-dock[data-tab=kaguya] .kgd-sub{color:var(--gold);font-family:"Shippori Mincho B1",serif;letter-spacing:.14em;text-transform:uppercase;font-size:10.5px}
+#kg-dock[data-tab=kaguya] .kgd-sub::before{content:"🌙 ";letter-spacing:0}
+.kgd-state{font-size:12px;color:rgba(239,230,211,.62)}
+.kgd-aside{grid-column:1/-1;margin:2px 0 0;font-size:13px;font-style:italic;color:rgba(239,230,211,.75)}
+.kgd-body{flex:1;min-height:0;display:flex;flex-direction:column}
+.kgd-pane{flex:1;min-height:0;display:none;flex-direction:column}
+#kg-dock[data-tab=iroha] .kgd-pane[data-who=iroha],#kg-dock[data-tab=kaguya] .kgd-pane[data-who=kaguya],#kg-dock[data-tab=both] .kgd-pane{display:flex}
+#kg-dock[data-tab=both] .kgd-pane+.kgd-pane{border-top:1px solid rgba(239,230,211,.12)}
+.kgd-panename{display:none;margin:6px 16px 0;font:800 12px "Shippori Mincho B1",serif;letter-spacing:.12em;text-transform:uppercase;color:rgba(239,230,211,.6)}
+#kg-dock[data-tab=both] .kgd-panename{display:block}
+/* the existing chat windows, settled into the panel */
+#kg-dock #ame-chat,#kg-dock #iroha-chat{display:flex!important;flex-direction:column;position:static!important;inset:auto!important;width:auto!important;height:auto!important;max-width:none!important;max-height:none!important;flex:1;min-height:0;margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;transform:none!important;opacity:1!important;visibility:visible!important;animation:none!important}
+#kg-dock .ame-header,#kg-dock .iroha-header,#kg-dock .kg-chat-big{display:none!important}
+#kg-dock #ame-messages,#kg-dock #iroha-messages{flex:1;min-height:0;overflow-y:auto;padding:8px 18px 14px;background:transparent!important;font-size:15px;line-height:1.62;scroll-behavior:auto}
+#kg-dock #iroha-messages{background-image:repeating-linear-gradient(180deg,transparent 0 31px,rgba(239,230,211,.035) 31px 32px)!important;background-attachment:local!important}
+#kg-dock .ame-msg{max-width:none!important;margin:10px 0!important;padding:0!important;border:0!important;background:none!important;box-shadow:none!important;color:var(--ivory)!important;font:inherit!important;line-height:1.62!important;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;position:relative}
+#kg-dock .ame-msg.ame{padding-left:12px!important;border-left:2px solid rgba(111,179,173,.45)!important}
+#kg-dock .kgd-pane[data-who=kaguya] .ame-msg.ame,#kg-dock .ame-msg.ame[data-who=kaguya]{border-left-color:rgba(233,162,189,.5)!important}
+#kg-dock .ame-msg.ame[data-name]::before{content:attr(data-name);display:block;font:800 11px "Shippori Mincho B1",serif;letter-spacing:.1em;text-transform:uppercase;color:var(--rose);margin-bottom:2px}
+#kg-dock #iroha-messages .ame-msg.user{background:rgba(111,179,173,.16)!important;color:#f6f1e6!important}#kg-dock #ame-messages .ame-msg.user{background:rgba(233,162,189,.16)!important;color:#f6f1e6!important}
+#kg-dock #iroha-messages .ame-msg,#kg-dock #ame-messages .ame-msg{color:var(--ivory)!important}
+#kg-dock .ame-msg.user{margin-left:auto!important;max-width:86%!important;width:fit-content;padding:9px 13px!important;border-radius:16px 16px 4px 16px!important;background:rgba(111,179,173,.16)!important;color:#f6f1e6!important}
+#kg-dock .kgd-pane[data-who=kaguya] .ame-msg.user{background:rgba(233,162,189,.16)!important}
+#kg-dock .ame-msg pre,#kg-dock .ame-msg table{max-width:100%;overflow-x:auto}
+.kgd-day{display:flex;align-items:center;gap:10px;margin:16px 0 6px;font-size:11.5px;letter-spacing:.06em;color:rgba(239,230,211,.5)}
+.kgd-day::before,.kgd-day::after{content:"";flex:1;border-top:1px solid rgba(239,230,211,.12)}
+.kgd-ts{display:block;margin-top:2px;font-size:11px;color:rgba(239,230,211,.42);font-style:normal}
+.kgd-ts::after{content:attr(data-label)}
+.ame-msg.user .kgd-ts{text-align:right}
+#kg-dock .kg-msg-tools{opacity:0}#kg-dock .ame-msg:hover .kg-msg-tools,#kg-dock .ame-msg:focus-within .kg-msg-tools{opacity:1}
+#kg-dock .kg-chat-down{position:sticky;bottom:8px;align-self:center;margin:-40px auto 8px;z-index:2;border:1px solid rgba(239,230,211,.2);background:#1b1830;color:#efe6d3;border-radius:999px;padding:6px 14px;font:700 12px "M PLUS Rounded 1c",sans-serif;cursor:pointer}
+#kg-dock #iroha-chips,#kg-dock #ame-chips{display:none!important}
+.kgd-actions{display:flex;gap:6px;flex-wrap:wrap;padding:6px 14px 0}
+.kgd-act{border:1px solid rgba(239,230,211,.18);background:rgba(239,230,211,.05);color:var(--ivory);border-radius:999px;padding:7px 13px;font:700 12.5px "M PLUS Rounded 1c",sans-serif;cursor:pointer;min-height:34px}
+.kgd-act:hover{background:rgba(239,230,211,.12)}.kgd-act[aria-pressed=true]{border-color:var(--teal)}
+#kg-dock .ame-input-area{display:flex!important;align-items:flex-end;gap:8px;padding:10px 14px 12px!important;margin:0!important;border-top:1px solid rgba(239,230,211,.08)!important;background:rgba(0,0,0,.14)!important;position:static!important}
+#kg-dock textarea,.kgd-both textarea{flex:1;min-width:0;resize:none;max-height:180px;padding:10px 12px!important;border-radius:14px!important;border:1px solid rgba(239,230,211,.18)!important;background:rgba(0,0,0,.25)!important;color:#f6f1e6!important;font:500 15px/1.5 "M PLUS Rounded 1c",sans-serif!important}
+#kg-dock #ame-send,#kg-dock #iroha-send,.kgd-send{min-height:42px;padding:0 16px!important;border-radius:12px!important;border:0!important;font:800 14px "M PLUS Rounded 1c",sans-serif!important;cursor:pointer;background:var(--teal)!important;color:#0d1a1a!important}
+#kg-dock #ame-send{background:var(--rose)!important;color:#2a1022!important}
+#kg-dock[data-tab=both] .ame-input-area{display:none!important}
+.kgd-both{display:flex;align-items:flex-end;gap:8px;padding:10px 14px 12px;border-top:1px solid rgba(239,230,211,.08);background:rgba(0,0,0,.14)}.kgd-both[hidden]{display:none}
+.kgd-both .kgd-send{background:var(--gold)!important;color:#2a2210!important}
+.kgd-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+#kg-dock-launch{position:fixed;right:16px;bottom:18px;z-index:119;display:flex;align-items:center;gap:6px;padding:6px 14px 6px 6px;border-radius:999px;border:1px solid rgba(239,230,211,.18);background:#14223a;color:#efe6d3;font:800 13px "M PLUS Rounded 1c",sans-serif;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+#kg-dock-launch[hidden]{display:none}#kg-dock-launch img{width:30px;height:30px;border-radius:50%;object-fit:cover;object-position:50% 10%;background:#0f1a2c}#kg-dock-launch img+img{margin-left:-12px;box-shadow:0 0 0 2px #14223a}
+.kgd-dot{width:9px;height:9px;border-radius:50%;background:var(--rose,#e9a2bd)}
+#kg-toast{position:fixed;left:16px;bottom:18px;z-index:400;display:grid;gap:8px;pointer-events:none}
+.kg-toast-item{padding:10px 14px;border-radius:12px;background:#1b1830;color:#efe6d3;border:1px solid rgba(239,230,211,.16);font:600 13px "M PLUS Rounded 1c",sans-serif;box-shadow:0 8px 22px rgba(0,0,0,.35);transition:opacity .5s}.kg-toast-item.out{opacity:0}
+@media(max-width:720px){
+  #kg-dock{--dw:100vw;left:0;width:100vw;z-index:260;border-left:0}
+  .kgd-back{display:block}.kgd-minbtn,[data-d=wide]{display:none}
+  .kgd-face{width:48px;height:48px}.kgd-who{padding:8px 14px}
+  #kg-dock-launch{bottom:calc(76px + env(safe-area-inset-bottom));right:12px}
+  #kg-toast{bottom:calc(84px + env(safe-area-inset-bottom))}
+}
+@media(prefers-reduced-motion:reduce){#kg-dock,.kg-toast-item{transition:none}}
+body.kg-plain #kg-dock{transition:none}`;
+  document.head.appendChild(css);
 })();
 
 </script>
@@ -9754,8 +10177,8 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
       const tabs = (M.SECTIONS[sec] || []).filter(([id]) => M.PANELS[id]);
       if (tabs.length > 1) for (const [id, label] of tabs) out.push({ label: clean(label), hint: name, run: () => M.go(sec, id) });
     }
-    out.push({ label: 'Talk to Kaguya', hint: 'Chat', run: () => { if (!$('ame-chat').classList.contains('open')) $('ame-gif').click(); } });
-    if (!$('iroha-widget')?.hidden) out.push({ label: 'Talk to Iroha', hint: 'Chat', run: () => { if (!$('iroha-chat').classList.contains('open')) $('iroha-gif').click(); } });
+    out.push({ label: 'Talk to Kaguya', hint: 'Chat', run: () => { if (window.__kgDock?.docked()) return window.__kgDock.open('kaguya'); if (!$('ame-chat').classList.contains('open')) $('ame-gif').click(); } });
+    if (!$('iroha-widget')?.hidden) out.push({ label: 'Talk to Iroha', hint: 'Chat', run: () => { if (window.__kgDock?.docked()) return window.__kgDock.open('iroha'); if (!$('iroha-chat').classList.contains('open')) $('iroha-gif').click(); } });
     if ($('mp-widget')?.classList.contains('mp-live')) out.push({ label: 'Stop the music', hint: 'Music', run: () => window.DeskMusic?.stop() });
     else out.push({ label: 'Open the music player', hint: 'Music', run: () => $('mp-toggle')?.click() });
     for (const [v, name] of THEMES) if (curTheme() !== v) out.push({ label: 'Theme: ' + name, hint: 'Look', run: () => setTheme(v) });
