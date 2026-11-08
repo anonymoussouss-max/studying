@@ -9750,7 +9750,7 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
     iroha: { chat: ic, widget: iw, gif: $('iroha-gif'), msgs: $('iroha-messages'), input: $('iroha-input'), send: $('iroha-send'), chips: $('iroha-chips'), bubble: $('iroha-bubble'), name: 'Iroha', full: 'Dr. Iroha Sakayori', art: (KG.iroha || {}).desk || (KG.iroha || {}).idle, store: 'iroha-chat', short: 'i' },
     kaguya: { chat: kc, widget: kw, gif: $('ame-gif'), msgs: $('ame-messages'), input: $('ame-input'), send: $('ame-send'), chips: $('ame-chips'), bubble: $('ame-bubble'), name: 'Kaguya', full: 'Kaguya', art: (KG.kaguya || {}).idle, store: 'ame-chat', short: 'k' }
   };
-  const P = 'kg-dock-v1', DEF = { layout: 'dock', open: false, tab: 'iroha', wide: false };
+  const P = 'kg-dock-v1', DEF = { layout: 'dock', open: false, tab: 'iroha', wide: false, font: 'm', w: 0 };
   let st; try { st = Object.assign({}, DEF, JSON.parse(localStorage.getItem(P) || '{}')); } catch (e) { st = Object.assign({}, DEF); }
   const persist = () => { try { localStorage.setItem(P, JSON.stringify(st)); } catch (e) {} };
   const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches || document.body.classList.contains('kg-plain');
@@ -9762,7 +9762,8 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
 
   /* ---------- the panel ---------- */
   const dock = document.createElement('aside'); dock.id = 'kg-dock'; dock.setAttribute('aria-label', 'Companion chat');
-  dock.innerHTML = `<header class="kgd-head">
+  dock.innerHTML = `<div class="kgd-resize" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize the chat panel" title="Drag to make the chat wider or narrower (arrow keys work too)"></div>
+    <header class="kgd-head">
       <button type="button" class="kgd-back" data-d="min" aria-label="Back to the desk">← Desk</button>
       <div class="kgd-tabs" role="tablist" aria-label="Who you're talking to">
         <button type="button" role="tab" id="kgd-tab-iroha" data-tab="iroha" aria-controls="kgd-body">Iroha</button>
@@ -9795,6 +9796,7 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
   function mount() {
     for (const w of ['iroha', 'kaguya']) { const o = WHO[w]; clearInline(o.chat); pane(w).appendChild(o.chat); if (o.input) o.input.placeholder = w === 'iroha' ? 'Write to Iroha…' : 'say something to kaguya…'; }
     document.body.classList.add('kg-docked');
+    for (const w of ['iroha', 'kaguya']) { const g = WHO[w].gif; if (!g || g._kgd) continue; g._kgd = 1; g.tabIndex = 0; g.setAttribute('role', 'button'); g.setAttribute('aria-label', 'Open the chat with ' + WHO[w].name); g.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && docked()) { e.preventDefault(); show(w); } }); }
   }
   function unmount() {
     for (const w of ['iroha', 'kaguya']) { const o = WHO[w]; o.widget.appendChild(o.chat); }
@@ -9810,8 +9812,19 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
   const docked = () => st.layout === 'dock';
   let returnTo = null;
   // each chat keeps its reading position when you switch tabs
-  const keepPos = () => { for (const w of ['iroha', 'kaguya']) { const m = WHO[w].msgs; if (m && m.offsetParent) m._pos = m.scrollTop; } };
-  const restorePos = () => { for (const w of ['iroha', 'kaguya']) { const m = WHO[w].msgs; if (m && m._pos != null && m.offsetParent) { m._force = true; m.scrollTop = m._pos; m._force = false; } } };
+  let switchedAt = 0;
+  const keepPos = () => { switchedAt = Date.now(); for (const w of ['iroha', 'kaguya']) { const m = WHO[w].msgs; if (m && m.offsetParent && m.clientHeight) m._saved = m.scrollHeight - m.scrollTop - m.clientHeight < 80 ? null : m.scrollTop; } };
+  const toLatest = w => { const m = WHO[w].msgs; if (!m) return; m._force = true; m.scrollTop = m.scrollHeight; m._force = false; m._atEnd = true; m._pos = null; m._saved = null; };
+  // restore each visible chat's place; the chats' own code can scroll a moment later, so the place is re-applied briefly
+  // unless you've scrolled yourself in the meantime
+  let userScrollAt = 0;
+  for (const ev of ['wheel', 'touchmove', 'keydown']) dock.addEventListener(ev, e => { if (ev !== 'keydown' || /^(Arrow|Page|Home|End)/.test(e.key)) userScrollAt = Date.now(); }, { passive: true });
+  const restorePos = () => {
+    const t0 = Date.now(), want = {};
+    for (const w of ['iroha', 'kaguya']) { const m = WHO[w].msgs; if (m && m.offsetParent) want[w] = m._saved == null ? null : m._saved; }
+    const apply = () => { if (userScrollAt > t0) return; for (const w of Object.keys(want)) { const m = WHO[w].msgs; if (!m.offsetParent) continue; if (want[w] == null) toLatest(w); else { m._force = true; m.scrollTop = want[w]; m._force = false; m._pos = want[w]; m._saved = want[w]; m._atEnd = false; } } };
+    apply(); setTimeout(apply, 60); setTimeout(apply, 250);
+  };
   function show(tab, focus = true) {
     if (!docked()) return;
     keepPos();
@@ -9820,7 +9833,11 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
     st.open = true; persist();
     const needOpen = !WHO.iroha.chat.classList.contains('open') || !WHO.kaguya.chat.classList.contains('open');
     ensureOpen('iroha'); ensureOpen('kaguya');
-    paint(); requestAnimationFrame(restorePos);
+    paint();
+    // a chat that just opened renders its history a moment later, so it starts at the latest message once that's done
+    restorePos();
+    // a chat that just opened renders its history a moment later: start it at the latest message once that's done
+    if (needOpen) setTimeout(() => { for (const w of ['iroha', 'kaguya']) if (WHO[w].msgs) { WHO[w].msgs._pos = null; WHO[w].msgs._saved = null; } restorePos(); }, 700);
     // focus the composer you can see; if the chats had to open first, wait for their own opening code (it focuses its own box),
     // and never pull focus away from something you've moved to in the meantime (a menu, another field)
     if (focus) setTimeout(() => {
@@ -9829,8 +9846,11 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
     }, needOpen ? 650 : 0);
   }
   function hide() {
-    st.open = false; persist(); closeMenu(); paint();
-    const back = returnTo && returnTo !== document.body && document.contains(returnTo) && !dock.contains(returnTo) && returnTo.offsetParent ? returnTo : launch;
+    st.open = false; persist(); closeMenu();
+    for (const o of [WHO.iroha, WHO.kaguya]) if (o.chat.classList.contains('open')) o.chat.querySelector('#ame-close,#iroha-close')?.click();
+    paint();
+    const fallback = launch.hidden ? WHO[st.tab === 'kaguya' ? 'kaguya' : 'iroha'].gif : launch;
+    const back = returnTo && returnTo !== document.body && document.contains(returnTo) && !dock.contains(returnTo) && returnTo.offsetParent ? returnTo : fallback;
     setTimeout(() => back?.focus?.({ preventScroll: true }), 0);
   }
   function setLayout(layout) {
@@ -9840,7 +9860,8 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
   window.__kgDock = { open: w => show(w), close: hide, on: isOpen, docked };
   // Settings → Companions: the layout choice is always reachable, including from floating windows
   const companions = M.PANELS.companions;
-  if (companions) M.PANELS.companions = () => `<section class="kl-card"><h3>Chat layout</h3><p class="kl-small">Docked: one panel on the right with Iroha, Kaguya and Both tabs, and the desk makes room for it. Floating: the two separate chat windows.</p><div class="kl-seg" role="group" aria-label="Chat layout"><button data-a="kgdocklayout" data-v="dock" aria-pressed="${docked()}">Docked panel</button><button data-a="kgdocklayout" data-v="float" aria-pressed="${!docked()}">Floating windows</button></div></section>` + companions();
+  if (companions) M.PANELS.companions = () => `<section class="kl-card"><h3>Chat layout</h3><p class="kl-small">Docked: one panel on the right with Iroha, Kaguya and Both tabs, and the desk makes room for it. Floating: the two separate chat windows.</p><div class="kl-seg" role="group" aria-label="Chat layout"><button data-a="kgdocklayout" data-v="dock" aria-pressed="${docked()}">Docked panel</button><button data-a="kgdocklayout" data-v="float" aria-pressed="${!docked()}">Floating windows</button></div><p class="kl-small">Chat text size</p><div class="kl-seg" role="group" aria-label="Chat text size">${Object.entries(SIZES).map(([k, l]) => `<button data-a="kgdockfont" data-v="${k}" aria-pressed="${(st.font || 'm') === k}">${l}</button>`).join('')}</div></section>` + companions();
+  M.ACTIONS.kgdockfont = b => { st.font = b.dataset.v; persist(); paint(); M.render(); };
   M.ACTIONS.kgdocklayout = b => { if (b.dataset.v !== st.layout) setLayout(b.dataset.v); M.render(); };
 
   /* ---------- painting the current state ---------- */
@@ -9852,11 +9873,24 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
     const b = M.block?.(); return b && b.kind === 'study' ? `Study · ${b.title}` : 'Study mode';
   };
   const L = () => M.L;
+  // the launcher shows whenever neither figure can be seen (phones, the Today scene standing in for them, figures hidden)
+  function syncLaunch() {
+    const seen = !phone() && ['iroha', 'kaguya'].some(w => { const g = WHO[w].gif, wd = WHO[w].widget; return g && !wd.hidden && getComputedStyle(wd).display !== 'none' && getComputedStyle(g).visibility !== 'hidden'; });
+    launch.hidden = !docked() || isOpen() || seen;
+  }
+  let syncQ = 0; new MutationObserver(() => { clearTimeout(syncQ); syncQ = setTimeout(syncLaunch, 60); }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  const MINW = 360, maxW = () => Math.max(MINW, Math.min(1000, innerWidth - 420));
+  const SIZES = { s: 'Small', m: 'Normal', l: 'Large' };
   function paint() {
     const open = isOpen(), tab = st.tab;
     document.body.classList.toggle('kg-dock-open', open);
     document.body.classList.toggle('kg-dock-wide', open && st.wide);
-    dock.hidden = !open; launch.hidden = !docked() || open;
+    dock.hidden = !open;
+    syncLaunch();
+    dock.dataset.fs = st.font || 'm';
+    const w = st.w && !st.wide && !phone() ? Math.max(MINW, Math.min(maxW(), st.w)) : 0;
+    if (w) { dock.style.setProperty('--dw', w + 'px'); document.body.style.setProperty('--dwb', w + 'px'); } else { dock.style.removeProperty('--dw'); document.body.style.removeProperty('--dwb'); }
+    const r = q('.kgd-resize'); r.setAttribute('aria-valuemin', MINW); r.setAttribute('aria-valuemax', maxW()); r.setAttribute('aria-valuenow', Math.round(dock.getBoundingClientRect().width || w || 440));
     dock.dataset.tab = tab;
     for (const b of dock.querySelectorAll('[role="tab"]')) { const on = b.dataset.tab === tab; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; }
     q('#kgd-body').setAttribute('aria-labelledby', 'kgd-tab-' + tab);
@@ -9903,6 +9937,7 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
     if (tab !== 'both') for (const b of chipList(tab)) items.push({ t: label(b), run: () => b.click() });
     items.push({ sep: 1 });
     items.push({ t: 'Mute or unmute their unprompted comments', title: 'Stops Kaguya and Iroha from commenting on their own. They still answer you.', run: () => $('ame-mute')?.click() });
+    items.push({ t: 'Text size: ' + SIZES[st.font || 'm'] + ' (change)', title: 'Small, normal or large text in the chat', run: () => { st.font = { s: 'm', m: 'l', l: 's' }[st.font || 'm']; persist(); paint(); } });
     items.push({ t: docked() ? 'Float as separate windows' : 'Dock on the right', run: () => setLayout(docked() ? 'float' : 'dock') });
     items.push({ t: 'Clear a chat… (Settings)', title: 'Clearing a chat is in Settings → Companions and always asks first.', run: () => M.go('settings', 'companions') });
     menu.innerHTML = items.map((x, i) => x.sep ? '<hr role="separator">' : `<button type="button" role="menuitem" data-i="${i}" ${x.title ? `title="${M.esc(x.title)}"` : ''}>${M.esc(x.t)}</button>`).join('');
@@ -9934,6 +9969,12 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
     if (go === null) return; e.preventDefault(); const t = tabs[(go + tabs.length) % tabs.length]; t.focus(); show(t.dataset.tab, false);
   });
   launch.addEventListener('click', () => show(st.tab));
+  const handle = q('.kgd-resize');
+  const setW = px => { st.w = Math.round(Math.max(MINW, Math.min(maxW(), px))); st.wide = false; paint(); };
+  handle.addEventListener('pointerdown', e => { if (phone()) return; e.preventDefault(); handle.setPointerCapture(e.pointerId); dock.classList.add('kgd-sizing');
+    const move = ev => setW(innerWidth - ev.clientX), up = () => { handle.removeEventListener('pointermove', move); dock.classList.remove('kgd-sizing'); persist(); };
+    handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', up, { once: true }); handle.addEventListener('pointercancel', up, { once: true }); });
+  handle.addEventListener('keydown', e => { const cur = dock.getBoundingClientRect().width; if (e.key === 'ArrowLeft') setW(cur + 24); else if (e.key === 'ArrowRight') setW(cur - 24); else return; e.preventDefault(); persist(); });
   dock.addEventListener('keydown', e => { if (e.key === 'Escape' && menu.hidden && (phone() || innerWidth < 1100)) { e.preventDefault(); hide(); } });
 
   /* ---------- Both: one message, the existing ask-both path brings the other in (one request each, no repeats) ---------- */
@@ -9955,7 +9996,7 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
   /* ---------- entry points elsewhere open the dock on the right companion ---------- */
   for (const w of ['iroha', 'kaguya']) {
     const o = WHO[w];
-    o.gif?.addEventListener('click', e => { if (!docked() || opening) return; e.stopImmediatePropagation(); e.preventDefault(); show(w); }, true);
+    o.gif?.addEventListener('click', e => { if (!docked() || opening) return; e.stopImmediatePropagation(); e.preventDefault(); setTimeout(() => show(w)); }, true); // deferred: a click() on an element already mid-click is ignored
   }
   for (const [fn, w] of [['__irohaAsk', 'iroha'], ['__irohaAskImg', 'iroha'], ['__kaguyaAsk', 'kaguya']]) {
     const f = window[fn]; if (typeof f !== 'function') continue;
@@ -9969,7 +10010,7 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
     el._atEnd = true;
     const gap = () => el.scrollHeight - desc.get.call(el) - el.clientHeight;
     Object.defineProperty(el, 'scrollTop', { configurable: true, get() { return desc.get.call(this); }, set(v) { if (this._atEnd || this._force || v < desc.get.call(this)) { desc.set.call(this, v); } else { const dn = this.parentNode?.querySelector('.kg-chat-down'); if (dn) { dn.hidden = false; dn.textContent = 'New messages ↓'; } } } });
-    el.addEventListener('scroll', () => { el._atEnd = gap() < 80; if (el._atEnd) { const dn = el.parentNode?.querySelector('.kg-chat-down'); if (dn) dn.textContent = 'Latest ↓'; } }, { passive: true });
+    el.addEventListener('scroll', () => { if (!el.clientHeight || Date.now() - switchedAt < 250) return; el._atEnd = gap() < 80; el._pos = el._atEnd ? null : desc.get.call(el); const dn0 = el.parentNode?.querySelector('.kg-chat-down'); if (dn0 && !el._atEnd && dn0.textContent !== 'New messages ↓') dn0.textContent = 'Jump to latest ↓'; if (el._atEnd) { const dn = el.parentNode?.querySelector('.kg-chat-down'); if (dn) dn.textContent = 'Jump to latest ↓'; } }, { passive: true });
     el.parentNode?.addEventListener('click', e => { if (e.target.closest('.kg-chat-down')) { el._force = true; desc.set.call(el, el.scrollHeight); el._force = false; el._atEnd = true; } });
   }
 
@@ -10065,11 +10106,19 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
 body.kg-dock-wide #kg-dock{--dw:min(900px,62vw)}
 @media(min-width:1100px){body.kg-docked.kg-dock-open{padding-right:var(--dwb,440px)}body.kg-docked.kg-dock-open.kg-dock-wide{--dwb:min(900px,62vw)}body.kg-docked.kg-dock-open #kg-bar{padding-right:max(16px,calc((100% - 1000px) / 2))}}
 @media(min-width:721px) and (max-width:1099px){#kg-dock{--dw:min(420px,92vw)}body.kg-dock-wide #kg-dock{--dw:min(820px,94vw)}}
-body.kg-docked.kg-dock-open #ame-widget,body.kg-docked.kg-dock-open #iroha-widget{display:none!important}
+/* the figures stay on the desk beside the open panel, side by side, so their pop-ups still show */
+@media(min-width:1100px){body.kg-docked.kg-dock-open #ame-widget{left:auto!important;top:auto!important;right:calc(var(--dwb,440px) + 22px)!important;bottom:16px!important}
+  body.kg-docked.kg-dock-open #iroha-widget{left:auto!important;top:auto!important;right:calc(var(--dwb,440px) + 170px)!important;bottom:16px!important}}
+@media(max-width:1099px){body.kg-docked.kg-dock-open #ame-widget,body.kg-docked.kg-dock-open #iroha-widget{display:none!important}}
+.kgd-resize{position:absolute;left:-5px;top:0;bottom:0;width:10px;cursor:col-resize;z-index:6}
+.kgd-resize::after{content:"";position:absolute;left:4px;top:50%;width:2px;height:44px;margin-top:-22px;border-radius:2px;background:rgba(239,230,211,.18);transition:background .15s}
+.kgd-resize:hover::after,.kgd-resize:focus-visible::after,#kg-dock.kgd-sizing .kgd-resize::after{background:var(--gold)}
+#kg-dock.kgd-sizing,body:has(#kg-dock.kgd-sizing){transition:none!important;user-select:none}
+#kg-dock{--fs:15.5px}#kg-dock[data-fs=s]{--fs:14px}#kg-dock[data-fs=l]{--fs:17.5px}
 .kgd-head{display:flex;align-items:center;gap:8px;padding:10px 12px 8px;border-bottom:1px solid rgba(239,230,211,.08);position:relative}
 .kgd-back{display:none;background:none;border:0;color:inherit;font:700 14px inherit;padding:8px 6px;cursor:pointer}
 .kgd-tabs{display:flex;gap:2px;padding:3px;border-radius:12px;background:rgba(0,0,0,.22);flex:1;min-width:0}
-.kgd-tabs button{flex:1;min-width:0;border:0;background:none;color:rgba(239,230,211,.7);font:700 13px "M PLUS Rounded 1c",sans-serif;padding:8px 6px;border-radius:9px;cursor:pointer}
+.kgd-tabs button{flex:1;min-width:0;border:0;background:none;color:rgba(239,230,211,.75);font:700 14px "M PLUS Rounded 1c",sans-serif;padding:8px 6px;border-radius:9px;cursor:pointer}
 .kgd-tabs button[aria-selected=true]{background:rgba(239,230,211,.12);color:#fff}
 #kg-dock[data-tab=iroha] .kgd-tabs button[aria-selected=true]{box-shadow:inset 0 -2px 0 var(--teal)}
 #kg-dock[data-tab=kaguya] .kgd-tabs button[aria-selected=true]{box-shadow:inset 0 -2px 0 var(--rose)}
@@ -10081,15 +10130,15 @@ body.kg-docked.kg-dock-open #ame-widget,body.kg-docked.kg-dock-open #iroha-widge
 .kgd-menu{position:absolute;right:10px;top:52px;z-index:5;min-width:250px;padding:6px;border-radius:12px;background:#1b1830;border:1px solid rgba(239,230,211,.14);box-shadow:0 14px 34px rgba(0,0,0,.45)}
 .kgd-menu button{display:block;width:100%;text-align:left;border:0;background:none;color:#efe6d3;font:500 13.5px "M PLUS Rounded 1c",sans-serif;padding:9px 10px;border-radius:8px;cursor:pointer}
 .kgd-menu button:hover,.kgd-menu button:focus-visible{background:rgba(239,230,211,.1)}.kgd-menu hr{border:0;border-top:1px solid rgba(239,230,211,.12);margin:6px 4px}
-.kgd-who{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:12px;padding:12px 16px 10px}
-.kgd-face{width:64px;height:64px;object-fit:cover;object-position:50% 12%;border-radius:18px;background:rgba(0,0,0,.25)}
+.kgd-who{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:16px;padding:18px 20px 16px}
+.kgd-face{width:84px;height:84px;object-fit:cover;object-position:50% 12%;border-radius:18px;background:rgba(0,0,0,.25)}
 #kg-dock[data-tab=iroha] .kgd-face{border-radius:14px;box-shadow:0 0 0 1px rgba(111,179,173,.45)}
 body.kg-dock-open #kg-mode .kg-ml{display:none}body.kg-dock-open #kg-mode .kg-ms{display:inline}body.kg-dock-open #kg-bar .kg-brand{flex:1 1 auto;min-width:96px}
 .kgd-act{order:0}.kgd-actions{padding:6px 14px 2px}
 #kg-dock[data-tab=kaguya] .kgd-face{object-position:28% 18%;border-radius:50%;box-shadow:0 0 0 2px rgba(233,162,189,.5),0 0 22px rgba(232,210,154,.18)}
 .kgd-face[hidden]{display:none}.kgd-who:has(.kgd-face[hidden]){grid-template-columns:1fr}
 .kgd-id{display:grid;gap:1px;min-width:0}
-.kgd-name{font:800 19px/1.2 "Shippori Mincho B1",Georgia,serif;letter-spacing:.01em}
+.kgd-name{font:800 22px/1.2 "Shippori Mincho B1",Georgia,serif;letter-spacing:.01em}.kgd-id{gap:3px!important}.kgd-state{font-size:12.5px!important}
 .kgd-sub{font:500 13px/1.2 "Segoe Print","Bradley Hand","Comic Neue",cursive;color:var(--teal);opacity:.9}
 #kg-dock[data-tab=kaguya] .kgd-sub{color:var(--gold);font-family:"Shippori Mincho B1",serif;letter-spacing:.14em;text-transform:uppercase;font-size:10.5px}
 #kg-dock[data-tab=kaguya] .kgd-sub::before{content:"🌙 ";letter-spacing:0}
@@ -10104,7 +10153,7 @@ body.kg-dock-open #kg-mode .kg-ml{display:none}body.kg-dock-open #kg-mode .kg-ms
 /* the existing chat windows, settled into the panel */
 #kg-dock #ame-chat,#kg-dock #iroha-chat{display:flex!important;flex-direction:column;position:static!important;inset:auto!important;width:auto!important;height:auto!important;max-width:none!important;max-height:none!important;flex:1;min-height:0;margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;transform:none!important;opacity:1!important;visibility:visible!important;animation:none!important}
 #kg-dock .ame-header,#kg-dock .iroha-header,#kg-dock .kg-chat-big{display:none!important}
-#kg-dock #ame-messages,#kg-dock #iroha-messages{flex:1;min-height:0;overflow-y:auto;padding:8px 18px 14px;background:transparent!important;font-size:15px;line-height:1.62;scroll-behavior:auto}
+#kg-dock #ame-messages,#kg-dock #iroha-messages{flex:1;min-height:0;overflow-y:auto;padding:0 20px 14px;background:transparent!important;font-size:var(--fs);line-height:1.65;scroll-behavior:auto}
 #kg-dock #iroha-messages{background-image:repeating-linear-gradient(180deg,transparent 0 31px,rgba(239,230,211,.035) 31px 32px)!important;background-attachment:local!important}
 #kg-dock .ame-msg{max-width:none!important;margin:10px 0!important;padding:0!important;border:0!important;background:none!important;box-shadow:none!important;color:var(--ivory)!important;font:inherit!important;line-height:1.62!important;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;position:relative}
 #kg-dock .ame-msg.ame{padding-left:12px!important;border-left:2px solid rgba(111,179,173,.45)!important}
@@ -10115,19 +10164,20 @@ body.kg-dock-open #kg-mode .kg-ml{display:none}body.kg-dock-open #kg-mode .kg-ms
 #kg-dock .ame-msg.user{margin-left:auto!important;max-width:86%!important;width:fit-content;padding:9px 13px!important;border-radius:16px 16px 4px 16px!important;background:rgba(111,179,173,.16)!important;color:#f6f1e6!important}
 #kg-dock .kgd-pane[data-who=kaguya] .ame-msg.user{background:rgba(233,162,189,.16)!important}
 #kg-dock .ame-msg pre,#kg-dock .ame-msg table{max-width:100%;overflow-x:auto}
-.kgd-day{display:flex;align-items:center;gap:10px;margin:16px 0 6px;font-size:11.5px;letter-spacing:.06em;color:rgba(239,230,211,.5)}
+.kgd-day{display:flex;align-items:center;gap:10px;margin:14px -20px 6px;padding:7px 20px;font-size:12px;letter-spacing:.06em;color:rgba(239,230,211,.62);position:sticky;top:0;z-index:1;background:rgba(15,26,44,.94);backdrop-filter:blur(4px)}
+#ame-messages .kgd-day{background:rgba(34,19,45,.94)}
 .kgd-day::before,.kgd-day::after{content:"";flex:1;border-top:1px solid rgba(239,230,211,.12)}
 .kgd-ts{display:block;margin-top:2px;font-size:11px;color:rgba(239,230,211,.42);font-style:normal}
 .kgd-ts::after{content:attr(data-label)}
 .ame-msg.user .kgd-ts{text-align:right}
 #kg-dock .kg-msg-tools{opacity:0}#kg-dock .ame-msg:hover .kg-msg-tools,#kg-dock .ame-msg:focus-within .kg-msg-tools{opacity:1}
-#kg-dock .kg-chat-down{position:sticky;bottom:8px;align-self:center;margin:-40px auto 8px;z-index:2;border:1px solid rgba(239,230,211,.2);background:#1b1830;color:#efe6d3;border-radius:999px;padding:6px 14px;font:700 12px "M PLUS Rounded 1c",sans-serif;cursor:pointer}
+#kg-dock .kg-chat-down{position:sticky;bottom:8px;align-self:center;margin:-44px auto 8px;z-index:2;border:1px solid rgba(239,230,211,.28);background:#1b1830;color:#efe6d3;border-radius:999px;padding:8px 16px;font:700 13px "M PLUS Rounded 1c",sans-serif;cursor:pointer}
 #kg-dock #iroha-chips,#kg-dock #ame-chips{display:none!important}
 .kgd-actions{display:flex;gap:6px;flex-wrap:wrap;padding:6px 14px 0}
-.kgd-act{border:1px solid rgba(239,230,211,.18);background:rgba(239,230,211,.05);color:var(--ivory);border-radius:999px;padding:7px 13px;font:700 12.5px "M PLUS Rounded 1c",sans-serif;cursor:pointer;min-height:34px}
+.kgd-act{border:1px solid rgba(239,230,211,.18);background:rgba(239,230,211,.05);color:var(--ivory);border-radius:999px;padding:8px 14px;font:700 13.5px "M PLUS Rounded 1c",sans-serif;cursor:pointer;min-height:34px}
 .kgd-act:hover{background:rgba(239,230,211,.12)}.kgd-act[aria-pressed=true]{border-color:var(--teal)}
 #kg-dock .ame-input-area{display:flex!important;align-items:flex-end;gap:8px;padding:10px 14px 12px!important;margin:0!important;border-top:1px solid rgba(239,230,211,.08)!important;background:rgba(0,0,0,.14)!important;position:static!important}
-#kg-dock textarea,.kgd-both textarea{flex:1;min-width:0;resize:none;max-height:180px;padding:10px 12px!important;border-radius:14px!important;border:1px solid rgba(239,230,211,.18)!important;background:rgba(0,0,0,.25)!important;color:#f6f1e6!important;font:500 15px/1.5 "M PLUS Rounded 1c",sans-serif!important}
+#kg-dock textarea,.kgd-both textarea{flex:1;min-width:0;resize:none;max-height:180px;padding:10px 12px!important;border-radius:14px!important;border:1px solid rgba(239,230,211,.18)!important;background:rgba(0,0,0,.25)!important;color:#f6f1e6!important;font:500 var(--fs,15px)/1.5 "M PLUS Rounded 1c",sans-serif!important}
 #kg-dock #ame-send,#kg-dock #iroha-send,.kgd-send{min-height:42px;padding:0 16px!important;border-radius:12px!important;border:0!important;font:800 14px "M PLUS Rounded 1c",sans-serif!important;cursor:pointer;background:var(--teal)!important;color:#0d1a1a!important}
 #kg-dock #ame-send{background:var(--rose)!important;color:#2a1022!important}
 #kg-dock[data-tab=both] .ame-input-area{display:none!important}
@@ -10142,7 +10192,7 @@ body.kg-dock-open #kg-mode .kg-ml{display:none}body.kg-dock-open #kg-mode .kg-ms
 @media(max-width:720px){
   #kg-dock{--dw:100vw;left:0;width:100vw;z-index:260;border-left:0}
   .kgd-back{display:block}.kgd-minbtn,[data-d=wide]{display:none}
-  .kgd-face{width:48px;height:48px}.kgd-who{padding:8px 14px}
+  .kgd-face{width:56px;height:56px}.kgd-who{padding:10px 16px}.kgd-resize{display:none}
   #kg-dock-launch{bottom:calc(76px + env(safe-area-inset-bottom));right:12px}
   #kg-toast{bottom:calc(84px + env(safe-area-inset-bottom))}
 }
