@@ -1096,11 +1096,14 @@ window.__KG_BUILTIN = {
 
   const AME_FALLBACK = window.__KG_BUILTIN.kaguya.idle;
   gif.referrerPolicy = "no-referrer";
-  const failed = new Set();
+  // gif.src is absolute while GIFS holds relative names, so compare resolved URLs; a failed image is
+  // swapped for the built-in art for good, so a missing file is requested once, not in a loop.
   gif.addEventListener("error", () => {
-    failed.add(gif.src);
-    const next = Object.values(GIFS).find(u => !failed.has(u));
-    gif.src = next || AME_FALLBACK;
+    const bad = gif.src, B = window.__KG_BUILTIN.kaguya;
+    if (bad.startsWith("data:")) return;
+    let swap = AME_FALLBACK;
+    for (const k of Object.keys(GIFS)) if (GIFS[k] && new URL(GIFS[k], location.href).href === bad) { GIFS[k] = B[k] || AME_FALLBACK; swap = GIFS[k]; }
+    gif.src = swap;
   });
 
   gif.src = GIFS.idle;
@@ -1866,7 +1869,12 @@ window.__KG_BUILTIN = {
   // Study talk switches Iroha into her lab-coat pose; everything else keeps the requested face.
   const STUDY_RE = /deriv|equation|unit|problem|question|chapter|formula|physics|chem|math|rocket|orbit|delta|impulse|thrust|sign conv|diagram|notebook|block|timer|study|exam|mock|revis|recall|mistake|error|integral|vector|momentum|page|solve|answer|assumption|minutes/i;
   const talkFace = (text, k) => k !== "approve" && STUDY_RE.test(text) ? "study" : (k || "talking");
-  igif.addEventListener("error", () => { const k = Object.keys(IG).find(n => IG[n] === igif.src) || "idle"; igif.src = IGB[k] || IGB.idle; });
+  igif.addEventListener("error", () => {
+    const bad = igif.src; if (bad.startsWith("data:")) return;
+    let swap = IGB.idle;
+    for (const k of Object.keys(IG)) if (IG[k] && new URL(IG[k], location.href).href === bad) { IG[k] = IGB[k] || IGB.idle; swap = IG[k]; }
+    igif.src = swap;
+  });
   igif.src = rest();
 
   function iAdd(role, text, who) {
@@ -7598,35 +7606,88 @@ window.KG_RECALL = {
   const METHODS = [
     ['recall', 'Retrieval practice (active recall)', 'Strong evidence', 'Pull the idea out of your memory instead of reading it again. The effort of remembering is what makes it stick.', 'Close the book and answer a question cold. Iroha\'s recall questions and the 20-minute revision blocks are built on this.', 'Quiz me now', 'iroha', "Quiz me with retrieval practice: ask me 5 short questions, one at a time, on what I studied most recently. Don't give the answer until I've tried. After each one, tell me if I'm right and the one thing I missed."],
     ['spaced', 'Spaced repetition', 'Strong evidence', 'Review the same thing over growing gaps: 1 day, 2, 4, 8 and so on. Forgetting a little before each review makes the memory stronger.', 'Cards you miss in Recall come back on a spaced schedule automatically. Your logged misses come back after 1, 3, 7, 14 and 30 days.', 'Open Recall', 'go', 'study:recall'],
+    ['relearn', 'Successive relearning', 'Strong evidence from real courses', 'Recall each item until you get it right once, then do the same set again in later sessions. In class studies this raised exam scores by about a letter grade.', 'Iroha keeps putting your misses back in the line until every one is right. Repeat the same set in 2 days and again in a week.', 'Relearn a set', 'iroha', "Successive relearning: ask me the topic first. Then ask me 8 short recall questions on it, one at a time. Any question I miss goes back to the end of the line, and we keep going until I've answered every one correctly once. Don't give the answer until I've tried. At the end, list the 8 questions and which ones I missed, so I can repeat this exact set in 2 days and again in a week."],
+    ['pfail', 'Productive failure (try before you are taught)', 'Strong evidence for understanding concepts', 'Struggle with a problem on a new topic before the lecture teaches it. You will probably fail, and that is the point: your attempts show you exactly what the lecture needs to explain.', 'Before a lecture, spend 10–15 minutes on one problem from it. Then watch the lecture looking for the idea you were missing.', 'Try before the lecture', 'iroha', "Productive failure: ask me which topic my next lecture is on. Then give me one hard but approachable JEE problem on it that I haven't been taught to solve yet. I'll attempt it for 10-15 minutes and send you every idea I try, even wrong ones. Don't give hints or the method while I try. When I send my attempts, tell me which of my ideas came closest to the real method and what to look for in the lecture. Then tell me to go watch it."],
     ['interleave', 'Interleaving', 'Good evidence, especially for maths and physics', 'Mix different problem types in one sitting instead of doing ten of the same kind. You learn to spot which method a problem needs.', 'After you\'ve learned a few chapters, do mixed sets instead of chapter-wise ones.', 'Give me a mixed set', 'iroha', "Give me an interleaved practice set: 5 JEE-style questions from 5 different chapters I've studied, mixed in random order, one at a time. Don't tell me the chapter. After I answer, tell me which idea it needed."],
+    ['confident', 'Confidence first (hypercorrection)', 'Strong evidence', 'Rate how sure you are before you check. Mistakes you were sure about are the ones that get fixed best when corrected, so they deserve the most attention.', 'Rate each answer 1–5 before Iroha marks it. Sure-but-wrong answers get rewritten in your own words.', 'Rate, then check', 'iroha', "Confidence check: ask me the topic first. Then ask me 5 questions, one at a time. Before I answer, I'll rate my confidence from 1 to 5. Only mark my answer after I've given both. When I'm wrong with confidence 4 or 5, stop and make me write the correct idea in my own words before we move on. At the end, list my sure-but-wrong answers."],
+    ['options', 'Explain every wrong option', 'Good evidence', 'On a multiple-choice question, say why each wrong option is wrong, not just why the right one is right. It also helps you remember the related facts behind the other options.', 'Built for JEE MCQs: pick your answer, then argue against the other three.', 'Argue all four options', 'iroha', "Wrong-option practice: ask me the topic first. Give me one JEE-style multiple-choice question with 4 plausible options (no silly ones). I'll pick my answer and explain why each of the other 3 options is wrong. Check all 4 explanations, not just my pick. Then give me the next one. Do 4 questions in total."],
     ['feynman', 'Feynman technique (self-explanation)', 'Good evidence', 'Explain the idea in plain words, as if to a 12-year-old. The places where you get stuck or hide behind jargon are exactly what you don\'t understand yet.', 'Explain a topic to Kaguya. She plays a curious student and asks "why?" whenever you skip a step.', 'Explain it to Kaguya', 'kaguya', "feynman time! i'm going to explain a topic to you like you're a curious 12-year-old. ask me what the topic is first. then be my student: say \"wait, why?\" whenever i skip a step or use a word without explaining it. don't explain it for me, just ask. at the end tell me the 1-2 spots where i got vague."],
     ['why', 'Elaborative interrogation (asking why)', 'Moderate evidence', 'For each fact or formula, ask why it\'s true, where it comes from and when it fails. Linking it to what you already know makes it easier to remember.', 'Iroha asks you why and how questions about one topic.', 'Ask me why', 'iroha', "Use elaborative interrogation on me: ask me what topic, then ask me 4 'why is this true?' or 'when does this fail?' questions about it, one at a time. Push me to connect it to things I already know. Correct me briefly after each answer."],
     ['blurt', 'Blurting (free recall)', 'Builds on retrieval practice', 'Write down everything you remember about a topic on a blank page, from memory. Then check your notes and fill the gaps in another colour.', 'Blurt for 8 minutes, then send Iroha what you wrote. She tells you what\'s missing.', 'Blurt to Iroha', 'iroha', "Blurting: I'm going to write everything I remember about a topic from memory, without notes. Ask me the topic first. When I send my blurt, list the important points I missed or got wrong, most important first. Keep it short."],
     ['worked', 'Worked examples, then solve one yourself', 'Good evidence for beginners', 'Study a fully solved problem step by step, then solve a similar one on your own. As you get better, rely on the examples less.', 'Ask Iroha for a worked example, then a matching problem to solve.', 'Worked example', 'iroha', "Teach me with a worked example: ask me the topic first. Then show one fully solved JEE-level problem with every step and why it's done. Then give me a similar problem to solve on my own, and check my answer."],
+    ['subgoal', 'Subgoal labels', 'Moderate evidence (mostly from other subjects)', 'Name the purpose of each chunk of steps in a solution, like "find the limiting reagent" or "apply energy conservation". It helps the method carry over to problems that look different.', 'Iroha shows a solution in unlabelled chunks. You name each chunk, then plan a new problem by its subgoals before solving it.', 'Label the steps', 'iroha', "Subgoal labels: ask me the topic first. Show me a fully worked JEE solution with its steps grouped into 3-5 numbered chunks, but no labels. I'll name the purpose of each chunk in a few words. Correct my labels. Then give me a new problem on the same idea that looks different; I'll write its subgoals first and solve it after. Check both."],
+    ['spoterror', 'Find the error', 'Mixed evidence: best next to a correct solution', 'Study a solution that contains one realistic mistake, find the line where it breaks, then compare it with the correct one. It trains the checking you need in an exam.', 'Iroha hides one realistic mistake in a solution. You find and fix it.', 'Find the mistake', 'iroha', "Find the error: ask me the topic first. Show me a JEE-style solution with exactly one realistic mistake in it (a sign, a unit, a wrong formula, a skipped condition: the kind students really make). Don't tell me where. I'll find the line that breaks and fix it. Then show the correct solution next to the wrong one and point out the difference. Do 3 of these."],
+    ['goalfree', 'Goal-free problems', 'Moderate evidence: best early in a chapter', 'Instead of answering one question, find every quantity you can from the given data. With no target to chase, you notice how the relationships connect.', 'Good for the first problems of mechanics, electricity, geometry or stoichiometry.', 'Give me a goal-free problem', 'iroha', "Goal-free problem: ask me the chapter first. Give me a JEE-style setup with the given data but no question. I'll find every quantity I can from it and show how. Then tell me what I missed and which relationship I didn't use. Then give me one normal question on the same setup."],
+    ['imagine', 'Imagine the steps', 'Moderate evidence: best for long procedures', 'After you follow a worked example, close your eyes and run through the steps in your head instead of reading it again.', 'Iroha shows a solution. You imagine it for 2 minutes, then write the steps from memory.', 'Imagine a solution', 'iroha', "Imagination practice: ask me the topic first. Show me one worked JEE solution with clear steps. Then tell me to close my eyes and run through the steps in my head for 2 minutes without looking. After that, I'll write the steps from memory. Check what I dropped or swapped."],
     ['dual', 'Dual coding (words + pictures)', 'Moderate evidence', 'Pair words with a diagram, graph or flowchart. Two ways of holding the same idea give you two ways to recall it.', 'Draw a diagram of a topic from memory, then send Iroha a photo (📷) to check it.', 'Check my diagram', 'iroha', "Dual coding: I'm going to draw a diagram or flowchart of a topic from memory and send you a photo. Check it for mistakes and missing parts, and tell me one thing to add."],
     ['errors', 'Learning from mistakes', 'Good evidence', 'Every wrong answer is the most useful thing you studied today. Write what went wrong and the fix, then retry it later.', 'Log misses in Practice. They come back on a spaced schedule until you get them right.', 'Open Practice', 'go', 'study:practice'],
+    ['aloud', 'Say the key lines aloud', 'Small but reliable effect', 'Saying something out loud makes it stand out in memory. It only works if you say a few key lines, not everything.', 'Read only the 5–8 most important formulas or definitions aloud, slowly. Kaguya asks you some of them back.', 'Say it to Kaguya', 'kaguya', "production effect time! ask me the topic first. then remind me: read only the 5-8 most important formulas or definitions from my notes OUT LOUD, slowly, not the whole page. tell me to say 'done' when i've finished. then ask me 3 of them back, one at a time, and tell me if i got them right."],
+    ['rest', 'Wakeful rest', 'Small but real effect', 'Right after learning, rest quietly for about 10 minutes with no phone, music or new input. The memory keeps settling while your mind is idle.', 'Use it straight after a lecture or revision block. The timer dims the desk for 10 minutes.', 'Start 10 quiet minutes', 'rest', ''],
+    ['woop', 'WOOP: plan for the obstacle', 'Promising: small studies', 'Wish, Outcome, Obstacle, Plan. Picture the goal, then the thing inside you most likely to stop it, then decide in advance: "If that happens, then I will…". In one study, students who did this finished 60% more practice questions.', 'Write it once. Your if-then plan shows on Today so you see it every day.', 'Walk me through it', 'kaguya', "woop with me! walk me through it one step at a time, short and warm: 1) my wish for this week's studying, 2) the best outcome if it happens, and let me picture it, 3) the main obstacle inside ME, not outside, 4) an if-then plan: 'if [obstacle], then I will [action]'. ask one at a time. at the end, repeat my if-then plan back to me in one line so i can save it on the Methods page."],
     ['pomodoro', 'Focused time blocks with real breaks', 'Practical, widely used', 'Work in focused blocks (25–50 minutes) with short breaks away from the screen. It keeps attention fresh and makes starting easier.', 'Start a session from the desk on Today. Stand up for 2 minutes about every 50.', 'Go to Today', 'go', 'today']
   ];
   const WEAK = 'Rereading, highlighting and rewatching a lecture feel productive but help much less on their own. Use them only as a first pass, then switch to something on this list.';
   const SLEEP = 'Sleep is part of studying: memories from the day are consolidated while you sleep. Your 1:00 bedtime is study time too.';
+  const STRESS = 'Close to an exam, keep testing yourself instead of rereading. In a 2016 study, stress wiped out memories built by rereading but not memories built by self-testing.';
+  const FRESH = new Set(['relearn', 'pfail', 'confident', 'options', 'subgoal', 'spoterror', 'goalfree', 'imagine', 'aloud', 'rest', 'woop']);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const woopLine = w => `If ${esc(w.obstacle)}, then I will ${esc(w.plan)}.`;
+  function woopBox() {
+    const w = M.L.woop;
+    const saved = w ? `<p class="kg-woop-plan">${woopLine(w)}</p><p class="kl-small">Wish: ${esc(w.wish)}${w.outcome ? ` · Best outcome: ${esc(w.outcome)}` : ''}</p>` : '';
+    return `${saved}<details class="kg-woop"${w ? '' : ' open'}><summary class="kl-small">${w ? 'Rewrite my plan' : 'Write my plan'}</summary><form data-f="kgwoop" class="kg-woop-form">
+      <label>Wish <input name="wish" required maxlength="140" value="${esc(w?.wish)}" placeholder="e.g. Finish rotational motion this week"></label>
+      <label>Best outcome <input name="outcome" maxlength="140" value="${esc(w?.outcome)}" placeholder="How it feels when it's done"></label>
+      <label>Obstacle inside me <input name="obstacle" required maxlength="140" value="${esc(w?.obstacle)}" placeholder="e.g. I open my phone when a problem gets hard"></label>
+      <label>Then I will <input name="plan" required maxlength="140" value="${esc(w?.plan)}" placeholder="e.g. put it in the other room and try for 5 more minutes"></label>
+      <div class="kl-row"><button>Save my if-then plan</button>${w ? '<button type="button" class="kl-ghost" data-a="kgwoopclear">Clear</button>' : ''}</div></form></details>`;
+  }
   M.PANELS.methods = () => {
     const brk = !!window.__kgOnBreak;
-    return `<section class="kl-card"><p class="kl-eyebrow">STUDY METHODS</p><h2>What actually works</h2><p>These are the methods learning research supports best, strongest first. Each one has a button to try it here.${brk ? ' The buttons come back when your break ends.' : ''}</p></section>`
-      + METHODS.map(([id, name, ev, what, how, label]) => `<section class="kl-card kg-method"><h3>${esc(name)}</h3><p class="kg-ev">${esc(ev)}</p><p>${esc(what)}</p><p class="kl-small">${esc(how)}</p>${brk ? '' : `<button data-a="kgmethod" data-v="${id}">${esc(label)}</button>`}</section>`).join('')
-      + `<section class="kl-card kl-mini"><p class="kl-small"><b>Less useful on their own:</b> ${esc(WEAK)}</p><p class="kl-small">${esc(SLEEP)}</p></section>`;
+    return `<section class="kl-card"><p class="kl-eyebrow">STUDY METHODS</p><h2>What actually works</h2><p>These are the methods learning research supports, roughly strongest first within each kind. Each one has a button to try it here.${brk ? ' The buttons come back when your break ends.' : ''}</p></section>`
+      + METHODS.map(([id, name, ev, what, how, label]) => `<section class="kl-card kg-method" id="kg-m-${id}"><h3>${esc(name)}${FRESH.has(id) ? ' <span class="kg-new">new</span>' : ''}</h3><p class="kg-ev">${esc(ev)}</p><p>${esc(what)}</p><p class="kl-small">${esc(how)}</p>${brk ? '' : `<button data-a="kgmethod" data-v="${id}">${esc(label)}</button>`}${id === 'woop' ? woopBox() : ''}</section>`).join('')
+      + `<section class="kl-card kl-mini"><p class="kl-small"><b>Less useful on their own:</b> ${esc(WEAK)}</p><p class="kl-small">${esc(STRESS)}</p><p class="kl-small">${esc(SLEEP)}</p></section>`;
   };
   M.SECTIONS.study.splice(4, 0, ['methods', '🧪 Methods']);
+  M.FORMS.kgwoop = v => {
+    const t = s => String(s || '').trim().replace(/[.\s]+$/, '').slice(0, 140);
+    const w = { wish: t(v.wish), outcome: t(v.outcome), obstacle: t(v.obstacle).replace(/^if\s+/i, ''), plan: t(v.plan).replace(/^then\s+(i will\s+)?/i, ''), d: M.today() };
+    if (!w.wish || !w.obstacle || !w.plan) return;
+    M.L.woop = w; M.save(); M.render();
+    M.K?.('saved! i\'ll keep your if-then plan on Today, so you see it every day 🌙');
+  };
+  M.ACTIONS.kgwoopclear = () => { delete M.L.woop; M.save(); M.render(); };
+  M.TODAY.push(() => M.L.woop ? `<section class="kl-card kl-mini"><p class="kl-eyebrow">MY IF-THEN PLAN</p><p class="kg-woop-plan">${woopLine(M.L.woop)}</p></section>` : '');
+  function wakefulRest() {
+    if (document.getElementById('kg-wrest')) return;
+    const end = Date.now() + 10 * 60000, o = document.createElement('div');
+    o.id = 'kg-wrest'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-label', 'Wakeful rest');
+    o.innerHTML = '<div class="kg-wrest-box"><p class="kg-wrest-eye">WAKEFUL REST</p><p id="kg-wrest-t" class="kg-wrest-t" aria-live="off">10:00</p><p>Eyes closed, or rest them on something far away. No phone, no music, no notes. Let the last block settle.</p><button type="button" id="kg-wrest-x">I\'m back</button></div>';
+    document.body.append(o);
+    const tick = () => { const s = Math.ceil((end - Date.now()) / 1000); if (s <= 0) return close(true); o.querySelector('#kg-wrest-t').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+    const iv = setInterval(tick, 500);
+    function close(done) { clearInterval(iv); o.remove(); if (done) M.K?.('ten quiet minutes, done. that block is settling in now 🌙'); }
+    o.querySelector('#kg-wrest-x').onclick = () => close(false);
+    o.querySelector('#kg-wrest-x').focus();
+  }
   M.ACTIONS.kgmethod = b => {
     const m = METHODS.find(x => x[0] === b.dataset.v); if (!m || window.__kgOnBreak) return;
     const [, , , , , , who, what] = m;
     if (who === 'go') { const [s, t] = what.split(':'); M.go(s, t); }
+    else if (who === 'rest') wakefulRest();
     else if (who === 'kaguya') window.__kaguyaAsk?.(what);
     else window.__irohaAsk?.(what);
   };
   window.__kgMethods = METHODS;
   const css = document.createElement('style');
-  css.textContent = '.kg-method h3{margin-bottom:2px}.kg-method .kg-ev{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--kg-a1,#9d7bff);margin:0 0 8px}';
+  css.textContent = '.kg-method h3{margin-bottom:2px}.kg-method .kg-ev{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--kg-a1,#9d7bff);margin:0 0 8px}'
+    + '.kg-new{display:inline-block;vertical-align:middle;margin-left:6px;padding:1px 8px;border-radius:999px;background:var(--kg-a1,#ff6fae);color:#1d1238;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}'
+    + '.kg-woop{margin-top:10px}.kg-woop summary{cursor:pointer}.kg-woop-form{display:grid;gap:8px;margin-top:8px}.kg-woop-form label{display:grid;gap:3px;font-size:13px}.kg-woop-form input{width:100%;box-sizing:border-box}'
+    + '.kg-woop-plan{font-family:"Shippori Mincho B1",serif;font-size:15.5px;line-height:1.55;margin:8px 0 4px}'
+    + '#kg-wrest{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:16px;background:rgba(6,5,16,.94);color:#e9e4ff}'
+    + '.kg-wrest-box{max-width:360px;text-align:center;display:grid;gap:12px}.kg-wrest-eye{font-size:11.5px;letter-spacing:.14em;color:#b3a9e0;margin:0}'
+    + '.kg-wrest-t{font-family:"Shippori Mincho B1",serif;font-size:56px;line-height:1;margin:0;font-variant-numeric:tabular-nums}'
+    + '#kg-wrest-x{justify-self:center;padding:8px 18px;border-radius:999px;border:1px solid rgba(255,255,255,.3);background:transparent;color:inherit;font:inherit;cursor:pointer}';
   document.head.appendChild(css);
 })();
 
