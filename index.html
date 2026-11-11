@@ -588,7 +588,7 @@ body.habit-shh #hb-session-card {text-align:center;}
 .hb-day-progress {display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:12px;}
 #habit-desk progress {width:100%;height:9px;accent-color:var(--hb-accent);margin:12px 0 18px;}
 .hb-timeline {list-style:none;margin:20px 0 0;padding:0;}
-.hb-timeline li {display:grid;grid-template-columns:100px 1fr auto;align-items:center;gap:14px;padding:12px 0;border-top:1px solid var(--hb-line);}
+.hb-timeline li {display:grid;grid-template-columns:100px 1fr auto;align-items:center;gap:18px;padding:20px 14px;margin:10px 0;border:1px solid var(--hb-line);border-radius:12px;}
 .hb-timeline time {font-size:12px;font-variant-numeric:tabular-nums;}
 .hb-timeline small {display:block;font-size:11px;opacity:.75;}
 .hb-timeline .hb-block-rest,.hb-timeline .hb-block-life,.hb-timeline .hb-block-sleep {opacity:.75;}
@@ -608,11 +608,11 @@ body.habit-shh #hb-session-card {text-align:center;}
 (function(root){
   'use strict';
   const focus={1:'Mathematics',2:'Physics',3:'Chemistry',4:'Mathematics',5:'Physics',6:'Chemistry'};
-  const limits={'maths-part2':70,'maths-part3':35,'physics-part2':40,'chem-part2':40,maths:210,'maths-rev':60,physics:210,'physics-rev':60,chem:210,errors:60,recall:60,'maths-hw':90,'maths-sp':90,'physics-sp':90,'chem-sp':90,'chem-rev':50,focus:120};
+  const limits={'maths-part2':70,'maths-part3':35,'physics-part2':40,'chem-part2':40,maths:210,'maths-rev':150,physics:210,'physics-rev':150,chem:210,errors:60,recall:60,'maths-hw':90,'maths-sp':90,'physics-sp':90,'chem-sp':90,'chem-rev':150,focus:120};
   const full={maths:150,'maths-rev':90,physics:150,'physics-rev':60,chem:150,errors:60,recall:60,'chem-rev':30,focus:180};
   // The chosen plan lives with the Moon Lab data, so sync and backups carry it.
   const labData=()=>{try{return JSON.parse(root.localStorage.getItem('kg-lab-v1')||'{}');}catch(e){return {};}};
-  const hours=()=>{const h=labData().planHours;return h===8||h===10||h===12?h:6;};
+  const hours=()=>{const h=labData().planHours;return h===12?12:h===8||h===10?(dueSubjects().size?10:8):6;};
   // a short day is any plan under 12 hours; the 12-hour plan's own short fallback is the 8-hour day
   const shortHours=()=>{const h=hours();return h<12?h:8;};
   // 80% of the day's study plan makes it count. A past short day keeps the size it had that day.
@@ -643,55 +643,38 @@ body.habit-shh #hb-session-card {text-align:center;}
   function dueSubjects(){
     const n=new Date(),m=n.getHours()*60+n.getMinutes(),d=new Date(n);if(m<630)d.setDate(d.getDate()-1);
     const iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),out=new Set();
-    for(const e of (labData().lectures||[]))if(e&&e.due&&e.due<=iso)out.add(e.subj);
+    for(const e of (labData().lectures||[]))if(e&&e.due&&e.due<=iso&&['Maths','Physics','Chemistry'].includes(e.subj))out.add(e.subj);
+    const saved=labData().planReviewSnapshot;if(saved?.date===iso)for(const sub of saved.subjects||[])if(['Maths','Physics','Chemistry'].includes(sub))out.add(sub);
     return out;
   }
-  // Your real day (the 8-hour plan). Times count from 10:30 (0): 12:00 is 90, 16:00 is 330, 20:30 is 600, 23:00 is 750, 01:00 is 870.
-  // Normal day: sleep in to 12:00, start 12:30. Spaced day: wake 10:30 and do the due subjects first (Maths 45, Physics 40, Chemistry 30).
-  // Breakfast after the Maths revision, tea after the Physics lecture, the irl break at 20:30 (or right after Physics revision if later),
-  // dinner at 23:00 (or right after Chemistry revision if later), then wind-down to sleep at 01:00.
-  function realDay(){
-    const len=lens8().len,due=dueSubjects(),rows=[];let t=0;
-    const SP=[['Maths','maths-sp','Maths · spaced revision (due topics)',45,'maths'],['Physics','physics-sp','Physics · spaced revision (due topics)',40,'physics'],['Chemistry','chem-sp','Chemistry · spaced revision (due topics)',30,'chemistry']].filter(s=>due.has(s[0]));
-    const put=(id,title,kind,m,b)=>{if(m>0){rows.push([id,title,kind,m,b||null]);t+=m;}};
-    const until=(at,id,title)=>{if(at>t)put(id,title,'rest',at-t);};
-    if(SP.length){put('wake','Wake, water, a quick start','life',15);for(const s of SP)put(s[1],s[2],'study',s[3],s[4]);if(t+5>=120)put('brk-0','Break before the lecture','life',5);else until(120,'free-0','Free time before the lecture');}
-    else{put('lie-in','Sleep in','sleep',90);put('wake','Wake, water, settle in','life',30);}
-    put('maths','Maths · lectures','study',len.maths,'maths');put('brk-1','Break · away from the desk','life',10);
-    put('maths-rev','Maths · revise today’s lecture','study',45,'maths');put('breakfast','Breakfast','life',30);
-    put('maths-hw','Maths · homework','study',50,'maths');put('brk-2','Break · switch subjects','life',10);
-    put('physics','Physics · lectures','study',len.physics,'physics');put('tea','Tea','life',30);
-    put('physics-rev','Physics · revise today’s lecture','study',25,'physics');
-    until(600,'free-1','Free time');put('irl','Your break for real-life stuff','life',15);
-    put('chem','Chemistry · lectures','study',len.chem,'chemistry');put('chem-rev','Chemistry · revise today’s lecture','study',25,'chemistry');
-    until(750,'free-evening','Free time before dinner');put('dinner','Dinner','life',30);
-    put('wind','Wind down','life',Math.max(30,870-t));put('sleep','Sleep','sleep',1440-t);
+  // Exact net-study budgets. Review durations remain those of the original plan.
+  function realDay(late=false){
+    const due=dueSubjects(),rows=[],sp=[['Maths','maths-sp',45,'maths'],['Physics','physics-sp',40,'physics'],['Chemistry','chem-sp',30,'chemistry']].filter(x=>due.has(x[0]));
+    const target=sp.length?600:480,review=sp.reduce((n,x)=>n+x[2],0);
+    let t=0;
+    const put=(id,title,kind,m,b=null)=>{if(m>0){rows.push([id,title,kind,m,b]);t+=m;}};
+    put('free-morning',late?'Your morning · sleep, meals and settle in':sp.length?'Wake, water and settle in':'Slow morning · breakfast and settle in','rest',late?210:sp.length?15:120);
+    // Between every review and the next task there is a real ten-minute break.
+    sp.forEach(([sub,id,m,b],i)=>{put(id,sub+' · spaced revision (due topics)','study',m,b);put('brk-sp-'+i,'Break away from the desk','life',10);});
+    // Keep each subject together; the extra time is explicit problem practice, never fake spaced review.
+    const extra=target-review-480,mathExtra=Math.floor(extra/3/5)*5,phyExtra=Math.floor(extra/3/5)*5;
+    put('maths','Maths · lecture, retrieval and homework','study',200+mathExtra,'maths');
+    put('breakfast','Meal and a proper break','life',30);
+    put('physics','Physics · lecture, retrieval and problems','study',160+phyExtra,'physics');
+    put('dinner','Dinner and time away','life',30);
+    put('chem','Chemistry · lecture, retrieval and problems','study',120+extra-mathExtra-phyExtra,'chemistry');
+    // Reserve another 30 minutes (8h) or 60 minutes (10h) for pauses inside the long subject blocks.
+    // Split each subject once so these pauses are timed, rather than counted as studying.
+    const pauseBudget=(sp.length?120:90)-60-sp.length*10;
+    let remaining=pauseBudget;
+    for(const id of ['maths','physics','chem']){
+      const at=rows.findIndex(r=>r[0]===id),r=rows[at],pause=id==='chem'?remaining:Math.floor(pauseBudget/3/5)*5;remaining-=pause;
+      if(pause){const first=Math.ceil(r[3]/2/5)*5;rows.splice(at,1,[r[0],r[1],'study',first,r[4]],['brk-'+id,'Break away from the desk','life',pause,null],[id+'-rev',r[1]+' · continue','study',r[3]-first,r[4]]);t+=pause;}
+    }
+    // Late 8h ends 23:30; late 10h ends 02:00. Normal days keep their original 01:00 sleep boundary.
+    if(!late&&t<780)put('free-evening','Evening is yours','rest',780-t);
+    put('wind','Wind down','life',90);put('sleep','Sleep · no early catch-up required','sleep',1440-t);
     return rows;
-  }
-
-  function lateDay(){
-    const mode=labData().lateSchedule, due=dueSubjects(), rows=[];
-    const put=(id,title,kind,m,b)=>rows.push([id,title,kind,m,b||null]);
-    put('late-morning','Your morning: sleep, meals and settle in','rest',210);
-    const review=mode!=='normal', ten=mode==='ten';
-    if(review){
-      for(const [sub,id,m,b] of [['Maths','maths-sp',45,'maths'],['Physics','physics-sp',40,'physics'],['Chemistry','chem-sp',30,'chemistry']]){
-        put(id,due.has(sub)?sub+' · spaced revision (due topics)':sub+' · optional practice (nothing due)', 'study',m,b);
-        if(sub==='Maths')put('brk-0','Break away from the desk','life',10);
-      }
-    }else{put('maths','Maths · lecture, part 1','study',45,'maths');put('brk-0','Break away from the desk','life',10);put('maths-part2','Maths · lecture, part 2','study',70,'maths');}
-    put('breakfast','Meal and time away','life',30);
-    put(review?'maths':'maths-part3','Maths · lecture','study',review?80:35,'maths');
-    if(!review)put('maths-rev','Maths · revise today’s lecture','study',45,'maths');
-    put('brk-1','Break away from the desk','life',10);
-    put('maths-hw',review?'Maths · revision and homework':'Maths · homework','study',50,'maths');
-    put('physics','Physics · lecture','study',80,'physics');put('irl','Real-life break','life',15);
-    put(review?'physics-rev':'physics-part2',review?'Physics · revision':'Physics · lecture, part 2','study',40,'physics');
-    if(!review)put('physics-rev','Physics · revision','study',25,'physics');
-    put('chem','Chemistry · lecture, part 1','study',review?50:25,'chemistry');put('dinner','Dinner','life',25);
-    put('chem-part2','Chemistry · lecture, part 2','study',40,'chemistry');put('chem-rev','Chemistry · revision','study',25,'chemistry');
-    if(ten){put('brk-2','Break away from the desk','life',15);put('focus','Continue an unfinished lecture or practice','study',60,'mixed');put('brk-3','Break away from the desk','life',15);put('recall','Independent practice and error repair','study',60,'mixed');}
-    put('wind','Wind down','life',90);put('sleep','Sleep — no early catch-up required','sleep',1440-rows.reduce((n,r)=>n+r[3],0));return rows;
   }
   const HOW={'maths-hw':'Today’s homework. Hardest question first, about 10 minutes each, then mark it and move on. Check against the solutions PDF at the end.',
     breakfast:'Eat away from the desk. Real food: your brain runs on it.',tea:'Tea, away from the screen.',irl:'Your time for real-life stuff.',
@@ -709,10 +692,10 @@ body.habit-shh #hb-session-card {text-align:center;}
     const hh=h||shortHours(),six=hh===6,ten=hh===10,late=six&&!!labData().planLate,L8=six?null:lens8(ten?520:480);
     const len=six?{maths:100,physics:100,chem:100}:L8.len,rv=six?{maths:20,physics:20,chem:20}:L8.rev;
     const brk=(n,m)=>['brk-'+n,m===15?'Break · switch subjects':'Break · away from the desk','life',m];
-    const rows=labData().lateSchedule&&[8,10].includes(hh)?lateDay():!six?realDay():[['wake','Wake, water, breakfast','life',20],['free-morning','Slow start, lunch, your own time','rest',late?325:six?265:175],['maths','Maths · lectures','study',len.maths,'maths'],brk(1,10),...(six?[['maths-rev','Maths · revise that lecture','study',rv.maths,'maths']]:[['maths-hw','Maths · today’s lecture: revise + homework','study',60,'maths']]),brk(2,15),['physics','Physics · lectures','study',len.physics,'physics'],brk(3,10),['physics-rev','Physics · revise that lecture','study',rv.physics,'physics'],['dinner','Dinner','life',30],['chem','Chemistry · lectures','study',len.chem,'chemistry'],brk(4,10),['chem-rev','Chemistry · revise that lecture','study',rv.chem,'chemistry'],...(six?[]:[brk(5,10),['maths-rev','Maths · spaced revision (topics due today)','study',rv.maths,'maths']]),...(ten?[brk(6,10),['recall','Active recall with Iroha','study',40,'mixed']]:[]),['free-evening','Evening is yours','rest',0],['wind','Wind down','life',90],['sleep','Sleep','sleep',570]];
+    const rows=!six?realDay(!!labData().lateSchedule):[['wake','Wake, water, breakfast','life',20],['free-morning','Slow start, lunch, your own time','rest',late?325:six?265:175],['maths','Maths · lectures','study',len.maths,'maths'],brk(1,10),...(six?[['maths-rev','Maths · revise that lecture','study',rv.maths,'maths']]:[['maths-hw','Maths · today’s lecture: revise + homework','study',60,'maths']]),brk(2,15),['physics','Physics · lectures','study',len.physics,'physics'],brk(3,10),['physics-rev','Physics · revise that lecture','study',rv.physics,'physics'],['dinner','Dinner','life',30],['chem','Chemistry · lectures','study',len.chem,'chemistry'],brk(4,10),['chem-rev','Chemistry · revise that lecture','study',rv.chem,'chemistry'],...(six?[]:[brk(5,10),['maths-rev','Maths · spaced revision (topics due today)','study',rv.maths,'maths']]),...(ten?[brk(6,10),['recall','Active recall with Iroha','study',40,'mixed']]:[]),['free-evening','Evening is yours','rest',0],['wind','Wind down','life',90],['sleep','Sleep','sleep',570]];
     if(six){const fe=rows.find(r=>r[0]==='free-evening'),fm=rows.find(r=>r[0]==='free-morning');fe[3]=1440-rows.reduce((n,r)=>n+r[3],0);if(fe[3]<0){fm[3]+=fe[3];fe[3]=0;}}
     let offset=0;
-    return rows.filter(r=>r[3]>0).map(([id,title,kind,minutes,bucket=null])=>{const start=offset;offset+=minutes;return {id,title,kind,minutes,bucket,start,end:offset,how:HOW[id]?HOW[id]:/-sp$/.test(id)?SPHOW:id.startsWith('brk-')?(minutes===15?'Stand up and leave the desk. Water, a stretch, a window. No phone feeds: they make starting again harder.':'Eyes off the screen. Stand, drink water, breathe. Then straight into revision while the lecture is fresh.'):id==='maths-hw'?'Revise today’s lecture first with a method (blurt it or a quick self-test), then do the homework. Hardest question first, about 10 minutes each, then mark it and move on.':id.endsWith('-rev')?revMethod(dow,id).how:id==='errors'?'Redo every question you got wrong today and write the fix in one line. Just the misses.':id==='recall'?'Books closed. Spaced reviews that are due come first, then Iroha asks and you answer from memory.':kind==='study'?'Watch the lecture and make notes. Stand up for 2 minutes about every 50.':id==='free-morning'?'No study yet. Eat, rest and do something you like.':id==='sleep'?'9.5 hours in bed. Sleep at 01:00, wake at 10:30.':id==='free-evening'?'Study is done. Rest tonight; no catch-up required.':'Leave the books closed. This time is part of the plan.'};});
+    return rows.filter(r=>r[3]>0).map(([id,title,kind,minutes,bucket=null])=>{const start=offset;offset+=minutes;return {id,title,kind,minutes,bucket,start,end:offset,how:!six&&['maths','physics','chem','maths-rev','physics-rev','chem-rev'].includes(id)?'Continue this subject where you left off. Watch the lecture, then retrieve its ideas without notes and work problems. The time is a study budget, not a promise to finish a lecture. Keep the scheduled break; unfinished work can wait.':HOW[id]?HOW[id]:/-sp$/.test(id)?SPHOW:id.startsWith('brk-')?(minutes===15?'Stand up and leave the desk. Water, a stretch, a window. No phone feeds: they make starting again harder.':'Eyes off the screen. Stand, drink water, breathe. Then straight into revision while the lecture is fresh.'):id==='maths-hw'?'Revise today’s lecture first with a method (blurt it or a quick self-test), then do the homework. Hardest question first, about 10 minutes each, then mark it and move on.':id.endsWith('-rev')?revMethod(dow,id).how:id==='errors'?'Redo every question you got wrong today and write the fix in one line. Just the misses.':id==='recall'?'Books closed. Spaced reviews that are due come first, then Iroha asks and you answer from memory.':kind==='study'?'Watch the lecture and make notes. Stand up for 2 minutes about every 50.':id==='free-morning'?'No study yet. Eat, rest and do something you like.':id==='sleep'?'Sleep follows the wind-down shown in this plan; no early catch-up required.':id==='free-evening'?'Study is done. Rest tonight; no catch-up required.':'Leave the books closed. This time is part of the plan.'};});
   }
   const api={focus,limits,full,fallback,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
@@ -784,7 +767,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     return { chain, statuses, freezes, weekDays, freezeLeft:bank };
   }
   function elapsed(a, now = Date.now()) { return Math.max(0, Math.min(a.targetMs, a.accruedMs + (a.running ? Math.max(0,now-a.lastStart) : 0))); }
-  function late(now = new Date(), short = false) { const m=now.getHours()*60+now.getMinutes(); const ten=JSON.parse(root.localStorage.getItem('kg-lab-v1')||'{}').lateSchedule==='ten'; return ten ? m>=120 && m<630 : m >= (23*60+30) || m<630; }
+  function late(now = new Date(), short = false) { const m=now.getHours()*60+now.getMinutes(); const ten=!!JSON.parse(root.localStorage.getItem('kg-lab-v1')||'{}').lateSchedule&&P.hours()===10; return ten ? m>=120 && m<630 : m >= (23*60+30) || m<630; }
   function recommendation(energy, isLate) { if (isLate || energy==='low') return { minutes:15, kind:'review', hard:false }; if (energy==='high') return { minutes:60, kind:'mock', hard:true }; return { minutes:25, kind:'recall', hard:false }; }
   function mastery(h) {
     const buckets = new Map();
@@ -4473,7 +4456,7 @@ body.kg-light .kg-saved{background:#f7f3fb}
 .kg-chat-down:focus-visible{outline:2px solid #f5d27a;outline-offset:2px}
 /* room for the meter above Iroha on phones */
 @media(max-width:720px){#kg-scene:has(.kgs-meter:not([hidden])){height:352px}}
-.kg-plan-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:6px 0 8px}
+.kg-plan-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:12px 0 16px}
 @media(max-width:520px){.kg-plan-row{grid-template-columns:repeat(2,1fr)}}
 #moon-lab .kg-plan-row button{display:flex;flex-direction:column;align-items:center;gap:2px;min-height:56px;padding:8px 4px;line-height:1.25}
 .kg-plan-row small{font-size:11.5px;font-weight:500;opacity:.85}
@@ -7469,36 +7452,38 @@ window.KG_RECALL = {
   const M = window.MoonLab; if (!M) return;
   const { L, save, today } = M;
   // [key, hours, label, start, note]. The late 6 hour day is the same plan, only starting later. The normal day starts at 12:30, or 10:45 when spaced revision is due.
-  const PLANS = [['6', 6, '6 hours', '3:15 PM', 'Lectures, then 20 minutes of revision each, with real breaks between'], ['6L', 6, '6 hours late', '4:15 PM', 'A late start: lectures, then 20 minutes of revision each, with real breaks between'], ['8', 8, 'Normal day', '12:30 PM', 'Your real day: lectures, revising today\'s lectures, Maths homework, and spaced revision first thing on days it\'s due'], ['12', 12, '12 hours', '11:00 AM', 'Only for a catch-up day with a lot due, or a whole day mastering one topic']];
-  // the 10-hour plan is gone: the normal day grows by itself when spaced revision is due
-  if (L.planHours === 10 && L.lateSchedule !== 'ten') L.planHours = 8;
-  if (![6, 8, 10, 12].includes(L.planHours)) L.planHours = 6;
-  if (L.planHours !== 6) L.planLate = false;
+  const PLANS = [['6',6,'6 hours','3:15 PM','Six study hours with breaks'],['6L',6,'6 hours late','4:15 PM','The same six-hour plan, starting later'],['8',8,'Normal day','12:30 PM','8 study hours, or 10 when spaced revision is due; starts 10:45 AM on review days'],['8L',8,'Late day – 2 PM','2:00 PM','8 study hours, or 10 when spaced revision is due'],['12',12,'12 hours','11:00 AM','Your existing twelve-hour plan']];
+  if(L.planHours===10)L.planHours=8;
+  if(![6,8,12].includes(L.planHours))L.planHours=6;
+  L.lateSchedule=L.planHours===8&&L.lateSchedule?'late':null;
+  if(L.planHours!==6)L.planLate=false;
   // when each plan started, so the step-up advisor knows how long you've been on it
   if (!L.planSince) L.planSince = today();
   // the normal day's start depends on whether spaced revision is due today
   const startAt = h => { const o = window.StudyPlan?.startFor?.(h); if (typeof o !== 'number') return ''; const m = (630 + o) % 1440, hr = Math.floor(m / 60); return `${hr % 12 || 12}:${String(m % 60).padStart(2, '0')} ${hr < 12 ? 'AM' : 'PM'}`; };
-  PLANS.push(['8L',8,'2 PM · Normal','2:00 PM','8 study hours; wind-down 11:30 PM, sleep 1 AM'],['8R',8,'2 PM · Reviews first','2:00 PM','8 study hours including review slots; wind-down 11:30 PM, sleep 1 AM'],['10L',10,'2 PM · 10 hours','2:00 PM','10 study hours including review slots; wind-down 2 AM, sleep 3:30 AM']);
-  const current = () => L.lateSchedule ? ({normal:'8L',reviews:'8R',ten:'10L'}[L.lateSchedule] || '8') : L.planHours === 6 && L.planLate ? '6L' : String(L.planHours);
+  const current=()=>L.planHours===8&&L.lateSchedule?'8L':L.planHours===6&&L.planLate?'6L':String(L.planHours);
   L.planLog = L.planLog || {};
   save();
   // A plan under 12 hours marks each day as a short day, and remembers its size so past days stay counted fairly.
   function apply() {
     const s = window.DeskStore?.getState?.(); if (!s || !s.hydrated || !s.patchDay || L.planHours === 12) return;
     const d = today();
-    if (L.planLog[d] !== L.planHours) { L.planLog[d] = L.planHours; save(); }
+    const subjects=window.StudyPlan.dueSubjects();
+    if(L.planHours===8){L.planReviewSnapshot={date:d,subjects};save();}
+    const effective=window.StudyPlan.hours();
+    if (L.planLog[d] !== effective) { L.planLog[d] = effective; save(); }
     if (!s.days?.[d]?.shortDay) s.patchDay(d, { shortDay: true });
   }
   const card = () => `<section class="kl-card kg-plan"><p class="kl-eyebrow">YOUR STUDY DAY</p>
-    <div class="kg-plan-row" role="group" aria-label="Hours of study per day">${PLANS.map(([k, h, label, at]) => `<button data-a="kgplan" data-v="${k}" aria-pressed="${current() === k}"><b>${label}</b><small>from ${['8L','8R','10L'].includes(k) ? at : h === 8 ? startAt(h) || at : at}</small></button>`).join('')}</div>
-    <p class="kl-small">${window.__kgOnBreak ? 'Starts when your break ends. ' : ''}${PLANS.find(p => p[0] === current())[4]}. ${L.lateSchedule === 'ten' ? 'Sleep at 3:30 AM on this plan.' : 'Sleep stays at 1:00.'}</p></section>`;
+    <div class="kg-plan-row" role="group" aria-label="Hours of study per day">${PLANS.map(([k, h, label, at]) => `<button data-a="kgplan" data-v="${k}" aria-pressed="${current() === k}"><b>${label}</b><small>from ${k==='8L'?at:h===8?(window.StudyPlan.dueSubjects().length?'10:45 AM':'12:30 PM'):at}</small></button>`).join('')}</div>
+    <p class="kl-small">${window.__kgOnBreak ? 'Starts when your break ends. ' : ''}${PLANS.find(p => p[0] === current())[4]}. ${L.planHours===8?'Today: '+window.StudyPlan.hours()+' study hours. ':''}${L.lateSchedule&&window.StudyPlan.hours()===10?'Wind-down at 2 AM; sleep at 3:30 AM.':'Wind-down at 11:30 PM; sleep at 1 AM.'}</p></section>`;
   const todayPanel = M.PANELS.today;
   M.PANELS.today = () => card() + todayPanel();
   function setPlan(key) {
     const p = PLANS.find(x => x[0] === key); if (!p || p[0] === current()) return;
     const h = p[1];
     if (h !== L.planHours) L.planSince = today();
-    L.planHours = h; L.planLate = p[0] === '6L'; L.lateSchedule = ({'8L':'normal','8R':'reviews','10L':'ten'})[key] || null;
+    L.planHours = h; L.planLate = p[0] === '6L'; L.lateSchedule = key==='8L'?'late':null;
     const d = today();
     if (h === 12) { delete L.planLog[d]; window.DeskStore?.getState?.().patchDay?.(d, { shortDay: false }); }
     save(); apply();
