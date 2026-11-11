@@ -10614,4 +10614,54 @@ body.kg-plain #kg-dock{transition:none}`;
 })();
 
 </script>
+<style>
+#fy-daily{display:none;position:relative;isolation:isolate;overflow:hidden;margin:0 0 18px;padding:clamp(24px,5vw,48px) 20px 20px;border:1px solid #8ac6f63b;border-radius:16px;color:#edf7ff;text-align:center;background:
+radial-gradient(ellipse at 8% -20%,#192d46 0 22%,#5c94bc 23%,#172b41 24%,transparent 25%),
+radial-gradient(ellipse at 79% 12%,#d6ecff 0 1px,transparent 2px),
+radial-gradient(ellipse at 32% 77%,#d6ecff 0 1px,transparent 2px),
+radial-gradient(ellipse at 92% 54%,#d6ecff 0 1px,transparent 2px),
+linear-gradient(125deg,#101c32,#03070e 72%)}
+#fy-daily::before{content:'';position:absolute;z-index:-1;inset:-85% -22%;transform:rotate(42deg);background:repeating-radial-gradient(ellipse at 18% 43%,transparent 0 54%,#75b3ed29 54.2% 54.8%,#41678b30 55% 56%,transparent 56.5% 58%);pointer-events:none}
+body.kg-sec-today:not(.habit-shh):not(.kg-flow-on) #fy-daily{display:block}
+#fy-daily h2{margin:0 0 16px;font-family:Geist,Arial,sans-serif;font-weight:500;font-size:clamp(20px,5vw,43px);letter-spacing:.32em;text-transform:uppercase;text-shadow:0 0 22px #98cfff85}
+#fy-daily audio{display:block;width:min(100%,360px);height:36px;margin:auto;opacity:.92}
+#fy-daily [role=status]{margin:10px 0 0;font-size:13px;color:#bdcfe5}
+#fy-daily [role=status]:empty{display:none}
+</style>
+<script>
+(() => {
+  const main = document.getElementById('kg-main');
+  if (!main) return;
+  const clips = ["fang-yuan/clip-01.mp4", "fang-yuan/clip-02.mp4", "fang-yuan/clip-03.mp4", "fang-yuan/clip-04.mp4", "fang-yuan/clip-05.mp4", "fang-yuan/clip-06.mp4", "fang-yuan/clip-07.mp4", "fang-yuan/clip-08.mp4", "fang-yuan/clip-09.mp4", "fang-yuan/clip-10.mp4", "fang-yuan/clip-11.mp4", "fang-yuan/clip-12.mp4", "fang-yuan/clip-13.mp4", "fang-yuan/clip-14.mp4", "fang-yuan/clip-15.mp4", "fang-yuan/clip-16.mp4", "fang-yuan/clip-17.mp4", "fang-yuan/clip-18.mp4", "fang-yuan/clip-19.mp4", "fang-yuan/clip-20.mp4", "fang-yuan/clip-21.mp4", "fang-yuan/clip-22.mp4", "fang-yuan/clip-23.mp4", "fang-yuan/clip-24.mp4", "fang-yuan/clip-25.mp4", "fang-yuan/clip-26.mp4", "fang-yuan/clip-27.mp4", "fang-yuan/clip-28.mp4", "fang-yuan/clip-29.mp4", "fang-yuan/clip-30.mp4", "fang-yuan/clip-31.mp4", "fang-yuan/clip-32.mp4", "fang-yuan/clip-33.mp4", "fang-yuan/clip-34.mp4", "fang-yuan/clip-35.mp4", "fang-yuan/clip-36.mp4", "fang-yuan/clip-37.mp4", "fang-yuan/clip-38.mp4", "fang-yuan/clip-39.mp4", "fang-yuan/clip-40.mp4", "fang-yuan/clip-41.mp4", "fang-yuan/clip-42.mp4", "fang-yuan/clip-43.mp4", "fang-yuan/clip-44.mp4", "fang-yuan/clip-45.mp4", "fang-yuan/clip-46.mp4", "fang-yuan/clip-47.mp4", "fang-yuan/clip-48.mp4", "fang-yuan/clip-49.mp4", "fang-yuan/clip-50.mp4", "fang-yuan/clip-51.mp4", "fang-yuan/clip-52.mp4", "fang-yuan/clip-53.mp4"];
+  const card = document.createElement('section');
+  card.id = 'fy-daily';
+  card.innerHTML = '<h2>Fang Yuan</h2><audio controls preload="none" aria-label="Fang Yuan quote"></audio><p role="status"></p>';
+  main.prepend(card);
+  const audio = card.querySelector('audio');
+  const status = card.querySelector('[role=status]');
+  let attempted = false;
+
+  function update() {
+    const classes = document.body.classList;
+    const visible = classes.contains('kg-sec-today') && !classes.contains('habit-shh') && !classes.contains('kg-flow-on');
+    if (!visible) {
+      audio.pause();
+      return;
+    }
+    if (attempted) return;
+    attempted = true;
+    audio.src = clips[Math.floor(Math.random() * clips.length)];
+    audio.play().catch(error => {
+      if (error.name === 'NotAllowedError') status.textContent = 'Press Play to listen.';
+      else if (error.name !== 'AbortError') status.textContent = 'This clip could not be played.';
+    });
+  }
+
+  audio.addEventListener('playing', () => { status.textContent = ''; });
+  audio.addEventListener('error', () => { status.textContent = 'This clip is unavailable. Keep the fang-yuan folder beside index.html.'; });
+  new MutationObserver(update).observe(document.body, {attributes:true, attributeFilter:['class']});
+  update();
+})();
+</script>
+
 </body></html>
