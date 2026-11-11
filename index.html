@@ -3388,7 +3388,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
   }
   const actions={
     fallback:()=>{const form=$('hb-start'),draft=form?formObject(form):null;patchDay(today(),{shortDay:!days()[today()]?.shortDay});render();if(draft){const fresh=$('hb-start');for(const [name,value] of Object.entries(draft)){const el=fresh.elements[name];if(el)el.type==='checkbox'?el.checked=true:el.value=value;}}toast(days()[today()]?.shortDay?'Eight hours. Today’s focus stays protected; enjoy the breaks.':'Twelve-hour plan restored. Your saved work is intact.');},
-    'block-task':el=>{if(h.active){toast('Finish your current session before choosing another block.');return;}const b=window.StudySchedule(!!days()[today()]?.shortDay,C.date(today()).getDay()).find(b=>b.id===el.dataset.block);if(!b)return;const f=$('hb-start'),subject=b.id==='focus'?window.StudyPlan.focus[C.date(today()).getDay()]:({maths:'Maths',physics:'Physics',chemistry:'Chemistry'}[b.bucket] || 'Mixed');f.elements.subject.value=subject==='Mathematics'?'Maths':subject;f.elements.task.value=b.title+' · solve one question and explain it';f.elements.topic.value=b.title;f.elements.kind.value=sleeping()?'review':b.id==='errors'?'mistakes':'recall';f.elements.task.focus();$('hb-session-card').scrollIntoView({behavior:'smooth'});},
+    'block-task':el=>{if(h.active){toast('Finish your current session before choosing another block.');return;}const b=window.StudySchedule(!!days()[today()]?.shortDay,C.date(today()).getDay()).find(b=>b.id===el.dataset.block);if(!b){toast('That block is no longer in today’s plan. Refresh and choose again.');return;}window.MoonLab?.go('today');view='start';render();const f=$('hb-start');if(!f){toast('Session setup is still loading. Please try again.');return;}const subject=b.id==='focus'?window.StudyPlan.focus[C.date(today()).getDay()]:({maths:'Maths',physics:'Physics',chemistry:'Chemistry'}[b.bucket] || 'Mixed');f.elements.subject.value=subject==='Mathematics'?'Maths':subject;f.elements.task.value=b.title+' · solve one question and explain it';f.elements.topic.value=b.title;f.elements.kind.value=sleeping()?'review':b.id==='errors'?'mistakes':'recall';f.elements.minutes.value=Math.min(180,b.minutes);f.elements.task.focus();$('hb-session-card').scrollIntoView({behavior:'smooth',block:'start'});toast('Block selected. Check the task, then start when ready.');},
     rescue:()=>{const f=$('hb-start');f.elements.minutes.value=5;f.elements.kind.value='review';f.elements.hard.checked=false;f.elements.task.value='Open my notes, choose one question, and attempt the first step';f.elements.phone.focus();say('you don’t have to feel ready. open the page, try one step for five minutes, then decide. tiny steps still count!');window.__irohaSay?.('Five minutes. Starting now. No negotiating.',{face:'stern'});},
     'use-next':()=>{if(h.active){toast('Finish the current session first.');return;}view='start';render();const n=next(),f=$('hb-start');f.elements.task.value=n.task;f.elements.topic.value=n.topic;f.elements.subject.value=n.subject;f.elements.kind.value=sleeping()?'review':n.kind;f.elements.task.focus();},
     minimum:()=>{const f=$('hb-start');f.elements.minutes.value=5;f.elements.kind.value='review';f.elements.hard.checked=false;f.elements.phone.focus();toast('Five minutes is enough. Check the phone ritual and press play.');},
@@ -7863,6 +7863,43 @@ window.KG_RECALL = {
   };
   M.SECTIONS.study.splice(1, 0, ['notes', '📚 Notes']);
 
+  /* Saved notes: one stable folder per lecture, using exactly the revision title. */
+  let noteQuery='',noteSubject='',noteId='',noteFiles=null,noteLoad=0;
+  const noteURLs=[];
+  function clearNoteURLs(){while(noteURLs.length)URL.revokeObjectURL(noteURLs.pop());}
+  const noteURL=blob=>{const u=URL.createObjectURL(blob);noteURLs.push(u);return u;};
+  M.SECTIONS.study.push(['savednotes','Saved notes']);
+  M.PANELS.savednotes=()=>{
+    const all=L.lectures||[],q=noteQuery.toLowerCase();
+    const list=all.filter(e=>(!noteSubject||e.subj===noteSubject)&&(!q||(label(e)+' '+(e.details||'')).toLowerCase().includes(q))).slice().sort((a,b)=>String(b.made||'').localeCompare(String(a.made||'')));
+    const selected=all.find(e=>e.id===noteId);
+    clearNoteURLs();
+    let detail='';
+    if(selected){
+      detail=`<section class="kl-card kg-note-open"><p class="kl-eyebrow">SAVED NOTES</p><h2>${esc(label(selected))}</h2><p class="kl-small">Saved ${esc(selected.made)} · ${selected.due?'Next review: '+esc(selected.due):'Review cycle complete'}</p><div class="kl-row"><button data-a="kglecrev" data-v="${esc(selected.id)}">Revise with Iroha</button><button data-a="kgnotesclose">Close notes</button></div><h3>Your lecture notes</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(selected.details||'No written summary saved.')}</p>${selected.outlineFix?`<details><summary>Your corrected reading</summary><p style="white-space:pre-wrap">${esc(selected.outlineFix)}</p></details>`:''}<h3>Saved files</h3>`;
+      if(noteFiles===null)detail+='<p role="status">Loading saved files…</p>';
+      else if(!noteFiles.length)detail+='<p>No PDFs or photos attached to this lecture. Your written notes are saved above.</p>';
+      else detail+=noteFiles.map(({id,rec})=>{
+        if(!rec)return '<p>A saved attachment is unavailable on this browser. Restore a full backup to recover it.</p>';
+        const pdf=rec.kind==='pdf',url=pdf&&rec.blob instanceof Blob?noteURL(rec.blob):!pdf&&/^data:image\/(png|jpeg|webp|gif);base64,/i.test(rec.img||'')?rec.img:'';
+        const text=rec.pageNotes?.map((t,i)=>t?`Page ${i+1}\n${t}`:'').filter(Boolean).join('\n\n')||rec.parts?.map(x=>x.text||'').join('\n\n')||rec.outline||'';
+        return `<article class="kl-card kl-mini"><h4>${esc(rec.name||'Lecture attachment')}</h4>${url?`<a href="${esc(url)}" download="${esc(rec.name||'notes')}">Download ${pdf?'PDF':'photo'}</a>${pdf?` · <a href="${esc(url)}" target="_blank" rel="noopener">Open PDF</a>`:`<img src="${esc(url)}" alt="${esc(rec.name||'Saved note photo')}" loading="lazy" style="display:block;max-width:100%;max-height:650px;object-fit:contain;margin-top:16px">`}`:'<p>The original file is unavailable; any saved reading appears below.</p>'}${text?`<details><summary>Read extracted text</summary><p class="kl-small">Automatic reading may contain mistakes. Check it against the original.</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit">${esc(text)}</pre></details>`:''}</article>`;
+      }).join('');
+      detail+='</section>';
+    }
+    return `<section class="kl-card"><p class="kl-eyebrow">YOUR NOTE SHELF</p><h2>Every saved lecture</h2><p>Each block uses the same title as spaced revision. Completed reviews stay here too.</p><form data-f="kgnotesfilter" class="kl-row"><input name="query" value="${esc(noteQuery)}" placeholder="Search Lec 17, chapter or topic" aria-label="Search saved notes"><select name="subject" aria-label="Filter by subject"><option value="">All subjects</option>${['Maths','Physics','Chemistry'].map(x=>`<option ${x===noteSubject?'selected':''}>${x}</option>`).join('')}</select><button>Search</button><button type="button" data-a="kgnotesclear">Clear</button></form><p class="kl-small">${list.length} of ${all.length} saved lectures. Files stay in this browser; use Full backup to keep a copy.</p><button data-a="kglecnew">+ Save a lecture</button></section>`+detail+(list.length?list.map(e=>`<section class="kl-card kl-mini"><h3>${esc(label(e))}</h3><p class="kl-small">${esc(e.made)} · ${e.files?.length||0} attachments · ${e.due?'Review '+esc(e.due):'Review cycle complete'}</p><div class="kl-row"><button class="kl-primary" data-a="kgnotesopen" data-v="${esc(e.id)}">Open notes</button><button data-a="kglecrev" data-v="${esc(e.id)}">Revise</button></div></section>`).join(''):'<section class="kl-card"><p>No lectures match. Clear the filters or save your first lecture.</p></section>');
+  };
+  M.FORMS.kgnotesfilter=v=>{noteQuery=String(v.query||'').trim();noteSubject=String(v.subject||'');M.render();};
+  M.ACTIONS.kgnotesclear=()=>{noteQuery='';noteSubject='';M.render();};
+  M.ACTIONS.kgnotesclose=()=>{noteId='';noteFiles=null;noteLoad++;clearNoteURLs();M.render();};
+  M.ACTIONS.kgnotesopen=async b=>{
+    const e=L.lectures.find(x=>x.id===b.dataset.v);if(!e)return;
+    const token=++noteLoad;noteId=e.id;noteFiles=null;M.go('library','savednotes');
+    const records=await Promise.all((e.files||[]).map(async id=>({id,rec:await getFile(id)})));
+    if(token!==noteLoad)return;noteFiles=records;M.softRender?.();
+    document.querySelector('.kg-note-open')?.scrollIntoView({block:'start',behavior:'smooth'});
+  };
+
   /* ---------- saving a lecture ---------- */
   M.FORMS.kglec = async (v, f) => {
     if (busy) return;
@@ -9269,7 +9306,7 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
   // the fourth flag marks the small icon-only pages
   const NAV = [['today', '☀', 'Today'], ['study', '📖', 'Study'], ['library', '📚', 'Library'], ['progress', '📈', 'Progress'], ['plan', '🗓', 'Plan', 1], ['company', '🌙', 'Company', 1], ['settings', '⚙', 'Settings', 1]];
   // Library keeps what you've collected; Study is where you work. Old links to these tabs land in Library.
-  const LIB = ['notes', 'chapters', 'doubts', 'methods', 'tools'];
+  const LIB = ['savednotes', 'notes', 'chapters', 'doubts', 'methods', 'tools'];
   M.SECTIONS.library = LIB.map(id => M.SECTIONS.study.find(t => t[0] === id)).filter(Boolean);
   for (const id of LIB) { const i = M.SECTIONS.study.findIndex(t => t[0] === id); if (i >= 0) M.SECTIONS.study.splice(i, 1); }
   M.SECTIONS.library.push(...(M.LIBX || [])); // extra Library tabs from parts loaded before this one (growth.js)
