@@ -7859,7 +7859,7 @@ window.KG_RECALL = {
     const list = dueList(); if (!list.length) return '';
     return `<section class="kl-card kg-lecdue"><p class="kl-eyebrow">✦ SPACED REVISION DUE</p><h3>${list.length} lecture${list.length === 1 ? '' : 's'} to revise today</h3>
       ${list.map(e => `<div class="kg-lecrow"><div><b>${esc(label(e))}</b><small>Day ${GAPS[e.stage] || ''} review${e.files?.length ? ` · ${e.files.length} file${e.files.length === 1 ? '' : 's'} saved` : ' · no files'}${progressText(e)}</small></div>
-        <div class="kl-row"><button data-a="kgnotesopen" data-v="${esc(e.id)}">View notes / PDF</button><button class="kl-primary" data-a="kglecrev" data-v="${e.id}">Revise with Iroha</button><button data-a="kglecok" data-v="${e.id}" title="You got the core ideas back without help. Moves it to the next gap.">✓ Recalled independently</button><button class="kl-ghost" data-a="kglecshaky" data-v="${e.id}" title="Some of it needed hints or answers. Back tomorrow.">↺ Needs another review</button></div></div>`).join('')}</section>`;
+        <div class="kl-row"><button data-a="kgnotesopen" data-v="${esc(e.id)}">View notes / PDF</button><button data-a="kgnotesattach" data-v="${esc(e.id)}">Attach PDF / photos</button><button class="kl-primary" data-a="kglecrev" data-v="${e.id}">Revise with Iroha</button><button data-a="kglecok" data-v="${e.id}" title="You got the core ideas back without help. Moves it to the next gap.">✓ Recalled independently</button><button class="kl-ghost" data-a="kglecshaky" data-v="${e.id}" title="Some of it needed hints or answers. Back tomorrow.">↺ Needs another review</button></div></div>`).join('')}</section>`;
   }
   const todayPanel = M.PANELS.today;
   M.PANELS.today = () => { if (window.__kgOnBreak) return todayPanel(); const h = todayPanel(), c = logForm() + dueCard(); const i = h.indexOf('</section>'); return i < 0 ? c + h : h.slice(0, i + 10) + c + h.slice(i + 10); };
@@ -7875,11 +7875,41 @@ window.KG_RECALL = {
         <button>Save lengths</button></form></section>`;
     return `<section class="kl-card"><p class="kl-eyebrow">LECTURE NOTES</p><h2>Your lectures, on a spaced schedule</h2><p>Each lecture comes back after 1, 3, 5, 7, 14, 30 and 60 days. Files stay on this device.</p><button data-a="kglecnew">+ Log a lecture</button></section>` + lensCard
       + (list.length ? list.map(e => `<section class="kl-card kl-mini kg-lecrow"><div><b>${esc(label(e))}</b><small>${e.due ? (M.onBreak?.() ? 'Revisions paused for your break' : `Next revision ${e.due <= today() ? 'today' : esc(e.due)}`) : 'Done: all 7 revisions'} · ${e.files?.length || 0} file${e.files?.length === 1 ? '' : 's'}${progressText(e)}</small></div>
-        <div class="kl-row"><button data-a="kgnotesopen" data-v="${esc(e.id)}">View notes / PDF</button><button data-a="kglecrev" data-v="${e.id}">Revise now</button><button class="kl-ghost" data-a="kglecdel" data-v="${e.id}">Delete</button></div></section>`).join('')
+        <div class="kl-row"><button data-a="kgnotesopen" data-v="${esc(e.id)}">View notes / PDF</button><button data-a="kgnotesattach" data-v="${esc(e.id)}">Attach PDF / photos</button><button data-a="kglecrev" data-v="${e.id}">Revise now</button><button class="kl-ghost" data-a="kglecdel" data-v="${e.id}">Delete</button></div></section>`).join('')
         : '<section class="kl-card kl-mini"><p class="kl-small">Nothing yet. After your next lecture, Iroha will ask you to log it.</p></section>');
   };
   M.SECTIONS.study.splice(1, 0, ['notes', '📚 Notes']);
 
+  // Save original PDFs before any optional AI reading; uploading works offline.
+  async function saveLectureAttachments(e,picked){
+    const errors=[];let saved=0;
+    for(const file of picked){
+      try{
+        const pdf=/pdf/i.test(file.type)||/\.pdf$/i.test(file.name);
+        if(!pdf&&!/^image\//.test(file.type))throw new Error('Choose a PDF or image');
+        if(file.size>40*1024*1024)throw new Error('File exceeds 40 MB');
+        const id=e.id+'-'+(crypto.randomUUID?.()||Date.now()+'-'+Math.random());
+        const rec=pdf?{kind:'pdf',name:file.name,blob:file,read:false}:{kind:'img',name:file.name,img:await window.__kgShrink(file)};
+        await putFile(id,rec);(e.files||(e.files=[])).push(id);saved++;
+      }catch(err){errors.push(file.name+': '+err.message);}
+    }
+    return {saved,errors};
+  }
+  function pickLecturePDF(existing,options={}){
+    const input=document.createElement('input');input.type='file';input.accept='application/pdf,.pdf,image/*';input.multiple=true;
+    input.addEventListener('change',async()=>{
+      if(!input.files?.length)return;
+      const status=options.status;if(status)status.textContent='Saving attachments…';
+      const e=existing||{id:'lec'+(crypto.randomUUID?.()||Date.now()),subj:options.subject||'Maths',ch:'',topic:String(options.title||'New lecture').trim().slice(0,120),details:'',made:today(),stage:0,due:add(today(),1),files:[],reviews:0};
+      try{
+        const result=await saveLectureAttachments(e,[...input.files]);
+        if(result.saved){if(!existing)L.lectures.push(e);save();focusSession='';focusNoteNode=null;window.HabitDesk?.refresh?.();if(options.done)options.done(e);}
+        const message=result.saved?result.saved+' attachment(s) saved. '+result.errors.join('; '):result.errors.join('; ')||'No attachments saved.';
+        if(status?.isConnected)status.textContent=message;else M.I(message,{face:'study'});
+      }catch(err){if(status)status.textContent='Could not save: '+err.message;}
+    });input.click();
+  }
+  M.ACTIONS.kgnotesattach=b=>{const e=L.lectures.find(x=>x.id===b.dataset.v);if(e)pickLecturePDF(e,{done:()=>M.ACTIONS.kgnotesopen({dataset:{v:e.id}})});};
   // Keep the actual viewer node across timer redraws so pause/resume retains the PDF page.
   let focusNoteNode=null,focusSession='',focusURL='',focusRequest=0;
   window.__kgMountSessionNotes=active=>{
@@ -7888,13 +7918,18 @@ window.KG_RECALL = {
     if(focusNoteNode&&focusSession===active.id){host.append(focusNoteNode);return;}
     focusRequest++;if(focusURL)URL.revokeObjectURL(focusURL);focusURL='';focusSession=active.id;
     const node=document.createElement('section');focusNoteNode=node;node.style.cssText='text-align:left;margin-top:24px;border-top:1px solid #ffffff30;padding-top:20px;min-width:0';
-    const lectures=(L.lectures||[]).filter(e=>e.files?.length).slice().sort((a,b)=>Number(b.subj===active.subject)-Number(a.subj===active.subject)||Number(!!b.due&&b.due<=today())-Number(!!a.due&&a.due<=today()));
+    const lectures=(L.lectures||[]).slice().sort((a,b)=>Number(b.subj===active.subject)-Number(a.subj===active.subject)||Number(!!b.due&&b.due<=today())-Number(!!a.due&&a.due<=today()));
     node.innerHTML=`<h3>Notes for this session</h3><p class="hb-caption">Open your saved PDF here. The timer keeps its current state.</p><label>Lecture<select data-focus-lecture style="width:100%;margin:8px 0">${lectures.map(e=>`<option value="${esc(e.id)}">${esc(label(e))}</option>`).join('')}</select></label><label>Attachment<select data-focus-file style="width:100%;margin:8px 0"></select></label><div data-focus-view aria-live="polite"></div>`;
     host.append(node);
+    const upload=document.createElement('div');upload.style.cssText='margin:16px 0;display:grid;gap:10px';
+    upload.innerHTML=`<label>New lecture title<input data-new-title maxlength="120" placeholder="e.g. Kinematics · Lec 8" style="width:100%"></label><label>Subject<select data-new-subject>${['Maths','Physics','Chemistry'].map(x=>`<option ${x===active.subject?'selected':''}>${x}</option>`).join('')}</select></label><button type="button" data-new-upload>Upload a new lecture PDF</button><button type="button" data-existing-upload>Attach PDF to selected lecture</button><p data-upload-status role="status"></p>`;
+    node.prepend(upload);
+    upload.querySelector('[data-new-upload]').onclick=()=>{const title=upload.querySelector('[data-new-title]').value.trim();const status=upload.querySelector('[data-upload-status]');if(!title){status.textContent='Enter the new lecture title first.';return;}pickLecturePDF(null,{title,subject:upload.querySelector('[data-new-subject]').value,status});};
+    upload.querySelector('[data-existing-upload]').onclick=()=>{const e=L.lectures.find(x=>x.id===node.querySelector('[data-focus-lecture]').value);if(e)pickLecturePDF(e,{status:upload.querySelector('[data-upload-status]')});else upload.querySelector('[data-upload-status]').textContent='Use Upload a new lecture PDF to save your first lecture.';};
     const select=node.querySelector('[data-focus-lecture]'),files=node.querySelector('[data-focus-file]'),view=node.querySelector('[data-focus-view]');let records=[];
     function show(){
       if(focusURL)URL.revokeObjectURL(focusURL);focusURL='';view.replaceChildren();
-      const rec=records[Number(files.value)]?.rec;if(!rec){view.textContent='This attachment is missing from this browser. Restore a full backup to recover it.';return;}
+      const rec=records[Number(files.value)]?.rec;if(!rec){view.textContent='No attachment available here. Use Attach PDF to selected lecture above, or restore a full backup.';return;}
       if(rec.kind==='pdf'&&rec.blob instanceof Blob){
         focusURL=URL.createObjectURL(rec.blob);
         const link=document.createElement('a');link.href=focusURL;link.target='_blank';link.rel='noopener';link.textContent='Open PDF in a separate tab';view.append(link);
@@ -7909,7 +7944,7 @@ window.KG_RECALL = {
       if(token!==focusRequest)return;records=result;files.innerHTML=records.map((x,i)=>`<option value="${i}">${esc(x.rec?.name||'Unavailable attachment')}</option>`).join('');files.disabled=false;show();
     }
     select.addEventListener('change',load);files.addEventListener('change',show);
-    if(lectures.length)load();else{select.disabled=true;files.disabled=true;view.textContent='No lecture attachments saved yet. Save your PDF with a lecture in Library → Notes, then reopen this session.';}
+    if(lectures.length)load();else{select.disabled=true;files.disabled=true;view.textContent='No lectures saved yet. Enter a title above and upload your new lecture PDF here.';}
   };
 
   /* Saved notes: one stable folder per lecture, using exactly the revision title. */
@@ -7925,7 +7960,7 @@ window.KG_RECALL = {
     clearNoteURLs();
     let detail='';
     if(selected){
-      detail=`<section class="kl-card kg-note-open"><p class="kl-eyebrow">SAVED NOTES</p><h2>${esc(label(selected))}</h2><p class="kl-small">Saved ${esc(selected.made)} · ${selected.due?'Next review: '+esc(selected.due):'Review cycle complete'}</p><div class="kl-row"><button data-a="kglecrev" data-v="${esc(selected.id)}">Revise with Iroha</button><button data-a="kgnotesclose">Close notes</button></div><h3>Your lecture notes</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(selected.details||'No written summary saved.')}</p>${selected.outlineFix?`<details><summary>Your corrected reading</summary><p style="white-space:pre-wrap">${esc(selected.outlineFix)}</p></details>`:''}<h3>Saved files</h3>`;
+      detail=`<section class="kl-card kg-note-open"><p class="kl-eyebrow">SAVED NOTES</p><h2>${esc(label(selected))}</h2><p class="kl-small">Saved ${esc(selected.made)} · ${selected.due?'Next review: '+esc(selected.due):'Review cycle complete'}</p><div class="kl-row"><button data-a="kgnotesattach" data-v="${esc(selected.id)}">Attach PDF / photos</button><button data-a="kglecrev" data-v="${esc(selected.id)}">Revise with Iroha</button><button data-a="kgnotesclose">Close notes</button></div><h3>Your lecture notes</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(selected.details||'No written summary saved.')}</p>${selected.outlineFix?`<details><summary>Your corrected reading</summary><p style="white-space:pre-wrap">${esc(selected.outlineFix)}</p></details>`:''}<h3>Saved files</h3>`;
       if(noteFiles===null)detail+='<p role="status">Loading saved files…</p>';
       else if(!noteFiles.length)detail+='<p>No PDFs or photos attached to this lecture. Your written notes are saved above.</p>';
       else detail+=noteFiles.map(({id,rec})=>{
@@ -7936,7 +7971,7 @@ window.KG_RECALL = {
       }).join('');
       detail+='</section>';
     }
-    return `<section class="kl-card"><p class="kl-eyebrow">YOUR NOTE SHELF</p><h2>Every saved lecture</h2><p>Each block uses the same title as spaced revision. Completed reviews stay here too.</p><form data-f="kgnotesfilter" class="kl-row"><input name="query" value="${esc(noteQuery)}" placeholder="Search Lec 17, chapter or topic" aria-label="Search saved notes"><select name="subject" aria-label="Filter by subject"><option value="">All subjects</option>${['Maths','Physics','Chemistry'].map(x=>`<option ${x===noteSubject?'selected':''}>${x}</option>`).join('')}</select><button>Search</button><button type="button" data-a="kgnotesclear">Clear</button></form><p class="kl-small">${list.length} of ${all.length} saved lectures. Files stay in this browser; use Full backup to keep a copy.</p><button data-a="kglecnew">+ Save a lecture</button></section>`+detail+(list.length?list.map(e=>`<section class="kl-card kl-mini"><h3>${esc(label(e))}</h3><p class="kl-small">${esc(e.made)} · ${e.files?.length||0} attachments · ${e.due?'Review '+esc(e.due):'Review cycle complete'}</p><div class="kl-row"><button class="kl-primary" data-a="kgnotesopen" data-v="${esc(e.id)}">View notes / PDF</button><button data-a="kglecrev" data-v="${esc(e.id)}">Revise</button></div></section>`).join(''):'<section class="kl-card"><p>No lectures match. Clear the filters or save your first lecture.</p></section>');
+    return `<section class="kl-card"><p class="kl-eyebrow">YOUR NOTE SHELF</p><h2>Every saved lecture</h2><p>Each block uses the same title as spaced revision. Completed reviews stay here too.</p><form data-f="kgnotesfilter" class="kl-row"><input name="query" value="${esc(noteQuery)}" placeholder="Search Lec 17, chapter or topic" aria-label="Search saved notes"><select name="subject" aria-label="Filter by subject"><option value="">All subjects</option>${['Maths','Physics','Chemistry'].map(x=>`<option ${x===noteSubject?'selected':''}>${x}</option>`).join('')}</select><button>Search</button><button type="button" data-a="kgnotesclear">Clear</button></form><p class="kl-small">${list.length} of ${all.length} saved lectures. Files stay in this browser; use Full backup to keep a copy.</p><button data-a="kglecnew">+ Save a lecture</button></section>`+detail+(list.length?list.map(e=>`<section class="kl-card kl-mini"><h3>${esc(label(e))}</h3><p class="kl-small">${esc(e.made)} · ${e.files?.length||0} attachments · ${e.due?'Review '+esc(e.due):'Review cycle complete'}</p><div class="kl-row"><button class="kl-primary" data-a="kgnotesopen" data-v="${esc(e.id)}">View notes / PDF</button><button data-a="kgnotesattach" data-v="${esc(e.id)}">Attach PDF / photos</button><button data-a="kglecrev" data-v="${esc(e.id)}">Revise</button></div></section>`).join(''):'<section class="kl-card"><p>No lectures match. Clear the filters or save your first lecture.</p></section>');
   };
   M.FORMS.kgnotesfilter=v=>{noteQuery=String(v.query||'').trim();noteSubject=String(v.subject||'');M.render();};
   M.ACTIONS.kgnotesclear=()=>{noteQuery='';noteSubject='';M.render();};
@@ -7968,8 +8003,7 @@ window.KG_RECALL = {
         if (/pdf/i.test(file.type) || /\.pdf$/i.test(file.name)) {
           if (file.size > 40 * 1024 * 1024) { M.I(`${file.name} is over 40 MB. I skipped it.`, { face: 'stern' }); continue; }
           busy = 'Reading ' + file.name + '…'; M.render();
-          const p = await window.__kgPdfParts(file);
-          await putFile(id, { kind: 'pdf', name: file.name, pages: p.pages, parts: p.parts, page1: p.page1, blob: file });
+          await putFile(id, { kind: 'pdf', name: file.name, blob: file, read: false });
         } else {
           await putFile(id, { kind: 'img', name: file.name, img: await window.__kgShrink(file) });
         }
