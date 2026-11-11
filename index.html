@@ -3221,6 +3221,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     oldDesk.hidden=!!h.shh;
     if (view==='settings') { const restore=$('hb-restore'); if(restore)restore.addEventListener('change',restoreFile); }
     updateClock();
+    window.__kgMountSessionNotes?.(h.active);
   }
   function startView(n) {
     const history=C.history(h,days(),today()), active=h.active;
@@ -7862,6 +7863,38 @@ window.KG_RECALL = {
         : '<section class="kl-card kl-mini"><p class="kl-small">Nothing yet. After your next lecture, Iroha will ask you to log it.</p></section>');
   };
   M.SECTIONS.study.splice(1, 0, ['notes', '📚 Notes']);
+
+  // Keep the actual viewer node across timer redraws so pause/resume retains the PDF page.
+  let focusNoteNode=null,focusSession='',focusURL='',focusRequest=0;
+  window.__kgMountSessionNotes=active=>{
+    if(!active){focusRequest++;if(focusURL)URL.revokeObjectURL(focusURL);focusURL='';focusNoteNode=null;focusSession='';return;}
+    const host=document.getElementById('hb-session-card');if(!host)return;
+    if(focusNoteNode&&focusSession===active.id){host.append(focusNoteNode);return;}
+    focusRequest++;if(focusURL)URL.revokeObjectURL(focusURL);focusURL='';focusSession=active.id;
+    const node=document.createElement('section');focusNoteNode=node;node.style.cssText='text-align:left;margin-top:24px;border-top:1px solid #ffffff30;padding-top:20px;min-width:0';
+    const lectures=(L.lectures||[]).filter(e=>e.files?.length).slice().sort((a,b)=>Number(b.subj===active.subject)-Number(a.subj===active.subject)||Number(!!b.due&&b.due<=today())-Number(!!a.due&&a.due<=today()));
+    node.innerHTML=`<h3>Notes for this session</h3><p class="hb-caption">Open your saved PDF here. The timer keeps its current state.</p><label>Lecture<select data-focus-lecture style="width:100%;margin:8px 0">${lectures.map(e=>`<option value="${esc(e.id)}">${esc(label(e))}</option>`).join('')}</select></label><label>Attachment<select data-focus-file style="width:100%;margin:8px 0"></select></label><div data-focus-view aria-live="polite"></div>`;
+    host.append(node);
+    const select=node.querySelector('[data-focus-lecture]'),files=node.querySelector('[data-focus-file]'),view=node.querySelector('[data-focus-view]');let records=[];
+    function show(){
+      if(focusURL)URL.revokeObjectURL(focusURL);focusURL='';view.replaceChildren();
+      const rec=records[Number(files.value)]?.rec;if(!rec){view.textContent='This attachment is missing from this browser. Restore a full backup to recover it.';return;}
+      if(rec.kind==='pdf'&&rec.blob instanceof Blob){
+        focusURL=URL.createObjectURL(rec.blob);
+        const link=document.createElement('a');link.href=focusURL;link.target='_blank';link.rel='noopener';link.textContent='Open PDF in a separate tab';view.append(link);
+        const frame=document.createElement('iframe');frame.src=focusURL;frame.title=rec.name||'Lecture PDF';frame.style.cssText='display:block;width:100%;height:65vh;min-height:360px;border:0;background:white;border-radius:10px;margin-top:12px';view.append(frame);
+      }else if(/^data:image\/(png|jpeg|webp|gif);base64,/i.test(rec.img||'')){
+        const img=document.createElement('img');img.src=rec.img;img.alt=rec.name||'Saved notes';img.style.cssText='max-width:100%;display:block';view.append(img);
+      }else{const p=document.createElement('p');p.textContent='Original file unavailable. Saved reading:';const pre=document.createElement('pre');pre.style.cssText='white-space:pre-wrap;font:inherit';pre.textContent=rec.parts?.map(x=>x.text||'').join('\n\n')||rec.outline||'No extracted text available.';view.append(p,pre);}
+    }
+    async function load(){
+      const token=++focusRequest;view.textContent='Loading saved attachments…';files.disabled=true;
+      const e=lectures.find(e=>e.id===select.value);const result=await Promise.all((e?.files||[]).map(async id=>({id,rec:await getFile(id)})));
+      if(token!==focusRequest)return;records=result;files.innerHTML=records.map((x,i)=>`<option value="${i}">${esc(x.rec?.name||'Unavailable attachment')}</option>`).join('');files.disabled=false;show();
+    }
+    select.addEventListener('change',load);files.addEventListener('change',show);
+    if(lectures.length)load();else{select.disabled=true;files.disabled=true;view.textContent='No lecture attachments saved yet. Save your PDF with a lecture in Library → Notes, then reopen this session.';}
+  };
 
   /* Saved notes: one stable folder per lecture, using exactly the revision title. */
   let noteQuery='',noteSubject='',noteId='',noteFiles=null,noteLoad=0;
