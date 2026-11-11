@@ -649,7 +649,7 @@ body.habit-shh #hb-session-card {text-align:center;}
   }
   // Exact net-study budgets. Review durations remain those of the original plan.
   const studyDate=()=>{const d=new Date();if(d.getHours()*60+d.getMinutes()<630)d.setDate(d.getDate()-1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
-  const eveningPlan=()=>labData().eveningPlanDate===studyDate();
+  const eveningPlan=()=>{const d=new Date(),date=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');return date==='2026-11-11'&&labData().eveningPlanDate===date;};
   function recoverySubject(){
     const d=studyDate();if(d==='2026-11-12')return 'Chemistry';
     const yesterday=new Date(d+'T12:00:00');yesterday.setDate(yesterday.getDate()-1);const iso=yesterday.getFullYear()+'-'+String(yesterday.getMonth()+1).padStart(2,'0')+'-'+String(yesterday.getDate()).padStart(2,'0');
@@ -667,7 +667,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     put('free-morning',special?'Eat, rest and settle in · no catch-up before 6:15 PM':'Breakfast / lunch and your own time before study','rest',start);
     const due=dueSubjects(),queue=[];
     if(!special&&!recovery)for(const [sub,id,m,b] of [['Maths','maths-sp',45,'maths'],['Physics','physics-sp',40,'physics'],['Chemistry','chem-sp',30,'chemistry']])if(due.has(sub))queue.push([id,sub+' · spaced revision (due topics)',m,b]);
-    queue.push(['maths',special?'Maths · lecture, retrieval and homework · continue':'Maths · lecture, retrieval and homework',special?90:180,'maths'],['physics','Physics · lecture, retrieval and problems',special?60:160,'physics'],['chem','Chemistry · lecture, retrieval and problems',special?60:140,'chemistry']);
+    queue.push(['maths',special?'Maths · lecture, retrieval and homework · continue':'Maths · lecture, retrieval and homework',special?30:180,'maths'],['physics','Physics · lecture, retrieval and problems',special?120:160,'physics'],['chem','Chemistry · lecture, retrieval and problems',special?60:140,'chemistry']);
     if(special)queue.splice(2);
     if(recovery){const sub=recoverySubject(),id={Maths:'maths',Physics:'physics',Chemistry:'chem'}[sub];queue.splice(0,queue.length,[id,sub+' · one lecture, at your pace',Math.min(180,lens8().len[id]),sub==='Chemistry'?'chemistry':id]);}
     const meals=special?[570]:[recovery||late||six&&L.planLate?330:210,570];let mi=0;
@@ -7465,7 +7465,8 @@ window.KG_RECALL = {
   // [key, hours, label, start, note]. The late 6 hour day is the same plan, only starting later. The normal day starts at 12:30, or 10:45 when spaced revision is due.
   const PLANS=[['6',6,'6 hours','12:00 PM','Up to 6 hours, including due reviews'],['6L',6,'6 hours late','2:00 PM','Up to 6 hours, including due reviews'],['8',8,'Normal day','12:00 PM','Up to 8 hours; meals, breaks and bedtime take priority'],['8L',8,'Late day – 2 PM','2:00 PM','Study only what fits before 11:30 PM; no automatic extension']];
   PLANS.push(['recovery',8,'Recovery · one subject','2:00 PM','One lecture at your pace; stop by 10 PM, even if unfinished']);
-  if(today()==='2026-11-11')PLANS.push(['today',8,'Today only · 6:15 PM','6:15 PM','Maths continuation and a little Physics; no Chemistry today; finish by 10 PM']);
+  const calendarToday=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+  if(calendarToday()==='2026-11-11')PLANS.push(['today',8,'Today only · 6:15 PM','6:15 PM','30 minutes of Maths and 2 hours of Physics; no Chemistry; finish by 10 PM']);
   if(L.planHours===12)L.planHours=8;
   if(L.planHours===10)L.planHours=8;
   if(![6,8,12].includes(L.planHours))L.planHours=6;
@@ -7475,7 +7476,7 @@ window.KG_RECALL = {
   if (!L.planSince) L.planSince = today();
   // the normal day's start depends on whether spaced revision is due today
   const startAt = h => { const o = window.StudyPlan?.startFor?.(h); if (typeof o !== 'number') return ''; const m = (630 + o) % 1440, hr = Math.floor(m / 60); return `${hr % 12 || 12}:${String(m % 60).padStart(2, '0')} ${hr < 12 ? 'AM' : 'PM'}`; };
-  const current=()=>L.eveningPlanDate===today()?'today':L.recoveryPlan?'recovery':L.planHours===8&&L.lateSchedule?'8L':L.planHours===6&&L.planLate?'6L':String(L.planHours);
+  const current=()=>calendarToday()==='2026-11-11'&&L.eveningPlanDate===calendarToday()?'today':L.recoveryPlan?'recovery':L.planHours===8&&L.lateSchedule?'8L':L.planHours===6&&L.planLate?'6L':String(L.planHours);
   L.planLog = L.planLog || {};
   save();
   // A plan under 12 hours marks each day as a short day, and remembers its size so past days stay counted fairly.
@@ -7497,7 +7498,7 @@ window.KG_RECALL = {
     const p = PLANS.find(x => x[0] === key); if (!p || p[0] === current()) return;
     const h = p[1];
     if (h !== L.planHours) L.planSince = today();
-    L.planHours = h; L.planLate = p[0] === '6L'; L.lateSchedule = key==='8L'?'late':null; L.eveningPlanDate=key==='today'?today():null; L.recoveryPlan=key==='recovery';
+    L.planHours = h; L.planLate = p[0] === '6L'; L.lateSchedule = key==='8L'?'late':null; L.eveningPlanDate=key==='today'?calendarToday():null; L.recoveryPlan=key==='recovery';
     const d = today();
     if (h === 12) { delete L.planLog[d]; window.DeskStore?.getState?.().patchDay?.(d, { shortDay: false }); }
     save(); apply();
@@ -7505,6 +7506,8 @@ window.KG_RECALL = {
     window.HabitDesk?.refresh?.(); window.DeskStore?.setState?.({ habitRevision: Date.now() });
     setTimeout(() => M.render(), 50);
   }
+  function expireEveningPlan(){if(calendarToday()==='2026-11-11')return;const i=PLANS.findIndex(p=>p[0]==='today');if(i>=0)PLANS.splice(i,1);if(L.eveningPlanDate){L.eveningPlanDate=null;save();apply();window.HabitDesk?.refresh?.();}if(i>=0)M.render();}
+  setInterval(expireEveningPlan,30000);window.addEventListener('focus',expireEveningPlan);expireEveningPlan();
   M.ACTIONS.kgplan = b => setPlan(b.dataset.v);
   window.__kgSetPlan = setPlan;
   window.__kgPlanGo = () => M.go('today');
