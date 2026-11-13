@@ -3307,7 +3307,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     const target=study.reduce((n,b)=>n+b.minutes,0),logged=C.minutes(h,days(),today()),pct=target?Math.min(100,Math.round(logged*100/target)):0;
     const time=offset=>{const m=(630+offset)%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');};
     return `<article class="hb-day-map hb-card" id="hb-day-map"><div class="hb-section-heading"><div><p class="hb-eyebrow">${esc(C.date(today()).toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'}))} · YOUR DAY</p><h2>${focus?esc(focus)+' is today’s focus.':'Sunday belongs to you.'}</h2><p>${focus?`${window.StudyPlan.shortHours()+'-hour plan'} · ${window.StudyPlan.need(true)} min today keeps the chain · sleep 01:00`:'A full rest day. You do not owe the desk a session.'}</p></div>${focus?(window.StudyPlan.hours()<12?'':button(short?'8h fallback on · switch to 12h':'Switch to 8h fallback','fallback','aria-pressed="'+short+'"')):button('Mark today rested','rest')}</div>
-    ${focus?`<div class="hb-day-progress"><strong>${Math.round(logged)} / ${target} min logged</strong><span>${logged>=target*0.8?'Today counts 🌙':Math.max(0,Math.ceil(target*0.8-logged))+' min until today counts (80%)'}</span></div><progress max="100" value="${pct}" aria-label="Today’s study progress">${pct}%</progress><details><summary>See the ${short?window.StudyPlan.shortHours():'12'}-hour schedule · ${study.length} study blocks</summary><ol class="hb-timeline">${blocks.map(b=>`<li class="hb-block-${b.kind}"><time>${time(b.start)}–${time(b.end)}</time><span><strong>${esc(b.title)}</strong><small>${b.minutes}m · ${esc(b.kind==='study' && b.id==='focus'?'today’s priority':b.kind)}</small></span>${b.kind==='study'?button('Start timer','block-task','data-block="'+esc(b.id)+'" aria-label="Choose '+esc(b.title)+'"'):''}</li>`).join('')}</ol><p class="hb-caption">A plan is a guide. Only saved work counts. Switching keeps your logs; each plan caps its own blocks.</p></details>`:'<p>Walk, eat, see someone, do something with no score attached. ♡</p>'}</article>`;
+    ${focus?`<div class="hb-day-progress"><strong>${Math.round(logged)} / ${target} min logged</strong><span>${logged>=window.StudyPlan.need(true)?'Today counts 🌙':Math.max(0,Math.ceil(window.StudyPlan.need(true)-logged))+' min until today counts'}</span></div><progress max="100" value="${pct}" aria-label="Today’s study progress">${pct}%</progress><details><summary>See the ${short?window.StudyPlan.shortHours():'12'}-hour schedule · ${study.length} study blocks</summary><ol class="hb-timeline">${blocks.map(b=>`<li class="hb-block-${b.kind}"><time>${time(b.start)}–${time(b.end)}</time><span><strong>${esc(b.title)}</strong><small>${b.minutes}m · ${esc(b.kind==='study' && b.id==='focus'?'today’s priority':b.kind)}</small></span>${b.kind==='study'?button('Start timer','block-task','data-block="'+esc(b.id)+'" aria-label="Choose '+esc(b.title)+'"'):''}</li>`).join('')}</ol><p class="hb-caption">A plan is a guide. Only saved work counts. Switching keeps your logs; each plan caps its own blocks.</p></details>`:'<p>Walk, eat, see someone, do something with no score attached. ♡</p>'}</article>`;
   }
   function restartView() {return `<details class="hb-card hb-extra"><summary>Make this feel like something I chose</summary><form id="hb-reason" class="hb-stack"><label>What do I want studying to make possible?<textarea name="reason" rows="2" maxlength="300" placeholder="Something that matters to you, beyond a score.">${esc(settings().reason || '')}</textarea></label><button type="submit">Keep my reason</button></form><p>Try one small question before deciding how the whole day will go.</p></details>`;}
   function discoveryView() {const finds=h.sessions.filter(s=>s.discovery).slice(-4).reverse();return `<details class="hb-card hb-extra"><summary>Little discoveries · ${h.sessions.filter(s=>s.discovery).length}</summary><p>Keep the moments when an idea clicks. Add one at the end of a session.</p>${finds.map(s=>`<blockquote><p>“${esc(s.discovery)}”</p><cite>${esc(s.subject)} · ${esc(s.date)}</cite></blockquote>`).join('') || '<p class="hb-caption">Your first “oh, that’s why!” belongs here.</p>'}</details>`;}
@@ -8030,13 +8030,32 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
         <div class="kl-row"><button class="kl-primary" ${busy ? 'disabled' : ''}>${busy || 'Save lecture'}</button><button type="button" class="kl-ghost" data-a="kglecskip">Not now</button></div>
       </form></section>`;
   }
+  /* weekly wildcard: one unlabelled problem from the Maths or Physics chapter you haven't tested for longest (3+ weeks),
+     so strong topics can come back if they've quietly faded. Picked once per week and kept for that week. */
+  const weekOf = d => M.add(d, -((new Date(d + 'T12:00:00').getDay() + 6) % 7));
+  function wildcard() {
+    const d = today(), wk = weekOf(d); if (L.wildWeek === wk) return null;
+    if (L.wildPick?.wk === wk) return L.wildPick;
+    const last = {};
+    for (const e of L.log || []) if (e.ch && (e.t === 'pyq' || e.t === 'recall') && (!last[e.ch] || e.d > last[e.ch])) last[e.ch] = e.d;
+    for (const e of L.lectures) if (e.ch) { const t = e.lastGraded || e.made; if (t && (!last[e.ch] || t > last[e.ch])) last[e.ch] = t; }
+    const c = Object.entries(last).map(([ch, t]) => ({ ch, days: M.gap(d, t), subj: (M.CHAPS.find(x => x.id === ch) || {}).subj }))
+      .filter(x => x.days >= 21 && (x.subj === 'Maths' || x.subj === 'Physics')).sort((a, b) => b.days - a.days)[0];
+    if (!c) return null; L.wildPick = { wk, ...c }; save(); return L.wildPick;
+  }
+  function wildProblem(ch) {
+    const c = M.CHAPS.find(x => x.id === ch); if (!c) return;
+    window.__kgOnce = `[weekly wildcard, not typed by me: ONE fresh problem from the ${c.subj} chapter "${c.name}", which I haven't tested for weeks. Don't name the chapter, topic or method: I have to recognise it. Use a setup or representation that differs from the textbook default (for example a graph instead of values). Wait for my attempt, check it, then give a short worked solution and say how sure you are of the answer. Tell me to press "Solved on my own" or "Missed it".]`;
+    window.__irohaAsk?.(`Weekly wildcard: give me one fresh ${c.subj} problem.`);
+  }
   function dueCard() {
-    const list = dueList(); if (!list.length) return '';
-    const kind = ['a direct problem', 'a problem in a new setting', 'a mixed problem', 'a mock-style problem'];
-    return `<section class="kl-card kg-lecdue"><p class="kl-eyebrow">✦ OLDER-TOPIC SLOTS</p><h3>${list.length} older topic${list.length === 1 ? '' : 's'} to test today</h3>
+    const list = dueList(), wild = wildcard(); if (!list.length && !wild) return '';
+    const kind = ['a direct problem', 'a problem in a new setting', 'a mixed problem', 'a mock-style problem'], n = list.length + (wild ? 1 : 0);
+    return `<section class="kl-card kg-lecdue"><p class="kl-eyebrow">✦ OLDER-TOPIC SLOTS</p><h3>${n} older topic${n === 1 ? '' : 's'} to test today</h3>
       <p class="kl-small">Use these in place of problems you'd do anyway: one fresh problem each, chapter hidden so you choose the method. Solving any problem on that chapter on your own also counts.</p>
       ${list.map(e => `<div class="kg-lecrow"><div><b>${esc(e.subj)} · older topic, ${M.gap(today(), e.made)} days old</b><small>Check ${(e.stage || 0) + 1} of ${GAPS.length}: ${kind[Math.min(3, e.stage || 0)]}${e.files?.length ? ` · ${e.files.length} file${e.files.length === 1 ? '' : 's'} saved` : ''}</small><details><summary class="kl-small">Show the topic</summary><small>${esc(label(e))}${e.gapq ? ` · your gap question: ${esc(e.gapq)}` : ''}</small></details></div>
-        <div class="kl-row"><button class="kl-primary" data-a="kglecprob" data-v="${e.id}">Get a fresh problem</button><button data-a="kglecok" data-v="${e.id}" title="You chose the method and solved it without help. The gap grows.">✓ Solved on my own</button><button class="kl-ghost" data-a="kglecshaky" data-v="${e.id}" title="You needed a hint or missed a key step. Repair it; a different problem comes back in 2 days.">↺ Needed a hint</button><button class="kl-ghost" data-a="kgnotesopen" data-v="${esc(e.id)}">Notes</button></div></div>`).join('')}</section>`;
+        <div class="kl-row"><button class="kl-primary" data-a="kglecprob" data-v="${e.id}">Get a fresh problem</button><button data-a="kglecok" data-v="${e.id}" title="You chose the method and solved it without help. The gap grows.">✓ Solved on my own</button><button class="kl-ghost" data-a="kglecstuck" data-k="method" data-v="${e.id}" title="You couldn't tell which method to use. Next time: a problem where you must choose between plausible approaches, in 2 days.">↺ Couldn't pick the method</button><button class="kl-ghost" data-a="kglecstuck" data-k="slip" data-v="${e.id}" title="Right method, but a slip in the working. Next time: a short targeted repair, in 2 days.">↺ Slipped in the working</button><button class="kl-ghost" data-a="kglecredo" data-v="${e.id}" title="The problem was flawed or the marking is disputed. Get another one; nothing is recorded.">⚑ Bad problem</button><button class="kl-ghost" data-a="kgnotesopen" data-v="${esc(e.id)}">Notes</button></div></div>`).join('')}${wild ? `<div class="kg-lecrow kg-wild"><div><b>🃏 Wildcard · ${esc(wild.subj)}, a chapter untested for ${wild.days} days</b><small>Once a week. Unlabelled, so you have to recognise it. A miss puts it back into rotation.</small><details><summary class="kl-small">Show the chapter</summary><small>${esc(M.chName(wild.ch))}</small></details></div>
+        <div class="kl-row"><button class="kl-primary" data-a="kgwild" data-v="${esc(wild.ch)}">Get the wildcard problem</button><button data-a="kgwildok" data-v="${esc(wild.ch)}">✓ Solved on my own</button><button class="kl-ghost" data-a="kgwildmiss" data-v="${esc(wild.ch)}">↺ Missed it</button></div></div>` : ''}</section>`;
     // the old revision card below stays as a fallback (unused)
     return `<section class="kl-card kg-lecdue"><p class="kl-eyebrow">✦ SPACED REVISION DUE</p><h3>${list.length} lecture${list.length === 1 ? '' : 's'} to revise today</h3>${L.revMoved && L.revLevel === today() ? `<p class="kl-small">Capped at ${REV_CAP} a day so revision stays light. ${L.revMoved} more ${L.revMoved === 1 ? 'is' : 'are'} lined up for the next days.</p>` : ''}
       ${list.map(e => `<div class="kg-lecrow"><div><b>${esc(label(e))}</b><small>Day ${GAPS[e.stage] || ''} review${e.files?.length ? ` · ${e.files.length} file${e.files.length === 1 ? '' : 's'} saved` : ' · no files'}${progressText(e)}</small></div>
@@ -8318,12 +8337,13 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
 #kg-lecpick li b{display:block;font-size:13.5px}#kg-lecpick li small{opacity:.7;font-size:11.5px}#kg-lecpick .kg-lp-btns{display:flex;gap:4px;flex:none}
 #kg-lecpick .kg-lp-btns button{border:1px solid rgba(239,230,211,.25);background:none;color:inherit;border-radius:999px;padding:4px 10px;font:700 12px inherit;cursor:pointer}#kg-lecpick .kg-lp-btns button:hover{background:rgba(239,230,211,.1)}`; document.head.appendChild(s); }
   // an older-topic slot: one fresh problem, chapter hidden, harder in form as the topic ages
-  async function problem(id) {
+  async function problem(id, redo) {
     const e = L.lectures.find(x => x.id === id); if (!e) return;
     const files = (await Promise.all((e.files || []).map(getFile))).filter(Boolean), outline = files.map(x => x.outline).filter(Boolean).join('\n').slice(0, 3000);
     const form = ['a direct application of the main idea', 'the same idea in a new setting, so I must recognise when it applies', 'a mixed problem where this idea is one step among others', 'a cumulative, mock-style problem'][Math.min(3, e.stage || 0)];
     window.__kgOnce = `[older-topic slot, not typed by me: a check on ${label(e)} (${e.subj}), logged on ${e.made}. What I wrote after the lecture: "${e.details}".${e.gapq ? ` The question I saved to expose a gap: "${e.gapq}".` : ''}${outline ? ` Outline of my notes:\n${outline}` : ''}
-Give me ONE fresh problem: ${form}. Don't name the chapter, topic or method; I have to choose the method myself. Don't reuse a problem from my notes. Wait for my attempt. Then check it: if I chose the method and solved it on my own, tell me to press "Solved on my own"; if I needed a hint or missed a key step, help me repair it and tell me to press "Needed a hint".]`;
+Give me ONE fresh problem: ${form}. Don't name the chapter, topic or method; I have to choose the method myself. Don't reuse a problem from my notes, and change the setup, representation or given information, not just the numbers (for example a velocity-time graph instead of values).${e.stuck === 'method' ? " Last time I couldn't pick the method: make me choose between two or three plausible approaches." : e.stuck === 'slip' ? ' Last time I chose the right method but slipped in the working: make this a short problem that targets that step.' : ''}${redo ? ' The last problem was flawed or its marking disputed; this one replaces it and nothing was recorded.' : ''}
+Wait for my attempt. Then check it, give a short worked solution, and say how sure you are of the answer. If I chose the method and solved it on my own, tell me to press "Solved on my own". If I couldn't choose the method, say "Couldn't pick the method"; if the method was right but I slipped, say "Slipped in the working", and help me repair it either way.]`;
     window.__irohaAsk?.(`Older-topic slot: give me one fresh ${e.subj} problem.`);
     e.lastRev = today(); save();
   }
@@ -8343,7 +8363,7 @@ Give me ONE fresh problem: ${form}. Don't name the chapter, topic or method; I h
     // how long since you last saw it matters for what a success means
     (L.revLog = L.revLog || []).push({ d: today(), src: 'lecture', ok: !!ok, gap: M.gap(today(), e.lastGraded || e.made || today()) }); if (L.revLog.length > 2000) L.revLog = L.revLog.slice(-2000);
     e.lastGraded = today();
-    if (ok) { e.stage++; e.due = e.stage < GAPS.length ? add(today(), GAPS[e.stage] - GAPS[e.stage - 1]) : ''; }
+    if (ok) { e.stage++; delete e.stuck; e.due = e.stage < GAPS.length ? add(today(), GAPS[e.stage] - GAPS[e.stage - 1]) : ''; }
     else e.due = add(today(), 2); // needed a hint or missed a step: repair it, and a different problem comes back sooner
     save(); M.render();
     M.I(ok ? (e.due ? `Good. ${label(e)} comes back on day ${GAPS[e.stage]}.` : `${label(e)}: all four checks done. It's yours now.`) : "Good to know. Look over just the weak part once tonight; a different problem on it comes back in two days.", { face: ok ? 'approve' : 'stern' });
@@ -8351,6 +8371,18 @@ Give me ONE fresh problem: ${form}. Don't name the chapter, topic or method; I h
   Object.assign(M.ACTIONS, {
     kglecrev: b => revise(b.dataset.v),
     kglecprob: b => problem(b.dataset.v),
+    // where you got stuck decides the next problem; both come back in 2 days
+    kglecstuck: b => { const e = L.lectures.find(x => x.id === b.dataset.v); if (e) e.stuck = b.dataset.k; grade(b.dataset.v, false); },
+    // a flawed or disputed problem: replace it, nothing recorded
+    kglecredo: b => problem(b.dataset.v, true),
+    kgwild: b => wildProblem(b.dataset.v),
+    kgwildok: b => { L.wildWeek = weekOf(today()); L.log.push({ d: today(), t: 'recall', ok: true, ch: b.dataset.v }); save(); M.render(); M.I?.('Good. That chapter held up after weeks away.', { face: 'approve' }); },
+    kgwildmiss: b => {
+      L.wildWeek = weekOf(today()); const ch = b.dataset.v; L.log.push({ d: today(), t: 'recall', ok: false, ch });
+      const e = L.lectures.filter(x => x.ch === ch).sort((a, b) => b.made.localeCompare(a.made))[0];
+      if (e) { e.stage = Math.min(e.stage || 0, 1); e.due = add(today(), 2); }
+      save(); M.render(); M.I?.("Good thing we checked. It's back in rotation: a fresh problem on it in two days.", { face: 'study' });
+    },
     kglecok: b => grade(b.dataset.v, true),
     kglecshaky: b => grade(b.dataset.v, false),
     kglecskip: () => { L.lecPending = null; save(); M.render(); },
@@ -9657,7 +9689,7 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
     const m = new Date().getHours() * 60 + new Date().getMinutes(), t = (m < 630 ? m + 1440 : m) - 630, left = b ? Math.max(0, b.end - t) : 0;
     const el = $('kg-status');
     if (el && window.__kgOnBreak) { el.textContent = `${me} Resting until ${window.__kgBreakUntil} · doctor's orders · chain safe`; return; }
-    if (el) el.textContent = `${me} ${M.hist().chain}-day chain · ${got >= need ? 'today counts ✓' : `${Math.max(0, need - got)} min until today counts`}${b && !M.isNight() ? ` · ${b.title}, ${Math.floor(left / 60) ? Math.floor(left / 60) + 'h ' : ''}${left % 60}m left` : ''}`;
+    if (el) el.textContent = `${me} ${M.hist().chain}-day chain · ${new Date(M.today() + 'T12:00:00').getDay() === 0 ? 'Sunday · rest day, the chain is safe' : got >= need ? 'today counts ✓' : `${Math.max(0, need - got)} min until today counts`}${b && !M.isNight() ? ` · ${b.title}, ${Math.floor(left / 60) ? Math.floor(left / 60) + 'h ' : ''}${left % 60}m left` : ''}`;
     const dot = bar.querySelector('[data-sec="study"] .kg-dot'); if (dot) dot.hidden = !M.L.ask.q;
   }
   // each page reopens on the tab you left it on
