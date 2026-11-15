@@ -79,3 +79,17 @@ test('the desk day starts at 4:00 AM: 5:00 AM belongs to the same calendar day',
   // a college-day plan (not Sunday's empty rest plan) means 5 AM counted as Monday
   assert.ok(P.fallback(1).some(r => r.id === 'maths-chunk-m'));
 });
+
+test('no separate spaced-revision blocks: older material lives inside practice, totals unchanged', () => {
+  const due = [{ id: 'x', subj: 'Physics', due: '2026-11-10', stage: 1 }, { id: 'y', subj: 'Maths', due: '2026-11-10', stage: 1 }];
+  const college = plan(at(MON, '07:00'), { mathsNext: { [MON]: 155 }, lectures: due }).fallback(1);
+  const holiday = plan(at(SAT, '11:00'), { lectures: due }).fallback(6);
+  for (const rows of [college, holiday]) assert.ok(!rows.some(r => /-sp-chunk/.test(r.id)), 'found a spaced block');
+  assert.strictEqual(college.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0), 480);
+  assert.strictEqual(holiday.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0), 600);
+});
+
+test('subject practice blocks carry a "mix in older material" note', () => {
+  const rows = plan(at(MON, '07:00'), { mathsNext: { [MON]: 155 } }).fallback(1);
+  assert.match(rows.find(r => r.id.startsWith('physics-chunk')).how, /Mix in about \d+ min of older material/);
+});
