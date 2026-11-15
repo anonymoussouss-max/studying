@@ -60,3 +60,29 @@ test('an unaided success makes a skill solid; a hint makes it shaky', () => {
   assert.strictEqual(P.recordAttempt(sk({ strength: 'shaky' }), 'ok', TODAY).strength, 'solid');
   assert.strictEqual(P.recordAttempt(sk({}), 'hint', TODAY).strength, 'shaky');
 });
+
+test('credit goes to the lecture\'s own skill when the attempt names a lecture', () => {
+  const skills = [sk({ id: 'parts', ch: 'int', lectures: ['l1'] }), sk({ id: 'subst', ch: 'int', lectures: ['l2'] })];
+  assert.strictEqual(P.creditTarget(skills, { ch: 'int', lec: 'l2' }), 'subst');
+});
+
+test('a chapter tick with several skills credits none, rather than guessing', () => {
+  const skills = [sk({ id: 'parts', ch: 'int' }), sk({ id: 'subst', ch: 'int' })];
+  assert.strictEqual(P.creditTarget(skills, { ch: 'int' }), null);
+});
+
+test('a chapter tick credits the chapter\'s only skill', () => {
+  assert.strictEqual(P.creditTarget([sk({ id: 'only', ch: 'int' }), sk({ id: 'other', ch: 'vec' })], { ch: 'int' }), 'only');
+});
+
+test('a skill recorded today is not shown again today, whatever the result', () => {
+  assert.strictEqual(P.pickMix([sk({ id: 'h', strength: 'shaky', last: 'hint', lastTested: TODAY })], 'Maths', TODAY).length, 0);
+});
+
+test('rest after unaided successes grows: 7, 14, 28 days, capped at 56', () => {
+  let s = sk({});
+  const rests = [];
+  for (let i = 0; i < 5; i++) { s = P.recordAttempt(s, 'ok', TODAY); rests.push(P.restDays(s)); }
+  assert.deepStrictEqual(J(rests), [7, 14, 28, 56, 56]);
+  assert.strictEqual(P.restDays(P.recordAttempt(s, 'hint', TODAY)), 0);
+});
