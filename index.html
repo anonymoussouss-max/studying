@@ -773,16 +773,20 @@ body.habit-shh #hb-session-card {text-align:center;}
     return out;};
   // older skills to mix into practice: shaky first, then new, then solid by longest untested; never one shown unaided in the last 7 days or made today
   const pickMix=(skills,subj,today,n=3)=>{const rank=s=>s.strength==='shaky'?0:s.strength==='new'?1:2;
-    return (skills||[]).filter(s=>(!subj||s.subj===subj)&&s.made&&s.made<today&&!(s.last==='ok'&&s.lastTested&&gapD(today,s.lastTested)<7))
+    return (skills||[]).filter(s=>(!subj||s.subj===subj)&&s.made&&s.made<today&&s.lastTested!==today&&!(s.lastTested&&gapD(today,s.lastTested)<restDays(s)))
       .sort((a,b)=>rank(a)-rank(b)||String(a.lastTested||a.made).localeCompare(String(b.lastTested||b.made))).slice(0,n);};
   const mixMinutes=m=>Math.round(m*0.25/5)*5; // shortcut: fixed 25% share, make it adaptive after the 4-week trial
   // the day's small recall queue: at most 3 open misses, knowledge gaps first, then oldest due
   const recallToday=(attempts,today)=>(attempts||[]).filter(x=>x&&!x.ok&&x.due&&x.due<=today)
     .sort((a,b)=>(a.cause==='knowledge gap'?0:1)-(b.cause==='knowledge gap'?0:1)||a.due.localeCompare(b.due)).slice(0,3);
-  const recordAttempt=(s,result,today)=>({...s,lastTested:today,last:result,strength:result==='ok'?'solid':'shaky'});
+  // consecutive unaided successes stretch the rest before a skill is mixed in again: 7, 14, 28, then 56 days
+  const recordAttempt=(s,result,today)=>({...s,lastTested:today,last:result,strength:result==='ok'?'solid':'shaky',okStreak:result==='ok'?(s.okStreak||0)+1:0});
+  const restDays=s=>s.last==='ok'?Math.min(56,7*2**Math.max(0,(s.okStreak||1)-1)):0;
+  // which skill an attempt proves: the lecture's own skill, else the chapter's only skill; never a guess between several
+  const creditTarget=(skills,{ch,lec}={})=>{const by=f=>(skills||[]).filter(f),l=lec?by(s=>(s.lectures||[]).includes(lec)):[],c=l.length?l:ch?by(s=>s.ch===ch):[];return c.length===1?c[0].id:null;};
   // each subject practice block reserves ~25% for older material (see Mix in on Today)
   const fallbackMix=(dow,h)=>fallback(dow,h).map(r=>r.kind==='study'&&/^(maths|physics|chem)-chunk/.test(r.id)&&r.minutes>=30?{...r,how:(r.how||'')+' Mix in about '+mixMinutes(r.minutes)+' min of older material: see Mix in on Today.'}:r);
-  const api={skillsFromLectures,pickMix,mixMinutes,recallToday,recordAttempt,dayKind,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={skillsFromLectures,pickMix,mixMinutes,recallToday,recordAttempt,restDays,creditTarget,dayKind,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -8061,22 +8065,6 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     load: async pairs => idb('readwrite', s => { for (const [k, v] of pairs) s.put(v, k); return null; })
   };
 
-  const isDue = e => e.due && e.due <= today();
-  /* daily cap: at most 3 lecture reviews a day (2 per subject). Most overdue and earliest-stage (most fragile) first;
-     the rest roll to tomorrow, so a week of daily lectures never turns into ten reviews at once. */
-  const REV_CAP = 3, REV_PER_SUBJ = 1; // one older-topic slot per subject per day
-  function levelLoad() {
-    const d = today(); if (L.revLevel === d) return;
-    const due = L.lectures.filter(isDue).sort((a, b) => a.due.localeCompare(b.due) || (a.stage || 0) - (b.stage || 0));
-    const per = {}; let kept = 0, moved = 0;
-    for (const e of due) {
-      if (kept < REV_CAP && (per[e.subj] || 0) < REV_PER_SUBJ) { kept++; per[e.subj] = (per[e.subj] || 0) + 1; }
-      else { e.due = M.add(d, 1); moved++; }
-    }
-    L.revLevel = d; L.revMoved = moved; save();
-  }
-  levelLoad();
-  const dueList = () => { levelLoad(); return L.lectures.filter(isDue).sort((a, b) => a.due.localeCompare(b.due)); };
   const label = e => [e.subj, e.ch ? chName(e.ch) : '', e.topic].filter(Boolean).join(' · ');
   const hasNotesFor = ch => !!ch && L.lectures.some(e => e.ch === ch && e.files?.length);
   let busy = '';
@@ -8120,11 +8108,25 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     window.__kgOnce = `[mix-in problem, not typed by me: ONE fresh problem that tests the skill "${s.name}" (${s.subj}${s.ch ? ', ' + M.chName(s.ch) : ''}).${e ? ` From my lecture notes: "${String(e.details || '').slice(0, 600)}".` : ''}${replace ? ' The last problem was flawed or its marking disputed; this replaces it and nothing was recorded.' : ''} Don't name the skill, chapter or method: I have to recognise it. Change the setup, representation or given information, not just the numbers. Wait for my attempt, check it, give a short worked solution and say how sure you are of the answer. Then tell me which button fits: "Solved on my own", "Needed a hint" or "Missed".]`;
     window.__irohaAsk?.(`Give me one fresh ${s.subj} problem for my mix-in.`);
   }
-  function record(id, result) {
-    const s = skill(id); if (!s) return; const d = today();
-    L.skills = L.skills.map(x => x.id === id ? SP().recordAttempt(x, result, d) : x);
-    L.log.push({ d, t: 'recall', ok: result === 'ok', ch: s.ch || '', mix: 1, sk: id });
+  // one path for every result (Mix in buttons, chapter ticks, guided sessions): skill, trial log, review history and wildcard move together
+  function recordSkill(id, result, src = 'mix') {
+    const s = skill(id); if (!s) return false; const d = today();
+    // one result per skill per day: a just-explained problem can't later count as solved on my own
+    if (s.lastTested === d) { if (src === 'mix') M.K?.('that skill already has a result today. a fresh problem on it comes another day 🌙'); return false; }
+    const att = 'a' + Date.now().toString(36), before = { lastTested: s.lastTested, last: s.last, strength: s.strength, okStreak: s.okStreak };
+    L.skills = L.skills.map(x => x.id === id ? { ...SP().recordAttempt(x, result, d), att: { id: att, t: Date.now(), src, before } } : x);
+    L.log.push({ d, t: 'recall', ok: result === 'ok', ch: s.ch || '', mix: 1, sk: id, att, src });
+    (L.revLog = L.revLog || []).push({ d, src: 'skill', ok: result === 'ok', gap: M.gap(d, s.lastTested || s.made || d), att });
     if (L.wildPick?.sk === id) L.wildWeek = weekOf(d);
+    save(); M.render(); return true;
+  }
+  // a wrong button can be undone for 2 minutes; after that, credit needs a fresh problem another day
+  function undoSkill(id) {
+    const s = skill(id); if (!s?.att || Date.now() - s.att.t > 120000) return M.K?.('too late to undo that one 🌙');
+    const { id: att, before } = s.att;
+    L.skills = L.skills.map(x => x.id === id ? { ...x, ...before, att: null } : x);
+    L.log = L.log.filter(e => e.att !== att); L.revLog = (L.revLog || []).filter(e => e.att !== att);
+    if (L.wildPick?.sk === id) delete L.wildWeek;
     save(); M.render();
   }
   // the day's recall queue comes from the misses notebook: at most 3, same intervals as the Recall tab
@@ -8139,11 +8141,13 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     const d = today(), wild = wildcard(), ws = wild && skill(wild.sk);
     const subs = ['Maths', 'Physics', 'Chemistry'].map(s => [s, P.pickMix(L.skills, s, d, 3).filter(x => x.id !== wild?.sk)]).filter(g => g[1].length);
     const rec = P.recallToday(L.attempts, d), sample = P.dayKind?.(d)?.t === 'holiday' ? P.pickMix(L.skills, null, d, 6) : [];
-    if (!subs.length && !ws && !rec.length) return '';
+    const just = (L.skills || []).filter(s => s.att && s.lastTested === d && Date.now() - s.att.t < 120000);
+    if (!subs.length && !ws && !rec.length && !just.length) return '';
     const btns = id => `<div class="kl-row"><button class="kl-primary" data-a="skprob" data-v="${esc(id)}">Get a problem</button><button data-a="skrec" data-k="ok" data-v="${esc(id)}" title="You chose the method and solved it without help">✓ Solved on my own</button><button class="kl-ghost" data-a="skrec" data-k="hint" data-v="${esc(id)}" title="It comes back in your next practice block">↺ Needed a hint</button><button class="kl-ghost" data-a="skrec" data-k="miss" data-v="${esc(id)}">✗ Missed</button><button class="kl-ghost" data-a="skprob" data-bad="1" data-v="${esc(id)}" title="Flawed or disputed problem: get another, nothing recorded">⚑ Bad problem</button></div>`;
     const row = (s, head) => `<div class="kg-lecrow"><div><b>${head}</b><small>${s.strength === 'shaky' ? 'needed help last time' : s.lastTested ? `last tested ${M.gap(d, s.lastTested)} days ago` : 'not tested yet'}</small><details><summary class="kl-small">Show the skill</summary><small>${esc(skLabel(s))}</small></details></div>${btns(s.id)}</div>`;
     return `<section class="kl-card kg-lecdue"><p class="kl-eyebrow">✦ MIX IN</p><h3>Older skills for today's practice</h3>
       <p class="kl-small">Spend about a quarter of each practice block on these: one fresh problem each, skill hidden so you choose the method. Any problem you solve on your own on the same chapter counts too.</p>
+      ${just.map(s => `<div class="kg-lecrow"><div><b>Recorded: ${s.last === 'ok' ? 'solved on your own' : s.last === 'hint' ? 'needed a hint' : 'missed'}</b><small>${esc(s.subj)} · wrong button? undo within 2 minutes</small></div><div class="kl-row"><button class="kl-ghost" data-a="skundo" data-v="${esc(s.id)}">↶ Undo</button></div></div>`).join('')}
       ${subs.map(([sub, list]) => list.map(s => row(s, `${esc(sub)} · older skill`)).join('')).join('')}
       ${ws ? row(ws, `🃏 Weekly wildcard · ${esc(ws.subj)}, untested for ${wild.days} days`) : ''}
       ${sample.length ? `<details><summary class="kl-small"><b>Mock / backlog / test block:</b> one problem each on ${sample.length} older skills</summary><small>${sample.map(s => esc(skLabel(s))).join('<br>')}</small></details>` : ''}
@@ -8438,23 +8442,10 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
 #kg-lecpick ul{list-style:none;margin:0;padding:0 8px 10px;overflow:auto}#kg-lecpick li{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 6px;border-top:1px solid rgba(239,230,211,.08)}
 #kg-lecpick li b{display:block;font-size:13.5px}#kg-lecpick li small{opacity:.7;font-size:11.5px}#kg-lecpick .kg-lp-btns{display:flex;gap:4px;flex:none}
 #kg-lecpick .kg-lp-btns button{border:1px solid rgba(239,230,211,.25);background:none;color:inherit;border-radius:999px;padding:4px 10px;font:700 12px inherit;cursor:pointer}#kg-lecpick .kg-lp-btns button:hover{background:rgba(239,230,211,.1)}`; document.head.appendChild(s); }
-  // an older-topic slot: one fresh problem, chapter hidden, harder in form as the topic ages
-  async function problem(id, redo) {
-    const e = L.lectures.find(x => x.id === id); if (!e) return;
-    const files = (await Promise.all((e.files || []).map(getFile))).filter(Boolean), outline = files.map(x => x.outline).filter(Boolean).join('\n').slice(0, 3000);
-    const form = ['a direct application of the main idea', 'the same idea in a new setting, so I must recognise when it applies', 'a mixed problem where this idea is one step among others', 'a cumulative, mock-style problem'][Math.min(3, e.stage || 0)];
-    window.__kgOnce = `[older-topic slot, not typed by me: a check on ${label(e)} (${e.subj}), logged on ${e.made}. What I wrote after the lecture: "${e.details}".${e.gapq ? ` The question I saved to expose a gap: "${e.gapq}".` : ''}${outline ? ` Outline of my notes:\n${outline}` : ''}
-Give me ONE fresh problem: ${form}. Don't name the chapter, topic or method; I have to choose the method myself. Don't reuse a problem from my notes, and change the setup, representation or given information, not just the numbers (for example a velocity-time graph instead of values).${e.stuck === 'method' ? " Last time I couldn't pick the method: make me choose between two or three plausible approaches." : e.stuck === 'slip' ? ' Last time I chose the right method but slipped in the working: make this a short problem that targets that step.' : ''}${redo ? ' The last problem was flawed or its marking disputed; this one replaces it and nothing was recorded.' : ''}
-Wait for my attempt. Then check it, give a short worked solution, and say how sure you are of the answer. If I chose the method and solved it on my own, tell me to press "Solved on my own". If I couldn't choose the method, say "Couldn't pick the method"; if the method was right but I slipped, say "Slipped in the working", and help me repair it either way.]`;
-    window.__irohaAsk?.(`Older-topic slot: give me one fresh ${e.subj} problem.`);
-    e.lastRev = today(); save();
-  }
-  // any problem solved on your own on a chapter counts as that chapter's oldest due check (once a day per lecture)
-  window.__kgLecSatisfy = ch => {
-    if (!ch || !SP()?.pickMix) return; const d = today();
-    const s = SP().pickMix(L.skills, null, d, 999).find(x => x.ch === ch); if (!s) return;
-    L.skills = L.skills.map(x => x.id === s.id ? SP().recordAttempt(x, 'ok', d) : x);
-    save(); M.notify?.(`That counts for the skill: ${s.name}.`);
+  // any problem solved on your own on a chapter counts for that chapter's most-due skill
+  window.__kgLecSatisfy = (ch, lec) => {
+    if (!SP()?.creditTarget) return; const id = SP().creditTarget(L.skills, { ch, lec });
+    if (id && recordSkill(id, 'ok', 'auto')) M.notify?.(`That counts for the skill: ${skill(id).name}.`);
   };
   function grade(id, ok) {
     const e = L.lectures.find(x => x.id === id); if (!e) return;
@@ -8469,22 +8460,18 @@ Wait for my attempt. Then check it, give a short worked solution, and say how su
   }
   Object.assign(M.ACTIONS, {
     kglecrev: b => revise(b.dataset.v),
-    kglecprob: b => problem(b.dataset.v),
     skprob: b => skProblem(b.dataset.v, !!b.dataset.bad),
-    skrec: b => record(b.dataset.v, b.dataset.k),
+    skrec: b => recordSkill(b.dataset.v, b.dataset.k),
+    skundo: b => undoSkill(b.dataset.v),
     sksuggest: async () => {
       const f = document.querySelector('form[data-f="kglec"]'); if (!f) return;
       const topic = f.topic?.value || '', details = f.details?.value || '';
-      if (!topic && !details) return K('write the topic or your notes first, then i can ask iroha 🌙');
+      if (!topic && !details) return M.K?.('write the topic or your notes first, then i can ask iroha 🌙');
       const r = await window.__kgAsk?.('iroha', `[skill suggestion, not typed by me] From this lecture, name 1 to 3 distinct skills I must be able to do, each a short phrase of 3 to 8 words (for example "split a log inequality into base cases"). Topic: ${topic}. My notes: ${details.slice(0, 1200)}. Reply with only the skills, comma-separated, nothing else.`);
       if (r?.reply && f.skills) f.skills.value = r.reply.replace(/\n+/g, ', ').replace(/^[^:\n]{0,30}:\s*/, '').replace(/,\s*,/g, ',').replace(/\s+/g, ' ').trim().slice(0, 300);
-      else K("couldn't reach iroha just now. type the skills yourself, or leave it blank and the topic becomes the skill 🌙");
+      else M.K?.("couldn't reach iroha just now. type the skills yourself, or leave it blank and the topic becomes the skill 🌙");
     },
     rcmark: b => recallMark(b.dataset.v, b.dataset.k === '1'),
-    // where you got stuck decides the next problem; both come back in 2 days
-    kglecstuck: b => { const e = L.lectures.find(x => x.id === b.dataset.v); if (e) e.stuck = b.dataset.k; grade(b.dataset.v, false); },
-    // a flawed or disputed problem: replace it, nothing recorded
-    kglecredo: b => problem(b.dataset.v, true),
     kglecok: b => grade(b.dataset.v, true),
     kglecshaky: b => grade(b.dataset.v, false),
     kglecskip: () => { L.lecPending = null; save(); M.render(); },
@@ -8674,18 +8661,10 @@ Wait for my attempt. Then check it, give a short worked solution, and say how su
     if (next) return { eye: 'UP NEXT', title: `${next.title} at ${clock(next.start)}`, why: 'Five minutes now is a head start, if you want one.', btn: 'Start with 5 minutes', run: { desk: deskFor(next, 5) } };
     return { eye: 'TODAY', title: 'No study blocks today', why: 'Sunday is the rest day in your plan. Resting keeps the chain.', quiet: 1 };
   }
-  const spaced = (due, s, left, eye, where) => {
-    const e = due[0];
-    return { eye, title: `Spaced revision: ${lecLabel(e)}`, why: `It's due${e.due < today() ? `, waiting since ${pretty(e.due)}` : ' today'}, and due work comes first, oldest first. Day ${GAPS[e.stage] || ''} review, about ten minutes with Iroha${due.length > 1 ? `, then ${due.length - 1} more` : ''}${where}.`, btn: 'Start revising', run: { desk: { subject: s, topic: e.topic || s, task: 'Spaced revision with Iroha: ' + lecLabel(e), kind: 'recall', minutes: left }, lec: e.id } };
-  };
   function forBlock(b, t) {
     const id = b.id, s = subjOf(id), until = clock(b.end), left = Math.max(5, Math.min(180, b.end - t));
     const eye = `NOW · ${b.title.replace(/\s*\([^)]*\)/g, '').toUpperCase()} UNTIL ${until.toUpperCase()}`;
-    if (/-sp$/.test(id)) { const due = dueLec(s); if (due.length) return spaced(due, s, left, eye, ''); }
     if (/-rev$/.test(id)) {
-      // no spaced block on this plan: due lectures of this subject come first in its revision block
-      const due = schedule().some(x => /-sp$/.test(x.id)) ? [] : dueLec(s);
-      if (due.length) return spaced(due, s, left, eye, `, then today's ${s} lecture`);
       const m = method(id), n = M.coachDue?.() || 0;
       return { eye, title: `${s} revision: ${m.name}`, why: `${n ? `${n} spaced review${n === 1 ? '' : 's'} due first, in Study · Recall. ` : ''}${sentence(m.how)} Rereading feels productive but barely sticks.`, btn: 'Start', run: { desk: { subject: s, topic: "Today's lecture", task: `${m.name}: ${sentence(m.how)}`, kind: 'recall', minutes: left } } };
     }
@@ -9109,7 +9088,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       }
       if (v.miss && gap && !x) L.attempts.push({ id: M.uid(), d, ts: Date.now(), ok: false, src: 'flow', ch: f.lec ? lecture(f.lec)?.ch || '' : '', q: `${f.topic}: ${f.gap}`.slice(0, 240), cause: /\b(sign|arithmetic|calculation|copied|copy|typo|units?|careless|slip|misread|rounding)\b/i.test(f.gap || '') ? 'careless slip' : /\b(concept|understand|definition|why|formula|idea|meaning)\b/i.test(f.gap || '') ? 'knowledge gap' : f.act === 'diagnose' ? 'careless slip' : 'knowledge gap', fix: (f.fix || '').slice(0, 200), due: M.add(d, 1), st: 0 });
       L.flowLog.push({ id: f.id, d, act: f.act, subj: f.subj, topic: f.topic, goal: f.goal, gap: gap ? f.gap.slice(0, 300) : '', fixed: f.fixed, ev, disputed: f.disputed || '', miss: f.miss || '', by: f.checker?.provider || '', model: f.checker?.model || '', met: v.met || '', warm: !!f.warm.trim(), recap: !!(f.rc1 || f.rc2 || f.rc3), card: !!f.cardId, mins: f.started ? Math.min(180, Math.round((Date.now() - f.started - (f.away || 0)) / 60000)) : 0 }); // time away after "Leave for now" doesn't count
-        if (ev === 'indep' && !gap && f.lec) window.__kgLecSatisfy?.(lecture(f.lec)?.ch); // an independent session counts as the check
+        if (ev === 'indep' && !gap && f.lec) window.__kgLecSatisfy?.(lecture(f.lec)?.ch, f.lec); // an independent session counts as the check
       if (L.flowLog.length > 300) L.flowLog = L.flowLog.slice(-300);
       L.flow = null; save();
       closeDesk(f, v.mood);
