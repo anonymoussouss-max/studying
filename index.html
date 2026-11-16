@@ -853,7 +853,7 @@ body.habit-shh #hb-session-card {text-align:center;}
   const limits = { maths:150, 'maths-rev':90, physics:150, 'physics-rev':60, chem:150, 'chem-rev':50, focus:180, errors:60, recall:60 };
   function fresh() { return { version:1, sessions:[], mistakes:[], rests:[], plans:{}, quests:{}, drops:[], milestones:[], claimed:0, next:null, active:null, break:null, settings:{ energy:'medium', cueTime:'12:00', cueAfter:'breakfast', cuePlace:'my desk', theme:'rose', soundtrack:'library', ambient:{ rain:0, hush:0, piano:.25 }, coStudy:false, treat:'', exam:'', weeklySessions:5, weeklyQuestions:30 }, lastBackup:0 }; }
   function validState(h) {
-    return h && h.version === 1 && Array.isArray(h.sessions) && Array.isArray(h.mistakes) && Array.isArray(h.rests) && h.settings && typeof h.settings === 'object' && !Array.isArray(h.settings) && h.rests.every(validDate) && h.sessions.length <= 20000 && h.mistakes.length <= 5000 && h.sessions.every(s => s && typeof s.id === 'string' && validDate(s.date) && Number.isFinite(s.minutes) && s.minutes >= 0 && s.minutes <= 180 && Number.isFinite(s.xp) && s.xp >= 0 && typeof s.topic === 'string' && typeof s.task === 'string' && typeof s.win === 'string' && (s.discovery===undefined || typeof s.discovery==='string') && (s.distractions===undefined || (Array.isArray(s.distractions) && s.distractions.length<=20 && s.distractions.every(x=>typeof x==='string'))) && ['Maths','Physics','Chemistry','Mixed'].includes(s.subject) && ['review','recall','mistakes','mock'].includes(s.kind) && Number.isFinite(s.attempts) && s.attempts >= 0 && s.attempts <= 1000 && Number.isFinite(s.correct) && s.correct >= 0 && s.correct <= s.attempts) && h.mistakes.every(m => m && ['Maths','Physics','Chemistry','Mixed'].includes(m.subject) && typeof m.id === 'string' && validDate(m.due) && validDate(m.created) && Number.isInteger(m.stage) && m.stage >= 0 && m.stage <= 4 && typeof m.topic === 'string' && typeof m.question === 'string' && typeof m.fix === 'string' && ['knowledge gap','careless slip','misread','time pressure'].includes(m.cause) && Array.isArray(m.reviews) && m.reviews.every(r => validDate(r.date) && typeof r.ok === 'boolean'));
+    return h && h.version === 1 && Array.isArray(h.sessions) && Array.isArray(h.mistakes) && Array.isArray(h.rests) && h.settings && typeof h.settings === 'object' && !Array.isArray(h.settings) && h.rests.every(validDate) && h.sessions.length <= 20000 && h.mistakes.length <= 5000 && h.sessions.every(s => s && typeof s.id === 'string' && validDate(s.date) && Number.isFinite(s.minutes) && s.minutes >= 0 && s.minutes <= 600 && Number.isFinite(s.xp) && s.xp >= 0 && typeof s.topic === 'string' && typeof s.task === 'string' && typeof s.win === 'string' && (s.discovery===undefined || typeof s.discovery==='string') && (s.distractions===undefined || (Array.isArray(s.distractions) && s.distractions.length<=20 && s.distractions.every(x=>typeof x==='string'))) && ['Maths','Physics','Chemistry','Mixed','Other'].includes(s.subject) && ['review','recall','mistakes','mock','study'].includes(s.kind) && Number.isFinite(s.attempts) && s.attempts >= 0 && s.attempts <= 1000 && Number.isFinite(s.correct) && s.correct >= 0 && s.correct <= s.attempts) && h.mistakes.every(m => m && ['Maths','Physics','Chemistry','Mixed'].includes(m.subject) && typeof m.id === 'string' && validDate(m.due) && validDate(m.created) && Number.isInteger(m.stage) && m.stage >= 0 && m.stage <= 4 && typeof m.topic === 'string' && typeof m.question === 'string' && typeof m.fix === 'string' && ['knowledge gap','careless slip','misread','time pressure'].includes(m.cause) && Array.isArray(m.reviews) && m.reviews.every(r => validDate(r.date) && typeof r.ok === 'boolean'));
   }
   function normalize(h) {
     const base = fresh();
@@ -862,7 +862,7 @@ body.habit-shh #hb-session-card {text-align:center;}
       const shell = { ...base, ...h, settings: h.settings && typeof h.settings === 'object' && !Array.isArray(h.settings) ? h.settings : base.settings, sessions: [], mistakes: [], rests: [] };
       const okSettings = validState(shell) ? shell.settings : base.settings, s0 = { ...shell, settings: okSettings };
       h = { ...s0,
-        sessions: (Array.isArray(h.sessions) ? h.sessions : []).map(s => s && Number.isFinite(s.minutes) && s.minutes > 180 ? { ...s, minutes: 180 } : s).filter(s => validState({ ...s0, sessions: [s] })),
+        sessions: (Array.isArray(h.sessions) ? h.sessions : []).map(s => s && Number.isFinite(s.minutes) && s.minutes > 600 ? { ...s, minutes: 600 } : s).filter(s => validState({ ...s0, sessions: [s] })),
         mistakes: (Array.isArray(h.mistakes) ? h.mistakes : []).filter(m => validState({ ...s0, mistakes: [m] })),
         rests: (Array.isArray(h.rests) ? h.rests : []).filter(validDate) };
       try { console.warn('[habit] repaired saved data: invalid records were dropped'); } catch (e) {}
@@ -881,7 +881,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     // every study chunk counts, whichever plan it came from: capped at its known length, or 180 minutes if the plan has changed since
     const isStudy = id => !!subject(id) || /-(chunk|sp|rev|hw)\b/.test(id);
     for (const [id, min] of Object.entries(d.completed || {})) if (isStudy(id) && Number.isFinite(min)) schedule += Math.max(0, Math.min(P.limits[id] ?? limits[id] ?? P.full?.[id] ?? 180, min));
-    const sessions = h.sessions.filter(s=>s.date === iso).reduce((n,s)=>n+s.minutes,0);
+    const sessions = h.sessions.filter(s=>s.date === iso && s.subject !== 'Other').reduce((n,s)=>n+s.minutes,0); // "Other stuff" (projects) isn't study
     // These are two views of study; use the larger total to avoid double counting.
     return Math.max(schedule, sessions);
   }
@@ -938,12 +938,14 @@ body.habit-shh #hb-session-card {text-align:center;}
   function xp(session) { if(session.minutes<5) return 0; return 2+15+(session.kind==='mistakes'?20:session.kind==='recall'?15:session.kind==='mock'?15:5)+(session.hard?10:0)+(session.comeback?15:0); }
   function complete(h,a,values,now=Date.now()) {
     if (h.sessions.some(s=>s.id===a.id)) throw new Error('This session is already saved.');
-    if (!values.win.trim() || !values.mood || values.recall.length!==3 || values.recall.some(r=>!r.trim())) throw new Error('Add a win, a mood, and three things you recall.');
+    const recall=(values.recall||[]).map(x=>String(x||'').trim());
+    // exam-day and "Other stuff" sessions skip the recall step
+    if (!values.win.trim() || !values.mood || (!a.noRecall && (recall.length!==3 || recall.some(r=>!r)))) throw new Error('Add a win, a mood, and three things you recall.');
     const attempts=Number(values.attempts),correct=Number(values.correct);
     if (!Number.isInteger(attempts)||!Number.isInteger(correct)||attempts<0||attempts>1000||correct<0||correct>attempts) throw new Error('Correct answers must be between zero and questions attempted.');
     const score=values.score===''?null:Number(values.score), max=Number(values.max || 300);
     if (a.kind==='mock' && (!Number.isFinite(score)||score<0||!Number.isFinite(max)||max<=0||score>max)) throw new Error('Enter a mock score between zero and its maximum.');
-    const s={id:a.id,date:a.date,task:a.task,topic:a.topic,subject:a.subject,kind:a.kind,hard:!!a.hard,comeback:!!a.comeback,minutes:Math.floor(elapsed(a,now)/60000*10)/10,endedAt:now,attempts,correct,win:values.win.trim(),discovery:String(values.discovery || '').trim().slice(0,500),distractions:(a.distractions || []).slice(0,20),mood:values.mood,recall:values.recall.map(x=>x.trim()),score,max};
+    const s={id:a.id,date:a.date,task:a.task,topic:a.topic,subject:a.subject,kind:a.kind,hard:!!a.hard,comeback:!!a.comeback,minutes:Math.floor(elapsed(a,now)/60000*10)/10,endedAt:now,attempts,correct,win:values.win.trim(),discovery:String(values.discovery || '').trim().slice(0,500),distractions:(a.distractions || []).slice(0,20),mood:values.mood,recall:recall.filter(Boolean),score,max};
     s.xp=xp(s); return s;
   }
   function compare(h,days,today) {
@@ -2577,7 +2579,7 @@ window.__KG_BUILTIN = {
     const a = activeSession(); if (!a) return "";
     const what = [a.subject, a.topic, a.task].filter(Boolean).join(" · ");
     const state = a.phase === "closeout" ? "finished, I'm writing the close-out" : a.running ? "timer running" : "timer paused";
-    return `\n\n[not typed by me: you can see my screen's session timer. I'm in a timed study session right now: ${what}. ${sessionMins(a)} of ${Math.round(a.targetMs / 60000)} minutes done on my own session timer, ${state}. Session minutes go into my log when I end the session, so an empty log during a session is normal, not a missed block.${window.__kgWatch?.on() ? " Iroha's screen watch is on." : ""}]`;
+    return `\n\n[not typed by me: you can see my screen's session timer. I'm in a timed study session right now: ${what}. ${sessionMins(a)}${a.open ? " minutes done, open-ended," : ` of ${Math.round(a.targetMs / 60000)} minutes done`} on my own session timer, ${state}. Session minutes go into my log when I end the session, so an empty log during a session is normal, not a missed block.${window.__kgWatch?.on() ? " Iroha's screen watch is on." : ""}]`;
   }
   window.__kgSession = activeSession;
   // the dream from Today's "Why I'm doing this" card: a reason to hold on to on hard days, never a push to study more
@@ -3346,8 +3348,8 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
   const button=(text,action,extra='')=>`<button type="button" data-action="${action}" ${extra}>${text}</button>`;
   const field=(label,name,attrs='',value='')=>`<label>${label}<input name="${name}" ${attrs} value="${esc(value)}"></label>`;
   const select=(label,name,items,value)=>`<label>${label}<select name="${name}">${items.map(([v,l])=>`<option value="${esc(v)}" ${v===value?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
-  const subjects=['Maths','Physics','Chemistry','Mixed'].map(x=>[x,x]);
-  const kinds=[['review','Light review'],['recall','Active recall'],['mistakes','Mistake review'],['mock','Mixed timed mock']];
+  const subjects=[...['Maths','Physics','Chemistry','Mixed'].map(x=>[x,x]),['Other','Other stuff… (projects, not counted as study)']];
+  const kinds=[['study','Just study (no particular style)'],['review','Light review'],['recall','Active recall'],['mistakes','Mistake review'],['mock','Mixed timed mock']];
   const clock=ms=>{const n=Math.ceil(Math.max(0,ms)/1000);return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');};
   function sleeping() { return C.late(new Date(),!!days()[today()]?.shortDay); }
   function lastStudy() { return [...Object.keys(days()),...h.sessions.map(s=>s.date)].filter(d=>d<=today() && C.minutes(h,days(),d)>=5).sort().pop(); }
@@ -3410,7 +3412,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
   function startForm() {
     const rec=C.recommendation(settings().energy,sleeping()), n=next();
     return `<form id="hb-start" class="hb-stack"><div class="hb-grid">${select('Energy today','energy',[['low','Low · gentle review'],['medium','Medium · 25-minute recall'],['high','High · full mixed mock']],settings().energy)}
-      ${field('First task','task','required maxlength="200"',n.task)}${select('Subject','subject',subjects,n.subject)}${field('Topic','topic','required maxlength="80"',n.topic)}${select('Session style','kind',kinds,sleeping()?'review':n.kind === 'mistakes'?'mistakes':rec.kind)}${field('Minutes (5 is enough)','minutes','type="number" min="5" max="180" required',rec.minutes)}</div>
+      ${field('First task','task','required maxlength="200"',n.task)}${select('Subject','subject',subjects,n.subject)}${field('Topic','topic','required maxlength="80"',n.topic)}${select('Session style (optional)','kind',kinds,sleeping()?'review':'study')}${field('Minutes (leave empty to go until you stop)','minutes','type="number" min="5" max="600" placeholder="until I stop"','')}</div>
       <label class="hb-check"><input type="checkbox" name="hard" ${rec.hard && !sleeping()?'checked':''}>This is a hard topic for me (+10 quality XP)</label>
       <label class="hb-check"><input type="checkbox" name="phone" required>I’ve silenced my phone and put it away.</label>
       <p class="hb-caption">Start ritual: choose one task → silence phone → press play. ${settings().coStudy?'Kaguya and Iroha will check in at 5, 15 and 25 minutes.':'Kaguya and Iroha stay quiet in focus mode.'} Soundtrack follows the Sound switch.</p>
@@ -3418,7 +3420,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
       <p id="hb-form-error" role="alert"></p></form>`;
   }
   function activeView(a) {
-    return `<p>${esc(a.subject)} · ${esc(a.topic)} · ${esc(a.task)}</p><div class="hb-timer" id="hb-clock" role="timer" aria-label="Session time remaining">${clock(a.targetMs-C.elapsed(a))}</div><p id="hb-timer-caption" class="hb-caption">${a.running?'Focused minutes accumulate while this timer runs.':'Paused. Your work is saved.'}</p>
+    return `<p>${esc(a.subject)} · ${esc(a.topic)} · ${esc(a.task)}</p><div class="hb-timer" id="hb-clock" role="timer" aria-label="Session time remaining">${clock(a.open?C.elapsed(a):a.targetMs-C.elapsed(a))}</div><p id="hb-timer-caption" class="hb-caption">${a.running?'Focused minutes accumulate while this timer runs.':'Paused. Your work is saved.'}</p>
       ${a.phase!=='closeout'?`<details class="hb-parking"><summary>Something pulling your attention? Park it here.</summary><form id="hb-distraction"><label>Deal with it after this session<input name="thought" maxlength="240" required placeholder="e.g. Look up headphones later"></label><button type="submit">Park & return</button></form><ul>${(a.distractions || []).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`:''}
       ${a.phase==='closeout'?closeoutForm(a):`<div class="hb-actions">${button(a.running?'Pause':'Resume','pause','class="hb-primary"')}${button('End & recall','end')}${button('5-minute break','break')}</div><p class="hb-caption">End ritual: a win, a mood, and three things remembered without peeking. A timed session never silently saves a full block.</p>`}`;
   }
@@ -3426,7 +3428,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     const suggestion=C.nextTask(h,C.add(today(),1)), draft=a.draft || {};
     return `<form id="hb-closeout" class="hb-stack"><h3>Close the books. What stayed with you?</h3><p class="hb-caption">Your time is safe. Finish this close-out now or when you return.</p>
       ${field('Something that surprised me (optional)','discovery','maxlength="500"',draft.discovery || '')}${field('One-line win','win','required maxlength="240"',draft.win || '')}${select('How do you feel?','mood',[['','Choose a mood'],['calm','Calm'],['proud','Proud'],['tired','Tired'],['stuck','Stuck']], draft.mood || '')}
-      ${[1,2,3].map(i=>`<label>Recall ${i} · no peeking<textarea name="recall${i}" required maxlength="1000" rows="2">${esc(draft['recall'+i] || '')}</textarea></label>`).join('')}
+      ${a.noRecall?'':[1,2,3].map(i=>`<label>Recall ${i} · no peeking<textarea name="recall${i}" required maxlength="1000" rows="2">${esc(draft['recall'+i] || '')}</textarea></label>`).join('')}
       <div class="hb-grid">${field('Questions attempted (quality evidence)','attempts','type="number" min="0" max="1000" step="1" required',draft.attempts || 0)}${field('Correct answers','correct','type="number" min="0" max="1000" step="1" required',draft.correct || 0)}
       ${a.kind==='mock'?field('Mock score','score','type="number" min="0" step="any" required',draft.score || '')+field('Maximum score','max','type="number" min="1" step="any" required',draft.max || 300):''}</div>
       ${a.kind==='mock'?'<p>What went wrong? Add misses in the Mistakes tab so they return in 1, 3, 7 and 14 days. Your win and recall will also link to this mock in the original Note field.</p>':''}
@@ -3509,14 +3511,15 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     if(h.sessions.length>=20000)throw new Error('Session log is full. Download a backup before starting more sessions.');
     if(!values.phone)throw new Error('Silence your phone, then check the start ritual.');
     if(!values.task?.trim() || !values.topic?.trim())throw new Error('Choose a task and a topic.');
-    let minutes=Number(values.minutes),kind=values.kind,hard=!!values.hard;
-    if(!Number.isFinite(minutes)||minutes<5||minutes>180)throw new Error('Choose between 5 and 180 minutes.');
+    // empty minutes = an open session that runs until you stop it; only the minutes you actually stay count
+    const open=values.minutes===''||values.minutes==null;let minutes=open?600:Number(values.minutes),kind=values.kind||'study',hard=!!values.hard;
+    if(!Number.isFinite(minutes)||minutes<5||minutes>600)throw new Error('Choose between 5 and 600 minutes, or leave it empty.');
     if(sleeping()) {minutes=Math.min(15,minutes);kind='review';hard=false;toast('Sleep guard: a short, light review tonight.');}
     const store=window.DeskStore;
     if(store?.getState().pomo?.running)store.getState().pausePomo();
     window.DeskMusic?.stop();
     h.break=null;
-    h.active={id:uid(),date:today(),task:values.task.trim(),topic:values.topic.trim(),subject:values.subject,kind,hard,comeback,accruedMs:0,targetMs:minutes*60000,lastStart:Date.now(),running:true,phase:'study',checkpoints:[]};
+    h.active={id:uid(),date:today(),task:values.task.trim(),topic:values.topic.trim(),subject:values.subject,kind,hard,comeback,accruedMs:0,targetMs:minutes*60000,lastStart:Date.now(),running:true,phase:'study',checkpoints:[],open,noRecall:values.subject==='Other'||window.StudyPlan?.dayKind?.(today())?.t==='exam'};
     settings().energy=values.energy || settings().energy;
     h.shh=true;save();focus(true);view='start';render();startAudio();say('one task. phone away. i’ll sit right here with you 🌙');window.__irohaSay?.('Timer\'s going. Try to stay on this tab, and write the steps out. It helps.',{face:'stern'});
     $('hb-session-card').scrollIntoView({behavior:'smooth',block:'start'});
@@ -3620,7 +3623,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
   }
   function updateClock() {
     const a=h.active;
-    if(a && $('hb-clock'))$('hb-clock').textContent=clock(a.targetMs-C.elapsed(a));
+    if(a && $('hb-clock'))$('hb-clock').textContent=clock(a.open?C.elapsed(a):a.targetMs-C.elapsed(a));
     if(h.break && $('hb-break-clock'))$('hb-break-clock').textContent=clock(h.break.endsAt-Date.now());
     if(planClock && $('hb-plan-clock'))$('hb-plan-clock').textContent=Date.now()<planClock?clock(planClock-Date.now()):'Five minutes. Three small sessions is enough.';
   }
