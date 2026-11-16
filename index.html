@@ -777,13 +777,15 @@ body.habit-shh #hb-session-card {text-align:center;}
   // rows before `at` stay as history; fixed blocks (meals, IRL break, college, travel, wind-down, sleep) keep their times;
   // the study still owed (planned minus logged, per subject, in plan order) fills the gaps; what doesn't fit is named on dinner
   const isFixed=r=>(r[2]==='life'||r[2]==='sleep')&&!/^brk/.test(r[0]);
-  const replanFrom=(rows,at,logged={},until=Infinity)=>{
+  const replanFrom=(rows,at,logged={},until=Infinity,push=0)=>{
     const out=[],sub=id=>id.split('-')[0],plan=[],by={};out.origin=rows.origin||0;let t=out.origin;
     for(const r of rows)if(r[2]==='study'){const k=sub(r[0]);if(!by[k])plan.push(by[k]={k,title:r[1],b:r[4],m:0});by[k].m+=r[3];}
     const fixed=[];
     for(const r of rows){const s=t,e=t+r[3];t=e;
       if(s<at)out.push([r[0],r[2]==='study'?'Earlier block (re-planned)':r[1],r[2]==='study'?'rest':r[2],Math.min(e,at)-s,r[4],'past']);
-      if(e>at&&isFixed(r))fixed.push([r[0],r[1],r[2],e-Math.max(s,at),r[4],Math.max(s,at)]);}
+      if(e>at&&isFixed(r)){let s2=Math.max(s,at),m2=e-s2; // a moderately late start pushes dinner, wind-down and bedtime later; sleep ends where it did
+        if(push&&/^(meal-1|wind|sleep)$/.test(r[0])){s2+=push;if(r[0]==='sleep')m2-=push;}
+        fixed.push([r[0],r[1],r[2],m2,r[4],s2]);}}
     const q=plan.map(p=>({...p,m:Math.max(0,p.m-(logged[p.k]||0))})).filter(p=>p.m>=15);
     t=at;let since=0,n=0;
     for(const f of fixed){
@@ -801,8 +803,10 @@ body.habit-shh #hb-session-card {text-align:center;}
     for(const k in hs)out[k]=Math.max(out[k]||0,hs[k]); // two views of the same study: take the larger
     if(dayKind(d).t==='exam')return {exam:Object.values(out).reduce((a,b)=>a+b,0)};
     return out;};
+  // how a late first session is handled: up to 10 min nothing; up to 60 min keep every hour and push bedtime by the delay; later, keep bedtime and cut hours
+  const lateStart=mins=>mins<=10?{replan:false,push:0}:{replan:true,push:mins<=60?Math.round(mins):0};
   const fallbackRaw=()=>realDay(!!labData().lateSchedule);
-  const adapted=rows=>{const rp=(labData().replanAt||{})[studyDate()];const k=dayKind(studyDate());return rp==null?rows:replanFrom(rows,rp,loggedToday(),k.t==='exam'&&k.at?k.at-630-30:Infinity);};
+  const adapted=rows=>{const rp=(labData().replanAt||{})[studyDate()];const k=dayKind(studyDate());return rp==null?rows:replanFrom(rows,rp,loggedToday(),k.t==='exam'&&k.at?k.at-630-30:Infinity,(labData().replanPush||{})[studyDate()]||0);};
   // ---- skills (retention V1): lectures are the source, skills are what gets mixed into practice ----
   const gapD=(a,b)=>Math.round((Date.parse(a+'T12:00:00')-Date.parse(b+'T12:00:00'))/864e5);
   // one skill per lecture that no skill links to yet; running it again adds nothing
@@ -825,7 +829,7 @@ body.habit-shh #hb-session-card {text-align:center;}
   const creditTarget=(skills,{ch,lec}={})=>{const by=f=>(skills||[]).filter(f),l=lec?by(s=>(s.lectures||[]).includes(lec)):[],c=l.length?l:ch?by(s=>s.ch===ch):[];return c.length===1?c[0].id:null;};
   // each subject practice block reserves ~25% for older material (see Mix in on Today)
   const fallbackMix=(dow,h)=>fallback(dow,h).map(r=>r.kind==='study'&&/^(maths|physics|chem)-chunk/.test(r.id)&&r.minutes>=30?{...r,how:(r.how||'')+' Mix in about '+mixMinutes(r.minutes)+' min of older material: see Mix in on Today.'}:r);
-  const api={replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixMinutes,recallToday,recordAttempt,restDays,creditTarget,dayKind,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixMinutes,recallToday,recordAttempt,restDays,creditTarget,dayKind,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -7708,7 +7712,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   const M = window.MoonLab; if (!M) return;
   const { L, save, today, esc } = M;
   // [key, hours, label, start, note]. The late 6 hour day is the same plan, only starting later. The normal day starts at 12:30, or 10:45 when spaced revision is due.
-  const PLANS=[['6',6,'6 hours','12:00 PM','Up to 6 hours, including due reviews'],['6L',6,'6 hours late','2:00 PM','Up to 6 hours, including due reviews'],['8',8,'Normal day','12:00 PM','Up to 8 hours; meals, breaks and bedtime take priority'],['8L',8,'Late day – 2 PM','2:00 PM','Study only what fits before 11:30 PM; no automatic extension']];
+  const PLANS=[['6',6,'6 hours','12:00 PM','Up to 6 hours, including due reviews'],['8',8,'Normal day','12:00 PM','Up to 8 hours; meals, breaks and bedtime take priority']];
   PLANS.push(['recovery',8,'Recovery · one subject','2:00 PM','One lecture at your pace; stop by 10 PM, even if unfinished']);
   const calendarToday=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
   if(calendarToday()==='2026-11-11')PLANS.push(['today',8,'Today only · 6:15 PM','6:15 PM','30 minutes of Maths and 2 hours of Physics; no Chemistry; finish by 10 PM']);
@@ -7723,6 +7727,8 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   const startAt = h => { const o = window.StudyPlan?.startFor?.(h); if (typeof o !== 'number') return ''; const m = (630 + o) % 1440, hr = Math.floor(m / 60); return `${hr % 12 || 12}:${String(m % 60).padStart(2, '0')} ${hr < 12 ? 'AM' : 'PM'}`; };
   const current=()=>calendarToday()==='2026-11-11'&&L.eveningPlanDate===calendarToday()?'today':L.recoveryPlan?'recovery':L.planHours===8&&L.lateSchedule?'8L':L.planHours===6&&L.planLate?'6L':String(L.planHours);
   L.planLog = L.planLog || {};
+  // the late-start plans were replaced by the self-adapting schedule
+  if (L.planLate || L.lateSchedule) { L.planLate = false; L.lateSchedule = null; }
   // the recovery plan is for one day only
   if (L.recoveryPlan && L.recoveryPlan !== today()) L.recoveryPlan = false;
   save();
@@ -7754,17 +7760,22 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   let examOpen = false;
   const nowOff = () => { const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); return (m < 240 ? m + 1440 : m) - 630; };
   const replan = msg => { const d = today(); if (Date.now() - (L.replanTs || 0) < 600000) return; (L.replanAt = L.replanAt || {})[d] = nowOff(); L.replanTs = Date.now(); redo(); if (msg) M.K?.(msg); };
+  const lateTalk = (late, push) => { const hm = late >= 60 ? `${Math.floor(late / 60)} h ${late % 60} min` : `${late} minutes`;
+    const text = push ? `You started ${hm} late. I've moved dinner and bedtime ${push} minutes later so all of today's study still fits. Tomorrow's wake time doesn't move, so let's not make it a habit.` : `You started ${hm} late. Bedtime stays where it is, so I've trimmed today to what still fits. The rest is listed under dinner as moving to tomorrow.`;
+    M.duo?.([['i', text]]); window.__irohaSay?.(text, { force: 1, face: 'study', delay: 400 }); };
   let wasActive = false, activeFrom = null;
   setInterval(() => {
     const SP = window.StudyPlan; if (!SP?.fallback) return; const d = today(), a = !!window.__kgSession?.(), t = nowOff();
     const study = SP.fallback(new Date(d + 'T12:00:00').getDay()).filter(r => r.kind === 'study');
-    if (a && !wasActive) { activeFrom = t; if (study.length && !Math.round(M.mins(d)) && t > study[0].start + 10 && (L.replanAt || {})[d] == null) replan('you started later than planned, so i moved the rest of today to fit 🌙'); }
+    if (a && !wasActive) { activeFrom = t;
+      // a late first session: Iroha pushes bedtime a little (up to 60 min late) or cuts the hours (later than that)
+      if (study.length && !Math.round(M.mins(d)) && (L.replanAt || {})[d] == null) { const late = t - study[0].start, rule = SP.lateStart(late); if (rule.replan) { (L.replanPush = L.replanPush || {})[d] = rule.push; replan(''); lateTalk(late, rule.push); } } }
     if (!a && wasActive && activeFrom != null) { const row = study.find(r => r.start <= activeFrom && r.end > activeFrom); if (row && t > row.end + 10) replan('that session ran over, so i shifted the rest of today 🌙'); activeFrom = null; }
     wasActive = a;
   }, 30000);
   const redo = () => { save(); apply(); window.HabitDesk?.refresh?.(); window.DeskStore?.setState?.({ habitRevision: Date.now() }); setTimeout(() => M.render(), 50); };
   Object.assign(M.ACTIONS, {
-    kgday: b => { const v = b.dataset.v, d = today(); if (v === 'exam') { examOpen = true; return M.render(); } examOpen = false; if (L.replanAt) delete L.replanAt[d]; L.dayTypes = L.dayTypes || {}; if (v === 'auto') delete L.dayTypes[d]; else L.dayTypes[d] = v === 'holiday' || v === 'rest' ? { t: v } : { t: 'college', end: +v.slice(1) }; if (L.homeAt) delete L.homeAt[d]; redo(); },
+    kgday: b => { const v = b.dataset.v, d = today(); if (v === 'exam') { examOpen = true; return M.render(); } examOpen = false; if (L.replanAt) delete L.replanAt[d]; if (L.replanPush) delete L.replanPush[d]; L.dayTypes = L.dayTypes || {}; if (v === 'auto') delete L.dayTypes[d]; else L.dayTypes[d] = v === 'holiday' || v === 'rest' ? { t: v } : { t: 'college', end: +v.slice(1) }; if (L.homeAt) delete L.homeAt[d]; redo(); },
     kgreplan: () => { L.replanTs = 0; replan('re-planned the rest of today from now 🌙'); },
     kghome: () => { const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); (L.homeAt = L.homeAt || {})[today()] = (m < 240 ? m + 1440 : m) - 630; redo(); M.K?.("welcome back! lunch first, then the evening is rebuilt from now 🌙"); }
   });
