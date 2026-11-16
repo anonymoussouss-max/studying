@@ -803,8 +803,9 @@ body.habit-shh #hb-session-card {text-align:center;}
     for(const k in hs)out[k]=Math.max(out[k]||0,hs[k]); // two views of the same study: take the larger
     if(dayKind(d).t==='exam')return {exam:Object.values(out).reduce((a,b)=>a+b,0)};
     return out;};
-  // how a late first session is handled: up to 10 min nothing; up to 60 min keep every hour and push bedtime by the delay; later, keep bedtime and cut hours
-  const lateStart=mins=>mins<=10?{replan:false,push:0}:{replan:true,push:mins<=60?Math.round(mins):0};
+  // a late first session (over 10 min) moves dinner, wind-down and bedtime later by the delay, but bedtime never passes 1:00 AM;
+  // `room` = minutes between today's bedtime and 1:00 AM. Only study that still doesn't fit moves to tomorrow.
+  const lateStart=(mins,room=0)=>mins<=10?{replan:false,push:0}:{replan:true,push:Math.max(0,Math.min(Math.round(mins),Math.round(room)))};
   const fallbackRaw=()=>realDay(!!labData().lateSchedule);
   const adapted=rows=>{const rp=(labData().replanAt||{})[studyDate()];const k=dayKind(studyDate());return rp==null?rows:replanFrom(rows,rp,loggedToday(),k.t==='exam'&&k.at?k.at-630-30:Infinity,(labData().replanPush||{})[studyDate()]||0);};
   // ---- skills (retention V1): lectures are the source, skills are what gets mixed into practice ----
@@ -7761,15 +7762,15 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   const nowOff = () => { const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); return (m < 240 ? m + 1440 : m) - 630; };
   const replan = msg => { const d = today(); if (Date.now() - (L.replanTs || 0) < 600000) return; (L.replanAt = L.replanAt || {})[d] = nowOff(); L.replanTs = Date.now(); redo(); if (msg) M.K?.(msg); };
   const lateTalk = (late, push) => { const hm = late >= 60 ? `${Math.floor(late / 60)} h ${late % 60} min` : `${late} minutes`;
-    const text = push ? `You started ${hm} late. I've moved dinner and bedtime ${push} minutes later so all of today's study still fits. Tomorrow's wake time doesn't move, so let's not make it a habit.` : `You started ${hm} late. Bedtime stays where it is, so I've trimmed today to what still fits. The rest is listed under dinner as moving to tomorrow.`;
+    const text = push >= late ? `You started ${hm} late. I've moved dinner and bedtime ${push} minutes later so all of today's study still fits. Tomorrow's wake time doesn't move, so let's not make it a habit.` : push ? `You started ${hm} late. I've moved bedtime to 1:00 AM, which is as late as I'll go, and the study that still doesn't fit is listed under dinner as moving to tomorrow.` : `You started ${hm} late. Bedtime is already 1:00 AM, so I've trimmed today to what still fits. The rest is listed under dinner as moving to tomorrow.`;
     M.duo?.([['i', text]]); window.__irohaSay?.(text, { force: 1, face: 'study', delay: 400 }); };
   let wasActive = false, activeFrom = null;
   setInterval(() => {
     const SP = window.StudyPlan; if (!SP?.fallback) return; const d = today(), a = !!window.__kgSession?.(), t = nowOff();
-    const study = SP.fallback(new Date(d + 'T12:00:00').getDay()).filter(r => r.kind === 'study');
+    const rows = SP.fallback(new Date(d + 'T12:00:00').getDay()), study = rows.filter(r => r.kind === 'study'), bed = rows.find(r => r.id === 'sleep');
     if (a && !wasActive) { activeFrom = t;
       // a late first session: Iroha pushes bedtime a little (up to 60 min late) or cuts the hours (later than that)
-      if (study.length && !Math.round(M.mins(d)) && (L.replanAt || {})[d] == null) { const late = t - study[0].start, rule = SP.lateStart(late); if (rule.replan) { (L.replanPush = L.replanPush || {})[d] = rule.push; replan(''); lateTalk(late, rule.push); } } }
+      if (study.length && !Math.round(M.mins(d)) && (L.replanAt || {})[d] == null) { const late = t - study[0].start, rule = SP.lateStart(late, Math.max(0, 870 - (bed ? bed.start : 870))); if (rule.replan) { (L.replanPush = L.replanPush || {})[d] = rule.push; replan(''); lateTalk(late, rule.push); } } }
     if (!a && wasActive && activeFrom != null) { const row = study.find(r => r.start <= activeFrom && r.end > activeFrom); if (row && t > row.end + 10) replan('that session ran over, so i shifted the rest of today 🌙'); activeFrom = null; }
     wasActive = a;
   }, 30000);
