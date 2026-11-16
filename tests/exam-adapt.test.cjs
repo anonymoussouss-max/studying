@@ -36,3 +36,42 @@ test('an exam time stops preparation 30 minutes before it', () => {
   assert.ok(study(rows).every(r => r.end <= 13 * 60 + 30 - 630));
   assert.ok(study(rows).every(r => r.title === 'Chem test preparation'));
 });
+
+// ---- self-adapt ----
+const SAT = '2026-11-28', at = hm => { const [h, m] = hm.split(':').map(Number); return h * 60 + m - 630; };
+const anchors = rows => rows.filter(r => /^(meal|irl|lunch|wind|sleep|college|travel|ready)/.test(r.id)).map(r => `${r.id}@${clock(r.start)}+${r.minutes}`);
+
+test('started at 1 PM on a holiday: no study before 1 PM, breakfast and the IRL break stay put', () => {
+  const base = plan(`${SAT}T13:00:00`).fallback(6), re = plan(`${SAT}T13:00:00`, { replanAt: { [SAT]: at('13:00') } }).fallback(6);
+  assert.ok(re.filter(r => r.kind === 'study').every(r => r.start >= at('13:00')));
+  assert.strictEqual(JSON.stringify(anchors(re)), JSON.stringify(anchors(base)));
+});
+
+test('a session that ran 40 min late: the next study block starts at the real end', () => {
+  const base = plan(`${SAT}T11:00:00`).fallback(6), first = base.find(r => r.kind === 'study');
+  const late = first.end + 40;
+  const re = plan(`${SAT}T12:00:00`, { replanAt: { [SAT]: late } }).fallback(6);
+  assert.strictEqual(re.find(r => r.kind === 'study' && r.start >= late).start, late);
+});
+
+test('minutes already logged are not scheduled again', () => {
+  const P = plan(`${SAT}T13:00:00`, { replanAt: { [SAT]: at('13:00') } });
+  const owedNone = P.replanFrom(P.fallbackRaw(6), at('13:00'), {}), owedMaths = P.replanFrom(P.fallbackRaw(6), at('13:00'), { maths: 120 });
+  const m = rows => rows.filter(r => r[2] === 'study' && r[0].startsWith('maths')).reduce((n, r) => n + r[3], 0) - rows.filter(r => r[2] === 'study' && r[0].startsWith('maths') && r[5] === 'past').reduce((n, r) => n + r[3], 0);
+  const fut = rows => rows.filter(r => r[2] === 'study' && r[0].startsWith('maths') && !r[5]).reduce((n, r) => n + r[3], 0);
+  assert.strictEqual(fut(owedNone) - fut(owedMaths), 120);
+});
+
+test('what no longer fits is named, and rest, meals and sleep keep their minutes', () => {
+  const late = at('20:00');
+  const base = plan(`${SAT}T20:00:00`).fallback(6), re = plan(`${SAT}T20:00:00`, { replanAt: { [SAT]: late } }).fallback(6);
+  assert.ok(re.some(r => /moves to tomorrow/.test(r.title)));
+  const life = rows => rows.filter(r => r.start >= late && (r.kind === 'life' || r.kind === 'sleep') && !/^brk/.test(r.id)).reduce((n, r) => n + r.minutes, 0);
+  assert.strictEqual(life(re), life(base));
+});
+
+test('a re-plan still stops exam preparation 30 minutes before the exam', () => {
+  const day = { t: 'exam', name: 'Chem test', college: false, hours: 8, at: 14 * 60 };
+  const rows = plan(`${SAT}T11:00:00`, { dayTypes: { [SAT]: day }, replanAt: { [SAT]: at('11:00') } }).fallback(6);
+  assert.ok(rows.filter(r => r.kind === 'study').every(r => r.end <= at('13:30')));
+});

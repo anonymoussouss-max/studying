@@ -1,6 +1,6 @@
 # Spec: Exam day + self-adapting schedule — V1
 
-Status: proposed · Changes the shipped college-day schedule (`tasks/plan-college-day.md`) and retention (`SPEC-skill-based-retention.md`).
+Status: implemented · Changes the shipped college-day schedule (`tasks/plan-college-day.md`) and retention (`SPEC-skill-based-retention.md`).
 
 ## Capability map
 | Module id | Responsibility | Depends on |
