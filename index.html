@@ -769,10 +769,40 @@ body.habit-shh #hb-session-card {text-align:center;}
     const hh=h||shortHours(),six=hh===6,ten=hh===10,late=six&&!!labData().planLate,L8=six?null:lens8(ten?520:480);
     const len=six?{maths:100,physics:100,chem:100}:L8.len,rv=six?{maths:20,physics:20,chem:20}:L8.rev;
     const brk=(n,m)=>['brk-'+n,m===15?'Break · switch subjects':'Break · away from the desk','life',m];
-    const rows=realDay(!!labData().lateSchedule);
+    const rows=adapted(realDay(!!labData().lateSchedule));
     let offset=rows.origin||0; // a college day starts before 10:30
     return rows.filter(r=>r[3]>0).map(([id,title,kind,minutes,bucket=null])=>{const start=offset,bid=id.replace(/-chunk-\d+$/,'');offset+=minutes;return {id,title,kind,minutes,bucket,start,end:offset,how:!six&&['maths','physics','chem','maths-rev','physics-rev','chem-rev'].includes(bid)?'Continue this subject where you left off. Watch the lecture, then retrieve its ideas without notes and work problems. The time is a study budget, not a promise to finish a lecture. Keep the scheduled break; unfinished work can wait.':HOW[bid]?HOW[bid]:/-sp$/.test(bid)?SPHOW:id.startsWith('brk-')?(minutes===15?'Stand up and leave the desk. Water, a stretch, a window. No phone feeds: they make starting again harder.':'Eyes off the screen. Stand, drink water, breathe. Then straight into revision while the lecture is fresh.'):id==='maths-hw'?'Revise today’s lecture first with a method (blurt it or a quick self-test), then do the homework. Hardest question first, about 10 minutes each, then mark it and move on.':id.endsWith('-rev')?revMethod(dow,id).how:id==='errors'?'Redo every question you got wrong today and write the fix in one line. Just the misses.':id==='recall'?'Books closed. Spaced reviews that are due come first, then Iroha asks and you answer from memory.':kind==='study'?'Watch the lecture and make notes. Stand up for 2 minutes about every 50.':id==='free-morning'?'No study yet. Eat, rest and do something you like.':id==='sleep'?'Sleep follows the wind-down shown in this plan; no early catch-up required.':id==='free-evening'?'Study is done. Rest tonight; no catch-up required.':'Leave the books closed. This time is part of the plan.'};});
   }
+  // ---- self-adapt: re-lay the rest of today from a moment (late start, late finish, "Re-plan from now") ----
+  // rows before `at` stay as history; fixed blocks (meals, IRL break, college, travel, wind-down, sleep) keep their times;
+  // the study still owed (planned minus logged, per subject, in plan order) fills the gaps; what doesn't fit is named on dinner
+  const isFixed=r=>(r[2]==='life'||r[2]==='sleep')&&!/^brk/.test(r[0]);
+  const replanFrom=(rows,at,logged={},until=Infinity)=>{
+    const out=[],sub=id=>id.split('-')[0],plan=[],by={};out.origin=rows.origin||0;let t=out.origin;
+    for(const r of rows)if(r[2]==='study'){const k=sub(r[0]);if(!by[k])plan.push(by[k]={k,title:r[1],b:r[4],m:0});by[k].m+=r[3];}
+    const fixed=[];
+    for(const r of rows){const s=t,e=t+r[3];t=e;
+      if(s<at)out.push([r[0],r[2]==='study'?'Earlier block (re-planned)':r[1],r[2]==='study'?'rest':r[2],Math.min(e,at)-s,r[4],'past']);
+      if(e>at&&isFixed(r))fixed.push([r[0],r[1],r[2],e-Math.max(s,at),r[4],Math.max(s,at)]);}
+    const q=plan.map(p=>({...p,m:Math.max(0,p.m-(logged[p.k]||0))})).filter(p=>p.m>=15);
+    t=at;let since=0,n=0;
+    for(const f of fixed){
+      const end=Math.min(f[5],until);
+      while(q.length&&end-t>=15){const p=q[0],m=Math.min(50,p.m,end-t);out.push([p.k+'-chunk-r'+n++,p.title,'study',m,p.b]);limits[p.k+'-chunk-r'+(n-1)]=m;t+=m;since+=m;p.m-=m;if(p.m<15)q.shift();
+        if(q.length&&since>=150&&end-t>=40){out.push(['brk-r'+n++,'Rest · 20 minutes away from the desk','life',20,null]);t+=20;since=0;}}
+      if(f[5]>t)out.push(['free-r'+n++,'Free time · unfinished work can wait','rest',f[5]-t,null]);
+      t=f[5];if(/^meal|^lunch|^college|^sleep/.test(f[0]))since=0;
+      const moved=q.filter(p=>p.m>=15).map(p=>p.title.split(' · ')[0]+' '+p.m+' min');
+      out.push([f[0],f[0]==='meal-1'&&moved.length?f[1].split(' · ')[0]+' · moves to tomorrow: '+moved.join(', '):f[1],f[2],f[3],f[4]]);t+=f[3];}
+    return out;};
+  const loggedToday=()=>{const d=studyDate(),out={};let desk={},habit={};try{desk=JSON.parse(root.localStorage.getItem('desk-needy-v1')||'{}');habit=JSON.parse(root.localStorage.getItem('ame-habit-v1')||'{}');}catch(_){}
+    for(const [id,m] of Object.entries((desk.state||desk).days?.[d]?.completed||{}))if(Number.isFinite(+m)){const k=id.split('-')[0];out[k]=(out[k]||0)+ +m;}
+    const hk={Maths:'maths',Physics:'physics',Chemistry:'chem'},hs={};for(const s of habit.sessions||[])if(s.date===d){const k=hk[s.subject]||'other';hs[k]=(hs[k]||0)+(+s.minutes||0);}
+    for(const k in hs)out[k]=Math.max(out[k]||0,hs[k]); // two views of the same study: take the larger
+    if(dayKind(d).t==='exam')return {exam:Object.values(out).reduce((a,b)=>a+b,0)};
+    return out;};
+  const fallbackRaw=()=>realDay(!!labData().lateSchedule);
+  const adapted=rows=>{const rp=(labData().replanAt||{})[studyDate()];const k=dayKind(studyDate());return rp==null?rows:replanFrom(rows,rp,loggedToday(),k.t==='exam'&&k.at?k.at-630-30:Infinity);};
   // ---- skills (retention V1): lectures are the source, skills are what gets mixed into practice ----
   const gapD=(a,b)=>Math.round((Date.parse(a+'T12:00:00')-Date.parse(b+'T12:00:00'))/864e5);
   // one skill per lecture that no skill links to yet; running it again adds nothing
@@ -795,7 +825,7 @@ body.habit-shh #hb-session-card {text-align:center;}
   const creditTarget=(skills,{ch,lec}={})=>{const by=f=>(skills||[]).filter(f),l=lec?by(s=>(s.lectures||[]).includes(lec)):[],c=l.length?l:ch?by(s=>s.ch===ch):[];return c.length===1?c[0].id:null;};
   // each subject practice block reserves ~25% for older material (see Mix in on Today)
   const fallbackMix=(dow,h)=>fallback(dow,h).map(r=>r.kind==='study'&&/^(maths|physics|chem)-chunk/.test(r.id)&&r.minutes>=30?{...r,how:(r.how||'')+' Mix in about '+mixMinutes(r.minutes)+' min of older material: see Mix in on Today.'}:r);
-  const api={skillsFromLectures,pickMix,mixMinutes,recallToday,recordAttempt,restDays,creditTarget,dayKind,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixMinutes,recallToday,recordAttempt,restDays,creditTarget,dayKind,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -2556,7 +2586,7 @@ window.__KG_BUILTIN = {
     const spaced = cur && /-sp$/.test(cur[0]);
     const m = cur && /-rev$/.test(cur[0]) && !spaced && plan.blocks !== AME_WEEK && plan.blocks !== AME_SUNDAY ? window.StudyPlan?.revMethod?.(plan.dow, cur[0]) : null;
     const extra = spaced ? " This block is spaced revision of the topics due today for this subject, from my lecture log, not today's lecture." : cur && cur[0] === "maths-hw" ? " This block is the Maths homework; today's lecture was revised in the block before." : "";
-    return `\n\n[not typed by me: today's study blocks and their exact lengths: ${study}. Right now on the schedule: ${cur ? `${cur[1]}, ${cur[3]} min long, ${c.minutesLeft} min left in this schedule block` : "no block"} (the planner's clock, separate from any session timer of mine).${m ? ` This revision block's method is ${m.name}: ${m.how} Coach me through it if I ask.` : ""}${extra} Only use these lengths; never make up a block length.]`;
+    return `\n\n[not typed by me: today's study blocks and their exact lengths: ${study}. Right now on the schedule: ${cur ? `${cur[1]}, ${cur[3]} min long, ${c.minutesLeft} min left in this schedule block` : "no block"} (the planner's clock, separate from any session timer of mine).${m ? ` This revision block's method is ${m.name}: ${m.how} Coach me through it if I ask.` : ""}${extra} Only use these lengths; never make up a block length.${(k => k?.t === 'exam' ? ` Today is an exam day for ${k.name}: every study block is ${k.name} preparation, so keep help focused on that exam.` : '')(window.StudyPlan?.dayKind?.(iso))}]`;
   }
   // Replies are shown as plain text, so markdown marks are taken out instead of showing as ** and #.
   // Divider lines (---) and a dash opening a line go too.
@@ -7714,18 +7744,38 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     const SP = window.StudyPlan; if (!SP?.dayKind) return '';
     const d = today(), k = SP.dayKind(d), own = !!(L.dayTypes || {})[d], tmr = M.add(d, 1), tk = SP.dayKind(tmr), end = k.end || 900;
     const btn = (v, label, on) => `<button data-a="kgday" data-v="${v}" aria-pressed="${on}"><b>${label}</b></button>`;
-    return `<div class="kg-plan-row" role="group" aria-label="What kind of day is today">${btn('c900', 'College · until 3 PM', k.t === 'college' && end === 900)}${btn('c1020', 'College · until 5 PM', k.t === 'college' && end === 1020)}${btn('holiday', 'Holiday · 10 h', k.t === 'holiday')}${btn('rest', 'Rest', k.t === 'rest')}${own ? btn('auto', 'Auto (weekday default)', false) : ''}</div>
+    return `<div class="kg-plan-row" role="group" aria-label="What kind of day is today">${btn('c900', 'College · until 3 PM', k.t === 'college' && end === 900)}${btn('c1020', 'College · until 5 PM', k.t === 'college' && end === 1020)}${btn('holiday', 'Holiday · 10 h', k.t === 'holiday')}${btn('rest', 'Rest', k.t === 'rest')}${btn('exam', 'Exam today', k.t === 'exam')}${own ? btn('auto', 'Auto (weekday default)', false) : ''}</div>
+      ${examOpen ? `<form data-f="kgexam" class="kl-row"><label class="kl-small">Which exam? <input name="name" required maxlength="60" placeholder="e.g. BEEE Practical" value="${k.t === 'exam' ? esc(k.name || '') : ''}"></label><label class="kl-small">Exam starts at (optional) <input type="time" name="at"></label><button class="kl-primary">Save</button></form>` : ''}
+      ${k.t !== 'rest' ? `<div class="kl-row"><button type="button" class="kl-ghost" data-a="kgreplan" title="Started late or ran over? Re-lay the rest of today from now; meals and sleep stay put">↻ Re-plan from now</button>${(L.replanAt || {})[d] != null ? `<span class="kl-small">Re-planned at ${hhmm(L.replanAt[d])}</span>` : ''}</div>` : ''}
       ${k.t === 'exam' ? `<p class="kl-small"><b>Exam day: ${esc(k.name || 'Exam')}.</b> Every study block today is ${esc(k.name || 'exam')} preparation${k.college ? ', and there is no study at college' : ''}.</p>` : ''}
       ${k.t === 'college' || (k.t === 'exam' && k.college) ? `<form data-f="kgdayend" class="kl-row"><label class="kl-small">College ends at <input type="time" name="end" value="${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}"></label><button>Set</button><button type="button" class="kl-primary" data-a="kghome">🏠 I'm home now</button></form>` : ''}
       ${tk.t === 'college' ? `<form data-f="kgmaths" class="kl-row"><label class="kl-small">Tomorrow's Maths lecture <input name="len" placeholder="e.g. 2h 35m" value="${(L.mathsNext || {})[tmr] ? esc(String(L.mathsNext[tmr])) + ' min' : ''}" aria-label="Tomorrow's Maths lecture length"></label><button>Save</button><b class="kl-small">Wake tomorrow at ${hhmm(wakeFor(tmr))}</b></form>` : ''}`;
   };
+  let examOpen = false;
+  const nowOff = () => { const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); return (m < 240 ? m + 1440 : m) - 630; };
+  const replan = msg => { const d = today(); if (Date.now() - (L.replanTs || 0) < 600000) return; (L.replanAt = L.replanAt || {})[d] = nowOff(); L.replanTs = Date.now(); redo(); if (msg) M.K?.(msg); };
+  let wasActive = false, activeFrom = null;
+  setInterval(() => {
+    const SP = window.StudyPlan; if (!SP?.fallback) return; const d = today(), a = !!window.__kgSession?.(), t = nowOff();
+    const study = SP.fallback(new Date(d + 'T12:00:00').getDay()).filter(r => r.kind === 'study');
+    if (a && !wasActive) { activeFrom = t; if (study.length && !Math.round(M.mins(d)) && t > study[0].start + 10 && (L.replanAt || {})[d] == null) replan('you started later than planned, so i moved the rest of today to fit 🌙'); }
+    if (!a && wasActive && activeFrom != null) { const row = study.find(r => r.start <= activeFrom && r.end > activeFrom); if (row && t > row.end + 10) replan('that session ran over, so i shifted the rest of today 🌙'); activeFrom = null; }
+    wasActive = a;
+  }, 30000);
   const redo = () => { save(); apply(); window.HabitDesk?.refresh?.(); window.DeskStore?.setState?.({ habitRevision: Date.now() }); setTimeout(() => M.render(), 50); };
   Object.assign(M.ACTIONS, {
-    kgday: b => { const v = b.dataset.v, d = today(); L.dayTypes = L.dayTypes || {}; if (v === 'auto') delete L.dayTypes[d]; else L.dayTypes[d] = v === 'holiday' || v === 'rest' ? { t: v } : { t: 'college', end: +v.slice(1) }; if (L.homeAt) delete L.homeAt[d]; redo(); },
+    kgday: b => { const v = b.dataset.v, d = today(); if (v === 'exam') { examOpen = true; return M.render(); } examOpen = false; if (L.replanAt) delete L.replanAt[d]; L.dayTypes = L.dayTypes || {}; if (v === 'auto') delete L.dayTypes[d]; else L.dayTypes[d] = v === 'holiday' || v === 'rest' ? { t: v } : { t: 'college', end: +v.slice(1) }; if (L.homeAt) delete L.homeAt[d]; redo(); },
+    kgreplan: () => { L.replanTs = 0; replan('re-planned the rest of today from now 🌙'); },
     kghome: () => { const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); (L.homeAt = L.homeAt || {})[today()] = (m < 240 ? m + 1440 : m) - 630; redo(); M.K?.("welcome back! lunch first, then the evening is rebuilt from now 🌙"); }
   });
   Object.assign(M.FORMS, {
     kgdayend: v => { const [h, m] = String(v.end || '').split(':').map(Number); if (!(h >= 10 && h <= 21)) return M.K?.('pick a time between 10 AM and 9 PM'); const cur = window.StudyPlan.dayKind(today()); (L.dayTypes = L.dayTypes || {})[today()] = cur.t === 'exam' ? { ...cur, end: h * 60 + (m || 0) } : { t: 'college', end: h * 60 + (m || 0) }; redo(); },
+    kgexam: v => {
+      const name = String(v.name || '').trim().slice(0, 60); if (!name) return M.K?.('type which exam it is first 🌙');
+      const d = today(), w = new Date(d + 'T12:00:00').getDay(), college = w > 0 && w < 6, [ah, am] = String(v.at || '').split(':').map(Number);
+      (L.dayTypes = L.dayTypes || {})[d] = { t: 'exam', name, college, end: college ? 900 : undefined, hours: w === 6 ? 10 : 8, ...(ah >= 0 && ah < 24 ? { at: ah * 60 + (am || 0) } : {}) };
+      examOpen = false; if (L.replanAt) delete L.replanAt[d]; redo(); M.K?.(`good luck with ${name}! every block today is ${name} preparation 🌙`);
+    },
     kgmaths: v => { const n = window.StudyPlan.parseMins(v.len), tmr = M.add(today(), 1); if (!n) return M.K?.('type it like 2h 35m, 155 or 2.5h'); (L.mathsNext = L.mathsNext || {})[tmr] = n; redo(); }
   });
   const card = () => `<section class="kl-card kg-plan"><p class="kl-eyebrow">YOUR STUDY DAY</p>${dayCard()}
@@ -8175,7 +8225,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
       <p class="kl-small">Minutes are estimated at about 10 per problem. Keep the system if your solved-on-your-own rate holds or rises over the 4 weeks without adding study time.</p></section>`;
   };
   const todayPanel = M.PANELS.today;
-  M.PANELS.today = () => { if (window.__kgOnBreak) return todayPanel(); const h = todayPanel(), c = logForm() + dueCard(); const i = h.indexOf('</section>'); return i < 0 ? c + h : h.slice(0, i + 10) + c + h.slice(i + 10); };
+  M.PANELS.today = () => { if (window.__kgOnBreak) return todayPanel(); const h = todayPanel(), c = window.StudyPlan?.dayKind?.(today())?.t === 'exam' ? '' : logForm() + dueCard(); const i = h.indexOf('</section>'); return i < 0 ? c + h : h.slice(0, i + 10) + c + h.slice(i + 10); };
 
   /* ---------- Study · Notes: every lecture you've logged ---------- */
   M.PANELS.notes = () => {
