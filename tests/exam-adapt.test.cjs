@@ -75,3 +75,28 @@ test('a re-plan still stops exam preparation 30 minutes before the exam', () => 
   const rows = plan(`${SAT}T11:00:00`, { dayTypes: { [SAT]: day }, replanAt: { [SAT]: at('11:00') } }).fallback(6);
   assert.ok(rows.filter(r => r.kind === 'study').every(r => r.end <= at('13:30')));
 });
+
+// ---- late start: push bedtime a little, or cut hours ----
+test('lateness rule: up to 10 min ignored, up to 60 min pushes bedtime, more cuts hours', () => {
+  const P = plan(`${SAT}T11:00:00`);
+  assert.strictEqual(JSON.stringify(P.lateStart(5)), JSON.stringify({ replan: false, push: 0 }));
+  assert.strictEqual(JSON.stringify(P.lateStart(40)), JSON.stringify({ replan: true, push: 40 }));
+  assert.strictEqual(JSON.stringify(P.lateStart(120)), JSON.stringify({ replan: true, push: 0 }));
+});
+
+test('40 min late: dinner, wind-down and bedtime move 40 min later and every planned study minute still fits', () => {
+  const base = plan(`${SAT}T11:10:00`).fallback(6), first = base.find(r => r.kind === 'study').start;
+  const re = plan(`${SAT}T11:10:00`, { replanAt: { [SAT]: first + 40 }, replanPush: { [SAT]: 40 } }).fallback(6);
+  const s = (rows, id) => rows.find(r => r.id === id).start;
+  for (const id of ['meal-1', 'wind', 'sleep']) assert.strictEqual(s(re, id), s(base, id) + 40, id);
+  const fut = rows => rows.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0);
+  assert.strictEqual(fut(re), fut(base));
+  assert.ok(!re.some(r => /moves to tomorrow/.test(r.title)));
+});
+
+test('2 h late: bedtime stays, hours are cut and the rest is named', () => {
+  const base = plan(`${SAT}T12:30:00`).fallback(6), first = base.find(r => r.kind === 'study').start;
+  const re = plan(`${SAT}T12:30:00`, { replanAt: { [SAT]: first + 120 }, replanPush: { [SAT]: 0 } }).fallback(6);
+  assert.strictEqual(re.find(r => r.id === 'sleep').start, base.find(r => r.id === 'sleep').start);
+  assert.ok(re.some(r => /moves to tomorrow/.test(r.title)));
+});
