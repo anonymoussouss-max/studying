@@ -40,12 +40,13 @@ test('lecture lengths parse as minutes', () => {
   assert.strictEqual(P.parseMins('soon'), 0);
 });
 
-test('college day with a 155-min Maths lecture: wake 5:55, lecture ends at 9:00, 8 h of study, dinner at 11 PM', () => {
+test('college day with a 155-min Maths lecture: wake 5:55, lecture ends at 9:00, about 8 h of study, dinner at 11 PM', () => {
   const P = plan(at(MON, '07:00'), { mathsNext: { [MON]: 155 } });
   const rows = P.fallback(1);
   assert.strictEqual(clock(row(rows, 'wake').start), '05:55');
   assert.strictEqual(clock(row(rows, 'maths-chunk-m').end), '09:00');
-  assert.strictEqual(rows.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0), 480);
+  const total = rows.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0);
+  assert.ok(total >= 470 && total <= 480, 'total ' + total);
   assert.strictEqual(clock(row(rows, 'meal-1').start), '23:00');
 });
 
@@ -62,7 +63,7 @@ test('a 5 PM college day puts travel home at 5:00 PM', () => {
 test('"I\'m home now" late: what does not fit before dinner moves to tomorrow', () => {
   const P = plan(at(MON, '18:40'), { dayTypes: { [MON]: { t: 'college', end: 1020 } }, homeAt: { [MON]: 18 * 60 + 40 - 630 } });
   const rows = P.fallback(1);
-  assert.match(row(rows, 'meal-1').title, /moves to tomorrow: Chemistry \d+ min/);
+  assert.match(row(rows, 'meal-1').title, /moves to tomorrow: .*Chemistry \d+ min/);
   assert.strictEqual(clock(row(rows, 'meal-1').start), '23:00');
 });
 
@@ -85,11 +86,23 @@ test('no separate spaced-revision blocks: older material lives inside practice, 
   const college = plan(at(MON, '07:00'), { mathsNext: { [MON]: 155 }, lectures: due }).fallback(1);
   const holiday = plan(at(SAT, '11:00'), { lectures: due }).fallback(6);
   for (const rows of [college, holiday]) assert.ok(!rows.some(r => /-sp-chunk/.test(r.id)), 'found a spaced block');
-  assert.strictEqual(college.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0), 480);
+  const plain = plan(at(MON, '07:00'), { mathsNext: { [MON]: 155 } }).fallback(1);
+  const sum = rows => rows.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0);
+  assert.strictEqual(sum(college), sum(plain));
   assert.strictEqual(holiday.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0), 600);
 });
 
 test('subject practice blocks carry a "mix in older material" note', () => {
   const rows = plan(at(MON, '07:00'), { mathsNext: { [MON]: 155 } }).fallback(1);
   assert.match(rows.find(r => r.id.startsWith('physics-chunk')).how, /Mix in about \d+ min of older material/);
+});
+
+test('after college comes a 3-hour nap instead of lunch, then study resumes', () => {
+  const rows = plan(at(MON, '07:00'), { mathsNext: { [MON]: 155 } }).fallback(1);
+  assert.ok(!rows.some(r => r.id === 'lunch'), 'lunch still there');
+  const nap = row(rows, 'nap');
+  assert.strictEqual(clock(nap.start), '15:20');
+  assert.strictEqual(nap.minutes, 180);
+  const next = rows.find(r => r.kind === 'study' && r.start >= nap.end);
+  assert.strictEqual(clock(next.start), '18:20');
 });

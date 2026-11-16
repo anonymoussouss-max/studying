@@ -693,7 +693,7 @@ body.habit-shh #hb-session-card {text-align:center;}
       put('ready','Get ready','life',40);put('travel-0','Travel to college','life',20);
       if(!ex)put('maths-chunk-c','Maths revision · 60 min in a free period at college','study',60,'maths'); // exam day: no study at college
       const home=(L.homeAt||{})[d],back=home!=null?home:Math.max(t,(kind.end||900)-630+20);
-      put('college','College','life',back-20-t);put('travel-1','Travel home','life',20);put('lunch','Lunch','life',30);
+      put('college','College','life',back-20-t);put('travel-1','Travel home','life',20);put('nap','Nap · 3 hours, then the day resumes','life',180); // a 3-hour nap after college instead of lunch
     }
     // evening: older-topic slots, then Physics and Chemistry, up to 8 h in all, a 20-min rest per ~150 min, stop at 11 PM dinner
     const queue=[]; // older material is mixed into practice, not given its own blocks
@@ -793,7 +793,7 @@ body.habit-shh #hb-session-card {text-align:center;}
       while(q.length&&end-t>=15){const p=q[0],m=Math.min(50,p.m,end-t);out.push([p.k+'-chunk-r'+n++,p.title,'study',m,p.b]);limits[p.k+'-chunk-r'+(n-1)]=m;t+=m;since+=m;p.m-=m;if(p.m<15)q.shift();
         if(q.length&&since>=150&&end-t>=40){out.push(['brk-r'+n++,'Rest · 20 minutes away from the desk','life',20,null]);t+=20;since=0;}}
       if(f[5]>t)out.push(['free-r'+n++,'Free time · unfinished work can wait','rest',f[5]-t,null]);
-      t=f[5];if(/^meal|^lunch|^college|^sleep/.test(f[0]))since=0;
+      t=f[5];if(/^meal|^lunch|^nap|^college|^sleep/.test(f[0]))since=0;
       const moved=q.filter(p=>p.m>=15).map(p=>p.title.split(' · ')[0]+' '+p.m+' min');
       out.push([f[0],f[0]==='meal-1'&&moved.length?f[1].split(' · ')[0]+' · moves to tomorrow: '+moved.join(', '):f[1],f[2],f[3],f[4]]);t+=f[3];}
     return out;};
