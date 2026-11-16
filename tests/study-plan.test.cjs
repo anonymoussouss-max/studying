@@ -15,7 +15,7 @@ function plan(isoNow, lab = {}) {
   vm.runInNewContext(src, ctx);
   return ctx.StudyPlan;
 }
-const MON = '2026-11-16', SAT = '2026-11-21', SUN = '2026-11-22';
+const MON = '2026-11-23', SAT = '2026-11-28', SUN = '2026-11-29';
 const at = (d, hm) => `${d}T${hm}:00`;               // local time
 const clock = off => { const m = ((630 + off) % 1440 + 1440) % 1440; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
 const row = (rows, id) => rows.find(r => r.id === id);

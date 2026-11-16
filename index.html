@@ -673,37 +673,46 @@ body.habit-shh #hb-session-card {text-align:center;}
     const last=lectures.at(-1)?.subj;return {Maths:'Physics',Physics:'Chemistry',Chemistry:'Maths'}[last]||'Maths';
   }
   // day type for a date: saved override, else Mon–Fri college until 3 PM, Saturday holiday, Sunday rest
-  const dayKind=d=>{const o=(labData().dayTypes||{})[d];if(o)return o;const w=new Date(d+'T12:00:00').getDay();return w===0?{t:'rest'}:w===6?{t:'holiday'}:{t:'college',end:900};};
+  const dayKind=d=>{const o=(labData().dayTypes||{})[d];if(o)return o;
+    // shortcut: Mon 16 Nov 2026's exam day is built in because it was needed before the Exam today button shipped; harmless after that date
+    if(d==='2026-11-16')return {t:'exam',name:'BEEE Practical',college:true,end:900,hours:6,from:480};
+   const w=new Date(d+'T12:00:00').getDay();return w===0?{t:'rest'}:w===6?{t:'holiday'}:{t:'college',end:900};};
   const parseMins=s=>{const v=String(s||'').trim(),h=/(\d+(?:\.\d+)?)\s*h\s*(\d+)?/i.exec(v);const n=h?+h[1]*60+ +(h[2]||0):parseFloat(v);return n>=30&&n<=300?Math.round(n):0;};
   // college day, in minutes after 10:30 (negative = morning). Wake is worked back from 9:00 and the Maths lecture length.
   function collegeDay(L,kind){
     const d=studyDate(),rows=[];let t=0,total=0,serial=0;
     const put=(id,title,k,m,b=null)=>{if(m>0){rows.push([id,title,k,m,b]);t+=m;if(k==='study'){total+=m;limits[id]=m;}}};
+    // exam day: every study block is "<exam> preparation", capped at the chosen hours, stopping 30 min before the exam time
+    const ex=kind.t==='exam',title=ex?String(kind.name||'Exam').slice(0,60)+' preparation':'',cap=ex?Math.round((kind.hours||8)*60):480,atStop=ex&&kind.at?kind.at-630-30:Infinity;
     const lec=Math.min(210,Math.max(60,(L.mathsNext||{})[d]||lens8().medians.maths||lens8().len.maths));
-    const studyStart=Math.max(-300,-90-lec);t=studyStart-30;rows.origin=t; // never before 5:00 AM
-    put('wake','Wake, freshen up, breakfast','life',30);
-    put('maths-chunk-m','Maths · lecture','study',-90-t,'maths');
-    put('ready','Get ready','life',40);put('travel-0','Travel to college','life',20);
-    put('maths-chunk-c','Maths revision · 60 min in a free period at college','study',60,'maths');
-    const home=(L.homeAt||{})[d],back=home!=null?home:Math.max(t,(kind.end||900)-630+20);
-    put('college','College','life',back-20-t);put('travel-1','Travel home','life',20);put('lunch','Lunch','life',30);
+    if(ex&&kind.from!=null){t=kind.from-630;rows.origin=t;}
+    else if(ex&&!kind.college){t=0;rows.origin=0;}
+    else{const studyStart=Math.max(-300,-90-lec);t=studyStart-30;rows.origin=t;put('wake','Wake, freshen up, breakfast','life',30);} // never before 5:00 AM
+    if(!ex||kind.college){
+      put(ex?'exam-chunk-m':'maths-chunk-m',ex?title:'Maths · lecture','study',Math.min(-90-t,atStop-t,cap),ex?null:'maths');
+      put('ready','Get ready','life',40);put('travel-0','Travel to college','life',20);
+      if(!ex)put('maths-chunk-c','Maths revision · 60 min in a free period at college','study',60,'maths'); // exam day: no study at college
+      const home=(L.homeAt||{})[d],back=home!=null?home:Math.max(t,(kind.end||900)-630+20);
+      put('college','College','life',back-20-t);put('travel-1','Travel home','life',20);put('lunch','Lunch','life',30);
+    }
     // evening: older-topic slots, then Physics and Chemistry, up to 8 h in all, a 20-min rest per ~150 min, stop at 11 PM dinner
     const queue=[]; // older material is mixed into practice, not given its own blocks
-    let left=480-total-queue.reduce((n,q)=>n+q[2],0);const ph=Math.min(135,Math.max(0,left));queue.push(['physics','Physics · lecture, retrieval and problems',ph,'physics'],['chem','Chemistry · lecture, retrieval and problems',Math.max(0,left-ph),'chemistry']);
-    const stop=750;let since=0;
-    while(queue.length&&t<stop&&total<480){const q=queue[0];if(q[2]<15){queue.shift();continue;}const m=Math.min(50,q[2],stop-t,480-total);if(m<15)break;
+    if(ex)queue.push(['exam',title,Math.max(0,cap-total),null]);
+    else{let left=480-total;const ph=Math.min(135,Math.max(0,left));queue.push(['physics','Physics · lecture, retrieval and problems',ph,'physics'],['chem','Chemistry · lecture, retrieval and problems',Math.max(0,left-ph),'chemistry']);}
+    const stop=Math.max(t,Math.min(750,atStop));let since=0;
+    while(queue.length&&t<stop&&total<cap){const q=queue[0];if(q[2]<15){queue.shift();continue;}const m=Math.min(50,q[2],stop-t,cap-total);if(m<15)break;
       put(q[0]+'-chunk-'+serial++,q[1],'study',m,q[3]);since+=m;q[2]-=m;if(!q[2])queue.shift();
       if(queue.length&&since>=150&&stop-t>=40){put('brk-'+serial++,'Rest · 20 minutes away from the desk','life',20);since=0;}}
     const moved=queue.filter(q=>q[2]>=15).map(q=>q[1].split(' · ')[0]+' '+q[2]+' min');
-    if(t<stop)put('free-evening',moved.length?'Study time is over · moves to tomorrow: '+moved.join(', '):'Planned study time is over · unfinished work can wait','rest',stop-t);
-    put('meal-1',moved.length&&t>=stop?'Dinner · moves to tomorrow: '+moved.join(', '):'Dinner','life',20);put('wind','Wind down','life',20);put('sleep','Sleep','sleep',1440+rows.origin-t);
+    if(t<750)put('free-evening',ex&&kind.at&&t<=kind.at-630?'Exam · good luck':moved.length?'Study time is over · moves to tomorrow: '+moved.join(', '):'Planned study time is over · unfinished work can wait','rest',750-t);
+    put('meal-1',moved.length&&t>=750?'Dinner · moves to tomorrow: '+moved.join(', '):'Dinner','life',20);put('wind','Wind down','life',20);put('sleep','Sleep','sleep',1440+rows.origin-t);
     return rows;
   }
   function realDay(late=false){
     const L=labData(),special=eveningPlan(),recovery=L.recoveryPlan===studyDate()&&!special,six=L.planHours===6,stop=special||recovery?690:765,rows=[];let t=0,total=0,serial=0;
     const put=(id,title,kind,m,b=null)=>{if(m>0){rows.push([id,title,kind,m,b]);t+=m;if(kind==='study')total+=m;}};
     const kind=dayKind(studyDate()),hol=kind.t==='holiday'&&!special&&!recovery;
-    if(kind.t==='college'&&!special&&!recovery)return collegeDay(L,kind);
+    if((kind.t==='college'||kind.t==='exam')&&!special&&!recovery)return collegeDay(L,kind);
     // holiday: 10 h, study from 10:30 so it fits before dinner
     const start=special?465:recovery?210:hol?0:late||six&&L.planLate?210:90,cap=special?150:recovery?180:hol?600:six?360:480;
     put('free-morning',special?'Eat, rest and settle in · no catch-up before 6:15 PM':'Wake up and settle in · your own time before study','rest',start);
@@ -7706,7 +7715,8 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     const d = today(), k = SP.dayKind(d), own = !!(L.dayTypes || {})[d], tmr = M.add(d, 1), tk = SP.dayKind(tmr), end = k.end || 900;
     const btn = (v, label, on) => `<button data-a="kgday" data-v="${v}" aria-pressed="${on}"><b>${label}</b></button>`;
     return `<div class="kg-plan-row" role="group" aria-label="What kind of day is today">${btn('c900', 'College · until 3 PM', k.t === 'college' && end === 900)}${btn('c1020', 'College · until 5 PM', k.t === 'college' && end === 1020)}${btn('holiday', 'Holiday · 10 h', k.t === 'holiday')}${btn('rest', 'Rest', k.t === 'rest')}${own ? btn('auto', 'Auto (weekday default)', false) : ''}</div>
-      ${k.t === 'college' ? `<form data-f="kgdayend" class="kl-row"><label class="kl-small">College ends at <input type="time" name="end" value="${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}"></label><button>Set</button><button type="button" class="kl-primary" data-a="kghome">🏠 I'm home now</button></form>` : ''}
+      ${k.t === 'exam' ? `<p class="kl-small"><b>Exam day: ${esc(k.name || 'Exam')}.</b> Every study block today is ${esc(k.name || 'exam')} preparation${k.college ? ', and there is no study at college' : ''}.</p>` : ''}
+      ${k.t === 'college' || (k.t === 'exam' && k.college) ? `<form data-f="kgdayend" class="kl-row"><label class="kl-small">College ends at <input type="time" name="end" value="${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}"></label><button>Set</button><button type="button" class="kl-primary" data-a="kghome">🏠 I'm home now</button></form>` : ''}
       ${tk.t === 'college' ? `<form data-f="kgmaths" class="kl-row"><label class="kl-small">Tomorrow's Maths lecture <input name="len" placeholder="e.g. 2h 35m" value="${(L.mathsNext || {})[tmr] ? esc(String(L.mathsNext[tmr])) + ' min' : ''}" aria-label="Tomorrow's Maths lecture length"></label><button>Save</button><b class="kl-small">Wake tomorrow at ${hhmm(wakeFor(tmr))}</b></form>` : ''}`;
   };
   const redo = () => { save(); apply(); window.HabitDesk?.refresh?.(); window.DeskStore?.setState?.({ habitRevision: Date.now() }); setTimeout(() => M.render(), 50); };
@@ -7715,7 +7725,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     kghome: () => { const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); (L.homeAt = L.homeAt || {})[today()] = (m < 240 ? m + 1440 : m) - 630; redo(); M.K?.("welcome back! lunch first, then the evening is rebuilt from now 🌙"); }
   });
   Object.assign(M.FORMS, {
-    kgdayend: v => { const [h, m] = String(v.end || '').split(':').map(Number); if (!(h >= 10 && h <= 21)) return M.K?.('pick a time between 10 AM and 9 PM'); (L.dayTypes = L.dayTypes || {})[today()] = { t: 'college', end: h * 60 + (m || 0) }; redo(); },
+    kgdayend: v => { const [h, m] = String(v.end || '').split(':').map(Number); if (!(h >= 10 && h <= 21)) return M.K?.('pick a time between 10 AM and 9 PM'); const cur = window.StudyPlan.dayKind(today()); (L.dayTypes = L.dayTypes || {})[today()] = cur.t === 'exam' ? { ...cur, end: h * 60 + (m || 0) } : { t: 'college', end: h * 60 + (m || 0) }; redo(); },
     kgmaths: v => { const n = window.StudyPlan.parseMins(v.len), tmr = M.add(today(), 1); if (!n) return M.K?.('type it like 2h 35m, 155 or 2.5h'); (L.mathsNext = L.mathsNext || {})[tmr] = n; redo(); }
   });
   const card = () => `<section class="kl-card kg-plan"><p class="kl-eyebrow">YOUR STUDY DAY</p>${dayCard()}
