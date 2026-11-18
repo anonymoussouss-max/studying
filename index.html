@@ -618,13 +618,13 @@ body.habit-shh #hb-session-card {text-align:center;}
   // 80% of the day's study plan makes it count. A past short day keeps the size it had that day.
   const needLog=()=>{try{return JSON.parse(root.localStorage.getItem('kg-need-log')||'{}');}catch(e){return {};}};
   const need=(short,iso)=>{
-    const today=studyDate(),day=iso||today,logged=(labData().planLog||{})[day],base=Math.round((logged||(day<today?6:shortHours()))*60*0.8),stored=needLog()[day];
+    const today=studyDate(),day=iso||today,logged=(labData().planLog||{})[day],base=Math.round((logged != null ? logged : day<today?6:shortHours())*60*0.8),savedNeed=needLog()[day],stored=typeof savedNeed==='number'?(day<today?savedNeed:undefined):savedNeed?.base===base?savedNeed.value:undefined;
     if(day<today)return Number.isFinite(stored)?Math.min(stored,base):base;
     // starting late: today's bar is 80% of the study time still left in the plan, never below half the usual bar
     try{const n=new Date(),off=((x=>x<240?x+1440:x)(n.getHours()*60+n.getMinutes()))-630,dow=new Date(day+'T12:00:00').getDay();
       const left=dow===0?0:fallback(dow).filter(r=>r.kind==='study').reduce((s,r)=>s+Math.max(0,r.end-Math.max(r.start,off)),0);
       const v=Math.min(base,Math.max(Math.round(base*0.5),Math.round(left*0.8))),low=Number.isFinite(stored)?Math.min(stored,v):v;
-      if(low!==stored){const g=needLog();g[day]=low;for(const k of Object.keys(g))if(k<add8(day,-60))delete g[k];root.localStorage.setItem('kg-need-log',JSON.stringify(g));}
+      if(low!==stored){const g=needLog();g[day]={base,value:low};for(const k of Object.keys(g))if(k<add8(day,-60))delete g[k];root.localStorage.setItem('kg-need-log',JSON.stringify(g));}
       return low;}catch(e){return base;}
   };
   const add8=(iso,n)=>{const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+n);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
@@ -683,7 +683,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const d=studyDate(),rows=[];let t=0,total=0,serial=0;
     const put=(id,title,k,m,b=null)=>{if(m>0){rows.push([id,title,k,m,b]);t+=m;if(k==='study'){total+=m;limits[id]=m;}}};
     // exam day: every study block is "<exam> preparation", capped at the chosen hours, stopping 30 min before the exam time
-    const ex=kind.t==='exam',title=ex?String(kind.name||'Exam').slice(0,60)+' preparation':'',cap=ex?Math.round((kind.hours||8)*60):480,atStop=ex&&kind.at?kind.at-630-30:Infinity;
+    const ex=kind.t==='exam',title=ex?String(kind.name||'Exam').slice(0,60)+' preparation':'',cap=ex?Math.round((kind.hours||8)*60):Math.min(480,Number((L.dayHours||{})[d])*60|| (L.planHours===6?360:480)),atStop=ex&&kind.at?kind.at-630-30:Infinity;
     const lec=Math.min(210,Math.max(60,(L.mathsNext||{})[d]||lens8().medians.maths||lens8().len.maths));
     if(ex&&kind.from!=null){t=kind.from-630;rows.origin=t;}
     else if(ex&&!kind.college){t=0;rows.origin=0;}
@@ -712,9 +712,12 @@ body.habit-shh #hb-session-card {text-align:center;}
     const L=labData(),special=eveningPlan(),recovery=L.recoveryPlan===studyDate()&&!special,six=L.planHours===6,stop=special||recovery?690:765,rows=[];let t=0,total=0,serial=0;
     const put=(id,title,kind,m,b=null)=>{if(m>0){rows.push([id,title,kind,m,b]);t+=m;if(kind==='study')total+=m;}};
     const kind=dayKind(studyDate()),hol=kind.t==='holiday'&&!special&&!recovery;
+    // Explicit rest days must never create phantom study time on a weekday.
+    if(kind.t==='rest')return [['rest-day','Rest day · books closed','rest',780,null],['wind','Wind down','life',90,null],['sleep','Sleep','sleep',570,null]];
     if((kind.t==='college'||kind.t==='exam')&&!special&&!recovery)return collegeDay(L,kind);
-    // holiday: 10 h, study from 10:30 so it fits before dinner
-    const start=special?465:recovery?210:hol?0:late||six&&L.planLate?210:90,cap=special?150:recovery?180:hol?600:six?360:480;
+    // Holiday defaults to 10 hours, but an explicit 6/8-hour choice must take effect.
+    const holidayHours=Math.min(10,Math.max(6,Number((L.dayHours||{})[studyDate()])||10));
+    const start=special?465:recovery?210:hol?(holidayHours===10?0:90):late||six&&L.planLate?210:90,cap=special?150:recovery?180:hol?holidayHours*60:six?360:480;
     put('free-morning',special?'Eat, rest and settle in · no catch-up before 6:15 PM':'Wake up and settle in · your own time before study','rest',start);
     const due=dueSubjects(),queue=[];
     queue.push(['maths',special?'Maths · lecture, retrieval and homework · continue':'Maths · lecture, retrieval and homework',special?30:180,'maths'],['physics','Physics · lecture, retrieval and problems',special?120:160,'physics'],['chem','Chemistry · lecture, retrieval and problems',special?60:140,'chemistry']);
@@ -7749,6 +7752,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   const startAt = h => { const o = window.StudyPlan?.startFor?.(h); if (typeof o !== 'number') return ''; const m = (630 + o) % 1440, hr = Math.floor(m / 60); return `${hr % 12 || 12}:${String(m % 60).padStart(2, '0')} ${hr < 12 ? 'AM' : 'PM'}`; };
   const current=()=>calendarToday()==='2026-11-11'&&L.eveningPlanDate===calendarToday()?'today':L.recoveryPlan?'recovery':L.planHours===8&&L.lateSchedule?'8L':L.planHours===6&&L.planLate?'6L':String(L.planHours);
   L.planLog = L.planLog || {};
+  L.dayHours = L.dayHours || {}; // today's explicit hours, independent of the weekday/day-type preset
   // the late-start plans were replaced by the self-adapting schedule
   if (L.planLate || L.lateSchedule) { L.planLate = false; L.lateSchedule = null; }
   // the recovery plan is for one day only
@@ -7771,8 +7775,8 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   const dayCard = () => {
     const SP = window.StudyPlan; if (!SP?.dayKind) return '';
     const d = today(), k = SP.dayKind(d), own = !!(L.dayTypes || {})[d], tmr = M.add(d, 1), tk = SP.dayKind(tmr), end = k.end || 900;
-    const btn = (v, label, on) => `<button data-a="kgday" data-v="${v}" aria-pressed="${on}"><b>${label}</b></button>`;
-    return `<div class="kg-plan-row" role="group" aria-label="What kind of day is today">${btn('c900', 'College · until 3 PM', k.t === 'college' && end === 900)}${btn('c1020', 'College · until 5 PM', k.t === 'college' && end === 1020)}${btn('holiday', 'Holiday · 10 h', k.t === 'holiday')}${btn('rest', 'Rest', k.t === 'rest')}${btn('exam', 'Exam today', k.t === 'exam')}${own ? btn('auto', 'Auto (weekday default)', false) : ''}</div>
+    const btn = (v, label, on) => `<button type="button" data-a="kgday" data-v="${v}" aria-pressed="${on}"><b>${label}</b></button>`;
+    return `<div class="kg-plan-row" role="group" aria-label="What kind of day is today">${btn('c900', 'College · until 3 PM', k.t === 'college' && end === 900)}${btn('c1020', 'College · until 5 PM', k.t === 'college' && end === 1020)}${btn('holiday', 'Holiday · ' + ((L.dayHours || {})[d] || 10) + ' h', k.t === 'holiday')}${btn('rest', 'Rest', k.t === 'rest')}${btn('exam', 'Exam today', k.t === 'exam')}${own ? btn('auto', 'Auto (weekday default)', false) : ''}</div>
       ${examOpen ? `<form data-f="kgexam" class="kl-row"><label class="kl-small">Which exam? <input name="name" required maxlength="60" placeholder="e.g. BEEE Practical" value="${k.t === 'exam' ? esc(k.name || '') : ''}"></label><label class="kl-small">Exam starts at (optional) <input type="time" name="at"></label><button class="kl-primary">Save</button></form>` : ''}
       ${k.t !== 'rest' ? `<div class="kl-row"><button type="button" class="kl-ghost" data-a="kgreplan" title="Started late or ran over? Re-lay the rest of today from now; meals and sleep stay put">↻ Re-plan from now</button>${(L.replanAt || {})[d] != null ? `<span class="kl-small">Re-planned at ${hhmm(L.replanAt[d])}</span>` : ''}</div>` : ''}
       ${k.t === 'exam' ? `<p class="kl-small"><b>Exam day: ${esc(k.name || 'Exam')}.</b> Every study block today is ${esc(k.name || 'exam')} preparation${k.college ? ', and there is no study at college' : ''}.</p>` : ''}
@@ -7797,7 +7801,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   }, 30000);
   const redo = () => { save(); apply(); window.HabitDesk?.refresh?.(); window.DeskStore?.setState?.({ habitRevision: Date.now() }); setTimeout(() => M.render(), 50); };
   Object.assign(M.ACTIONS, {
-    kgday: b => { const v = b.dataset.v, d = today(); if (v === 'exam') { examOpen = true; return M.render(); } examOpen = false; if (L.replanAt) delete L.replanAt[d]; if (L.replanPush) delete L.replanPush[d]; L.dayTypes = L.dayTypes || {}; if (v === 'auto') delete L.dayTypes[d]; else L.dayTypes[d] = v === 'holiday' || v === 'rest' ? { t: v } : { t: 'college', end: +v.slice(1) }; if (L.homeAt) delete L.homeAt[d]; redo(); },
+    kgday: b => { const v = b.dataset.v, d = today(); if (v === 'exam') { examOpen = true; return M.render(); } examOpen = false; L.recoveryPlan = false; if (L.replanAt) delete L.replanAt[d]; if (L.replanPush) delete L.replanPush[d]; if (L.dayHours) delete L.dayHours[d]; L.dayTypes = L.dayTypes || {}; if (v === 'auto') delete L.dayTypes[d]; else L.dayTypes[d] = v === 'holiday' || v === 'rest' ? { t: v } : { t: 'college', end: +v.slice(1) }; if (L.homeAt) delete L.homeAt[d]; redo(); },
     kgreplan: () => { L.replanTs = 0; replan('re-planned the rest of today from now 🌙'); },
     kghome: () => { const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); (L.homeAt = L.homeAt || {})[today()] = (m < 240 ? m + 1440 : m) - 630; redo(); M.K?.("welcome back! lunch first, then the evening is rebuilt from now 🌙"); }
   });
@@ -7807,21 +7811,35 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
       const name = String(v.name || '').trim().slice(0, 60); if (!name) return M.K?.('type which exam it is first 🌙');
       const d = today(), w = new Date(d + 'T12:00:00').getDay(), college = w > 0 && w < 6, [ah, am] = String(v.at || '').split(':').map(Number);
       (L.dayTypes = L.dayTypes || {})[d] = { t: 'exam', name, college, end: college ? 900 : undefined, hours: w === 6 ? 10 : 8, ...(ah >= 0 && ah < 24 ? { at: ah * 60 + (am || 0) } : {}) };
-      examOpen = false; if (L.replanAt) delete L.replanAt[d]; redo(); M.K?.(`good luck with ${name}! every block today is ${name} preparation 🌙`);
+      examOpen = false; L.recoveryPlan = false; if (L.replanAt) delete L.replanAt[d]; if (L.dayHours) delete L.dayHours[d]; redo(); M.K?.(`good luck with ${name}! every block today is ${name} preparation 🌙`);
     },
     kgmaths: v => { const n = window.StudyPlan.parseMins(v.len), tmr = M.add(today(), 1); if (!n) return M.K?.('type it like 2h 35m, 155 or 2.5h'); (L.mathsNext = L.mathsNext || {})[tmr] = n; redo(); }
   });
   const card = () => `<section class="kl-card kg-plan"><p class="kl-eyebrow">YOUR STUDY DAY</p>${dayCard()}
-    <details${window.StudyPlan?.dayKind?.(today())?.t === 'college' ? '' : ' open'}><summary class="kl-small">Other plans (6 h, 8 h, late, recovery)</summary><div class="kg-plan-row" role="group" aria-label="Hours of study per day">${PLANS.map(([k, h, label, at]) => `<button data-a="kgplan" data-v="${k}" aria-pressed="${current() === k}"><b>${label}</b><small>from ${at}</small></button>`).join('')}</div></details>
+    <details open><summary class="kl-small">Other plans (6 h, 8 h, late, recovery)</summary><div class="kg-plan-row" role="group" aria-label="Hours of study per day">${PLANS.map(([k, h, label, at]) => `<button data-a="kgplan" data-v="${k}" aria-pressed="${current() === k && !(window.StudyPlan.dayKind(today()).t === 'holiday' && !(L.dayHours || {})[today()])}"><b>${label}</b><small>from ${at}</small></button>`).join('')}</div></details>
     <p class="kl-small">${window.__kgOnBreak ? 'Starts when your break ends. ' : ''}${PLANS.find(p => p[0] === current())[4]}. Today: ${Math.round(window.StudyPlan.hours()*60)} study minutes maximum, including reviews. ${current()==='today'||current()==='recovery'?'Stop by 10 PM.':'Wind-down at 11:30 PM.'} ${current()==='recovery'?'Today’s subject: '+window.StudyPlan.recoverySubject()+'. ':''}Stop each chunk when its timer ends; carry unfinished work forward, never borrow from a break.</p></section>`;
   const todayPanel = M.PANELS.today;
   M.PANELS.today = () => card() + todayPanel();
   function setPlan(key) {
-    const p = PLANS.find(x => x[0] === key); if (!p || p[0] === current()) return;
+    const p = PLANS.find(x => x[0] === key); if (!p) return;
+    const d = today(), kind = window.StudyPlan.dayKind(d).t;
+    const previous = Number((L.dayHours || {})[d]) || (kind === 'holiday' ? 10 : L.planHours);
+    if (p[0] === current() && previous === p[1] && kind !== 'rest' && kind !== 'exam' && (kind !== 'holiday' || (L.dayHours || {})[d])) return;
+    // Choosing study hours exits a manually selected rest day, including on Sundays.
+    if (kind === 'rest') {
+      const dow = new Date(d + 'T12:00:00').getDay();
+      (L.dayTypes = L.dayTypes || {})[d] = dow === 0 || dow === 6 ? {t:'holiday'} : {t:'college',end:900};
+    }
+    // On college and holiday days the selected study budget takes precedence.
+    const activeKind = window.StudyPlan.dayKind(d).t;
+    if (activeKind === 'holiday' || activeKind === 'college') L.dayHours[d] = p[1];
+    if (activeKind === 'exam') L.dayTypes[d] = {...window.StudyPlan.dayKind(d), hours:p[1]};
+    // A newly selected plan must not inherit an old re-plan cutoff.
+    if (L.replanAt) delete L.replanAt[d];
+    if (L.replanPush) delete L.replanPush[d];
     const h = p[1];
     if (h !== L.planHours) L.planSince = today();
     L.planHours = h; L.planLate = p[0] === '6L'; L.lateSchedule = key==='8L'?'late':null; L.eveningPlanDate=key==='today'?calendarToday():null; L.recoveryPlan=key==='recovery'?today():false;
-    const d = today();
     if (h === 12) { delete L.planLog[d]; window.DeskStore?.getState?.().patchDay?.(d, { shortDay: false }); }
     save(); apply();
     // the day card reads the plan when it draws, so switching between short plans has to redraw it
