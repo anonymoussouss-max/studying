@@ -827,10 +827,28 @@ body.habit-shh #hb-session-card {text-align:center;}
   const recordAttempt=(s,result,today)=>({...s,lastTested:today,last:result,strength:result==='ok'?'solid':'shaky',okStreak:result==='ok'?(s.okStreak||0)+1:0});
   const restDays=s=>s.last==='ok'?Math.min(56,7*2**Math.max(0,(s.okStreak||1)-1)):0;
   // which skill an attempt proves: the lecture's own skill, else the chapter's only skill; never a guess between several
-  const creditTarget=(skills,{ch,lec}={})=>{const by=f=>(skills||[]).filter(f),l=lec?by(s=>(s.lectures||[]).includes(lec)):[],c=l.length?l:ch?by(s=>s.ch===ch):[];return c.length===1?c[0].id:null;};
+  const creditTarget=(skills,{ch,lec,sk}={})=>{const list=skills||[];if(sk)return list.some(s=>s.id===sk)?sk:null;const c=lec?list.filter(s=>(s.lectures||[]).includes(lec)):ch?list.filter(s=>s.ch===ch):[];return c.length===1?c[0].id:null;};
+  // A small daily allocation inside existing practice. These are planning estimates, never elapsed study minutes.
+  const reviewBudget=minutes=>[10,15,20].includes(Number(minutes))?Number(minutes):15;
+  const reviewQueue=(skills,attempts,today,minutes=15,subj=null,log=[])=>{
+    minutes=reviewBudget(minutes);
+    const completedMinutes=(log||[]).filter(e=>e.d===today).reduce((n,e)=>n+(Number.isFinite(e.budgetMinutes)&&e.budgetMinutes>0?e.budgetMinutes:0),0);
+    const remainingMinutes=Math.max(0,minutes-completedMinutes), seen=new Set();
+    const misses=(attempts||[]).filter(x=>x&&!x.ok&&x.due&&x.due<=today&&x.lastSeen!==today&&(!subj||!x.subj||x.subj===subj));
+    const recall=recallToday(misses,today), older=pickMix(skills,subj,today,Number.MAX_SAFE_INTEGER);
+    const candidates=[...recall.map(item=>({type:'recall',id:item.id,item,minutes:5})),...older.map(item=>({type:'skill',id:item.id,item,minutes:5}))]
+      .filter(x=>{const key=x.type+':'+x.id;if(seen.has(key))return false;seen.add(key);return true;});
+    const candidateCount=new Set(misses.map(x=>'recall:'+x.id).concat(older.map(x=>'skill:'+x.id))).size;
+    const items=candidates.slice(0,Math.floor(remainingMinutes/5));
+    return {minutes,items,allocatedMinutes:items.length*5,completedMinutes,remainingMinutes,candidateCount,waitingCount:Math.max(0,candidateCount-items.length)};
+  };
+  // Creation/migration dates are not proof of a previous attempt. Only an actual dated result is evidence.
+  const previousSkillDate=(log,id,today)=>(log||[]).filter(e=>(e.sk||e.skillId)===id&&/^\d{4}-\d{2}-\d{2}$/.test(e.d||'')&&e.d<today&&
+    (['ok','hint','miss'].includes(e.result)||(typeof e.ok==='boolean'&&(e.mix||e.t==='skill'))||['indep','help','notyet'].includes(e.ev)))
+    .map(e=>e.d).sort().pop()||null;
   // each subject practice block reserves ~25% for older material (see Mix in on Today)
   const fallbackMix=(dow,h)=>fallback(dow,h).map(r=>r.kind==='study'&&/^(maths|physics|chem)-chunk/.test(r.id)&&r.minutes>=30?{...r,how:(r.how||'')+' Mix in about '+mixMinutes(r.minutes)+' min of older material: see Mix in on Today.'}:r);
-  const api={lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixMinutes,recallToday,recordAttempt,restDays,creditTarget,dayKind,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixMinutes,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -8165,10 +8183,12 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   /* ---------- skills (retention V1): lectures are the source, skills get mixed into practice ---------- */
   const SP = () => window.StudyPlan;
   // every lecture without a skill gets one named after its topic (runs again harmlessly); the 4-week trial starts the first time
-  const syncSkills = () => { if (!SP()?.skillsFromLectures) return; const n = (L.skills || []).length; L.skills = SP().skillsFromLectures(L.lectures, L.skills); if (!L.trialStart) L.trialStart = today(); if (L.skills.length !== n) save(); };
+  const syncSkills = () => { if (!SP()?.skillsFromLectures) return; const n = (L.skills || []).length, start = !L.trialStart; L.skills = SP().skillsFromLectures(L.lectures, L.skills); if (start) L.trialStart = today(); if (L.skills.length !== n || start) save(); };
   syncSkills();
   const skill = id => (L.skills || []).find(s => s.id === id);
   const skLabel = s => [s.subj, s.ch ? M.chName(s.ch) : '', s.name].filter(Boolean).join(' · ');
+  M.reviewPlan = subj => SP().reviewQueue(L.skills,L.attempts,today(),L.deskSettings?.reviewMinutes,subj,L.log);
+  window.__kgReviewPlan = M.reviewPlan;
   // weekly wildcard: the Maths or Physics skill untested for longest (3+ weeks), picked once per week
   const weekOf = d => M.add(d, -((new Date(d + 'T12:00:00').getDay() + 6) % 7));
   function wildcard() {
@@ -8184,44 +8204,52 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     window.__irohaAsk?.(`Give me one fresh ${s.subj} problem for my mix-in.`);
   }
   // one path for every result (Mix in buttons, chapter ticks, guided sessions): skill, trial log, review history and wildcard move together
-  function recordSkill(id, result, src = 'mix') {
-    const s = skill(id); if (!s) return false; const d = today();
+  function recordSkill(id, result, src = 'mix', meta = {}) {
+    const s = skill(id); if (!s || !['ok','hint','miss'].includes(result)) return false; const d = today();
     // one result per skill per day: a just-explained problem can't later count as solved on my own
     if (s.lastTested === d) { if (src === 'mix') M.K?.('that skill already has a result today. a fresh problem on it comes another day 🌙'); return false; }
-    const att = 'a' + Date.now().toString(36), before = { lastTested: s.lastTested, last: s.last, strength: s.strength, okStreak: s.okStreak };
-    L.skills = L.skills.map(x => x.id === id ? { ...SP().recordAttempt(x, result, d), att: { id: att, t: Date.now(), src, before } } : x);
-    L.log.push({ d, t: 'recall', ok: result === 'ok', ch: s.ch || '', mix: 1, sk: id, att, src });
+    if (meta.sourceEvent && (L.log || []).some(e=>e.sourceEvent===meta.sourceEvent&&e.sk===id)) return false;
+    const att = M.uid(), before = { lastTested: s.lastTested, last: s.last, strength: s.strength, okStreak: s.okStreak };
+    const previousDate = SP().previousSkillDate([...(L.log||[]),...(L.flowLog||[])],id,d);
+    const event = { d, t: src === 'mix' ? 'recall' : 'skill', ok: result === 'ok', result, ch: s.ch || '', mix: 1, sk: id, skillId:id, att, src,
+      sourceEvent:meta.sourceEvent||'', verified:meta.verified===true, verificationSource:String(meta.verificationSource||'').slice(0,300),
+      delayed:result==='ok'&&!!previousDate, previousDate, transfer:result==='ok'&&meta.transfer===true,
+      budgetMinutes:M.reviewPlan().items.some(x=>x.type==='skill'&&x.id===id)?5:0 };
+    L.skills = L.skills.map(x => x.id === id ? { ...SP().recordAttempt(x, result, d), att: { id: att, t: Date.now(), src, before, previousAtt:s.att||null, wildWeek:L.wildWeek||null } } : x);
+    (L.log=L.log||[]).push(event);
     (L.revLog = L.revLog || []).push({ d, src: 'skill', ok: result === 'ok', gap: M.gap(d, s.lastTested || s.made || d), att });
     if (L.wildPick?.sk === id) L.wildWeek = weekOf(d);
-    save(); M.render(); return true;
+    save(); M.render(); return event;
   }
+  M.recordSkill = recordSkill;
   // a wrong button can be undone for 2 minutes; after that, credit needs a fresh problem another day
   function undoSkill(id) {
     const s = skill(id); if (!s?.att || Date.now() - s.att.t > 120000) return M.K?.('too late to undo that one 🌙');
-    const { id: att, before } = s.att;
-    L.skills = L.skills.map(x => x.id === id ? { ...x, ...before, att: null } : x);
+    const { id: att, before, previousAtt, wildWeek } = s.att;
+    L.skills = L.skills.map(x => { if(x.id!==id)return x;const restored={...x,att:previousAtt||null};for(const key of ['lastTested','last','strength','okStreak']){if(Object.prototype.hasOwnProperty.call(before,key))restored[key]=before[key];else delete restored[key];}return restored; });
     L.log = L.log.filter(e => e.att !== att); L.revLog = (L.revLog || []).filter(e => e.att !== att);
-    if (L.wildPick?.sk === id) delete L.wildWeek;
+    if (L.wildPick?.sk === id) { if(wildWeek)L.wildWeek=wildWeek;else delete L.wildWeek; }
     save(); M.render();
   }
   // the day's recall queue comes from the misses notebook: at most 3, same intervals as the Recall tab
   const INTR = [1, 3, 7, 14, 30];
   function recallMark(id, ok) {
-    const x = (L.attempts || []).find(a => a.id === id); if (!x) return; const d = today();
+    const x = (L.attempts || []).find(a => a.id === id); const d = today(); if (!x || x.ok || !x.due || x.due>d || x.lastSeen===d) return;
+    const budgetMinutes=M.reviewPlan().items.some(item=>item.type==='recall'&&item.id===id)?5:0;
     x.st = ok ? (x.st || 0) + 1 : 0; x.due = x.st >= 5 ? '' : add(d, INTR[Math.min(x.st, 4)]); x.reviews = (x.reviews || 0) + 1;
-    L.log.push({ d, t: 'recall', ok, ch: x.ch || '' }); save(); M.render();
+    x.lastSeen=d; L.log.push({ d, t: 'recall', ok, ch: x.ch || '', miss:id, budgetMinutes }); save(); M.render();
   }
   function dueCard() {
     const P = SP(); if (!P?.pickMix) return ''; syncSkills();
-    const d = today(), wild = wildcard(), ws = wild && skill(wild.sk);
-    const subs = ['Maths', 'Physics', 'Chemistry'].map(s => [s, P.pickMix(L.skills, s, d, 3).filter(x => x.id !== wild?.sk)]).filter(g => g[1].length);
-    const rec = P.recallToday(L.attempts, d), sample = P.dayKind?.(d)?.t === 'holiday' ? P.pickMix(L.skills, null, d, 6) : [];
+    const d = today(), plan = M.reviewPlan(), wild = null, ws = null;
+    const subs = ['Maths', 'Physics', 'Chemistry'].map(s => [s, plan.items.filter(x => x.type === 'skill' && x.item.subj === s).map(x => x.item)]).filter(g => g[1].length);
+    const rec = plan.items.filter(x => x.type === 'recall').map(x => x.item), sample = [];
     const just = (L.skills || []).filter(s => s.att && s.lastTested === d && Date.now() - s.att.t < 120000);
-    if (!subs.length && !ws && !rec.length && !just.length) return '';
+    if (!subs.length && !rec.length && !just.length && !plan.candidateCount && !plan.completedMinutes) return '';
     const btns = id => `<div class="kl-row"><button class="kl-primary" data-a="skprob" data-v="${esc(id)}">Get a problem</button><button data-a="skrec" data-k="ok" data-v="${esc(id)}" title="You chose the method and solved it without help">✓ Solved on my own</button><button class="kl-ghost" data-a="skrec" data-k="hint" data-v="${esc(id)}" title="It comes back in your next practice block">↺ Needed a hint</button><button class="kl-ghost" data-a="skrec" data-k="miss" data-v="${esc(id)}">✗ Missed</button><button class="kl-ghost" data-a="skprob" data-bad="1" data-v="${esc(id)}" title="Flawed or disputed problem: get another, nothing recorded">⚑ Bad problem</button></div>`;
     const row = (s, head) => `<div class="kg-lecrow"><div><b>${head}</b><small>${s.strength === 'shaky' ? 'needed help last time' : s.lastTested ? `last tested ${M.gap(d, s.lastTested)} days ago` : 'not tested yet'}</small><details><summary class="kl-small">Show the skill</summary><small>${esc(skLabel(s))}</small></details></div>${btns(s.id)}</div>`;
     return `<section class="kl-card kg-lecdue"><p class="kl-eyebrow">✦ MIX IN</p><h3>Older skills for today's practice</h3>
-      <p class="kl-small">Spend about a quarter of each practice block on these: one fresh problem each, skill hidden so you choose the method. Any problem you solve on your own on the same chapter counts too.</p>
+      <p class="kl-small">Up to ${plan.minutes} minutes inside normal practice. ${plan.completedMinutes} estimated minutes recorded today; ${plan.allocatedMinutes} suggested below. Estimates are five minutes per task, not measured timer time. Stop at your budget.</p><p class="kl-small">${plan.waitingCount} other candidates remain saved for later. A result credits only its exact skill; an ambiguous chapter answer does not clear several skills.</p>
       ${just.map(s => `<div class="kg-lecrow"><div><b>Recorded: ${s.last === 'ok' ? 'solved on your own' : s.last === 'hint' ? 'needed a hint' : 'missed'}</b><small>${esc(s.subj)} · wrong button? undo within 2 minutes</small></div><div class="kl-row"><button class="kl-ghost" data-a="skundo" data-v="${esc(s.id)}">↶ Undo</button></div></div>`).join('')}
       ${subs.map(([sub, list]) => list.map(s => row(s, `${esc(sub)} · older skill`)).join('')).join('')}
       ${ws ? row(ws, `🃏 Weekly wildcard · ${esc(ws.subj)}, untested for ${wild.days} days`) : ''}
@@ -8723,7 +8751,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
         btn: close ? 'Finish the close-out' : a.running ? 'Back to it' : 'Resume', run: { resume: 1 } };
     }
     const p = L.lecPending;
-    if (p && p.date === d) return { eye: "WHILE IT'S FRESH", title: `Log your ${p.subj} lecture`, why: 'Two minutes now saves the lecture: Iroha brings it back on days 1, 3, 5, 7, 14, 30 and 60 and quizzes you from your own notes.', btn: 'Log it', run: { log: 1 } };
+    if (p && p.date === d) return { eye: "WHILE IT'S FRESH", title: `Log your ${p.subj} lecture`, why: 'Save the lecture and its notes. Older skills return through your mixed-practice budget.', btn: 'Log it', run: { log: 1 } };
     const t = nowT(), b = M.block(), list = schedule(), next = list.find(x => x.kind === 'study' && x.start > t);
     // last night's plan comes next, unless you said "not today" (habits.js)
     const tr = M.tomorrowRec?.(); if (tr) return tr;
@@ -8734,7 +8762,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     if (next && !started) return { eye: 'UP NEXT', title: `${next.title} at ${clock(next.start)}`, why: `Your plan starts then, and the time until then is yours.${b ? ` Right now: ${b.title.toLowerCase()}.` : ''} If you'd like a head start, five minutes is enough.`, btn: 'Start with 5 minutes', run: { desk: deskFor(next, 5) } };
     if (b) return { eye: /^free/.test(b.id) ? 'FREE TIME' : 'BREAK', title: `${b.title} until ${clock(b.end)}`, why: `It's part of the plan, so this time is yours.${next ? ` Next: ${next.title} at ${clock(next.start)}.` : ''}`, btn: 'Hang out with Kaguya', run: { go: 'company:hangout' } };
     if (next) return { eye: 'UP NEXT', title: `${next.title} at ${clock(next.start)}`, why: 'Five minutes now is a head start, if you want one.', btn: 'Start with 5 minutes', run: { desk: deskFor(next, 5) } };
-    return { eye: 'TODAY', title: 'No study blocks today', why: 'Sunday is the rest day in your plan. Resting keeps the chain.', quiet: 1 };
+    return { eye: 'TODAY', title: 'No study blocks today', why: 'There are no remaining study blocks right now. Your next session can wait for your plan.', quiet: 1 };
   }
   function forBlock(b, t) {
     const id = b.id, s = subjOf(id), until = clock(b.end), left = Math.max(5, Math.min(180, b.end - t));
@@ -8760,6 +8788,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   function card() {
     const r = rec(); if (!r) return '';
     const alt = alts(r);
+    if (window.LearningDesk?.todayCard) return window.LearningDesk.todayCard(r, alt);
     return `<section class="kl-card kg-rec${r.quiet ? ' quiet' : ''}"><p class="kl-eyebrow">${esc(r.eye)}</p><h2>${esc(r.title)}</h2>
       <p class="kg-why">${r.quiet ? '' : '<b>Why this:</b> '}${esc(r.why)}</p>
       ${r.btn || alt.length ? `<div class="kl-row">${r.btn ? `<button class="kl-primary" data-a="kgrec">${esc(r.btn)}</button>` : ''}${alt.map((x, i) => `<button class="kl-ghost" data-a="kgalt" data-v="${i}">${esc(x.label)}</button>`).join('')}</div>` : ''}</section>`;
@@ -8869,6 +8898,8 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   const $ = id => document.getElementById(id);
   const habit = () => { try { return JSON.parse(localStorage.getItem('ame-habit-v1') || 'null') || {}; } catch (e) { return {}; } };
   const ACTS = {
+    worked: { name: 'Worked example', icon: '↗', what: 'Explain a solved example, hide it, then try a nearby problem.', best: 'unfamiliar mathematics and physics', ask: 'Set a similar problem with changed numbers or conditions. Solve it without looking back. Explain why each major step applies and check the units.', check: 'Check the new problem and the reason for each step, not whether it copies the example. This is supported learning, not a test of independent retention.', kind: 'study', mins: 25 },
+    predict: { name: 'Predict & explain', icon: '◎', what: 'Make a prediction, observe a result, then explain the difference.', best: 'concepts, graphs and simulations', ask: 'Record what you observed in a trusted simulation, graph or worked calculation. Compare it with your prediction: what changed, why, and which assumption matters? Separate observation from inference.', check: 'Check the explanation and assumptions. Do not invent experimental observations. If the observation or reference is missing, identify it as a gap.', kind: 'study', mins: 20 },
     recall: { name: 'Recall', icon: '🧠', what: 'Write down everything you remember, no notes.', best: 'after a lecture, or a due review', ask: 'Everything you remember, from memory: definitions, formulas, an example, and how the ideas connect.', check: 'Compare it with what the topic needs (and my lecture notes, if given): what is solid, and what is missing or wrong.', kind: 'recall', mins: 15 },
     blurt: { name: 'Blurt', icon: '💨', what: 'Five fast minutes: dump it all out, then find the gaps.', best: 'a quick check before revising', ask: "Go fast. Fragments are fine. Don't stop to check anything.", check: 'It was written fast, so ignore style and order; find the most important idea that is missing or wrong.', kind: 'recall', mins: 10 },
     explain: { name: 'Explain', icon: '🗣', what: 'Feynman mode: explain it simply to Kaguya, then Iroha checks.', best: "things you can do but can't say why", ask: "Explain it to someone clever who has never seen it. Plain words, one example, and why it works.", check: 'Check the explanation for accuracy and find the spot where it turns vague or skips the why.', kind: 'recall', mins: 20 },
@@ -8876,13 +8907,13 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     compare: { name: 'Compare', icon: '⚖️', what: 'Two ideas side by side: alike, different, and when to use which.', best: 'topics you mix up', ask: 'Name the two things. How are they alike? How are they different? How do you tell which one a question needs?', check: 'Check that the comparison is accurate and that the "which one when" test would actually work on a real question.', kind: 'recall', mins: 15 },
     diagnose: { name: 'Diagnose', icon: '🩺', what: 'Take a mistake apart: what went wrong, and the rule that stops it.', best: 'a wrong answer from homework, a mock or your misses', ask: "The question and your wrong step. Then: what went wrong, why it happened, and the rule you'll use next time.", check: 'Check whether the diagnosis finds the real cause (not just "a silly mistake") and whether the rule would really prevent it.', kind: 'mistakes', mins: 15 }
   };
-  const NAMES = { goal: 'Goal', warmup: 'Recall first', attempt: 'Attempt', feedback: 'Feedback', repair: 'Repair', recap: 'Recap', save: 'Save' };
+  const NAMES = { goal: 'Goal', warmup: 'Recall / predict', example: 'Example', attempt: 'Attempt', feedback: 'Feedback', repair: 'Repair', recap: 'Recap', save: 'Save' };
   // the opener step only appears when you chose one
-  const stepsOf = f => ['goal', ...(f.opener ? ['warmup'] : []), 'attempt', 'feedback', 'repair', 'recap', 'save'];
+  const stepsOf = f => ['goal', ...(f.opener ? ['warmup'] : []), ...(f.act === 'worked' ? ['example'] : []), 'attempt', 'feedback', 'repair', 'recap', 'save'];
   const SUBJS = ['Maths', 'Physics', 'Chemistry', 'Mixed'];
   L.flowLog = L.flowLog || [];
   if (L.flow) L.flow.busy = '';
-  const blank = o => Object.assign({ id: M.uid(), act: '', subj: 'Maths', topic: '', goal: '', lec: '', miss: '', dispute: '', disputed: '', stretch: '', opener: '', warm: '', rc1: '', rc2: '', rc3: '', rcfb: '', since: '', rq: '', ra: '', cardId: '', energy: 'ordinary', ref: '', cmp: null, src: '', parking: false, mins: 25, step: 'goal', attempt: '', kq: '', ka: '', fb: '', right: '', gap: '', fix: '', repair: '', rfb: '', fixed: false, made: today(), started: 0, desk: false, busy: '' }, o || {});
+  const blank = o => Object.assign({ id: M.uid(), act: '', subj: 'Maths', topic: '', goal: '', lec: '', miss: '', dispute: '', disputed: '', stretch: '', opener: '', warm: '', rc1: '', rc2: '', rc3: '', rcfb: '', since: '', rq: '', ra: '', cardId: '', energy: 'ordinary', ref: '', cmp: null, src: '', parking: false, mins: 25, step: 'goal', attempt: '', kq: '', ka: '', fb: '', right: '', gap: '', fix: '', repair: '', rfb: '', fixed: false, made: today(), started: 0, desk: false, busy: '', requireVerification: true, verified: false, verificationSource: '', supported: false, transfer: false, example: '', exampleWhy: '' }, o || {});
   const lecture = id => (L.lectures || []).find(e => e.id === id);
   const lecLabel = e => [e.subj, e.ch ? M.chName(e.ch) : '', e.topic].filter(Boolean).join(' · ');
   // a check counts only when it came back with an explicit Gap verdict. A malformed reply, a "busy" line or anything else is not graded.
@@ -8933,7 +8964,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   async function check() {
     const f = L.flow, A = ACTS[f.act]; if (!f || f.busy) return;
     if (!f.attempt.trim()) return M.I('Write your attempt first. One line or one equation is enough if that is the answer.', { face: 'study' });
-    f.busy = 'iroha'; f.dispute = ''; f.disputed = ''; M.render();
+    f.busy = 'iroha'; f.dispute = ''; f.disputed = ''; f.verified = false; M.render();
     const kag = kagNote(f);
     // the note pages, when they're saved, so the check covers what you actually studied
     f._outline = f.lec ? await M.lecOutline?.(f.lec).catch?.(() => '') || '' : '';
@@ -9051,7 +9082,14 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     return `<p class="kl-eyebrow">BEFORE YOU OPEN YOUR NOTES · ${esc(f.topic)}</p><h2>${predict ? `What do you already know that might help with ${esc(f.topic)}, and what do you predict?` : `What do you remember about ${esc(f.topic)}?`}</h2>
       <p class="kl-small">A few minutes, notes closed. Fragments, a formula, or a sketch in words are all fine. It's kept separately, so at the end you can see what changed.</p>
       <textarea data-flow="warm" rows="7" maxlength="3000" aria-label="${predict ? 'What might help, and your prediction' : 'What you remember'}">${esc(f.warm)}</textarea>
-      <div class="kl-row"><button class="kl-primary" data-a="flowto" data-v="attempt">Done, on to the ${esc(A.name.toLowerCase())}</button><button class="kl-ghost" data-a="flowwarmskip">Skip it</button></div>`;
+      <div class="kl-row"><button class="kl-primary" data-a="flowto" data-v="${f.act === 'worked' ? 'example' : 'attempt'}">${f.act === 'predict' ? 'Prediction saved, now observe' : 'Continue'}</button><button class="kl-ghost" data-a="flowwarmskip">Skip it</button></div>`;
+  }
+  function exampleStep(f) {
+    return `<div class="learning-session-support"><p class="kl-eyebrow">WORKED EXAMPLE · ${esc(f.topic)}</p><h2>Understand the steps before doing them alone</h2>
+      <p>Use a solved example from your textbook or teacher. Explain why each step is allowed. Then hide it and solve a nearby problem. This session records supported learning; a later fresh problem can test independence.</p>
+      <label>Worked example <textarea data-flow="example" rows="9" maxlength="5000" placeholder="Paste the problem and solution, or write the book and page you are reading.">${esc(f.example || '')}</textarea></label>
+      <label>Why these steps? <textarea data-flow="exampleWhy" rows="4" maxlength="2000" placeholder="Name the principle, assumptions and one step you could not explain at first.">${esc(f.exampleWhy || '')}</textarea></label>
+      <div class="kl-row"><button class="kl-primary" data-a="flowhideexample">Hide example and try a similar problem</button></div></div>`;
   }
   function recapStep(f) {
     return `<p class="kl-eyebrow">RECAP · NOTES CLOSED</p><h2>In your own words, before any summary</h2>
@@ -9068,12 +9106,15 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   function attemptStep(f, A) {
     return `<p class="kl-eyebrow">${A.icon} ${A.name.toUpperCase()} · ${esc(f.subj)} · ${esc(f.topic)}</p><h2>${esc(f.goal || A.what)}</h2>
       <p class="kl-small">${esc(A.ask)}${f.act === 'explain' ? ' Feynman mode: Kaguya listens first, then Iroha checks.' : ''} No notes; it saves as you type.</p>
+      ${f.act === 'predict' ? `<div class="learning-session-support"><b>Your prediction</b><p class="kl-pre">${esc(f.warm || 'No prediction recorded.')}</p><p class="kl-small">Observe first, then explain. A simulation tests its model; it is not proof about every real situation.</p></div>` : ''}
+      ${f.act === 'worked' ? '<p class="learning-status">The example is hidden. Try removing one more hint each time you practise.</p><button class="kl-ghost" data-a="flowto" data-v="example">Look at example again</button>' : ''}
       ${missOf(f) ? `<div class="kg-flow-k kg-flow-miss"><b>The mistake</b><p>${esc(missOf(f).q)}</p>${missOf(f).cause || missOf(f).fix ? `<p class="kl-small">${missOf(f).cause ? 'Logged as ' + esc(missOf(f).cause) + '. ' : ''}${missOf(f).fix ? 'Your fix back then: ' + esc(missOf(f).fix) : ''}</p>` : ''}</div>` : ''}
       <textarea data-flow="attempt" rows="14" maxlength="6000" aria-label="Your attempt" placeholder="${esc(A.ask)}">${esc(f.attempt)}</textarea>
       ${f.act === 'blurt' ? `<details class="kg-flow-refbox" ${f.ref ? 'open' : ''}><summary>Reveal a reference to compare with (after your blank page)</summary><p class="kl-small">Write your blank page first. Then paste the part of your notes you're checking against, or leave this empty to compare with your lecture's notes.</p><textarea data-flow="ref" rows="5" maxlength="4000" aria-label="Reference from your notes">${esc(f.ref)}</textarea></details>` : ''}
       <p class="kl-small kg-flow-src">${esc(srcGuess(f))}</p>${f.energy === 'lighter' ? '<p class="kl-small">Lighter today: small is the plan.</p>' : ''}
       ${f.act === 'explain' ? (f.kq ? `<div class="kg-flow-k"><b>Kaguya</b><p>${esc(f.kq)}</p></div><textarea data-flow="ka" rows="3" maxlength="1500" aria-label="Your answer to Kaguya" placeholder="Answer her, simply (optional)">${esc(f.ka)}</textarea>` : `<div class="kl-row"><button data-a="flowlisten" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'kaguya', '🗣 Tell Kaguya')}</button><span class="kl-small">She asks the question a curious friend would.</span></div>`) : ''}
-      <div class="kl-row"><button class="kl-primary" data-a="flowcheck" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'iroha', 'Check it with Iroha')}</button></div>`;
+      <label class="kl-check"><input type="checkbox" data-flow="supported" ${f.supported ? 'checked' : ''} ${f.act === 'worked' ? 'disabled' : ''}> I used a hint, notes or a solution while answering</label>
+      <div class="kl-row"><button class="kl-primary" data-a="flowcheck" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'iroha', 'Check it with Iroha')}</button><button class="kl-ghost" data-a="flowto" data-v="save">Save without an AI check</button></div>`;
   }
   const backupModel = f => /gemini|groq/i.test(f.checker?.provider || '');
   const byLine = f => f.checker?.provider ? `<p class="kl-small kg-flow-by">Checked by ${esc(f.checker.model || 'an AI model')} via ${esc(f.checker.provider)}${backupModel(f) ? '. That is a backup model, so give this check a little less weight.' : '.'}</p>` : '';
@@ -9103,6 +9144,8 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   }
   // the evidence behind any grade, in words: independent, with help, or not yet
   const evidence = f => {
+    if (f.requireVerification && (!f.verified || !String(f.verificationSource || '').trim())) return ['ungraded', 'Saved without source verification. No independent credit.'];
+    if (f.supported && f.disputed !== 'unresolved' && graded(f) && (noGap(f) || f.fixed)) return ['help', 'Checked with support. Try a fresh problem another day.'];
     if (f.disputed === 'unresolved') return ['ungraded', "Unresolved: two checks disagreed and you haven't chosen, so nothing is counted."];
     if (!graded(f)) return ['ungraded', "Not graded: Iroha's check didn't come back in a form the desk can trust, so nothing is counted."];
     const how = f.disputed === 'agrees' ? ', confirmed by a fresh recheck' : /^(first|second)$/.test(f.disputed) ? ', after two checks disagreed and you chose' : '';
@@ -9115,10 +9158,13 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     const missNext = ev === 'indep' ? ((x?.st || 0) + 1 >= 5 ? 'it retires from the notebook: you have it.' : `it moves on, next review in ${INTM[Math.min((x?.st || 0) + 1, 4)]} days.`) : ev === 'help' ? 'it comes back tomorrow, to check the repair stuck.' : ev === 'ungraded' ? "it comes back tomorrow unchanged, since this session isn't graded." : 'it starts again tomorrow.';
     return `<p class="kl-eyebrow">SAVE</p><h2>${esc(A.name)}: ${esc(f.topic)}</h2>
       <p class="kg-flow-ev ${ev}"><b>Evidence</b> ${esc(evText)}</p>
+      <div class="learning-session-support"><p class="kl-small">AI feedback is a suggestion. To record a checked result, compare the reasoning and answer with a trusted key, textbook or teacher. Leaving this unchecked saves your work without certifying it.</p>
+      <label>Source and page / problem <input data-flow="verificationSource" maxlength="200" value="${esc(f.verificationSource || '')}" placeholder="e.g. textbook, exercise 4.2, problem 6"></label>
+      <label class="kl-check"><input type="checkbox" data-flow="verified" ${f.verified ? 'checked' : ''}> I checked the reasoning and result against this source</label>
+      <label class="kl-check"><input type="checkbox" data-flow="transfer" ${f.transfer ? 'checked' : ''}> This used the idea in an unfamiliar setting (my assessment)</label></div>
       <ul class="kl-list">${f.goal ? `<li><b>Goal:</b> ${esc(f.goal)}</li>` : ''}<li><b>Gap:</b> ${gap ? esc(f.gap) : noGap(f) ? 'none found' : 'not graded'}</li>${gap ? `<li><b>Repair:</b> ${f.fixed ? 'done, and Iroha agrees' : f.repair.trim() ? 'done, not confirmed' : 'not done yet'}</li>` : ''}${f.dispute ? `<li><b>Recheck:</b> ${esc(f.dispute)}</li>` : ''}${x ? `<li><b>Mistake notebook:</b> ${esc(missNext)}</li>` : ''}${f.warm.trim() ? '<li><b>Recall first:</b> done</li>' : ''}<li><b>Recap:</b> ${f.rc1 || f.rc2 || f.rc3 ? (f.rcfb ? 'written and checked' : 'written') : 'skipped'}${f.cardId ? ', one review item added' : ''}</li></ul>
       <form data-f="flowsave" class="kl-stack">
-      ${gap && !f.fixed && !x ? '<label class="kl-check"><input type="checkbox" name="miss" checked> Add the gap to my misses, so it comes back tomorrow</label>' : ''}
-      ${e && e.due ? `<fieldset class="kg-flow-rev"><legend>Spaced review of ${esc(e.topic)}. Suggested from the evidence: ${ev === 'indep' ? 'Recalled independently' : 'Needs another review'}. You decide.</legend><label class="kl-check"><input type="radio" name="rev" value="ok" ${ev === 'indep' ? 'checked' : ''}> ✓ Recalled independently</label><label class="kl-check"><input type="radio" name="rev" value="again" ${ev !== 'indep' ? 'checked' : ''}> ↺ Needs another review</label><label class="kl-check"><input type="radio" name="rev" value=""> Don't mark it now</label></fieldset>` : ''}
+      ${gap && !f.fixed && !x ? '<label class="kl-check"><input type="checkbox" name="miss"> Add this important gap to my misses for later practice</label>' : ''}
       ${f.goal ? `<fieldset class="kg-flow-rev"><legend>Core goal: ${esc(f.goal)}</legend><label class="kl-check"><input type="radio" name="met" value="yes"> Done</label><label class="kl-check"><input type="radio" name="met" value="partly"> Partly</label><label class="kl-check"><input type="radio" name="met" value="no"> Not yet</label></fieldset>` : ''}
       ${parkedNow(f) ? `<div class="kg-flow-k"><b>You parked ${parkedNow(f)} thought${parkedNow(f) === 1 ? '' : 's'}</b>${(L.parked || []).filter(p => !p.done && p.at >= f.started).map(p => `<p>${esc(p.t)}</p>`).join('')}<p class="kl-small">They're waiting on Today under Parked thoughts.</p></div>` : ''}
       <label>How did it feel? <select name="mood"><option value="calm">Calm</option><option value="proud">Proud</option><option value="tired">Tired</option><option value="stuck">Stuck</option></select></label>
@@ -9129,7 +9175,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     const f = L.flow;
     if (M.onBreak?.() && (!f || f.step === 'goal')) return `<section class="kl-card kl-breakcard"><p class="kl-eyebrow">🌙 RESTING</p><h3>Guided sessions are here when you're back.</h3><p>Nothing is waiting, and nothing is piling up.</p></section>`;
     const cur = f || blank(), A = ACTS[cur.act];
-    const body = cur.step === 'goal' || !A ? goalStep(cur) : cur.step === 'warmup' ? warmupStep(cur, A) : cur.step === 'recap' ? recapStep(cur) : cur.step === 'attempt' ? attemptStep(cur, A) : cur.step === 'feedback' ? feedbackStep(cur, A) : cur.step === 'repair' ? repairStep(cur) : saveStep(cur, A);
+    const body = cur.step === 'goal' || !A ? goalStep(cur) : cur.step === 'warmup' ? warmupStep(cur, A) : cur.step === 'example' ? exampleStep(cur) : cur.step === 'recap' ? recapStep(cur) : cur.step === 'attempt' ? attemptStep(cur, A) : cur.step === 'feedback' ? feedbackStep(cur, A) : cur.step === 'repair' ? repairStep(cur) : saveStep(cur, A);
     const recent = L.flowLog.slice(-5).reverse();
     return `<section class="kl-card kg-flow">${head(cur)}${parkForm(cur)}${body}</section>`
       + (cur.step === 'goal' && recent.length ? `<section class="kl-card kl-mini"><p class="kl-eyebrow">RECENT SESSIONS</p>${recent.map(x => `<div class="kl-li"><span>${esc(ACTS[x.act]?.name || '')}: ${esc(x.topic)}<small>${esc(x.d)} · ${x.gap ? (x.fixed ? 'gap repaired' : 'gap: ' + esc(x.gap.slice(0, 90))) : 'no gaps'}</small></span></div>`).join('')}</section>` : '');
@@ -9144,7 +9190,9 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       if (!topic) return M.I('Name the topic, even roughly. It tells me what to check against.', { face: 'study' });
       const f = L.flow = Object.assign(L.flow || blank(), { act: v.act, subj: SUBJS.includes(v.subj) ? v.subj : 'Maths', topic, goal: String(v.goal || '').trim(), lec: v.lec || '', mins: Math.max(5, Math.min(90, parseInt(v.mins) || A.mins)), stretch: String(v.stretch || '').trim(), energy: ['demanding', 'lighter'].includes(v.energy) ? v.energy : 'ordinary', opener: ['recall', 'predict'].includes(v.opener) ? v.opener : '' });
       if (f.energy === 'lighter') f.mins = Math.min(f.mins, 15);
-      f.step = f.opener ? 'warmup' : 'attempt'; f.started = Date.now();
+      if (f.act === 'predict') f.opener = 'predict';
+      if (f.act === 'worked') { f.opener = ''; f.supported = true; }
+      f.step = f.act === 'worked' ? 'example' : f.opener ? 'warmup' : 'attempt'; f.started = Date.now();
       f.desk = habit().active ? false : !!M.startDesk?.({ subject: f.subj === 'Mixed' ? 'Mixed' : f.subj, topic: f.topic, task: `${A.name}: ${f.goal || f.topic}`, kind: A.kind, minutes: f.mins }, true);
       save(); M.render(); setTimeout(() => document.querySelector('[data-flow="warm"],[data-flow="attempt"]')?.focus(), 60);
     },
@@ -9153,7 +9201,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       const d = today(), A = ACTS[f.act], gap = hasGap(f);
       const [ev] = evidence(f), x = missOf(f);
       // a mistake repaired here follows the notebook's own schedule: independent moves it on, help or no repair brings it back tomorrow
-      if (x) {
+      if (x && ev !== 'ungraded') {
         x.reviews = (x.reviews || 0) + 1;
         if (ev === 'indep') { x.st = (x.st || 0) + 1; x.due = x.st >= 5 ? '' : M.add(d, INTM[Math.min(x.st, 4)]); }
         else { if (ev === 'notyet') x.st = 0; x.due = M.add(d, 1); }
@@ -9162,21 +9210,22 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
         x.lastSeen = d;
       }
       if (v.miss && gap && !x) L.attempts.push({ id: M.uid(), d, ts: Date.now(), ok: false, src: 'flow', ch: f.lec ? lecture(f.lec)?.ch || '' : '', q: `${f.topic}: ${f.gap}`.slice(0, 240), cause: /\b(sign|arithmetic|calculation|copied|copy|typo|units?|careless|slip|misread|rounding)\b/i.test(f.gap || '') ? 'careless slip' : /\b(concept|understand|definition|why|formula|idea|meaning)\b/i.test(f.gap || '') ? 'knowledge gap' : f.act === 'diagnose' ? 'careless slip' : 'knowledge gap', fix: (f.fix || '').slice(0, 200), due: M.add(d, 1), st: 0 });
-      L.flowLog.push({ id: f.id, d, act: f.act, subj: f.subj, topic: f.topic, goal: f.goal, gap: gap ? f.gap.slice(0, 300) : '', fixed: f.fixed, ev, disputed: f.disputed || '', miss: f.miss || '', by: f.checker?.provider || '', model: f.checker?.model || '', met: v.met || '', warm: !!f.warm.trim(), recap: !!(f.rc1 || f.rc2 || f.rc3), card: !!f.cardId, mins: f.started ? Math.min(180, Math.round((Date.now() - f.started - (f.away || 0)) / 60000)) : 0 }); // time away after "Leave for now" doesn't count
-        if (ev === 'indep' && !gap && f.lec) window.__kgLecSatisfy?.(lecture(f.lec)?.ch, f.lec); // an independent session counts as the check
+      const skillId = window.StudyPlan.creditTarget(L.skills || [], {sk:f.skillId,lec:f.lec});
+      const result = skillId && ev !== 'ungraded' ? M.recordSkill?.(skillId, ev === 'indep' ? 'ok' : ev === 'help' ? 'hint' : 'miss', 'flow', {sourceEvent:f.id,verified:f.verified,verificationSource:f.verificationSource,transfer:f.transfer}) : null;
+      L.flowLog.push({ skillId, lec:f.lec || '', requireVerification:!!f.requireVerification, verified:!!f.verified, verificationSource:f.verificationSource || '', supported:!!f.supported, delayed:!!result?.delayed, transfer:ev === 'indep' && f.transfer === true, id: f.id, d, act: f.act, subj: f.subj, topic: f.topic, goal: f.goal, gap: gap ? f.gap.slice(0, 300) : '', fixed: f.fixed, ev, disputed: f.disputed || '', miss: f.miss || '', by: f.checker?.provider || '', model: f.checker?.model || '', met: v.met || '', warm: !!f.warm.trim(), recap: !!(f.rc1 || f.rc2 || f.rc3), card: !!f.cardId, mins: f.started ? Math.min(180, Math.round((Date.now() - f.started - (f.away || 0)) / 60000)) : 0 }); // time away after "Leave for now" doesn't count
       if (L.flowLog.length > 300) L.flowLog = L.flowLog.slice(-300);
       L.flow = null; save();
       closeDesk(f, v.mood);
-      if (f.lec && v.rev) M.ACTIONS[v.rev === 'ok' ? 'kglecok' : 'kglecshaky']?.({ dataset: { v: f.lec } });
       if (v.met === 'yes' && f.stretch) setTimeout(() => M.I(`Core goal done. The stretch goal is there if you want it: ${f.stretch}. Stopping here is just as fine.`, { face: 'study' }), 2600);
-      else if (!(f.lec && v.rev)) M.I(gap ? (f.fixed ? 'Saved. You found the gap and closed it; that is the whole point.' : 'Saved. The gap is written down, so it will come back.') : `Saved. ${A.name} with no gaps.`, { face: 'study' });
+      else M.I(ev === 'ungraded' ? 'Saved without a grade.' : gap ? (f.fixed ? 'Saved. You found the gap and closed it; that is the whole point.' : 'Saved. The gap is written down, so it will come back.') : `Saved. ${A.name} with no gaps.`, { face: 'study' });
       M.render();
     }
   });
   Object.assign(M.ACTIONS, {
     flowcheck: check, flowlisten: listen, flowrepair: checkRepair, flowdispute: dispute, flowrecap: checkRecap, flowcard: addCard,
     flowpark: () => { const f = L.flow; if (!f) return; f.parking = !f.parking; save(); M.render(); setTimeout(() => document.querySelector('.kg-park input')?.focus(), 50); },
-    flowwarmskip: () => { const f = L.flow; if (!f) return; f.warm = ''; f.step = 'attempt'; save(); M.render(); },
+    flowwarmskip: () => { const f = L.flow; if (!f) return; f.warm = ''; f.step = f.act === 'worked' ? 'example' : 'attempt'; save(); M.render(); },
+    flowhideexample: () => { const f = L.flow; if (!f || f.busy) return; if (!(f.example || '').trim()) return M.I('Add the example or its book and page first.', { face: 'study' }); f.supported = true; f.step = 'attempt'; save(); M.render(); },
     flowpick: b => { const f = L.flow; if (!f?.alt) return; const second = b.dataset.v === 'second'; if (second) Object.assign(f, { right: f.alt.right, gap: f.alt.gap, fix: f.alt.fix, checker: f.alt.by || f.checker }); f.disputed = second ? 'second' : 'first'; f.dispute = second ? 'The two checks disagreed; you chose the second.' : 'The two checks disagreed; you kept the first.'; f.alt = null; save(); M.render(); },
     flowto: b => { const f = L.flow; if (!f || f.busy) return; f.step = b.dataset.v; save(); M.render(); },
     flowleave: () => { if (L.flow) L.flow.leftAt = Date.now(); save(); M.go('today'); },
@@ -9187,13 +9236,18 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   let tSave = 0;
   document.addEventListener('input', e => {
     const k = e.target.dataset?.flow; if (!k || !L.flow) return;
-    L.flow[k] = e.target.value; clearTimeout(tSave); tSave = setTimeout(save, 400);
+    L.flow[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    if (['attempt', 'ka', 'ref', 'example', 'exampleWhy'].includes(k)) { L.flow.verified = false; L.flow.graded = false; L.flow.fixed = false; }
+    if (k === 'repair') { L.flow.verified = false; L.flow.fixed = false; }
+    if (k === 'verificationSource') L.flow.verified = false;
+    clearTimeout(tSave); tSave = setTimeout(save, 400);
+    if (e.target.type === 'checkbox' && L.flow.step === 'save') { save(); M.render(); }
   });
   addEventListener('beforeunload', () => { if (L.flow) save(); });
   // the quiet workspace: while attempting, reading feedback or repairing, everything else steps back
   // coming back to a session you left: the time away is subtracted from its length
   addEventListener('moonlab:render', e => { const f = L.flow; if (e.detail?.tab === 'session' && f?.leftAt) { f.away = (f.away || 0) + Math.max(0, Date.now() - f.leftAt); delete f.leftAt; save(); } });
-  addEventListener('moonlab:render', e => document.body.classList.toggle('kg-flow-on', e.detail?.tab === 'session' && !!L.flow && ['warmup', 'attempt', 'feedback', 'repair', 'recap', 'save'].includes(L.flow.step)));
+  addEventListener('moonlab:render', e => document.body.classList.toggle('kg-flow-on', e.detail?.tab === 'session' && !!L.flow && ['warmup', 'example', 'attempt', 'feedback', 'repair', 'recap', 'save'].includes(L.flow.step)));
 
   const css = document.createElement('style');
   css.textContent = `.kg-flow h2{margin:4px 0 8px;font-size:clamp(20px,2.4vw,25px);line-height:1.3}
@@ -11251,6 +11305,320 @@ body.kg-dock-open #fy-pop{display:none}
   addEventListener('resize', () => setTimeout(tidy, 100));
   addEventListener('pointerup', () => setTimeout(tidy, 400));
   setTimeout(run, 1500); setInterval(run, 4000);
+})();
+</script>
+<style id="learning-desk-style">
+/* Practical study desk. Insert after the legacy styles; the scene and portraits retain their art direction. */
+html,
+html[data-desk-theme="observatory"] {
+  --desk-bg:#0B1220; --desk-panel:#162238; --desk-text:#F1F5F9; --desk-muted:#B4C0D0;
+  --desk-accent:#67E8F9; --desk-secondary:#F9A8D4; --desk-warning:#FBBF24;
+  --desk-soft:#1E2D45; --desk-line:#3A4B63; --desk-control-line:#71839B;
+  --desk-on-accent:#0B1220; --desk-scheme:dark;
+}
+html[data-desk-theme="paper"] {
+  --desk-bg:#F7F5EF; --desk-panel:#FFFFFF; --desk-text:#17212B; --desk-muted:#52606D;
+  --desk-accent:#075E69; --desk-secondary:#754668; --desk-warning:#92400E;
+  --desk-soft:#EDF1EF; --desk-line:#CED6D7; --desk-control-line:#78888F;
+  --desk-on-accent:#FFFFFF; --desk-scheme:light;
+}
+html[data-desk-theme="sage"] {
+  --desk-bg:#18201D; --desk-panel:#222E28; --desk-text:#F2F5EE; --desk-muted:#BAC8BC;
+  --desk-accent:#B8D99A; --desk-secondary:#C6B9E8; --desk-warning:#F2BF80;
+  --desk-soft:#2D3B32; --desk-line:#4D6255; --desk-control-line:#82998B;
+  --desk-on-accent:#18201D; --desk-scheme:dark;
+}
+html[data-desk-theme] {
+  color-scheme:var(--desk-scheme);
+  scrollbar-color:var(--desk-control-line) var(--desk-bg);
+  --color-bg:var(--desk-bg); --color-surface:var(--desk-panel); --color-fg:var(--desk-text);
+  --color-muted:var(--desk-muted); --color-primary:var(--desk-accent);
+  --color-primary-fg:var(--desk-on-accent); --color-border:var(--desk-line);
+}
+html[data-desk-theme] body.kg-shell,
+html[data-desk-theme] body.kg-shell[data-theme] {
+  /* Existing seasonal shell backgrounds use !important. */
+  background:var(--desk-bg)!important; color:var(--desk-text); color-scheme:var(--desk-scheme);
+  --kg-a1:var(--desk-accent); --kg-a2:var(--desk-accent); --kg-c1:var(--desk-panel);
+  --kg-c2:var(--desk-panel); --kg-cb:var(--desk-line); --kd-surface:var(--desk-panel);
+  --kd-line:var(--desk-line); --kd-line-top:transparent; --kd-shadow:none;
+  --kd-glow:var(--desk-accent); --kd-muted:var(--desk-muted);
+}
+html[data-desk-theme] body #kg-main #habit-desk {
+  --hb-accent:var(--desk-accent); --hb-soft:var(--desk-soft); --hb-line:var(--desk-line);
+  --hb-ink:var(--desk-text); --hb-paper:var(--desk-panel);
+}
+html[data-desk-theme] body #kg-main #moon-lab {
+  --kl-ink:var(--desk-text); --kl-dim:var(--desk-muted); --kl-line:var(--desk-line);
+  --kl-card:var(--desk-panel); --kl-soft:var(--desk-soft); --kl-pink:var(--desk-accent);
+  --kl-gold:var(--desk-warning); --kl-cyan:var(--desk-accent);
+}
+html[data-desk-theme] #kg-bar,
+html[data-desk-theme] #kg-nav {background:var(--desk-bg);border-color:var(--desk-line);}
+html[data-desk-theme] #kg-bar .kg-brand b {color:var(--desk-text);}
+html[data-desk-theme] #kg-bar #kg-status,
+html[data-desk-theme] #kg-nav a {color:var(--desk-muted);}
+html[data-desk-theme] #kg-nav a:hover {background:var(--desk-soft);color:var(--desk-text);}
+html[data-desk-theme] #kg-nav a[aria-current="page"] {
+  background:var(--desk-soft);color:var(--desk-text);box-shadow:inset 0 -2px 0 var(--desk-accent);
+}
+html[data-desk-theme] #kg-main {min-width:0;}
+html[data-desk-theme] #kg-main :is(#habit-desk,#moon-lab) {color:var(--desk-text);}
+/* Restrained study surfaces override older presentation layers, including the optional plain look. */
+html[data-desk-theme] body #kg-main :is(.hb-card,.kl-card,.kl-boss,.kl-fold:not(.kl-mainfold):not(.kl-quietfold)) {
+  background:var(--desk-panel)!important;border-color:var(--desk-line)!important;
+  box-shadow:none!important;backdrop-filter:none!important;border-radius:16px!important;
+}
+html[data-desk-theme] body #kg-main #habit-desk .hb-day-map {background:var(--desk-panel)!important;}
+html[data-desk-theme] body #kg-main :is(.hb-card,.kl-card):hover {border-color:var(--desk-line)!important;}
+html[data-desk-theme] #kg-main :is(.hb-card,.kl-card) {padding:20px;}
+html[data-desk-theme] #kg-main.kd-enter :is(.hb-card,.kl-card) {animation:none;}
+html[data-desk-theme] #kg-main :is(#habit-desk,#moon-lab) :is(h2,h3) {
+  color:var(--desk-text);background:none;-webkit-text-fill-color:currentColor;
+}
+html[data-desk-theme] #kg-main :is(.hb-caption,.kl-small,.kl-intro,.kl-legend,.kg-flow-src) {
+  color:var(--desk-muted);opacity:1;
+}
+html[data-desk-theme] #kg-main :is(.hb-eyebrow,.kl-eyebrow) {color:var(--desk-secondary);}
+html[data-desk-theme] #kg-main :is(.hb-timer,.kl-timer) {color:var(--desk-accent);text-shadow:none;}
+html[data-desk-theme] #kg-main :is(.hb-nudge,.hb-welcome,.hb-answer,.hb-buckets span,.kl-chip,.kl-banner,.kl-back,.kl-paper,.kl-ch,.kg-cmp>div) {
+  background:var(--desk-soft);border-color:var(--desk-line);color:var(--desk-text);
+}
+html[data-desk-theme] body #kg-main #moon-lab .kl-ch:hover {
+  background:var(--desk-soft)!important;border-color:var(--desk-control-line)!important;
+}
+html[data-desk-theme] #kg-main :is(.kl-timer,.kl-paper-top) {background:var(--desk-panel);}
+html[data-desk-theme] #kg-main :is(.kl-quietfold>summary,.kl-table thead th) {color:var(--desk-muted);}
+html[data-desk-theme] #kg-main :is(.kl-tag,.kl-unit,.kl-hint) {color:var(--desk-secondary);}
+html[data-desk-theme] #kg-main :is(.kl-proof-usable,.kl-proof-retained,.kl-proof-ready) {color:var(--desk-accent);}
+html[data-desk-theme] #kg-main .kl-proof-repair {color:var(--desk-warning);}
+html[data-desk-theme] #kg-main :is(.kg-flow-steps li,.kg-flow-steps li.done) {color:var(--desk-muted);border-color:var(--desk-line);}
+html[data-desk-theme] #kg-main .kg-flow-steps li.on {background:var(--desk-accent);color:var(--desk-on-accent);border-color:var(--desk-accent);}
+html[data-desk-theme] #kg-main :is(.kg-flow-k b,.kg-cmp-bad b) {color:var(--desk-secondary);}
+html[data-desk-theme] #kg-main :is(.kg-flow-fb b,.kg-flow-recheck b,.kg-cmp-ok b,.kg-flow-ev b,.kg-flow-added) {color:var(--desk-accent);}
+html[data-desk-theme] #kg-main :is(.kg-flow-miss b,.kg-flow-ev.help b,.kg-cmp-miss b) {color:var(--desk-warning);}
+html[data-desk-theme] #kg-main .kg-cmp-unk b {color:var(--desk-muted);}
+/* Form and primary-button !important declarations match hard-coded legacy form rules. */
+html[data-desk-theme] body #kg-main :is(#habit-desk,#moon-lab) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),select,textarea) {
+  background:var(--desk-bg)!important;color:var(--desk-text)!important;border-color:var(--desk-control-line)!important;
+  min-width:0;max-width:100%;min-height:44px;font-size:16px;line-height:1.5;
+}
+html[data-desk-theme] #kg-main :is(input,textarea)::placeholder {color:var(--desk-muted);opacity:1;}
+html[data-desk-theme] #kg-main :is(input[type=checkbox],input[type=radio],input[type=range]) {accent-color:var(--desk-accent);}
+html[data-desk-theme] #kg-main :is(#habit-desk,#moon-lab) button {
+  min-height:44px;max-width:100%;background:var(--desk-panel);color:var(--desk-text);
+  border-color:var(--desk-control-line);white-space:normal;overflow-wrap:anywhere;
+}
+html[data-desk-theme] body #kg-main :is(#habit-desk,#moon-lab) :is(.hb-primary,.kl-primary):not(:disabled) {
+  background:var(--desk-accent)!important;color:var(--desk-on-accent)!important;
+  border-color:var(--desk-accent)!important;box-shadow:none!important;
+}
+html[data-desk-theme] #kg-main :is(#habit-desk,#moon-lab) button:not(:disabled):hover {
+  background:var(--desk-soft);transform:none;
+}
+html[data-desk-theme] body #kg-main :is(.hb-primary,.kl-primary):not(:disabled):hover {filter:brightness(.96);}
+html[data-desk-theme] #kg-main :is(.kl-conf,.kl-seg) [aria-pressed="true"],
+html[data-desk-theme] #moon-lab .kl-tabs [aria-current="page"] {
+  background:var(--desk-soft);color:var(--desk-accent);border-color:var(--desk-accent);box-shadow:none;
+}
+html[data-desk-theme] #kg-main progress,
+html[data-desk-theme] #kg-main progress::-webkit-progress-bar {background:var(--desk-soft);}
+html[data-desk-theme] #kg-main progress::-webkit-progress-value {background:var(--desk-accent);box-shadow:none;}
+html[data-desk-theme] #kg-main progress::-moz-progress-bar {background:var(--desk-accent);}
+html[data-desk-theme] #kg-main :is(button,a,summary,input,select,textarea):focus-visible,
+html[data-desk-theme] #kg-bar :is(button,a):focus-visible {
+  outline:3px solid var(--desk-accent)!important;outline-offset:3px;
+}
+html[data-desk-theme] #kg-main details>summary:hover {color:var(--desk-accent);}
+html[data-desk-theme] ::selection {background:var(--desk-accent);color:var(--desk-on-accent);}
+
+/* Today's single decision, compact plan, and expandable supporting material. */
+#kg-main .learning-desk {
+  padding:24px;min-width:0;background:var(--desk-panel);color:var(--desk-text);
+  border:1px solid var(--desk-line);border-radius:16px;margin:0 0 20px;
+}
+#kg-main .learning-desk h2 {font-size:clamp(24px,3vw,32px);line-height:1.25;margin:0 0 8px;}
+#kg-main .learning-desk p {max-width:68ch;}
+#kg-main .learning-kicker {
+  color:var(--desk-secondary);font-size:11px;font-weight:800;letter-spacing:.12em;
+  text-transform:uppercase;margin:0 0 8px;
+}
+#kg-main .learning-summary {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:16px;}
+#kg-main .learning-summary>* {min-width:0;}
+#kg-main .learning-actions {display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0 8px;}
+#kg-main .learning-actions button {min-height:44px;padding:10px 16px;}
+html[data-desk-theme] #kg-main :is(#habit-desk,#moon-lab) :is(.learning-desk,.learning-settings,.learning-session-support) button {min-height:44px;}
+#kg-main .learning-meta {color:var(--desk-muted);font-size:13px;line-height:1.6;margin:8px 0;}
+#kg-main .learning-plan {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin:20px 0 0;border-top:1px solid var(--desk-line);}
+#kg-main .learning-plan-item {padding:16px 16px 0 0;min-width:0;overflow-wrap:anywhere;}
+#kg-main .learning-plan-item :is(h3,strong) {display:block;font-size:15px;line-height:1.4;margin:0 0 4px;}
+#kg-main .learning-plan-item p {margin:0;color:var(--desk-muted);font-size:13px;line-height:1.6;}
+#kg-main .learning-status {display:inline-flex;align-items:center;border:1px solid var(--desk-line);border-radius:8px;padding:4px 8px;font-size:12px;color:var(--desk-accent);}
+#kg-main .learning-note {border-left:3px solid var(--desk-warning);padding:8px 12px;margin:16px 0;color:var(--desk-muted);font-size:13px;}
+#kg-main :is(.learning-settings,.learning-evidence,.learning-methods,.learning-session-support) {
+  min-width:0;color:var(--desk-text);overflow-wrap:anywhere;
+}
+#kg-main :is(.learning-desk,.learning-settings,.learning-evidence,.learning-methods,.learning-session-support) :is(p,li,label) {line-height:1.65;}
+#kg-main :is(.learning-settings,.learning-evidence,.learning-methods,.learning-session-support) h3 {font-size:18px;line-height:1.4;margin:0 0 8px;}
+#kg-main .learning-settings {display:grid;gap:16px;}
+#kg-main .learning-settings label {display:grid;gap:6px;min-width:0;font-size:13px;font-weight:700;}
+#kg-main .learning-settings :is(select,input) {width:100%;}
+#kg-main .learning-settings small {display:block;font-size:12px;color:var(--desk-muted);font-weight:400;}
+#kg-main .learning-evidence {display:grid;gap:12px;margin:16px 0;}
+#kg-main .learning-evidence :is(article,.learning-evidence-row) {padding:12px 0;border-top:1px solid var(--desk-line);}
+#kg-main .learning-evidence :is(p,ul) {margin:6px 0;}
+#kg-main .learning-methods {margin:20px 0;}
+#kg-main .learning-methods :is(ul,ol) {padding-left:20px;margin:12px 0;}
+#kg-main .learning-methods ul {list-style:disc;}
+#kg-main .learning-methods ol {list-style:decimal;}
+#kg-main .learning-methods li+li {margin-top:10px;}
+#kg-main :is(.learning-evidence,.learning-methods) a {color:var(--desk-accent);text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere;}
+#kg-main .learning-session-support {border-top:1px solid var(--desk-line);margin-top:16px;padding-top:12px;}
+#kg-main .learning-session-support label {display:grid;gap:6px;margin:12px 0;font-size:13px;font-weight:700;}
+#kg-main .learning-session-support textarea {min-height:112px;}
+#kg-main :is(.learning-desk,.learning-settings,.learning-evidence,.learning-methods,.learning-session-support) summary {
+  min-height:44px;display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:700;padding:8px 0;
+}
+#kg-main :is(.learning-desk,.learning-settings,.learning-evidence,.learning-methods,.learning-session-support) summary::before {
+  content:"+";display:inline-grid;place-items:center;flex:0 0 20px;width:20px;height:20px;
+  color:var(--desk-accent);font:700 18px/1 system-ui;
+}
+#kg-main :is(.learning-desk,.learning-settings,.learning-evidence,.learning-methods,.learning-session-support) details[open]>summary::before,
+#kg-main details.learning-session-support[open]>summary::before {content:"−";}
+#kg-main .learning-desk>details {border-top:1px solid var(--desk-line);margin-top:16px;padding-top:4px;}
+#kg-main :is(.learning-desk,.learning-settings,.learning-evidence,.learning-methods,.learning-session-support) [hidden] {display:none;}
+
+@media(min-width:721px) {
+  #kg-main .learning-settings .learning-settings-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+}
+@media(max-width:720px) {
+  html[data-desk-theme] #kg-main {width:calc(100% - 24px);}
+  html[data-desk-theme] #kg-main :is(.hb-card,.kl-card,.learning-desk) {padding:16px;}
+  #kg-main .learning-summary {grid-template-columns:minmax(0,1fr);gap:8px;}
+  #kg-main .learning-plan {grid-template-columns:minmax(0,1fr);}
+  #kg-main .learning-plan-item {padding:12px 0;border-bottom:1px solid var(--desk-line);}
+  #kg-main .learning-plan-item:last-child {border-bottom:0;}
+  #kg-main .learning-actions button {flex:1 1 160px;}
+  html[data-desk-theme] #kg-main :is(.hb-section-heading,.kl-paper-top) {flex-wrap:wrap;}
+  html[data-desk-theme] #kg-main .hb-timeline li {grid-template-columns:minmax(0,1fr);gap:8px;}
+  html[data-desk-theme] #kg-main .hb-timeline li button {justify-self:start;}
+  html[data-desk-theme] #kg-main :is(.hb-grid,.hb-metrics,.kg-flow-grid) {grid-template-columns:minmax(0,1fr);}
+  html[data-desk-theme] #kg-nav a {min-width:0;min-height:44px;}
+}
+@media(max-width:380px) {
+  html[data-desk-theme] #kg-main {width:calc(100% - 16px);}
+  html[data-desk-theme] #kg-main :is(.hb-card,.kl-card,.learning-desk) {padding:12px;}
+  #kg-main .learning-actions {gap:8px;}
+  html[data-desk-theme] #kg-main .hb-actions>button {flex:1 1 100%;}
+}
+@media(prefers-reduced-motion:reduce) {
+  html[data-desk-theme] {scroll-behavior:auto;}
+  html[data-desk-theme] #kg-main *,html[data-desk-theme] #kg-main *::before,html[data-desk-theme] #kg-main *::after {
+    animation:none!important;transition:none!important;scroll-behavior:auto!important;
+  }
+}
+
+.learning-plan>li{padding:16px;display:grid;gap:6px}.learning-summary strong{display:block;font-size:28px}.learning-summary span{display:block}.learning-session-support .kl-check{display:flex!important}
+</style>
+<script id="learning-desk-core">
+/* Pure presentation preferences and evidence summaries; no schedule or history migration. */
+(function (root) {
+  'use strict';
+  function settings(input) {
+    const s = input || {};
+    return { theme: ['observatory', 'paper', 'sage'].includes(s.theme) ? s.theme : 'observatory', reviewMinutes: [10, 15, 20].includes(Number(s.reviewMinutes)) ? Number(s.reviewMinutes) : 15 };
+  }
+  function evidence(logs) {
+    const out = { independent: 0, delayed: 0, transfer: 0, supported: 0, unverified: 0 };
+    for (const x of Array.isArray(logs) ? logs : []) {
+      const verified = x.requireVerification === true && x.verified === true && String(x.verificationSource || '').trim() && x.disputed !== 'unresolved';
+      if (!verified) { out.unverified++; continue; }
+      if (x.ev === 'help' || x.supported === true) { out.supported++; continue; }
+      if (x.ev !== 'indep') continue;
+      out.independent++;
+      if (x.delayed === true) out.delayed++;
+      if (x.transfer === true) out.transfer++;
+    }
+    return out;
+  }
+  root.LearningDeskCore = { settings, evidence };
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script id="learning-desk-ui">
+(function () {
+  'use strict';
+  const M = window.MoonLab, C = window.LearningDeskCore;
+  if (!M || !C) return;
+  const { L, esc } = M;
+  const preferences = () => C.settings(L.deskSettings);
+  function applyTheme() {
+    document.documentElement.dataset.deskTheme = preferences().theme;
+    document.body.classList.remove('kg-light');
+  }
+  applyTheme();
+  const route = (label, section, panel) => `<button class="kl-ghost" data-a="learninggo" data-section="${section}" data-panel="${panel}">${label}</button>`;
+  window.LearningDesk = {
+    todayCard(r, alt) {
+      const p = preferences();
+      return `<section class="kl-card kg-rec learning-desk${r.quiet ? ' quiet' : ''}"><div class="learning-meta"><span class="learning-kicker">${esc(r.eye || 'ONE THING AT A TIME')}</span>${!r.quiet ? `<span>Older material: up to ${p.reviewMinutes} min inside practice</span>` : ''}</div>
+        <h2>${esc(r.title)}</h2><p class="kg-why">${r.quiet ? '' : '<b>Why this:</b> '}${esc(r.why)}</p>
+        <div class="learning-actions">${r.btn ? `<button class="kl-primary" data-a="kgrec">${esc(r.btn)}</button>` : ''}</div>
+        ${!r.quiet && !r.resume ? '<ol class="learning-plan"><li><b>Attempt</b><span>Choose a method before opening notes.</span></li><li><b>Check</b><span>Find the first incorrect step.</span></li><li><b>Repair</b><span>Fix one gap, then stop at your planned time.</span></li></ol>' : ''}
+        ${alt.length ? `<details><summary>Choose something else</summary><div class="learning-actions">${alt.map((x, i) => `<button class="kl-ghost" data-a="kgalt" data-v="${i}">${esc(x.label)}</button>`).join('')}${route('Learn a new method', 'library', 'methods')}</div></details>` : ''}</section>`;
+    }
+  };
+  M.ACTIONS.learninggo = b => M.go(b.dataset.section, b.dataset.panel);
+  M.ACTIONS.learningstart = b => M.flowStart({ act: b.dataset.act, subj: 'Physics' });
+  M.FORMS.learningprefs = v => {
+    const previous = L.deskSettings;
+    L.deskSettings = preferences();
+    L.deskSettings = C.settings({ ...L.deskSettings, ...v });
+    if (M.save() === false) { L.deskSettings = previous; return; }
+    applyTheme(); M.render();
+    const status = document.getElementById('learning-settings-status');
+    if (status) status.textContent = 'Saved on this device. Included in your study backup.';
+  };
+  const oldApp = M.PANELS.app;
+  M.PANELS.app = () => {
+    const p = preferences();
+    return `<section class="kl-card learning-settings"><p class="kl-eyebrow">YOUR STUDY DESK</p><h2>Readable, with room to think</h2>
+      <form data-f="learningprefs" class="kl-stack"><div class="learning-settings-grid">
+        <label>Desk palette <select name="theme"><option value="observatory" ${p.theme === 'observatory' ? 'selected' : ''}>Observatory · dark blue</option><option value="paper" ${p.theme === 'paper' ? 'selected' : ''}>Paper &amp; Teal · light</option><option value="sage" ${p.theme === 'sage' ? 'selected' : ''}>Sage Lab · dark green</option></select></label>
+        <label>Older-material practice per day <select name="reviewMinutes">${[10,15,20].map(n => `<option value="${n}" ${p.reviewMinutes === n ? 'selected' : ''}>Up to ${n} minutes</option>`).join('')}</select></label></div>
+        <p class="kl-small">This is part of your usual practice, not extra time on your timetable. Suggestions use five-minute estimates; a hard problem can take longer. Stop at the budget. Unfinished items stay visible for another day.</p>
+        <div class="kl-row"><button class="kl-primary">Save desk preferences</button><span id="learning-settings-status" role="status" class="kl-small"></span></div></form></section>${oldApp ? oldApp() : ''}`;
+  };
+  const methodRows = [
+    ['Solve → check → repair', 'Attempt a real problem, compare the reasoning with a reliable key, then redo the first broken step. For an orbit, state the system and assumptions before choosing energy or forces.', 'High value. Feedback quality matters; repeatedly guessing at problems beyond your preparation is inefficient.'],
+    ['Worked examples → fewer hints', 'Explain each step in a correct solution. Hide it and solve a nearby problem; later try an unfamiliar one. Start a new integration technique or a first rocket-equation derivation this way.', 'Strong evidence for mathematics, especially novices. Fade support as skill grows. Copying the steps is not independent practice.'],
+    ['Spaced, mixed problems', 'Use a small part of normal practice for older skills. Mix a few methods you already know, without topic labels; decide what the problem needs before calculating.', 'Spacing is well supported; mathematical interleaving is useful but not a universal recipe. Block a few initial examples when a method is new.'],
+    ['Short retrieval', 'Close notes and reconstruct a definition, diagram or derivation. Then check. Explain why orbital speed varies with radius, rather than only reciting an equation.', 'Strong general learning evidence. Math-specific retrieval findings are less certain than general findings; do not replace problem solving with flashcards.'],
+    ['Explain the mechanism', 'Ask why a step is valid, when it would fail, and what a graph means. Teach a short explanation, then check it against a source.', 'Useful with feedback. Fluency and an agreeable AI listener do not establish correctness.'],
+    ['Predict → observe → explain', 'Predict a graph or simulation result, inspect it, and account for the mismatch. Change one parameter at a time; try orbital radius and period.', 'A useful design for conceptual practice. Simulations illustrate a model and need guidance; their output is not unrestricted physical proof.'],
+    ['Represent the same idea twice', 'Connect words, equations and a relevant diagram: force arrows, an energy curve, or a graph of acceleration. Explain how each corresponds.', 'Useful when representations clarify the structure. Decorative imagery, copying diagrams and split attention can add work without learning.'],
+    ['Read strategically; discuss selectively', 'Skim to locate a gap, read that part, close it and apply it. In group study, attempt first, compare reasoning, then solve alone.', 'Reading and discussion are useful inputs. Highlighting, rereading and listening alone are weak evidence of lasting learning.']
+  ];
+  const oldMethods = M.PANELS.methods;
+  M.PANELS.methods = () => `<section class="kl-card learning-methods"><p class="kl-eyebrow">A SMALL SYSTEM, USED WELL</p><h2>Learn → solve → check → revisit</h2><p>Start with one good source and one problem. These are practical priorities for technical subjects, not a universal league table or guaranteed learning rates.</p>
+    <div class="learning-actions"><button data-a="learningstart" data-act="worked">Start with an example</button><button data-a="learningstart" data-act="solve">Practise independently</button><button data-a="learningstart" data-act="predict">Predict &amp; explain</button></div>
+    <h3>A realistic 45-minute session</h3><ol><li>3 min: recall what you need and choose a checkable goal.</li><li>10 min: explain a worked example if the method is new.</li><li>20 min: solve, check and repair. Include one older problem within this time.</li><li>7 min: try a changed setting and check units / limits.</li><li>5 min: write one uncertainty and save. Then take a break.</li></ol><p class="kl-small">A starting template, not a prescribed pace. Shorten it when needed. Preserve meals, rest and a stopping time.</p>
+    ${methodRows.map(([name, how, limits]) => `<details><summary>${name}</summary><p>${how}</p><p class="kl-small">${limits}</p></details>`).join('')}
+    <details><summary>Science → astrophysics → rocket science</summary><ul><li><b>Foundations:</b> algebra, functions, trigonometry, vectors and calculus alongside mechanics. Use the existing rocket path for progression.</li><li><b>Astrophysics:</b> connect gravity, energy, waves and thermodynamics to observations. Check orders of magnitude and distinguish a model from measured evidence.</li><li><b>Rocket science:</b> derive momentum and ideal rocket relations; state idealizations, then use simulations and paper mission studies to explore tradeoffs.</li></ul><p>Move on when you can explain and solve representative problems without prompts. A later unfamiliar problem is a stronger check than repeating the same one.</p>${route('Open the rocket path', 'study', 'rocket')}</details>
+    <details><summary>Set up the physical desk without buying much</summary><ul><li><b>Essentials:</b> one clear writing area, scratch paper, a pen, readable light and water. Keep the phone out of reach and notifications off.</li><li><b>Screen:</b> one task, its reference and a scratchpad. Close unrelated tabs; set comfortable text size and brightness.</li><li><b>Optional:</b> a book stand, existing headphones or an external keyboard if they solve a specific discomfort. A new tablet or extra monitor is not required.</li><li><b>Close out:</b> note the next small step, back up your work, and leave the desk ready.</li></ul></details>
+    <details><summary>Research and free learning resources</summary><p class="kl-small">The priorities above are an evidence-informed application, not direct evidence for every astrophysics or engineering topic.</p><ul>
+      <li><a href="https://link.springer.com/article/10.1007/s10648-025-10035-1" target="_blank" rel="noopener noreferrer">Murray, Horner &amp; Göbel (2025), Educational Psychology Review 37:75</a>: mathematics spacing and retrieval meta-analysis; the retrieval evidence base is smaller.</li>
+      <li><a href="https://link.springer.com/article/10.1007/s10648-023-09745-1" target="_blank" rel="noopener noreferrer">Barbieri et al. (2023), Educational Psychology Review 35:11</a>: worked examples in mathematics.</li>
+      <li><a href="https://pubmed.ncbi.nlm.nih.gov/33683913/" target="_blank" rel="noopener noreferrer">Yang et al. (2021), Psychological Bulletin</a>: classroom quizzing meta-analysis.</li>
+      <li><a href="https://files.eric.ed.gov/fulltext/ED595322.pdf" target="_blank" rel="noopener noreferrer">Rohrer et al. (2020), Journal of Educational Psychology</a>: randomized mathematics interleaving trial.</li>
+      <li><a href="https://ies.ed.gov/ncee/WWC/PracticeGuide/1/Published" target="_blank" rel="noopener noreferrer">IES (2007), Organizing Instruction and Study to Improve Student Learning</a>: practice guide.</li>
+      <li>Free: <a href="https://ocw.mit.edu/collections/ocw-scholar/" target="_blank" rel="noopener noreferrer">MIT OpenCourseWare</a>, <a href="https://phet.colorado.edu/" target="_blank" rel="noopener noreferrer">PhET simulations</a>, <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/guide-to-rockets/" target="_blank" rel="noopener noreferrer">NASA rocket guide</a>.</li></ul></details></section>
+    <details class="kl-card learning-methods"><summary>More tools already in your desk</summary>${oldMethods ? oldMethods() : ''}</details>`;
+  const oldSkills = M.PANELS.skills;
+  if (oldSkills) M.PANELS.skills = () => {
+    const s = C.evidence(L.flowLog);
+    return `<section class="kl-card learning-evidence"><p class="kl-eyebrow">EVIDENCE, NOT A MASTERY SCORE</p><h2>What your checked work shows</h2><div class="learning-summary"><div><strong>${s.independent}</strong><span>Independent checked attempts</span></div><div><strong>${s.delayed}</strong><span>After an earlier dated skill check</span></div><div><strong>${s.transfer}</strong><span>Unfamiliar settings · your assessment</span></div></div><p class="kl-small">${s.supported} supported attempts. ${s.unverified} saved records without source verification, including older records. Counts overlap; no percentage predicts mastery. Covers the latest ${Math.min(300, (L.flowLog || []).length)} saved guided sessions.</p><p class="kl-small">Source verification is your report, not an external certification. Delayed results require an exact linked skill and a prior check on a different day; transfer is never inferred from the activity name.</p></section>${oldSkills()}`;
+  };
+  M.softRender?.();
 })();
 </script>
 </body></html>
