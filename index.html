@@ -1562,6 +1562,7 @@ window.__KG_BUILTIN = {
   async function sendMessage() {
     const text = input.value.trim();
     if (!text || isSending) return;
+    if (window.__kgBreakCouncil?.request('kaguya', text)) { input.value = ''; return; }
     window.__kgPopClear?.(); // you've moved on: the full text stays in the chat
 
     input.value = "";
@@ -2197,6 +2198,7 @@ window.__KG_BUILTIN = {
   async function iSend(preset, image, tag) {
     const usePaste = !image && !!pasted && !iSending;
     const text = (preset || iinput.value).trim() || (usePaste ? "Look at this image and help me with it." : ""); if (!text || iSending) return;
+    if (!preset && !image && window.__kgBreakCouncil?.request('iroha', text)) { iinput.value = ''; return; }
     let thumb = null;
     if (usePaste) { image = pasted.img; thumb = pasted.url; pasted = null; pchip.hidden = true; pchip.textContent = ""; }
     POP.q.length = 0; // you've moved on: the full text stays in the chat
@@ -2655,7 +2657,7 @@ window.__KG_BUILTIN = {
     if (i >= 0 && out[i].role === "user") { const FR = "\n\n[background from the website, not typed by me. Answer what I actually said first. Use any of it only if it's relevant, and don't steer the conversation toward study unless I did.]", c = String(out[i].content), k = c.indexOf("\n\n["); out[i].content = k < 0 ? c + FR : c.slice(0, k) + FR + c.slice(k); }
     if (i >= 0 && out[i].role === "user") out[i].content += planNote() + sessionNote() + dreamNote() + (window.__kgCoachNote?.() || "") + (who === "iroha" ? (window.__kgTutorNote?.() || "") + (window.__kgProofNote?.() || "") : "");
     if (i >= 0 && out[i].role === "user" && who === "iroha" && window.__kgOnce) { out[i].content += "\n\n" + window.__kgOnce; window.__kgOnce = null; }
-    if (i >= 0 && out[i].role === "user") out[i].content += (window.__kgBondNote?.(who) || "") + crossNote(who) + (window.__kgNoteExtra && window.__kgNoteExtra[who] ? "\n\n" + window.__kgNoteExtra[who] : "");
+    if (i >= 0 && out[i].role === "user") out[i].content += (window.__kgBondNote?.(who) || "") + crossNote(who) + (window.__kgNoteExtra && window.__kgNoteExtra[who] ? "\n\n" + window.__kgNoteExtra[who] : "") + (window.__kgAdminNote?.[who] || "");
     return out;
   };
   // After one of them replies, the other sometimes jumps in with a line of her own.
@@ -3662,7 +3664,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     if((!desk().sound || window.__kgOnBreak) && melodyTimer)stopAudio();
   },1000);
   // Keep the original schedule, floating companion and dashboard on the same rule.
-  window.HabitDesk={shiftMistakes(n){if(!n)return;for(const m of h.mistakes)if(m&&m.stage<4&&m.due)m.due=C.add(m.due,n);save();},setTheme(t){h.settings.theme=t;save();render();},refresh(){if(!document.activeElement?.closest('#habit-desk form'))render();},
+  window.HabitDesk={pauseActive(){if(!h.active||!h.active.running)return true;pause();return !h.active.running;},shiftMistakes(n){if(!n)return;for(const m of h.mistakes)if(m&&m.stage<4&&m.due)m.due=C.add(m.due,n);save();},setTheme(t){h.settings.theme=t;save();render();},refresh(){if(!document.activeElement?.closest('#habit-desk form'))render();},
     minutes:iso=>C.minutes(h,days(),iso),
     history:(d,iso)=>C.history(h,d,iso),
     counted:(iso,d)=>{const status=C.history(h,{...days(),[iso]:d || days()[iso]},iso).statuses[iso];return status==='study'||status==='rest';},
@@ -11638,5 +11640,214 @@ html[data-desk-theme] #kg-main :is(#habit-desk,#moon-lab) :is(.learning-desk,.le
   };
   M.softRender?.();
 })();
+</script>
+<script id="kg-admin-council">
+/* Iroha administration & two-companion break council.
+   Scoped to local study-plan settings; AI text never runs as code. */
+(function () {
+  'use strict';
+  const M = window.MoonLab;
+  if (!M) return;
+  const esc = s => M.esc ? M.esc(String(s ?? '')) : String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const getLog = () => { try { const a=JSON.parse(localStorage.getItem('kg-admin-log-v1') || '[]'); return Array.isArray(a) ? a : []; } catch (_) { return []; } };
+  const audit = (action, detail) => {
+    const line = { at: Date.now(), action, detail: String(detail).slice(0, 400) };
+    try { localStorage.setItem('kg-admin-log-v1', JSON.stringify([...getLog(), line].slice(-35))); } catch (_) {}
+    renderHistory();
+  };
+  const readHabit = () => { try { return JSON.parse(localStorage.getItem('ame-habit-v1') || '{}') || {}; } catch (_) { return {}; } };
+  const readHours = () => Number(window.StudyPlan?.hours?.() || M.L?.planHours || 6);
+  const asMinutes = v => v === 'day' ? 'today off' : Math.max(5, Math.min(60, Number(v) || 10)) + ' minutes';
+  const bare = s => String(s || '').replace(/^\s*(?:\*{1,2})?\s*(?:DECISION|MINUTES|REASON)\s*:[^\n]*\n?/gim, '').trim();
+  let busy = false, pending = null;
+
+  const css = document.createElement('style');
+  css.textContent = `
+  #kg-council-launch{padding:7px 12px;border-radius:999px;border:1px solid #7fe3ff;color:#d8faff;background:#22314b;font:800 12px "M PLUS Rounded 1c",sans-serif;cursor:pointer;white-space:nowrap}
+  #kg-council-launch:hover{background:#2c4564}
+  #kg-council{position:fixed;inset:0;margin:auto;width:min(620px,calc(100vw - 24px));max-height:min(90vh,840px);padding:0;background:linear-gradient(170deg,#1c2040,#15132e);border:2px solid #7fe3ff;border-radius:22px;color:#f2eeff;box-shadow:0 24px 100px #000b;overflow:auto;font:14px/1.55 "M PLUS Rounded 1c",sans-serif;z-index:2147483646}
+  #kg-council::backdrop{background:#050617bd;backdrop-filter:blur(4px)}
+  #kg-council *{box-sizing:border-box}#kg-council h2{font:bold 24px Georgia,serif;margin:0 0 8px}#kg-council h3{font-size:16px;margin:10px 0}#kg-council p{margin:6px 0 12px}#kg-council header{display:flex;justify-content:space-between;gap:16px;align-items:start;padding:22px 22px 8px}
+  #kg-council .kc-body{padding:8px 22px 24px}#kg-council .kc-meta{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:#7fe3ff;font-weight:800}#kg-council .kc-hint{font-size:12px;color:#c8c7e4}#kg-council input,#kg-council textarea,#kg-council select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #65639c;background:#12152b;color:#fff;margin:5px 0 12px}
+  #kg-council textarea{min-height:70px;resize:vertical}#kg-council button{border-radius:11px;border:1px solid #7777ab;padding:9px 13px;color:#f4f3ff;background:#292c50;cursor:pointer;font-weight:700}#kg-council button:hover{border-color:#7fe3ff}#kg-council button:disabled{opacity:.6;cursor:wait}#kg-council .kc-primary{background:#7fe3ff;color:#0c1b26;border-color:#7fe3ff}#kg-council .kc-rose{background:#ff8bb8;color:#201122;border-color:#ff8bb8}#kg-council .kc-actions{display:flex;flex-wrap:wrap;gap:8px}
+  #kg-council .kc-line{border-left:3px solid #ff8bb8;background:#231d40;padding:10px 13px;margin:8px 0;border-radius:0 12px 12px 0;white-space:pre-wrap;overflow-wrap:anywhere}#kg-council .kc-line.iroha{border-color:#7fe3ff;background:#182c42}#kg-council .kc-line.system{border-color:#f5d27a;background:#292c46}#kg-council .kc-speaker{font-size:11px;letter-spacing:.08em;font-weight:800;text-transform:uppercase;margin-bottom:4px}#kg-council .kc-verdict{margin-top:14px;padding:14px;border:1px solid #7fe3ff;border-radius:14px}#kg-council .kc-verdict[data-v=postpone]{border-color:#e8c275}#kg-council .kc-verdict[data-v=error]{border-color:#ff8bb8}#kg-council .kc-history{max-height:160px;overflow:auto;font-size:12px;color:#c5c7e6;margin-top:8px}#kg-council .kc-history p{margin:3px 0}
+  .kg-admin-settings .kl-row{align-items:center;flex-wrap:wrap}.kg-admin-settings button{min-height:38px}.kg-admin-settings .kl-small{line-height:1.5}
+  @media(max-width:480px){#kg-council header{padding:16px 15px 6px}#kg-council .kc-body{padding:8px 15px 18px}#kg-council h2{font-size:21px}}
+  `;
+  document.head.appendChild(css);
+
+  const dialog = document.createElement('dialog'); dialog.id = 'kg-council';
+  dialog.innerHTML = `<header><div><div class="kc-meta">KAGUYA DESK · COMPANION COUNCIL</div><h2>Iroha × Kaguya</h2><p class="kc-hint">Iroha coordinates the study desk. For break requests, both companions consider the real schedule and discuss it in front of you.</p></div><button type="button" id="kc-close" aria-label="Close dialog">✕</button></header>
+    <div class="kc-body"><form id="kc-form"><label for="kc-reason">Why do you want a break?</label><textarea id="kc-reason" maxlength="600" placeholder="e.g. I've studied for an hour and need 15 minutes to recharge." required></textarea>
+      <label for="kc-minutes">Requested break</label><select id="kc-minutes"><option value="5">5 minutes</option><option value="10" selected>10 minutes</option><option value="15">15 minutes</option><option value="20">20 minutes</option><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option><option value="day">Rest of today</option></select>
+      <div class="kc-actions"><button type="submit" id="kc-ask" class="kc-primary">Ask both to decide</button><button type="button" id="kc-own">Take the break myself</button></div><p class="kc-hint">Their recommendation is advisory. Water, meals, health, sleep and urgent needs never require permission. They cannot block you from resting.</p></form>
+      <div id="kc-transcript" aria-live="polite" aria-relevant="additions text"></div><div id="kc-result"></div><details><summary class="kc-hint">Iroha's recent admin actions</summary><div class="kc-history" id="kc-history"></div></details></div>`;
+  document.body.appendChild(dialog);
+  const $ = id => document.getElementById(id);
+  const transcript = $('kc-transcript'), result = $('kc-result'), reasonInput=$('kc-reason'), lenSelect=$('kc-minutes');
+  function renderHistory() { const l = getLog(); $('kc-history').innerHTML = l.length ? l.slice(-10).reverse().map(x => `<p><b>${esc(new Date(x.at).toLocaleString())}</b> · ${esc(x.action)}: ${esc(x.detail)}</p>`).join('') : '<p>No admin changes yet.</p>'; }
+  renderHistory();
+  const line = (who, msg) => { const el = document.createElement('div'); el.className = 'kc-line '+who; const name=document.createElement('div'); name.className='kc-speaker'; name.textContent=who==='system'?'Desk':who==='iroha'?'Iroha':'Kaguya'; const body=document.createElement('div');body.textContent=String(msg || '').slice(0,1300); el.append(name,body); transcript.appendChild(el); el.scrollIntoView({block:'nearest'}); };
+  const status = (message, v='') => { result.innerHTML = `<div class="kc-verdict" data-v="${esc(v)}">${esc(message)}</div>`; };
+  const open = (text='', from='') => { if(text)reasonInput.value=String(text).slice(0,600); const n=(String(text).match(/\b(\d{1,2})[\s-]*(?:min(?:ute)?s?|m)\b/i)||[])[1]; if(n){const choices=[5,10,15,20,30,45,60];lenSelect.value=String(choices.find(x=>x>=Number(n)) || 60);} else if(/(?:whole|rest of|entire|full)\s+(?:the\s+)?day|today\s+off|day\s+off|rest\s+day|skip\s+(?:study(?:ing)?)\s+today/i.test(text))lenSelect.value='day';
+    if(!dialog.open){ if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');} if(text) setTimeout(()=>{$('kc-ask').focus();},0);else reasonInput.focus(); };
+  const close = () => { if (dialog.open && typeof dialog.close === 'function') dialog.close(); else dialog.removeAttribute('open'); };
+  $('kc-close').addEventListener('click',close);
+  dialog.addEventListener('click',e=>{if(e.target===dialog)close();});
+
+  function pauseSession() {
+    // Use the desk's own pause control, so elapsed time is recorded correctly.
+    const h=readHabit();
+    if(h.active?.running && h.active.phase!=='closeout') {
+      if(typeof window.HabitDesk?.pauseActive === 'function') {
+        if(!window.HabitDesk.pauseActive()) return false;
+      } else {
+        const b=document.querySelector('#hb-session-card [data-action="pause"]');
+        if(b)b.click(); else return false; // Never fake a paused timer.
+      }
+    }
+    const p=window.DeskStore?.getState?.();
+    if(p?.pomo?.running && p.pausePomo)p.pausePomo();
+    return true;
+  }
+  function takeBreak(mins, source='user') {
+    if (mins==='day') {
+      // The user confirms changing their persistent day/chain; it isn't doctor's advice.
+      if(!confirm('Mark the rest of today as a rest day? This changes the study schedule and pauses reviews.'))return false;
+      const d=M.today();
+      if(!pauseSession()) {
+        status('Pause the running study timer before marking a rest day.','error');
+        return false;
+      }
+      M.ACTIONS.kgday?.({dataset:{v:'rest'}});
+      window.DeskStore?.getState?.().patchDay?.(d,{rested:true});
+      M.L.cmode={m:'quiet'}; M.save(); M.render();
+      audit('rest day',source);line('system','Today is marked as a rest day, not a medical leave. Change it using Your Study Day whenever you want.');
+      return true;
+    }
+    mins=Math.max(5,Math.min(60,Math.round(Number(mins)||10)));
+    if(!pauseSession()) {
+      status('Your running session timer could not be paused automatically. Pause it from the Today page before leaving; no break timer has been started.','error');
+      return false;
+    }
+    const b=document.querySelector('#kg-mode [data-mode="break"]');
+    if(b){b.click();} // official mode setter synchronizes timers, interruptions and UI
+    M.L.cmode={m:'break',until:Date.now()+mins*60000};
+    M.save();M.render();
+    window.__kgShortBreak=true;
+    audit('short break',`${mins} min · ${source}`);
+    line('system',`Break started for ${mins} minutes. The study timer is paused. You may resume whenever you want.`);
+    return true;
+  }
+  const answer = async (who, text) => {
+    const r=await window.__kgAsk?.(who,text);
+    return r && typeof r.reply==='string' && r.reply.trim() && !/too many requests|rate limited|too many viewers/i.test(r.reply) ? r.reply.trim() : null;
+  };
+  const isHealth = s => /\b(ill|sick|fever|pain|headache|migraine|dizz|faint|injur|panic|anxious|emergency|hospital|doctor|medication|grief|exhaust|burn(?:ed|t)?\s*out|overwhelm|cannot breathe|need sleep|haven't eaten|not eaten|dehydrat)\b/i.test(s);
+  function context() {
+    const h=readHabit(),a=h.active;
+    return JSON.stringify({localTime:new Date().toLocaleTimeString(),today:M.today(),planHours:readHours(),dayType:window.StudyPlan?.dayKind?.(M.today())?.t||'unknown',minutesLogged:Math.round(M.mins?.(M.today())||window.HabitDesk?.minutes?.(M.today())||0),onScheduledRest:!!window.__kgOnBreak,onShortBreak:!!window.__kgShortBreak,currentSession:a?{subject:a.subject||'',topic:String(a.topic||'').slice(0,100),running:!!a.running,minutesElapsed:Math.round((Number(a.accruedMs||0)+(a.running?Date.now()-a.lastStart:0))/60000)}:null}).slice(0,900);
+  }
+  const claim = (text, dur, extra='') => `[site coordinator request, not user typed: The user asks for ${asMinutes(dur)} away from studying, reason: "${String(text).slice(0,500)}". Schedule context: ${context()}. ${extra}\nA decision is advice, not a restriction: health, meals, water, sleep and emergencies always take priority. Never demand work as a condition for resting. Be yourself, speak directly to the other companion, and mention whether now and this duration make sense in 1-3 natural sentences.]`;
+  async function council(text, dur) {
+    if (busy) return;
+    if(!window.__kgAsk){status('The companion backend is unavailable. You can take your break yourself.','error');return;}
+    busy=true; pending=null; $('kc-ask').disabled=true; transcript.textContent=''; result.textContent='';
+    line('system',`Request: ${text} · ${asMinutes(dur)}. Iroha and Kaguya are reviewing it.`);
+    try {
+      const first=await answer('iroha',claim(text,dur,'Iroha: explain your first view to Kaguya.'));
+      if(!first)throw new Error('Iroha did not answer.');line('iroha',first);
+      const second=await answer('kaguya',claim(text,dur,`Iroha just told you: "${first.slice(0,900)}". Respond to Iroha honestly, including any worries or support.`));
+      if(!second)throw new Error('Kaguya did not answer.');line('kaguya',second);
+      const final=await answer('iroha',claim(text,dur,`Kaguya replied: "${second.slice(0,900)}". You are the study-plan coordinator; consider her response and decide what to recommend. Format exactly:\nDECISION: APPROVE or SHORTEN or POSTPONE\nMINUTES: ${dur==='day'?'DAY or integer 5 to 60':'integer 5 to 60'}\nREASON: your final natural-language reply to Kaguya and the user. If the user is unwell, in pain, needs sleep, food or water, recommend APPROVE and do not impose conditions. Never say a break is forbidden. If recommending POSTPONE, offer a shorter break now.`));
+      if(!final)throw new Error('Iroha could not finish the discussion.');
+      const m=/\bDECISION\s*:\s*(APPROVE|SHORTEN|POSTPONE)\b/i.exec(final),n=/\bMINUTES\s*:\s*(DAY|\d{1,3})\b/i.exec(final);
+      if(!m)throw new Error('The final decision could not be verified.');
+      const verdict=m[1].toUpperCase(),mins=dur==='day'?(n?.[1].toUpperCase()==='DAY'?'day':Math.min(60,Math.max(5,Number(n?.[1])||10))):Math.min(60,Math.max(5,Number(n?.[1])||Number(dur)||10));
+      const finalText=(/\bREASON\s*:\s*([^]*)/i.exec(final)||[])[1]?.trim()||bare(final);
+      line('iroha',finalText||'Let us be sensible about this.');
+      const safeNeed=isHealth(text);
+      const allowed=safeNeed||verdict==='APPROVE'||verdict==='SHORTEN';
+      const display=allowed ? (verdict==='SHORTEN'&&!safeNeed ? `They suggest ${asMinutes(mins)} rather than ${asMinutes(dur)}.`:`They agreed: ${asMinutes(dur)} is fine.`) : `Iroha recommends postponing or shortening this break. You still decide.`;
+      const actual=safeNeed?dur:verdict==='APPROVE'?dur:mins;
+      pending={requested:dur,actual,verdict,allowed};
+      status(display,allowed?'approve':'postpone');
+      if(allowed) {
+        if(actual==='day'){ // persistent changes require an explicit user confirmation
+          addResultAction('Accept the rest-day recommendation',()=>takeBreak('day','Iroha + Kaguya approved'));
+        } else if(takeBreak(actual,'Iroha + Kaguya approved')) {
+          status(display+' Break started. Their recommendation is not medical advice.','approve');
+        }
+      } else {
+        addResultAction(`Take ${asMinutes(dur)} anyway`,()=>takeBreak(dur,'user override'));
+      }
+      audit('council recommendation',`${verdict} · requested ${asMinutes(dur)} · suggested ${asMinutes(actual)}`);
+    } catch (err) {
+      status('The companions could not finish their conversation ('+String(err?.message||'connection unavailable')+'). No AI decision was invented. You can still take a break yourself.','error');
+      audit('council unavailable',err?.message||'network or response error');
+    } finally { busy=false; $('kc-ask').disabled=false; }
+  }
+  function addResultAction(label,fn){const btn=document.createElement('button');btn.type='button';btn.className='kc-primary';btn.textContent=label;btn.style.marginTop='10px';result.appendChild(btn);btn.addEventListener('click',()=>{if(fn())btn.disabled=true;});}
+  $('kc-form').addEventListener('submit',e=>{e.preventDefault();const t=reasonInput.value.trim();if(t.length<2)return; council(t,lenSelect.value);});
+  $('kc-own').addEventListener('click',()=>{if(busy)return;const t=reasonInput.value.trim()||'I chose to rest';if(takeBreak(lenSelect.value,'user decision: '+t.slice(0,80)))status('Your break was chosen by you. No approval required.','approve');});
+
+  // Iroha can change today's plan, day type, or re-plan via a tightly scoped command.
+  // No model text is evaluated; only a user's explicit action is accepted.
+  function command(who,text) {
+    if(who!=='iroha')return false;
+    const s=String(text||'').trim();
+    if(!/\b(change|switch|set|make|use|replan|re-plan|rearrange|reschedule|schedule)\b/i.test(s))return false;
+    let action='',detail='';
+    if(/\b(replan|re-plan|rearrange|reschedule)\b/i.test(s)&&/\b(today|now|schedule|plan)\b/i.test(s)){
+      M.ACTIONS.kgreplan?.(); action='Re-plan from now'; detail='Today';
+    } else if(/\b(6|8)\s*(?:h(?:ou)?rs?)\b|\b(?:six|eight)\s*hours?\b/i.test(s)&&/\b(plan|study|hours?|schedule|day)\b/i.test(s)){
+      const h=/\b6\b|\bsix\b/i.test(s)?'6':'8'; window.__kgSetPlan?.(h);action='Study hours';detail=h+' h';
+    } else if(/\b(holiday|college|rest day)\b/i.test(s) && /\b(today|day|schedule)\b/i.test(s)){
+      const v=/\brest day\b/i.test(s)?'rest':/\bholiday\b/i.test(s)?'holiday':/5\s*pm|17:00/i.test(s)?'c1020':'c900';
+      if(v==='rest'&&!confirm('Iroha will mark today as a rest day. Continue?'))return true;
+      M.ACTIONS.kgday?.({dataset:{v}});action='Day type';detail=v;
+    }
+    if(!action)return false;
+    audit(action,detail);
+    window.__kgScript?.([['i',`I changed ${action.toLowerCase()} to ${detail}. Kaguya, we will follow the updated desk.`],['k','got it! the new plan is what we follow 🌙']]);
+    // Keep chat response explicit: the change was made by code, not by a claimed AI tool call.
+    M.K?.('Iroha updated your '+action.toLowerCase()+'.');
+    return true;
+  }
+  function admin(who,text){return command(who,text);}
+  const explicitBreak = text => {
+    const s=String(text||'').trim();if(!s || s.length>600)return false;
+    if(/\b(?:what|why|how|when|who|explain|tell me about)\b.*\bbreak\b/i.test(s) && !/\b(?:can i|may i|i need|i want|let me|please)\b/i.test(s))return false;
+    return /\b(can\s+i|could\s+i|may\s+i|let\s+me|need\s+(?:a|to|some)|want\s+(?:a|to)|give\s+me|please|i(?:'m| am)\s+(?:taking|going to take)|ask\s+(?:for|about)|request\s+(?:a|some)|should\s+i|take\s+a)\b.{0,70}\b(break|rest|time\s+off|day\s+off)\b/i.test(s)
+      || /\b(break|rest|day\s+off)\b.{0,40}\b(please|now|for\s+\d+\s*min)/i.test(s)
+      || /\b(can\s+i|could\s+i|may\s+i|need\s+to|want\s+to|please)\b.{0,40}\b(skip\s+studying|take\s+today\s+off)\b/i.test(s);
+  };
+  const requestFromChat = (who, text) => {
+    if(explicitBreak(text)){ open(text,who);return true; }
+    if(admin(who,text))return true;
+    return false;
+  };
+  window.__kgAdminNote = {
+    iroha: "\n\n[Desk permissions: you coordinate Kaguya's study-plan decisions with the user. The website lets you change the 6/8-hour plan, day type and re-plan only when the user explicitly asks. If they ask for a break, the three-turn council opens with Kaguya; never falsely claim you performed an action. Respect health and user choice.]",
+    kaguya: "\n\n[Desk coordination: Iroha is the study-plan coordinator. Discuss changes and break requests with her; you can disagree, and the user always has the final say. Do not pretend to change site settings yourself.]"
+  };
+  window.__kgBreakCouncil = {open,request:requestFromChat,take:takeBreak,ask:council,log:getLog};
+  window.__irohaAdmin = Object.freeze({setStudyHours:h=>{if(![6,8].includes(Number(h)))return false;window.__kgSetPlan?.(String(h));audit('Study hours',h+' h');return true;},replan:()=>{M.ACTIONS.kgreplan?.();audit('Re-plan from now','Today');},askBreak:open,log:getLog});
+  // Add an unobtrusive entry point next to companion mode, and in Settings → Companions.
+  function launch() {
+    const bar=$('kg-mode');if(!bar || $('kg-council-launch'))return;
+    const b=document.createElement('button');b.type='button';b.id='kg-council-launch';b.textContent='⚖ Ask both for a break';b.title='Iroha and Kaguya discuss a break together';b.onclick=()=>open();bar.after(b);
+  }
+  launch();setInterval(launch,3000);
+  const old=M.PANELS.companions;
+  if(typeof old==='function')M.PANELS.companions=()=>`<section class="kl-card kl-stack kg-admin-settings"><p class="kl-eyebrow">IROHA · STUDY DESK ADMIN</p><h3>Iroha coordinates with Kaguya</h3><p class="kl-small">Iroha can update study hours, day type and re-planning when you ask her explicitly. Break requests open a live three-turn discussion: Iroha → Kaguya → Iroha. Their decision is advice; you can always rest. No access to your computer, accounts, or other websites.</p><div class="kl-row"><button type="button" data-a="iadminbreak" class="kl-primary">⚖ Ask both for a break</button><button type="button" data-a="iadmintalk">Let them discuss today's plan</button><button type="button" data-a="iadmin6">Iroha → 6 h plan</button><button type="button" data-a="iadmin8">Iroha → 8 h plan</button><button type="button" data-a="iadminreplan">Iroha → Re-plan now</button></div></section>`+old();
+  M.ACTIONS.iadminbreak=()=>open();
+  M.ACTIONS.iadmin6=()=>window.__irohaAdmin?.setStudyHours(6);
+  M.ACTIONS.iadmin8=()=>window.__irohaAdmin?.setStudyHours(8);
+  M.ACTIONS.iadminreplan=()=>window.__irohaAdmin?.replan();
+  M.ACTIONS.iadmintalk=()=>window.__kgTalk?.('Iroha, as the study desk coordinator, review today’s schedule with Kaguya. Discuss what should stay, what can be adjusted, and why. Do not change settings without a direct user request.','iroha',3);
+  M.render?.();
+})();
+
 </script>
 </body></html>
