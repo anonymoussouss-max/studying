@@ -708,12 +708,12 @@ body.habit-shh #hb-session-card {text-align:center;}
     put('meal-1',moved.length&&t>=750?'Dinner · moves to tomorrow: '+moved.join(', '):'Dinner','life',20);put('wind','Wind down','life',20);put('sleep','Sleep','sleep',1440+rows.origin-t);
     return rows;
   }
-  // 2026-11: Normal is eight NET study hours, 2 PM–11:15 PM (75 min of breaks).
+  // 2026-11: Normal is eight NET study hours, noon–9 PM or 2 PM–11:15 PM.
   // Normal subject budgets: Maths lecture 120 + revision 60; Physics lecture 90 + spaced 60; Chemistry lecture 90 + revision 60.
   // The optional ten-hour plan is for occasional free days, 11 AM–11:05 PM (125 min of breaks).
   // College/exam/recovery remain separate, because a 2 PM start clashes with college attendance.
   function freeDaySchedule(hours){
-    const ten=hours===10,start=ten?30:210,rows=[];
+    const ten=hours===10,noon=!ten && labData().eightHourStart==='12',start=ten?30:noon?90:210,rows=[];
     let t=0;
     const put=(id,title,kind,m,b=null)=>{if(m>0){rows.push([id,title,kind,m,b]);t+=m;if(kind==='study')limits[id]=m;}};
     put('free-morning','Morning · breakfast, errands and personal time','rest',start);
@@ -730,6 +730,21 @@ body.habit-shh #hb-session-card {text-align:center;}
       ['brk-n4','Break · stand, drink water','life',10],
       ['chem-n2','Chemistry · revision, questions and active recall','study',60,'chemistry']
     ];
+    // 12 PM option: 480 minutes of study from noon to 8:30 PM, three 10-minute breaks,
+    // followed by the protected 8:30–9:00 PM dinner/offline break. Lunch is before noon.
+    // Keep study IDs identical across the two 8-hour versions so progress follows the plan.
+    const normalNoon=[
+      ['maths-n1','Mathematics · lecture and worked examples','study',120,'maths'],
+      ['brk-n1','Break · water and stretch (2:00–2:10)','life',10],
+      ['physics-n1','Physics · lecture and worked problems','study',90,'physics'],
+      ['brk-n2','Break · snack and eyes off screen (3:40–3:50)','life',10],
+      ['chem-n1','Chemistry · lecture, concepts and notes','study',90,'chemistry'],
+      ['brk-n3','Break · water and movement (5:20–5:30)','life',10],
+      ['maths-n2','Mathematics · revision and homework','study',60,'maths'],
+      ['physics-n2','Physics · spaced revision and corrections','study',60,'physics'],
+      ['chem-n2','Chemistry · revision and active recall','study',60,'chemistry'],
+      ['meal-1','Protected dinner / offline break · 8:30–9:00 PM','life',30]
+    ];
     const occasional=[
       ['maths-o1','Mathematics · lecture and applications','study',90,'maths'],
       ['brk-o1','Break · water and movement','life',15],
@@ -745,8 +760,8 @@ body.habit-shh #hb-session-card {text-align:center;}
       ['brk-o5','Break · water and stretch','life',15],
       ['mock-o','Mixed recall / mock · review errors','study',60,null]
     ];
-    for(const r of ten?occasional:normal)put(...r);
-    // The last study block finishes at 23:15 (normal) or 23:05 (occasional).
+    for(const r of ten?occasional:noon?normalNoon:normal)put(...r);
+    // Last study ends at 20:30 (12 PM normal), 23:15 (2 PM normal), or 23:05 (occasional).
     // Sleep is never pushed later than midnight just to hit a study quota.
     put('wind','Wind down · books closed','life',Math.max(0,810-t));
     put('sleep','Sleep','sleep',1440-t);
@@ -7779,20 +7794,21 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
 
 </script>
 <script id="kg-plan-script">
-/* ===== Your study day: normal 8h from 2 PM; optional 6h lighter and 10h occasional ===== */
+/* ===== Your study day: normal 8h at 12 PM or 2 PM; optional 6h lighter and 10h occasional ===== */
 (function () {
   'use strict';
   const M = window.MoonLab; if (!M) return;
   const { L, save, today, esc } = M;
   // [key, hours, label, start, note]. Free-day templates are net study time, excluding breaks.
   const PLANS=[
-    ['8',8,'Normal · 8 hours','2:00 PM','8 hours net study, 2:00–11:15 PM on free days, with 75 min of breaks'],
+    ['8',8,'Normal · 8 hours','12 PM / 2 PM','Choose 12:00 PM–9:00 PM (study ends 8:30, dinner 8:30–9) or 2:00–11:15 PM (75 min of breaks)'],
     ['6',6,'Lighter · 6 hours','flexible','A lighter six-hour day with breaks and reviews'],
     ['10',10,'Occasional · 10 hours','11:00 AM','Only for an occasional free day: 10 hours net study, finishing 11:05 PM']
   ];
   PLANS.push(['recovery',8,'Recovery · one subject','2:00 PM','One lecture at your pace; stop by 10 PM, even if unfinished']);
   const calendarToday=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
   if(calendarToday()==='2026-11-11')PLANS.push(['today',8,'Today only · 6:15 PM','6:15 PM','30 minutes of Maths and 2 hours of Physics; no Chemistry; finish by 10 PM']);
+  if(!['12','14'].includes(L.eightHourStart))L.eightHourStart='14';
   if(L.planHours===12)L.planHours=8;
   if(![6,8,10].includes(L.planHours))L.planHours=8;
   // An occasional ten-hour day must never silently become the next day's default.
@@ -7869,9 +7885,10 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     },
     kgmaths: v => { const n = window.StudyPlan.parseMins(v.len), tmr = M.add(today(), 1); if (!n) return M.K?.('type it like 2h 35m, 155 or 2.5h'); (L.mathsNext = L.mathsNext || {})[tmr] = n; redo(); }
   });
+  let selectingEight=false;
   const card = () => `<section class="kl-card kg-plan"><p class="kl-eyebrow">YOUR STUDY DAY</p>${dayCard()}
-    <details open><summary class="kl-small">Study plans · 8 h normal, 6 h lighter, 10 h occasional, recovery</summary><div class="kg-plan-row" role="group" aria-label="Hours of study per day">${PLANS.map(([k, h, label, at]) => `<button data-a="kgplan" data-v="${k}" aria-pressed="${current() === k}"><b>${label}</b><small>from ${at}</small></button>`).join('')}</div></details>
-    <p class="kl-small">${window.__kgOnBreak ? 'Starts when your break ends. ' : ''}${(PLANS.find(p => p[0] === current()) || PLANS[0])[4]}. Today: ${Math.round(window.StudyPlan.hours()*60)} planned study minutes, excluding breaks. ${current()==='today'||current()==='recovery'?'Stop by 10 PM.':window.StudyPlan.dayKind(today()).t==='college'?'College-day timing adapts to attendance; the 2 PM free-day schedule does not apply.':window.StudyPlan.dayKind(today()).t==='normal'||window.StudyPlan.dayKind(today()).t==='holiday'?'Wind down after the last block; no late catch-up.':'Meals and sleep take priority.'} ${current()==='recovery'?'Today’s subject: '+window.StudyPlan.recoverySubject()+'. ':''}Stop each chunk when its timer ends; carry unfinished work forward, never borrow from a break.</p></section>`;
+    <details open><summary class="kl-small">Study plans · 8 h normal, 6 h lighter, 10 h occasional, recovery</summary><div class="kg-plan-row" role="group" aria-label="Hours of study per day">${PLANS.map(([k, h, label, at]) => `<button data-a="kgplan" data-v="${k}" aria-pressed="${current() === k}"><b>${label}</b><small>${k==='8'?'Starts ' + (L.eightHourStart==='12'?'12:00 PM':'2:00 PM') + ' · change':'from '+at}</small></button>`).join('')}</div>${selectingEight ? `<div class="kl-row kg-eight-choice" role="group" aria-label="Choose 8-hour normal start time" style="margin-top:12px;padding:12px;border:1px solid var(--color-border);border-radius:12px;flex-wrap:wrap"><b class="kl-small" style="width:100%">Normal 8 hours — choose your start:</b><button type="button" class="kl-primary" data-a="kg8start" data-v="12" aria-pressed="${L.eightHourStart==='12'}">12:00 PM · finish study 8:30 PM, dinner until 9</button><button type="button" class="kl-ghost" data-a="kg8start" data-v="14" aria-pressed="${L.eightHourStart==='14'}">2:00 PM · finish 11:15 PM</button></div>` : ''}</details>
+    <p class="kl-small">${window.__kgOnBreak ? 'Starts when your break ends. ' : ''}${current()==='8'?(L.eightHourStart==='12'?'Noon option: 12:00 PM–8:30 PM study, then protected 8:30–9:00 PM dinner. Three short breaks; eat lunch before starting.':'Afternoon option: 2:00–11:15 PM, with 75 min of breaks.'):(PLANS.find(p => p[0] === current()) || PLANS[0])[4]}. Today: ${Math.round(window.StudyPlan.hours()*60)} planned study minutes, excluding breaks. ${current()==='today'||current()==='recovery'?'Stop by 10 PM.':window.StudyPlan.dayKind(today()).t==='college'?'College-day timing adapts to attendance; the 2 PM free-day schedule does not apply.':window.StudyPlan.dayKind(today()).t==='normal'||window.StudyPlan.dayKind(today()).t==='holiday'?'Wind down after the last block; no late catch-up.':'Meals and sleep take priority.'} ${current()==='recovery'?'Today’s subject: '+window.StudyPlan.recoverySubject()+'. ':''}Stop each chunk when its timer ends; carry unfinished work forward, never borrow from a break.</p></section>`;
   const todayPanel = M.PANELS.today;
   M.PANELS.today = () => card() + todayPanel();
   function setPlan(key) {
@@ -7908,7 +7925,21 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   setInterval(expireEveningPlan,30000);window.addEventListener('focus',expireEveningPlan);expireEveningPlan();
   function expireOccasional10(){if(L.planHours!==10||L.occasional10Date===today())return;L.planHours=8;L.occasional10Date=null;L.planSince=today();redo();}
   setInterval(expireOccasional10,60000);window.addEventListener('focus',expireOccasional10);
-  M.ACTIONS.kgplan = b => setPlan(b.dataset.v);
+  M.ACTIONS.kgplan = b => {
+    if(b.dataset.v==='8'){selectingEight=!selectingEight;M.render();return;}
+    selectingEight=false;setPlan(b.dataset.v);
+  };
+  M.ACTIONS.kg8start = b => {
+    const v=b.dataset.v;if(v!=='12'&&v!=='14')return;
+    const changed=L.eightHourStart!==v;
+    L.eightHourStart=v; selectingEight=false;
+    // Choosing a new start must clear an old 're-plan from now' cutoff.
+    const d=today(); if(changed){if(L.replanAt)delete L.replanAt[d];if(L.replanPush)delete L.replanPush[d];}
+    save();setPlan('8');
+    // If setPlan returned early because 8h was already active, still update UI/timetable.
+    window.HabitDesk?.refresh?.();window.DeskStore?.setState?.({habitRevision:Date.now()});
+    M.render();
+  };
   window.__kgSetPlan = setPlan;
   window.__kgPlanGo = () => M.go('today');
   window.addEventListener('moonlab:render', apply);
@@ -8353,7 +8384,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     const list = L.lectures.slice().sort((a, b) => b.made.localeCompare(a.made));
     const P = window.StudyPlan?.lens8?.() || { len: {}, rev: {} }, ids = { Maths: 'maths', Physics: 'physics', Chemistry: 'chem' };
     const lensCard = `<section class="kl-card kg-lens"><p class="kl-eyebrow">LECTURE LENGTHS</p><h3>Your recorded lecture lengths</h3>
-      <p class="kl-small">The Normal 8-hour free-day schedule uses fixed blocks: Maths lecture 120 min + revision 60 min; Physics lecture 90 min + spaced revision 60 min; Chemistry lecture 90 min + revision 60 min. Logged lecture lengths are kept for personalised estimates and other planner features, but do not change these fixed normal blocks.</p>
+      <p class="kl-small">Both Normal 8-hour free-day schedules use fixed study blocks: Maths lecture 120 min + revision 60 min; Physics lecture 90 min + spaced revision 60 min; Chemistry lecture 90 min + revision 60 min. Logged lecture lengths are kept for personalised estimates and other planner features, but do not change these fixed normal blocks.</p>
       <form data-f="kglens" class="kl-stack">${['Maths', 'Physics', 'Chemistry'].map(s => `<label>${s} <input name="${s}" value="${esc((L.lecLens[s] || []).join(', '))}" inputmode="numeric" aria-label="${s} lecture lengths in minutes"></label>
         <p class="kl-small">${(L.lecLens[s] || []).length >= 3 ? `Recorded median ${hm(median(L.lecLens[s]))} from ${Math.min(15, L.lecLens[s].length)} lectures (for flexible estimates)` : 'Keep recording lecture lengths for personalised estimates; the Normal timetable stays fixed.'}</p>`).join('')}
         <button>Save lengths</button></form></section>`;
