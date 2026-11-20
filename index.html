@@ -709,6 +709,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     return rows;
   }
   // 2026-11: Normal is eight NET study hours, 2 PM–11:15 PM (75 min of breaks).
+  // Normal subject budgets: Maths lecture 120 + revision 60; Physics lecture 90 + spaced 60; Chemistry lecture 90 + revision 60.
   // The optional ten-hour plan is for occasional free days, 11 AM–11:05 PM (125 min of breaks).
   // College/exam/recovery remain separate, because a 2 PM start clashes with college attendance.
   function freeDaySchedule(hours){
@@ -717,17 +718,17 @@ body.habit-shh #hb-session-card {text-align:center;}
     const put=(id,title,kind,m,b=null)=>{if(m>0){rows.push([id,title,kind,m,b]);t+=m;if(kind==='study')limits[id]=m;}};
     put('free-morning','Morning · breakfast, errands and personal time','rest',start);
     const normal=[
-      ['maths-n1','Mathematics · lecture and worked examples','study',90,'maths'],
+      ['maths-n1','Mathematics · lecture and worked examples','study',120,'maths'],
       ['brk-n1','Break · stretch and water','life',15],
       ['physics-n1','Physics · lecture and worked problems','study',90,'physics'],
       ['brk-n2','Break · eyes off the screen','life',10],
-      ['chem-n1','Chemistry · concepts and retrieval','study',60,'chemistry'],
+      ['chem-n1','Chemistry · lecture, concepts and notes','study',90,'chemistry'],
       ['meal-1','Meal · away from the desk','life',30],
-      ['maths-n2','Mathematics · homework and spaced practice','study',90,'maths'],
+      ['maths-n2','Mathematics · revision, homework and spaced practice','study',60,'maths'],
       ['brk-n3','Break · movement and water','life',10],
-      ['physics-n2','Physics · problems and error corrections','study',90,'physics'],
+      ['physics-n2','Physics · spaced revision, problems and corrections','study',60,'physics'],
       ['brk-n4','Break · stand, drink water','life',10],
-      ['chem-n2','Chemistry · questions and active recall','study',60,'chemistry']
+      ['chem-n2','Chemistry · revision, questions and active recall','study',60,'chemistry']
     ];
     const occasional=[
       ['maths-o1','Mathematics · lecture and applications','study',90,'maths'],
@@ -8351,10 +8352,10 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   M.PANELS.notes = () => {
     const list = L.lectures.slice().sort((a, b) => b.made.localeCompare(a.made));
     const P = window.StudyPlan?.lens8?.() || { len: {}, rev: {} }, ids = { Maths: 'maths', Physics: 'physics', Chemistry: 'chem' };
-    const lensCard = `<section class="kl-card kg-lens"><p class="kl-eyebrow">LECTURE LENGTHS</p><h3>Your 8-hour day is built from these</h3>
-      <p class="kl-small">Minutes, oldest first. The median of the last 15 sets each lecture block, rounded up to 5 minutes; revision gets the rest of the 8 hours. Every lecture you log adds its length here.</p>
+    const lensCard = `<section class="kl-card kg-lens"><p class="kl-eyebrow">LECTURE LENGTHS</p><h3>Your recorded lecture lengths</h3>
+      <p class="kl-small">The Normal 8-hour free-day schedule uses fixed blocks: Maths lecture 120 min + revision 60 min; Physics lecture 90 min + spaced revision 60 min; Chemistry lecture 90 min + revision 60 min. Logged lecture lengths are kept for personalised estimates and other planner features, but do not change these fixed normal blocks.</p>
       <form data-f="kglens" class="kl-stack">${['Maths', 'Physics', 'Chemistry'].map(s => `<label>${s} <input name="${s}" value="${esc((L.lecLens[s] || []).join(', '))}" inputmode="numeric" aria-label="${s} lecture lengths in minutes"></label>
-        <p class="kl-small">${(L.lecLens[s] || []).length >= 3 ? `Median ${hm(median(L.lecLens[s]))} from ${Math.min(15, L.lecLens[s].length)} lectures → ${P.len[ids[s]]}-minute lecture block, ${P.rev[ids[s]]}-minute revision` : 'Needs 3 lectures before it changes the plan.'}</p>`).join('')}
+        <p class="kl-small">${(L.lecLens[s] || []).length >= 3 ? `Recorded median ${hm(median(L.lecLens[s]))} from ${Math.min(15, L.lecLens[s].length)} lectures (for flexible estimates)` : 'Keep recording lecture lengths for personalised estimates; the Normal timetable stays fixed.'}</p>`).join('')}
         <button>Save lengths</button></form></section>`;
     return `<section class="kl-card"><p class="kl-eyebrow">LECTURE NOTES</p><h2>Your lectures, on a spaced schedule</h2><p>Each lecture comes back as a fresh problem after about 3, 10, 30 and 60 days; any problem you solve on its chapter on your own counts. Files stay on this device.</p><button data-a="kglecnew">+ Log a lecture</button></section>` + lensCard
       + (list.length ? list.map(e => `<section class="kl-card kl-mini kg-lecrow"><div><b>${esc(label(e))}</b><small>${e.due ? (M.onBreak?.() ? 'Revisions paused for your break' : `Next revision ${e.due <= today() ? 'today' : esc(e.due)}`) : 'Done: all 4 checks'} · ${e.files?.length || 0} file${e.files?.length === 1 ? '' : 's'}${progressText(e)}</small></div>
@@ -8578,7 +8579,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     }
     save(); refreshPlan(); M.render();
     const P = window.StudyPlan.lens8();
-    M.I(`Updated. Maths ${P.len.maths}, Physics ${P.len.physics}, Chemistry ${P.len.chem} minutes, from your medians.`, { face: 'approve' });
+    M.I('Lecture lengths saved for personalised estimates. The Normal 8-hour timetable keeps its fixed block lengths.', { face: 'approve' });
   };
   /* ---------- revising: Iroha quizzes you from your own notes ---------- */
   async function revise(id) {
