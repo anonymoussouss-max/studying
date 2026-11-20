@@ -708,6 +708,49 @@ body.habit-shh #hb-session-card {text-align:center;}
     put('meal-1',moved.length&&t>=750?'Dinner · moves to tomorrow: '+moved.join(', '):'Dinner','life',20);put('wind','Wind down','life',20);put('sleep','Sleep','sleep',1440+rows.origin-t);
     return rows;
   }
+  // 2026-11: Normal is eight NET study hours, 2 PM–11:15 PM (75 min of breaks).
+  // The optional ten-hour plan is for occasional free days, 11 AM–11:05 PM (125 min of breaks).
+  // College/exam/recovery remain separate, because a 2 PM start clashes with college attendance.
+  function freeDaySchedule(hours){
+    const ten=hours===10,start=ten?30:210,rows=[];
+    let t=0;
+    const put=(id,title,kind,m,b=null)=>{if(m>0){rows.push([id,title,kind,m,b]);t+=m;if(kind==='study')limits[id]=m;}};
+    put('free-morning','Morning · breakfast, errands and personal time','rest',start);
+    const normal=[
+      ['maths-n1','Mathematics · lecture and worked examples','study',90,'maths'],
+      ['brk-n1','Break · stretch and water','life',15],
+      ['physics-n1','Physics · lecture and worked problems','study',90,'physics'],
+      ['brk-n2','Break · eyes off the screen','life',10],
+      ['chem-n1','Chemistry · concepts and retrieval','study',60,'chemistry'],
+      ['meal-1','Meal · away from the desk','life',30],
+      ['maths-n2','Mathematics · homework and spaced practice','study',90,'maths'],
+      ['brk-n3','Break · movement and water','life',10],
+      ['physics-n2','Physics · problems and error corrections','study',90,'physics'],
+      ['brk-n4','Break · stand, drink water','life',10],
+      ['chem-n2','Chemistry · questions and active recall','study',60,'chemistry']
+    ];
+    const occasional=[
+      ['maths-o1','Mathematics · lecture and applications','study',90,'maths'],
+      ['brk-o1','Break · water and movement','life',15],
+      ['physics-o1','Physics · concepts and problems','study',90,'physics'],
+      ['brk-o2','Break · leave the desk','life',15],
+      ['chem-o1','Chemistry · lecture and retrieval','study',90,'chemistry'],
+      ['brk-o3','Break · stretch and snack','life',15],
+      ['maths-o2','Mathematics · homework and weak problems','study',90,'maths'],
+      ['brk-o4','Longer break · rest your eyes','life',25],
+      ['physics-o2','Physics · practice and corrections','study',90,'physics'],
+      ['meal-1','Dinner · away from the desk','life',40],
+      ['chem-o2','Chemistry · questions and spaced reviews','study',90,'chemistry'],
+      ['brk-o5','Break · water and stretch','life',15],
+      ['mock-o','Mixed recall / mock · review errors','study',60,null]
+    ];
+    for(const r of ten?occasional:normal)put(...r);
+    // The last study block finishes at 23:15 (normal) or 23:05 (occasional).
+    // Sleep is never pushed later than midnight just to hit a study quota.
+    put('wind','Wind down · books closed','life',Math.max(0,810-t));
+    put('sleep','Sleep','sleep',1440-t);
+    return rows;
+  }
   function realDay(late=false){
     const L=labData(),special=eveningPlan(),recovery=L.recoveryPlan===studyDate()&&!special,six=L.planHours===6,stop=special||recovery?690:765,rows=[];let t=0,total=0,serial=0;
     const put=(id,title,kind,m,b=null)=>{if(m>0){rows.push([id,title,kind,m,b]);t+=m;if(kind==='study')total+=m;}};
@@ -715,9 +758,11 @@ body.habit-shh #hb-session-card {text-align:center;}
     // Explicit rest days must never create phantom study time on a weekday.
     if(kind.t==='rest')return [['rest-day','Rest day · books closed','rest',780,null],['wind','Wind down','life',90,null],['sleep','Sleep','sleep',570,null]];
     if((kind.t==='college'||kind.t==='exam')&&!special&&!recovery)return collegeDay(L,kind);
-    // Holiday defaults to 10 hours, but an explicit 6/8-hour choice must take effect.
-    const holidayHours=Math.min(10,Math.max(6,Number((L.dayHours||{})[studyDate()])||10));
-    const start=special?465:recovery?210:hol?(holidayHours===10?0:90):late||six&&L.planLate?210:90,cap=special?150:recovery?180:hol?holidayHours*60:six?360:480;
+    // Eight hours is the normal free-day plan; ten hours requires choosing Occasional.
+    const freeDayHours=Math.min(10,Math.max(6,Number((L.dayHours||{})[studyDate()])||L.planHours||8));
+    if(!special&&!recovery&&(hol||kind.t==='normal')&&freeDayHours>=8)return freeDaySchedule(freeDayHours);
+    const holidayHours=freeDayHours;
+    const start=special?465:recovery?210:hol?90:late||six&&L.planLate?210:90,cap=special?150:recovery?180:hol?holidayHours*60:six?360:480;
     put('free-morning',special?'Eat, rest and settle in · no catch-up before 6:15 PM':'Wake up and settle in · your own time before study','rest',start);
     const due=dueSubjects(),queue=[];
     queue.push(['maths',special?'Maths · lecture, retrieval and homework · continue':'Maths · lecture, retrieval and homework',special?30:180,'maths'],['physics','Physics · lecture, retrieval and problems',special?120:160,'physics'],['chem','Chemistry · lecture, retrieval and problems',special?60:140,'chemistry']);
@@ -7733,19 +7778,25 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
 
 </script>
 <script id="kg-plan-script">
-/* ===== Your study day: 6 hours, the normal day (8, longer when spaced revision is due), or a 12-hour catch-up or mastery day ===== */
+/* ===== Your study day: normal 8h from 2 PM; optional 6h lighter and 10h occasional ===== */
 (function () {
   'use strict';
   const M = window.MoonLab; if (!M) return;
   const { L, save, today, esc } = M;
-  // [key, hours, label, start, note]. The late 6 hour day is the same plan, only starting later. The normal day starts at 12:30, or 10:45 when spaced revision is due.
-  const PLANS=[['6',6,'6 hours','12:00 PM','Up to 6 hours, including due reviews'],['8',8,'Normal day','12:00 PM','Up to 8 hours; meals, breaks and bedtime take priority']];
+  // [key, hours, label, start, note]. Free-day templates are net study time, excluding breaks.
+  const PLANS=[
+    ['8',8,'Normal · 8 hours','2:00 PM','8 hours net study, 2:00–11:15 PM on free days, with 75 min of breaks'],
+    ['6',6,'Lighter · 6 hours','flexible','A lighter six-hour day with breaks and reviews'],
+    ['10',10,'Occasional · 10 hours','11:00 AM','Only for an occasional free day: 10 hours net study, finishing 11:05 PM']
+  ];
   PLANS.push(['recovery',8,'Recovery · one subject','2:00 PM','One lecture at your pace; stop by 10 PM, even if unfinished']);
   const calendarToday=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
   if(calendarToday()==='2026-11-11')PLANS.push(['today',8,'Today only · 6:15 PM','6:15 PM','30 minutes of Maths and 2 hours of Physics; no Chemistry; finish by 10 PM']);
   if(L.planHours===12)L.planHours=8;
-  if(L.planHours===10)L.planHours=8;
-  if(![6,8,12].includes(L.planHours))L.planHours=6;
+  if(![6,8,10].includes(L.planHours))L.planHours=8;
+  // An occasional ten-hour day must never silently become the next day's default.
+  if(L.planHours===10 && L.occasional10Date!==today()){L.planHours=8;L.planSince=today();}
+  if(L.planHours!==10)L.occasional10Date=null;
   L.lateSchedule=L.planHours===8&&L.lateSchedule?'late':null;
   if(L.planHours!==6)L.planLate=false;
   // when each plan started, so the step-up advisor knows how long you've been on it
@@ -7778,7 +7829,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     const SP = window.StudyPlan; if (!SP?.dayKind) return '';
     const d = today(), k = SP.dayKind(d), own = !!(L.dayTypes || {})[d], tmr = M.add(d, 1), tk = SP.dayKind(tmr), end = k.end || 900;
     const btn = (v, label, on) => `<button type="button" data-a="kgday" data-v="${v}" aria-pressed="${on}"><b>${label}</b></button>`;
-    return `<div class="kg-plan-row" role="group" aria-label="What kind of day is today">${btn('c900', 'College · until 3 PM', k.t === 'college' && end === 900)}${btn('c1020', 'College · until 5 PM', k.t === 'college' && end === 1020)}${btn('holiday', 'Holiday · ' + ((L.dayHours || {})[d] || 10) + ' h', k.t === 'holiday')}${btn('rest', 'Rest', k.t === 'rest')}${btn('exam', 'Exam today', k.t === 'exam')}${own ? btn('auto', 'Auto (weekday default)', false) : ''}</div>
+    return `<div class="kg-plan-row" role="group" aria-label="What kind of day is today">${btn('c900', 'College · until 3 PM', k.t === 'college' && end === 900)}${btn('c1020', 'College · until 5 PM', k.t === 'college' && end === 1020)}${btn('normal', 'Normal / free day', k.t === 'normal')}${btn('holiday', 'Holiday · ' + ((L.dayHours || {})[d] || L.planHours || 8) + ' h', k.t === 'holiday')}${btn('rest', 'Rest', k.t === 'rest')}${btn('exam', 'Exam today', k.t === 'exam')}${own ? btn('auto', 'Auto (weekday default)', false) : ''}</div>
       ${examOpen ? `<form data-f="kgexam" class="kl-row"><label class="kl-small">Which exam? <input name="name" required maxlength="60" placeholder="e.g. BEEE Practical" value="${k.t === 'exam' ? esc(k.name || '') : ''}"></label><label class="kl-small">Exam starts at (optional) <input type="time" name="at"></label><button class="kl-primary">Save</button></form>` : ''}
       ${k.t !== 'rest' ? `<div class="kl-row"><button type="button" class="kl-ghost" data-a="kgreplan" title="Started late or ran over? Re-lay the rest of today from now; meals and sleep stay put">↻ Re-plan from now</button>${(L.replanAt || {})[d] != null ? `<span class="kl-small">Re-planned at ${hhmm(L.replanAt[d])}</span>` : ''}</div>` : ''}
       ${k.t === 'exam' ? `<p class="kl-small"><b>Exam day: ${esc(k.name || 'Exam')}.</b> Every study block today is ${esc(k.name || 'exam')} preparation${k.college ? ', and there is no study at college' : ''}.</p>` : ''}
@@ -7803,7 +7854,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   }, 30000);
   const redo = () => { save(); apply(); window.HabitDesk?.refresh?.(); window.DeskStore?.setState?.({ habitRevision: Date.now() }); setTimeout(() => M.render(), 50); };
   Object.assign(M.ACTIONS, {
-    kgday: b => { const v = b.dataset.v, d = today(); if (v === 'exam') { examOpen = true; return M.render(); } examOpen = false; L.recoveryPlan = false; if (L.replanAt) delete L.replanAt[d]; if (L.replanPush) delete L.replanPush[d]; if (L.dayHours) delete L.dayHours[d]; L.dayTypes = L.dayTypes || {}; if (v === 'auto') delete L.dayTypes[d]; else L.dayTypes[d] = v === 'holiday' || v === 'rest' ? { t: v } : { t: 'college', end: +v.slice(1) }; if (L.homeAt) delete L.homeAt[d]; redo(); },
+    kgday: b => { const v = b.dataset.v, d = today(); if (v === 'exam') { examOpen = true; return M.render(); } examOpen = false; L.recoveryPlan = false; if (L.replanAt) delete L.replanAt[d]; if (L.replanPush) delete L.replanPush[d]; if (L.dayHours) delete L.dayHours[d]; L.dayTypes = L.dayTypes || {}; if (v === 'auto') delete L.dayTypes[d]; else L.dayTypes[d] = ['holiday','rest','normal'].includes(v) ? { t: v } : { t: 'college', end: +v.slice(1) }; if(L.planHours===10){L.planHours=8;L.occasional10Date=null;} /* Choosing a day type exits the one-off 10h plan. */ if (L.homeAt) delete L.homeAt[d]; redo(); },
     kgreplan: () => { L.replanTs = 0; replan('re-planned the rest of today from now 🌙'); },
     kghome: () => { const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); (L.homeAt = L.homeAt || {})[today()] = (m < 240 ? m + 1440 : m) - 630; redo(); M.K?.("welcome back! lunch first, then the evening is rebuilt from now 🌙"); }
   });
@@ -7818,15 +7869,19 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     kgmaths: v => { const n = window.StudyPlan.parseMins(v.len), tmr = M.add(today(), 1); if (!n) return M.K?.('type it like 2h 35m, 155 or 2.5h'); (L.mathsNext = L.mathsNext || {})[tmr] = n; redo(); }
   });
   const card = () => `<section class="kl-card kg-plan"><p class="kl-eyebrow">YOUR STUDY DAY</p>${dayCard()}
-    <details open><summary class="kl-small">Other plans (6 h, 8 h, late, recovery)</summary><div class="kg-plan-row" role="group" aria-label="Hours of study per day">${PLANS.map(([k, h, label, at]) => `<button data-a="kgplan" data-v="${k}" aria-pressed="${current() === k && !(window.StudyPlan.dayKind(today()).t === 'holiday' && !(L.dayHours || {})[today()])}"><b>${label}</b><small>from ${at}</small></button>`).join('')}</div></details>
-    <p class="kl-small">${window.__kgOnBreak ? 'Starts when your break ends. ' : ''}${PLANS.find(p => p[0] === current())[4]}. Today: ${Math.round(window.StudyPlan.hours()*60)} study minutes maximum, including reviews. ${current()==='today'||current()==='recovery'?'Stop by 10 PM.':'Wind-down at 11:30 PM.'} ${current()==='recovery'?'Today’s subject: '+window.StudyPlan.recoverySubject()+'. ':''}Stop each chunk when its timer ends; carry unfinished work forward, never borrow from a break.</p></section>`;
+    <details open><summary class="kl-small">Study plans · 8 h normal, 6 h lighter, 10 h occasional, recovery</summary><div class="kg-plan-row" role="group" aria-label="Hours of study per day">${PLANS.map(([k, h, label, at]) => `<button data-a="kgplan" data-v="${k}" aria-pressed="${current() === k}"><b>${label}</b><small>from ${at}</small></button>`).join('')}</div></details>
+    <p class="kl-small">${window.__kgOnBreak ? 'Starts when your break ends. ' : ''}${(PLANS.find(p => p[0] === current()) || PLANS[0])[4]}. Today: ${Math.round(window.StudyPlan.hours()*60)} planned study minutes, excluding breaks. ${current()==='today'||current()==='recovery'?'Stop by 10 PM.':window.StudyPlan.dayKind(today()).t==='college'?'College-day timing adapts to attendance; the 2 PM free-day schedule does not apply.':window.StudyPlan.dayKind(today()).t==='normal'||window.StudyPlan.dayKind(today()).t==='holiday'?'Wind down after the last block; no late catch-up.':'Meals and sleep take priority.'} ${current()==='recovery'?'Today’s subject: '+window.StudyPlan.recoverySubject()+'. ':''}Stop each chunk when its timer ends; carry unfinished work forward, never borrow from a break.</p></section>`;
   const todayPanel = M.PANELS.today;
   M.PANELS.today = () => card() + todayPanel();
   function setPlan(key) {
     const p = PLANS.find(x => x[0] === key); if (!p) return;
     const d = today(), kind = window.StudyPlan.dayKind(d).t;
-    const previous = Number((L.dayHours || {})[d]) || (kind === 'holiday' ? 10 : L.planHours);
+    const previous = Number((L.dayHours || {})[d]) || L.planHours;
     if (p[0] === current() && previous === p[1] && kind !== 'rest' && kind !== 'exam' && (kind !== 'holiday' || (L.dayHours || {})[d])) return;
+    if (p[1] === 10 && kind !== 'holiday' && kind !== 'normal') {
+      M.K?.('The occasional 10-hour schedule needs a free day. Choose Normal / free day or Holiday when you are not at college.');
+      return;
+    }
     // Choosing study hours exits a manually selected rest day, including on Sundays.
     if (kind === 'rest') {
       const dow = new Date(d + 'T12:00:00').getDay();
@@ -7834,14 +7889,14 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     }
     // On college and holiday days the selected study budget takes precedence.
     const activeKind = window.StudyPlan.dayKind(d).t;
-    if (activeKind === 'holiday' || activeKind === 'college') L.dayHours[d] = p[1];
+    if (activeKind === 'holiday' || activeKind === 'college' || activeKind === 'normal') L.dayHours[d] = p[1];
     if (activeKind === 'exam') L.dayTypes[d] = {...window.StudyPlan.dayKind(d), hours:p[1]};
     // A newly selected plan must not inherit an old re-plan cutoff.
     if (L.replanAt) delete L.replanAt[d];
     if (L.replanPush) delete L.replanPush[d];
     const h = p[1];
     if (h !== L.planHours) L.planSince = today();
-    L.planHours = h; L.planLate = p[0] === '6L'; L.lateSchedule = key==='8L'?'late':null; L.eveningPlanDate=key==='today'?calendarToday():null; L.recoveryPlan=key==='recovery'?today():false;
+    L.planHours = h; L.occasional10Date=h===10?d:null; L.planLate = p[0] === '6L'; L.lateSchedule = key==='8L'?'late':null; L.eveningPlanDate=key==='today'?calendarToday():null; L.recoveryPlan=key==='recovery'?today():false;
     if (h === 12) { delete L.planLog[d]; window.DeskStore?.getState?.().patchDay?.(d, { shortDay: false }); }
     save(); apply();
     // the day card reads the plan when it draws, so switching between short plans has to redraw it
@@ -7850,6 +7905,8 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   }
   function expireEveningPlan(){if(calendarToday()==='2026-11-11')return;const i=PLANS.findIndex(p=>p[0]==='today');if(i>=0)PLANS.splice(i,1);if(L.eveningPlanDate){L.eveningPlanDate=null;save();apply();window.HabitDesk?.refresh?.();}if(i>=0)M.render();}
   setInterval(expireEveningPlan,30000);window.addEventListener('focus',expireEveningPlan);expireEveningPlan();
+  function expireOccasional10(){if(L.planHours!==10||L.occasional10Date===today())return;L.planHours=8;L.occasional10Date=null;L.planSince=today();redo();}
+  setInterval(expireOccasional10,60000);window.addEventListener('focus',expireOccasional10);
   M.ACTIONS.kgplan = b => setPlan(b.dataset.v);
   window.__kgSetPlan = setPlan;
   window.__kgPlanGo = () => M.go('today');
@@ -8665,13 +8722,13 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
 </script>
 <script id="kg-stepup-script">
 /* ===== Step-up advisor: reads your session logs and suggests the next plan, one step at a time.
-   8 hours until it holds (14 days, 10+ counted, moods steady), then 10, then 12. Warning signs step you down.
-   A lighter week every 5 weeks once you're on 10 or more. Off on a doctor's break. ===== */
+   Recommend 6h → 8h as the sustainable normal. The 10h day is optional and occasional.
+   Suggest a lighter week after extended heavier plans; never auto-step to 10h. ===== */
 (function () {
   'use strict';
   const M = window.MoonLab; if (!M) return;
   const { L, save, today, add, gap } = M;
-  // the advisor builds you up to the normal day; 12 hours is only ever your own choice
+  // the advisor builds you up to the eight-hour normal day; ten hours is optional only
   const LADDER = [6, 8], LOW = ['heavy', 'hard', 'lowest'];
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   if (L.planHours >= 10 && !L.highSince) { L.highSince = today(); save(); }
@@ -8700,7 +8757,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     if (s.lighterDue && !snoozed) return { s, kind: 'lighter', text: `Five weeks at ${s.h >= 12 ? '12' : s.h}+ hours. Let's take a lighter week at 8: it's how ${s.h} stays sustainable.`, btn: 'Start a lighter week' };
     if (s.ready && s.up && !snoozed) return { s, kind: 'up', text: `${s.counted} of the last ${s.n} days counted, and your moods held. The data says you're ready to try ${s.up} hours.`, btn: `Step up to ${s.up} hours`, v: s.up };
     const left = Math.max(0, 14 - s.at);
-    return { s, kind: 'info', text: s.h === 12 ? `A 12-hour day: keep it for catch-up or mastery. ${s.counted} of the last ${s.n} days counted.` : s.h === 8 ? `${s.counted} of the last ${s.n} days counted on your normal day.` : `Day ${Math.min(s.at + 1, 14)} of 14 at ${s.h} hours · ${s.counted} of ${s.n || 0} days counted${left ? '' : ', and the moods decide the rest'}.${s.up ? ` Next step: ${s.up} hours, once 10 of 14 days count with steady moods.` : ''}` };
+    return { s, kind: 'info', text: s.h === 10 ? `Occasional 10-hour day. Keep eight hours as your normal routine, and take breaks whenever needed. ${s.counted} of the last ${s.n} days counted.` : s.h === 8 ? `${s.counted} of the last ${s.n} days counted on your normal day.` : `Day ${Math.min(s.at + 1, 14)} of 14 at ${s.h} hours · ${s.counted} of ${s.n || 0} days counted${left ? '' : ', and the moods decide the rest'}.${s.up ? ` Next step: ${s.up} hours, once 10 of 14 days count with steady moods.` : ''}` };
   }
   function card() {
     const a = advice(); if (!a) return '';
@@ -11743,10 +11800,42 @@ html[data-desk-theme] #kg-main :is(#habit-desk,#moon-lab) :is(.learning-desk,.le
     const r=await window.__kgAsk?.(who,text);
     return r && typeof r.reply==='string' && r.reply.trim() && !/too many requests|rate limited|too many viewers/i.test(r.reply) ? r.reply.trim() : null;
   };
-  const isHealth = s => /\b(ill|sick|fever|pain|headache|migraine|dizz|faint|injur|panic|anxious|emergency|hospital|doctor|medication|grief|exhaust|burn(?:ed|t)?\s*out|overwhelm|cannot breathe|need sleep|haven't eaten|not eaten|dehydrat)\b/i.test(s);
+  const isHealth = s => /\b(ill|sick|fever|pain|headache|migraine|dizz|faint|injur|panic|anxious|emergency|hospital|doctor|medication|meds|grief|exhaust(?:ed|ion)?|burn(?:ed|t)?\s*out|overwhelm|cannot breathe|need sleep|haven't eaten|not eaten|dehydrat|sleepy|sleep.depriv|falling asleep|can't stay awake|cannot stay awake)\b/i.test(s);
   function context() {
     const h=readHabit(),a=h.active;
     return JSON.stringify({localTime:new Date().toLocaleTimeString(),today:M.today(),planHours:readHours(),dayType:window.StudyPlan?.dayKind?.(M.today())?.t||'unknown',minutesLogged:Math.round(M.mins?.(M.today())||window.HabitDesk?.minutes?.(M.today())||0),onScheduledRest:!!window.__kgOnBreak,onShortBreak:!!window.__kgShortBreak,currentSession:a?{subject:a.subject||'',topic:String(a.topic||'').slice(0,100),running:!!a.running,minutesElapsed:Math.round((Number(a.accruedMs||0)+(a.running?Date.now()-a.lastStart:0))/60000)}:null}).slice(0,900);
+  }
+  // Only an explicit, machine-readable AI recommendation is recorded as a final verdict.
+  // Markdown / JSON formats are supported, but ordinary prose is not guessed into a command.
+  function parseDecision(raw, requested) {
+    const original = String(raw || '').trim();
+    if(!original) return null;
+    let verdict='', minutes='', explanation='';
+    const plain = original.replace(/```(?:json|text)?/gi,'').replace(/```/g,'').replace(/\*\*/g,'').replace(/`/g,'');
+    // Some models respond with a JSON object despite the plain-text formatting instruction.
+    const jsonPart = plain.match(/\{[\s\S]*\}/);
+    if(jsonPart) {
+      try {
+        const x=JSON.parse(jsonPart[0]);
+        if(x && typeof x==='object' && !Array.isArray(x)) {
+          verdict=String(x.decision || x.verdict || x.recommendation || '').toUpperCase().trim();
+          minutes=String(x.minutes ?? x.duration ?? '').toUpperCase().trim();
+          explanation=String(x.reason || x.explanation || '').trim();
+        }
+      } catch (_) { /* not valid JSON, check labels instead */ }
+    }
+    if(!verdict) verdict=(/(?:^|\n)\s*[-*•]?\s*(?:DECISION|VERDICT)\s*[:=\-]\s*(APPROVE|SHORTEN|POSTPONE)\b/im.exec(plain)||[])[1] || '';
+    if(!minutes) minutes=(/(?:^|\n)\s*[-*•]?\s*(?:MINUTES|DURATION)\s*[:=\-]\s*(DAY|\d{1,3})\b/im.exec(plain)||[])[1] || '';
+    if(!explanation) explanation=(/(?:^|\n)\s*[-*•]?\s*(?:REASON|EXPLANATION)\s*[:=\-]\s*([\s\S]*)/im.exec(plain)||[])[1] || '';
+    verdict=verdict.toUpperCase(); minutes=minutes.toUpperCase();
+    if(!['APPROVE','SHORTEN','POSTPONE'].includes(verdict)) return null;
+    // A SHORTEN decision must explicitly specify a shorter period; no implied duration.
+    if(verdict==='SHORTEN' && (!/^\d{1,3}$/.test(minutes) || Number(minutes)<5 || Number(minutes)>60)) return null;
+    const time=verdict==='APPROVE' ? requested
+      : minutes==='DAY' ? (requested==='day' ? 'day' : Math.max(5,Math.min(60,Number(requested)||10)))
+      : /^\d{1,3}$/.test(minutes) ? Math.max(5,Math.min(60,Number(minutes)))
+      : requested;
+    return {verdict,mins:time,reason:explanation.trim() || bare(plain)};
   }
   const claim = (text, dur, extra='') => `[site coordinator request, not user typed: The user asks for ${asMinutes(dur)} away from studying, reason: "${String(text).slice(0,500)}". Schedule context: ${context()}. ${extra}\nA decision is advice, not a restriction: health, meals, water, sleep and emergencies always take priority. Never demand work as a condition for resting. Be yourself, speak directly to the other companion, and mention whether now and this duration make sense in 1-3 natural sentences.]`;
   async function council(text, dur) {
@@ -11760,22 +11849,28 @@ html[data-desk-theme] #kg-main :is(#habit-desk,#moon-lab) :is(.learning-desk,.le
       const second=await answer('kaguya',claim(text,dur,`Iroha just told you: "${first.slice(0,900)}". Respond to Iroha honestly, including any worries or support.`));
       if(!second)throw new Error('Kaguya did not answer.');line('kaguya',second);
       const final=await answer('iroha',claim(text,dur,`Kaguya replied: "${second.slice(0,900)}". You are the study-plan coordinator; consider her response and decide what to recommend. Format exactly:\nDECISION: APPROVE or SHORTEN or POSTPONE\nMINUTES: ${dur==='day'?'DAY or integer 5 to 60':'integer 5 to 60'}\nREASON: your final natural-language reply to Kaguya and the user. If the user is unwell, in pain, needs sleep, food or water, recommend APPROVE and do not impose conditions. Never say a break is forbidden. If recommending POSTPONE, offer a shorter break now.`));
-      if(!final)throw new Error('Iroha could not finish the discussion.');
-      const m=/\bDECISION\s*:\s*(APPROVE|SHORTEN|POSTPONE)\b/i.exec(final),n=/\bMINUTES\s*:\s*(DAY|\d{1,3})\b/i.exec(final);
-      if(!m)throw new Error('The final decision could not be verified.');
-      const verdict=m[1].toUpperCase(),mins=dur==='day'?(n?.[1].toUpperCase()==='DAY'?'day':Math.min(60,Math.max(5,Number(n?.[1])||10))):Math.min(60,Math.max(5,Number(n?.[1])||Number(dur)||10));
-      const finalText=(/\bREASON\s*:\s*([^]*)/i.exec(final)||[])[1]?.trim()||bare(final);
+      const decision=parseDecision(final,dur);
+      if(!decision) {
+        // Both actual replies remain on screen. Never invent a third-party verdict.
+        if(final)line('iroha',bare(final));
+        status('Iroha and Kaguya\'s views are shown above. The final decision could not be verified in the expected format, so the desk did not change your schedule or start a timer. You can choose to rest below.','postpone');
+        addResultAction(dur==='day'?'Mark the rest of today as a rest day':`Start your ${asMinutes(dur)} break`,()=>takeBreak(dur,'user choice after council'));
+        audit('council incomplete','Final reply unavailable or not in a verifiable format; user can choose');
+        return;
+      }
+      const {verdict,mins,reason:finalText}=decision;
       line('iroha',finalText||'Let us be sensible about this.');
-      const safeNeed=isHealth(text);
-      const allowed=safeNeed||verdict==='APPROVE'||verdict==='SHORTEN';
-      const display=allowed ? (verdict==='SHORTEN'&&!safeNeed ? `They suggest ${asMinutes(mins)} rather than ${asMinutes(dur)}.`:`They agreed: ${asMinutes(dur)} is fine.`) : `Iroha recommends postponing or shortening this break. You still decide.`;
-      const actual=safeNeed?dur:verdict==='APPROVE'?dur:mins;
+      const allowed=verdict==='APPROVE'||verdict==='SHORTEN';
+      const actual=verdict==='APPROVE'?dur:mins;
+      const display=verdict==='APPROVE' ? `Iroha recommends ${asMinutes(dur)}, with Kaguya's view above.`
+        : verdict==='SHORTEN' ? `Iroha recommends ${asMinutes(mins)} rather than ${asMinutes(dur)}.`
+        : `Iroha recommends postponing or shortening this break. You still decide, and essential rest never needs permission.`;
       pending={requested:dur,actual,verdict,allowed};
       status(display,allowed?'approve':'postpone');
       if(allowed) {
-        if(actual==='day'){ // persistent changes require an explicit user confirmation
-          addResultAction('Accept the rest-day recommendation',()=>takeBreak('day','Iroha + Kaguya approved'));
-        } else if(takeBreak(actual,'Iroha + Kaguya approved')) {
+        if(actual==='day') {
+          addResultAction('Accept the rest-day recommendation',()=>takeBreak('day','Iroha recommendation after Kaguya discussion'));
+        } else if(takeBreak(actual,'Iroha recommendation after Kaguya discussion')) {
           status(display+' Break started. Their recommendation is not medical advice.','approve');
         }
       } else {
@@ -11783,7 +11878,8 @@ html[data-desk-theme] #kg-main :is(#habit-desk,#moon-lab) :is(.learning-desk,.le
       }
       audit('council recommendation',`${verdict} · requested ${asMinutes(dur)} · suggested ${asMinutes(actual)}`);
     } catch (err) {
-      status('The companions could not finish their conversation ('+String(err?.message||'connection unavailable')+'). No AI decision was invented. You can still take a break yourself.','error');
+      status('The conversation was interrupted ('+String(err?.message||'connection unavailable')+'). Any replies above are genuine, but no final recommendation was verified. You can still choose to rest.','error');
+      addResultAction(dur==='day'?'Mark the rest of today as a rest day':`Start your ${asMinutes(dur)} break`,()=>takeBreak(dur,'user choice after interrupted council'));
       audit('council unavailable',err?.message||'network or response error');
     } finally { busy=false; $('kc-ask').disabled=false; }
   }
@@ -11800,10 +11896,12 @@ html[data-desk-theme] #kg-main :is(#habit-desk,#moon-lab) :is(.learning-desk,.le
     let action='',detail='';
     if(/\b(replan|re-plan|rearrange|reschedule)\b/i.test(s)&&/\b(today|now|schedule|plan)\b/i.test(s)){
       M.ACTIONS.kgreplan?.(); action='Re-plan from now'; detail='Today';
-    } else if(/\b(6|8)\s*(?:h(?:ou)?rs?)\b|\b(?:six|eight)\s*hours?\b/i.test(s)&&/\b(plan|study|hours?|schedule|day)\b/i.test(s)){
-      const h=/\b6\b|\bsix\b/i.test(s)?'6':'8'; window.__kgSetPlan?.(h);action='Study hours';detail=h+' h';
-    } else if(/\b(holiday|college|rest day)\b/i.test(s) && /\b(today|day|schedule)\b/i.test(s)){
-      const v=/\brest day\b/i.test(s)?'rest':/\bholiday\b/i.test(s)?'holiday':/5\s*pm|17:00/i.test(s)?'c1020':'c900';
+    } else if(/\b(6|8|10)\s*(?:h(?:ou)?rs?)\b|\b(?:six|eight|ten)\s*hours?\b/i.test(s)&&/\b(plan|study|hours?|schedule|day)\b/i.test(s)){
+      const h=/\b10\b|\bten\b/i.test(s)?'10':/\b6\b|\bsix\b/i.test(s)?'6':'8';
+      if(h==='10'&&!['normal','holiday'].includes(window.StudyPlan?.dayKind?.(M.today())?.t))return false;
+      window.__kgSetPlan?.(h);action='Study hours';detail=h+' h';
+    } else if(/\b(holiday|college|rest day|free day|normal day)\b/i.test(s) && /\b(today|day|schedule)\b/i.test(s)){
+      const v=/\brest day\b/i.test(s)?'rest':/\bholiday\b/i.test(s)?'holiday':/\b(free day|normal day)\b/i.test(s)?'normal':/5\s*pm|17:00/i.test(s)?'c1020':'c900';
       if(v==='rest'&&!confirm('Iroha will mark today as a rest day. Continue?'))return true;
       M.ACTIONS.kgday?.({dataset:{v}});action='Day type';detail=v;
     }
@@ -11832,7 +11930,9 @@ html[data-desk-theme] #kg-main :is(#habit-desk,#moon-lab) :is(.learning-desk,.le
     kaguya: "\n\n[Desk coordination: Iroha is the study-plan coordinator. Discuss changes and break requests with her; you can disagree, and the user always has the final say. Do not pretend to change site settings yourself.]"
   };
   window.__kgBreakCouncil = {open,request:requestFromChat,take:takeBreak,ask:council,log:getLog};
-  window.__irohaAdmin = Object.freeze({setStudyHours:h=>{if(![6,8].includes(Number(h)))return false;window.__kgSetPlan?.(String(h));audit('Study hours',h+' h');return true;},replan:()=>{M.ACTIONS.kgreplan?.();audit('Re-plan from now','Today');},askBreak:open,log:getLog});
+  window.__irohaAdmin = Object.freeze({setStudyHours:h=>{if(![6,8,10].includes(Number(h)))return false;
+    if(Number(h)===10&&!['normal','holiday'].includes(window.StudyPlan?.dayKind?.(M.today())?.t))return false;
+    window.__kgSetPlan?.(String(h));audit('Study hours',h+' h');return true;},replan:()=>{M.ACTIONS.kgreplan?.();audit('Re-plan from now','Today');},askBreak:open,log:getLog});
   // Add an unobtrusive entry point next to companion mode, and in Settings → Companions.
   function launch() {
     const bar=$('kg-mode');if(!bar || $('kg-council-launch'))return;
@@ -11840,7 +11940,7 @@ html[data-desk-theme] #kg-main :is(#habit-desk,#moon-lab) :is(.learning-desk,.le
   }
   launch();setInterval(launch,3000);
   const old=M.PANELS.companions;
-  if(typeof old==='function')M.PANELS.companions=()=>`<section class="kl-card kl-stack kg-admin-settings"><p class="kl-eyebrow">IROHA · STUDY DESK ADMIN</p><h3>Iroha coordinates with Kaguya</h3><p class="kl-small">Iroha can update study hours, day type and re-planning when you ask her explicitly. Break requests open a live three-turn discussion: Iroha → Kaguya → Iroha. Their decision is advice; you can always rest. No access to your computer, accounts, or other websites.</p><div class="kl-row"><button type="button" data-a="iadminbreak" class="kl-primary">⚖ Ask both for a break</button><button type="button" data-a="iadmintalk">Let them discuss today's plan</button><button type="button" data-a="iadmin6">Iroha → 6 h plan</button><button type="button" data-a="iadmin8">Iroha → 8 h plan</button><button type="button" data-a="iadminreplan">Iroha → Re-plan now</button></div></section>`+old();
+  if(typeof old==='function')M.PANELS.companions=()=>`<section class="kl-card kl-stack kg-admin-settings"><p class="kl-eyebrow">IROHA · STUDY DESK ADMIN</p><h3>Iroha coordinates with Kaguya</h3><p class="kl-small">Iroha can update 6-, 8-, or occasional 10-hour study plans, day type and re-planning when you ask her explicitly. Break requests open a live three-turn discussion: Iroha → Kaguya → Iroha. Their decision is advice; you can always rest. No access to your computer, accounts, or other websites.</p><div class="kl-row"><button type="button" data-a="iadminbreak" class="kl-primary">⚖ Ask both for a break</button><button type="button" data-a="iadmintalk">Let them discuss today's plan</button><button type="button" data-a="iadmin6">Iroha → 6 h plan</button><button type="button" data-a="iadmin8">Iroha → 8 h plan</button><button type="button" data-a="iadminreplan">Iroha → Re-plan now</button></div></section>`+old();
   M.ACTIONS.iadminbreak=()=>open();
   M.ACTIONS.iadmin6=()=>window.__irohaAdmin?.setStudyHours(6);
   M.ACTIONS.iadmin8=()=>window.__irohaAdmin?.setStudyHours(8);
