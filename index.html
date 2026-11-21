@@ -711,7 +711,9 @@ body.habit-shh #hb-session-card {text-align:center;}
   // ---- the daily routine (free days): study fits between fixed anchors; wind-down (11:30 PM) and sleep (1:00-10:30 AM) never move ----
   // Offsets are minutes after 10:30 AM. Night medication makes a steady wind-down and bedtime non-negotiable, so study always stops by 11:30 PM.
   const STOP=780,SLEEP=870,R_HOURS=[4,6,7,8,10,12,16];
-  const anchors=dow=>[[0,'tea-am','Brush teeth, morning tea',30],[360,'lunch','Lunch · away from the desk',30],[540,'tea-pm','Evening tea',30],[dow===5?630:600,'irl','IRL commitments',30]];
+  // after a long sleep (woke at w), morning tea comes first, lunch is never sooner than 30 min after it, and anything already missed drops out
+  const anchors=(dow,w=0)=>{const a=[[w,'tea-am','Brush teeth, morning tea',30],[Math.max(360,w+30),'lunch','Lunch · away from the desk',30],[540,'tea-pm','Evening tea',30],[dow===5?630:600,'irl','IRL commitments',30]].filter(x=>x[1]==='tea-am'||x[0]>=w+30).sort((x,y)=>x[0]-y[0]),out=[];
+    for(const x of a){const p=out[out.length-1];if(p&&x[0]<p[0]+p[3])continue;out.push(x);}return out;};
   // the 8-hour split, scaled: Maths 37.5%, Physics and Chemistry 31.25% each; about two thirds lecture, one third revision; 10 h+ adds a mock
   function routineBlocks(h){
     const mock=h>=10?60:0,tot=h*60-mock,m=Math.round(tot*.375/5)*5,p=Math.round(tot*.3125/5)*5,c=tot-m-p,lec=x=>Math.round(x*2/3/5)*5;
@@ -727,11 +729,12 @@ body.habit-shh #hb-session-card {text-align:center;}
       rows.splice(i,1,...parts);return;}
   }
   // lay the day out with study starting at S; null when it can't finish by the 11:30 PM wind-down
-  function layRoutine(h,S,dow,meds){
-    const A=anchors(dow).sort((a,b)=>a[0]-b[0]),rows=[],q=routineBlocks(h).map(x=>({id:x[0],title:x[1],m:x[2],b:x[3],n:0}));let t=0,ai=0,since=0,k=0,first=null,last=0;
+  function layRoutine(h,S,dow,meds,w=0){
+    const A=anchors(dow,w),rows=[],q=routineBlocks(h).map(x=>({id:x[0],title:x[1],m:x[2],b:x[3],n:0}));let t=0,ai=0,since=0,k=0,first=null,last=0;
     const put=(id,title,kind,m,b=null)=>{if(m>0){rows.push([id,title,kind,m,b]);t+=m;}};
     const next=()=>ai<A.length?A[ai][0]:STOP,anchor=()=>{const a=A[ai++];put(a[1],a[2],'life',a[3]);since=0;};
     const fillTo=(x,title)=>{while(t<x){if(ai<A.length&&A[ai][0]<=t){anchor();continue;}put('free-'+k++,title,'rest',Math.min(x,next())-t);}};
+    if(w>0)put('sleep-in','Slept in · extra rest counts as recovery','rest',w);
     fillTo(S,'Free time · your own time before study');
     while(q.length){
       if(t>=STOP)return null;
@@ -754,20 +757,20 @@ body.habit-shh #hb-session-card {text-align:center;}
   }
   // Early starts at 11:00, Late as late as still fits, Normal halfway (on the half hour). Hours that can't fit are unavailable.
   const optCache={};
-  function routineOptions(dow){
-    if(optCache[dow])return optCache[dow];const out={};
-    for(const h of R_HOURS){const e=layRoutine(h,30,dow);
-      if(!e){out[h]={ok:false,why:'Doesn’t fit before the 11:30 PM wind-down without cutting wind-down or sleep'};continue;}
-      let l=null,ls=30;for(let S=Math.min(STOP-15,STOP-h*60);S>=30&&!l;S-=5){l=layRoutine(h,S,dow);if(l)ls=S;}if(!l){l=e;ls=30;}
-      let n=null,ns=Math.round((30+ls)/2/30)*30;for(;ns>=30&&!n;ns-=30){n=layRoutine(h,ns,dow);if(n)break;}if(!n){n=e;ns=30;}
-      out[h]={ok:true,early:{S:30,start:e.start,end:e.end},normal:{S:ns,start:n.start,end:n.end},late:{S:ls,start:l.start,end:l.end}};}
-    return optCache[dow]=out;
+  function routineOptions(dow,w=0){
+    const key=dow+'|'+w,E=Math.ceil((w+30)/5)*5;if(optCache[key])return optCache[key];const out={};
+    for(const h of R_HOURS){const e=layRoutine(h,E,dow,null,w);
+      if(!e){out[h]={ok:false,why:w?'Doesn’t fit between waking up and the 11:30 PM wind-down':'Doesn’t fit before the 11:30 PM wind-down without cutting wind-down or sleep'};continue;}
+      let l=null,ls=E;for(let S=Math.min(STOP-15,STOP-h*60);S>=E&&!l;S-=5){l=layRoutine(h,S,dow,null,w);if(l)ls=S;}if(!l){l=e;ls=E;}
+      let n=null,ns=Math.max(E,Math.round((E+ls)/2/30)*30);for(;ns>=E&&!n;ns-=30){n=layRoutine(h,ns,dow,null,w);if(n)break;}if(!n){n=e;ns=E;}
+      out[h]={ok:true,early:{S:E,start:e.start,end:e.end},normal:{S:ns,start:n.start,end:n.end},late:{S:ls,start:l.start,end:l.end}};}
+    return optCache[key]=out;
   }
   function routineDay(L,dow){
-    const o=routineOptions(dow);let h=Number((L.dayHours||{})[studyDate()])||L.planHours||8;
-    if(!o[h]?.ok)h=R_HOURS.filter(x=>x<=h&&o[x]?.ok).pop()||8;
+    const w=Number((L.wokeAt||{})[studyDate()])||0,o=routineOptions(dow,w);let h=Number((L.dayHours||{})[studyDate()])||L.planHours||8;
+    if(!o[h]?.ok)h=R_HOURS.filter(x=>x<=h&&o[x]?.ok).pop()||0;
     const v=['early','normal','late'].includes(L.planVariant)?L.planVariant:'normal';
-    return layRoutine(h,o[h][v].S,dow,L.medsAt);
+    return h?layRoutine(h,o[h][v].S,dow,L.medsAt,w):layRoutine(0,Math.ceil((w+30)/5)*5,dow,L.medsAt,w);
   }
   function realDay(late=false){
     const L=labData(),special=eveningPlan(),recovery=L.recoveryPlan===studyDate()&&!special,six=L.planHours===6,stop=special||recovery?690:765,rows=[];let t=0,total=0,serial=0;
@@ -915,7 +918,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     .map(e=>e.d).sort().pop()||null;
   // each subject practice block reserves ~25% for older material (see Mix in on Today)
   const fallbackMix=(dow,h)=>fallback(dow,h).map(r=>r.kind==='study'&&/^(maths|physics|chem)-chunk/.test(r.id)&&r.minutes>=30?{...r,how:(r.how||'')+' Mix in about '+mixMinutes(r.minutes)+' min of older material: see Mix in on Today.'}:r);
-  const api={routineOptions,routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixMinutes,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixMinutes,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -990,11 +993,12 @@ body.habit-shh #hb-session-card {text-align:center;}
       if (min>=P.need(!!days[cursor]?.shortDay,cursor)) { chain++; run++; statuses[cursor]='study'; }
       else if (breaks.some(b=>cursor>=b.from&&cursor<b.until)) statuses[cursor]='rest';
       else if (date(cursor).getDay()===0 && cursor!==today) statuses[cursor]='rest'; // Sunday is the plan's rest day: it never breaks the chain
-      else if (rested && !rests[wk]) { chain++; run++; rests[wk]=1; statuses[cursor]='rest'; }
+      else if (rested && !rests[wk]) { rests[wk]=1; statuses[cursor]='rest'; } // a rest day keeps the chain but doesn't add a day
       else if (cursor === today) statuses[cursor]='open';
       else if (chain>0 && bank>0) { bank--; freezes[wk]=(freezes[wk]||0)+1; statuses[cursor]='freeze'; } // a freeze protects the chain; it doesn't add a day
       else { chain=0; run=0; statuses[cursor]='miss'; }
       if (run > before && run % 7 === 0) bank = Math.min(3, bank + 1);
+      if (cursor === '2026-11-21' && chain > 3) { chain = 3; run = Math.min(run, 3); } // one-time reset Ayan asked for: rest days had been counted as +1
     }
     const wk = monday(today), weekDays = Object.keys(statuses).filter(d=>d>=wk && statuses[d]==='study').length;
     return { chain, statuses, freezes, weekDays, freezeLeft:bank };
@@ -7894,16 +7898,18 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   const medsHM = off => { const m = ((630 + off) % 1440 + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
   const routineInfo = () => {
     const SP = window.StudyPlan, d = today(), k = SP.dayKind(d).t, free = k === 'normal' || k === 'holiday', dow = new Date(d + 'T12:00:00').getDay();
-    const o = SP.routineOptions ? SP.routineOptions(dow) : {}, h = Number((L.dayHours || {})[d]) || L.planHours || 8, v = VARS.some(x => x[0] === L.planVariant) ? L.planVariant : 'normal';
-    return { SP, d, k, free, dow, o, h, v };
+    const o = SP.routineOptions ? SP.routineOptions(dow) : {}, want = Number((L.dayHours || {})[d]) || L.planHours || 8, v = VARS.some(x => x[0] === L.planVariant) ? L.planVariant : 'normal';
+    const h = free && !o[want]?.ok ? ((SP.routineHours || []).filter(x => x <= want && o[x]?.ok).pop() || want) : want, woke = (L.wokeAt || {})[d];
+    return { SP, d, k, free, dow, o, h, v, woke };
   };
   const picker = () => {
-    const { SP, free, o, h, v } = routineInfo(), rec = current() === 'recovery', off = (SP.routineHours || []).filter(x => free && !o[x]?.ok);
+    const { SP, free, o, h, v, woke } = routineInfo(), rec = current() === 'recovery', off = (SP.routineHours || []).filter(x => free && !o[x]?.ok);
+    const wake = free ? `<form data-f="kgwake" class="kl-row"><label class="kl-small">😴 Slept long? Woke at <input type="time" name="at" value="${woke != null ? medsHM(woke) : ''}"></label><button>${woke != null ? 'Change' : 'Rebuild today'}</button>${woke != null ? `<button type="button" class="kl-ghost" data-a="kgwakeclear">Undo</button><span class="kl-small">Today starts from ${hhmm(woke)}.</span>` : ''}</form>` : '';
     const hrs = (SP.routineHours || []).map(x => { const bad = free && !o[x]?.ok; return `<button type="button" data-a="kghrs" data-v="${x}" aria-pressed="${!rec && x === h}"${bad ? ` aria-disabled="true" class="kg-off" title="${esc(o[x].why)}"` : ''}><b>${x} h</b>${bad ? '<small>doesn’t fit</small>' : ''}</button>`; }).join('');
     const vars = free && o[h]?.ok && !rec ? `<div class="kg-plan-row" role="group" aria-label="When to study">${VARS.map(([id, label]) => `<button type="button" data-a="kgvar" data-v="${id}" aria-pressed="${v === id}"><b>${label}</b><small>${hhmm(o[h][id].start)} – ${hhmm(o[h][id].end)}</small></button>`).join('')}</div>` : '';
     const meds = `<form data-f="kgmeds" class="kl-row"><label class="kl-small">Night meds at <input type="time" name="at" value="${L.medsAt != null ? medsHM(L.medsAt) : ''}"></label><button>${L.medsAt != null ? 'Change' : 'Set'}</button>${L.medsAt != null ? `<span class="kl-small">Shown in tonight's plan at ${hhmm(L.medsAt)}</span>` : '<b class="kl-small">Set your night meds time so it shows in the plan.</b>'}</form>`;
     return `<details open><summary class="kl-small">Study hours · then Early, Normal or Late</summary><div class="kg-plan-row" role="group" aria-label="Hours of study today">${hrs}<button type="button" data-a="kgplan" data-v="recovery" aria-pressed="${rec}"><b>Recovery</b><small>one subject</small></button></div>${vars}
-      ${off.length ? `<p class="kl-small">${off.join(' h and ')} h don’t fit before the 11:30 PM wind-down without cutting wind-down or sleep, so they stay off.</p>` : ''}${meds}</details>`;
+      ${off.length ? `<p class="kl-small">${off.join(' h, ')} h don’t fit ${woke != null ? 'between waking up and' : 'before'} the 11:30 PM wind-down${woke != null ? '' : ' without cutting wind-down or sleep'}, so they stay off.</p>` : ''}${wake}${meds}</details>`;
   };
   const card = () => {
     const { SP, k, free, o, h, v } = routineInfo(), r = current() === 'recovery';
@@ -7922,8 +7928,18 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
       L.dayHours[d] = h; if (h !== L.planHours) L.planSince = today(); L.planHours = h; L.occasional10Date = h === 10 ? d : null;
       L.recoveryPlan = false; L.eveningPlanDate = null; clearReplan(d); redo();
     },
+    kgwakeclear: () => { const d = today(); if (L.wokeAt) delete L.wokeAt[d]; clearReplan(d); redo(); },
     kgvar: b => { const v = b.dataset.v; if (!VARS.some(x => x[0] === v)) return; L.planVariant = v; clearReplan(today()); redo(); }
   });
+  M.FORMS.kgwake = v => {
+    const s = String(v.at || '').trim(); if (!s) return M.K?.('type the time you woke up 🌙');
+    const [hh, mm] = s.split(':').map(Number), m = hh * 60 + (mm || 0), raw = (m < 240 ? m + 1440 : m) - 630, d = today();
+    if (raw <= 0) { if (L.wokeAt) delete L.wokeAt[d]; clearReplan(d); redo(); return M.K?.('that’s your usual wake time, so today runs as planned 🌙'); }
+    if (raw > 690) return M.K?.('after 10 PM there’s no study left to plan. rest, and tomorrow starts fresh 🌙');
+    const off = Math.ceil(raw / 5) * 5; L.wokeAt = { [d]: off }; clearReplan(d); L.autoReplanTs = Date.now(); redo();
+    const SP = window.StudyPlan, left = Math.round(SP.hours() * 60), text = `Good. Long sleep is recovery, not lost time. I rebuilt today from ${hhmm(off)}: ${left ? Math.floor(left / 60) + ' h' + (left % 60 ? ' ' + left % 60 + ' min' : '') + ' of fresh work still fits' : 'nothing needs to fit, so just rest'}. Bedtime stays at 1:00.`;
+    window.__irohaSay?.(text, { force: 1, face: 'study', delay: 300 });
+  };
   M.FORMS.kgmeds = v => {
     const s = String(v.at || '').trim(); if (!s) { delete L.medsAt; return redo(); }
     const [hh, mm] = s.split(':').map(Number), m = hh * 60 + (mm || 0), off = (m < 240 ? m + 1440 : m) - 630;

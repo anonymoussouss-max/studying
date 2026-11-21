@@ -151,3 +151,18 @@ test('re-planned late on a free day: owed study moves later, sleep and wind-down
   assert.ok(re.filter(r => r.kind === 'study').every(r => r.start >= 570 && r.end <= 780));
   assert.match(re.find(r => r.id === 'wind').title, /moves to tomorrow/);
 });
+
+test("slept long: today starts from the wake time, nothing before it, and bedtime stays", () => {
+  const rows = plan(at(MON, "13:10"), { wokeAt: { [MON]: 150 } }).fallback(1);
+  assert.strictEqual(rows.find(r => r.id === "tea-am").start, 150);
+  assert.ok(rows.filter(r => r.kind === "study").every(r => r.start >= 180 && r.end <= 780));
+  assert.strictEqual(rows.find(r => r.id === "sleep").start, 870);
+  const o = plan(at(MON, "13:10"), { wokeAt: { [MON]: 150 } }).routineOptions(1);
+  assert.strictEqual(clock(o[4].early.start), "13:30");
+  assert.strictEqual(o[10].ok, false);
+});
+test("woke after lunch time: lunch comes 30 min after morning tea, never skipped", () => {
+  const rows = plan(at(MON, "17:00"), { wokeAt: { [MON]: 380 } }).fallback(1);
+  assert.strictEqual(rows.find(r => r.id === "lunch").start, 410);
+  assert.ok(rows.some(r => r.kind === "study"));
+});
