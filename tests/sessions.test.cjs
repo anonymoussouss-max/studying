@@ -35,3 +35,16 @@ test('"Other stuff" minutes do not count toward the study day', () => {
   const s = C.complete({ sessions: [] }, active({ subject: 'Other', accruedMs: 90 * 60000, noRecall: true }), { ...done, recall: [] });
   assert.strictEqual(C.minutes({ sessions: [s] }, {}, D), 0);
 });
+
+// ---- the chain: rest days keep it but do not add a day ----
+const studied = dates => ({ sessions: dates.map(d => ({ date: d, minutes: 500, subject: "Maths" })), rests: [] });
+test("a rest day keeps the chain without adding a day", () => {
+  const h = studied(["2026-11-10", "2026-11-12", "2026-11-13"]); h.rests = ["2026-11-11"];
+  assert.strictEqual(C.history(h, {}, "2026-11-13").chain, 3);
+});
+test("the chain was reset to 3 on 21 Nov 2026 and grows from there", () => {
+  const h = studied(["2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20", "2026-11-21"]);
+  assert.strictEqual(C.history(h, {}, "2026-11-21").chain, 3);
+  h.sessions.push({ date: "2026-11-23", minutes: 500, subject: "Maths" });
+  assert.strictEqual(C.history(h, {}, "2026-11-23").chain, 4);
+});
