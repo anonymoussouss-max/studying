@@ -14,9 +14,9 @@ const clock = off => { const m = ((630 + off) % 1440 + 1440) % 1440; return `${S
 const study = rows => rows.filter(r => r.kind === 'study');
 const TUE = '2026-11-17', EXAM = { t: 'exam', name: 'BEEE Practical', college: true, end: 900, hours: 6, from: 480 };
 
-test('today (Mon 16 Nov) defaults to the BEEE Practical exam day', () => {
+test('days default to free days; exams come only from the Exam today button', () => {
   const P = plan('2026-11-16T08:05:00');
-  assert.strictEqual(P.dayKind('2026-11-16').name, 'BEEE Practical');
+  assert.strictEqual(P.dayKind('2026-11-16').t, 'normal');
   assert.strictEqual(P.dayKind(TUE).t, 'normal'); // college is a per-day toggle now
 });
 

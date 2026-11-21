@@ -1,5 +1,7 @@
 # Spec: Exam day + self-adapting schedule — V1
 
+> **Status (2026-11-21): shipped.** Exam day works from the Exam today button (the built-in 16 Nov shortcut is gone). Self-adapt went further than this spec: free days now follow a fixed routine (tea 10:30, lunch 4:30, evening tea 7:30, IRL 8:30 PM / Fri 9:00, wind-down 11:30 PM, sleep 1:00–10:30 AM) with Early / Normal / Late plans for 4–10 h, a slept-long wake button, and automatic re-planning when owed study and the plan drift 15+ min apart. Bedtime never moves on free days. College is a per-day toggle.
+
 Status: implemented · Changes the shipped college-day schedule (`tasks/plan-college-day.md`) and retention (`SPEC-skill-based-retention.md`).
 
 ## Capability map

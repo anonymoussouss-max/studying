@@ -1,5 +1,7 @@
 # Spec Delta: Skill-based retention — V1
 
+> **Status (2026-11-21): V1 shipped; the 4-week trial is running.** The fixed 25% older-material share stays until the trial gives a baseline (see the `shortcut:` note at `mixMinutes`). Shipped since: slip vs principle labels, a reference panel, a workload forecast with a daily cap, and a two-week check-in.
+
 Status: implemented
 
 ## Objective

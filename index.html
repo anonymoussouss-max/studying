@@ -661,7 +661,7 @@ body.habit-shh #hb-session-card {text-align:center;}
   }
   // Exact net-study budgets. Review durations remain those of the original plan.
   const studyDate=()=>{const d=new Date();if(d.getHours()*60+d.getMinutes()<240)d.setDate(d.getDate()-1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
-  const eveningPlan=()=>{const d=new Date(),date=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');return date==='2026-11-11'&&labData().eveningPlanDate===date;};
+  const eveningPlan=()=>false; // the one-off 11 Nov evening plan has expired; kept as a constant so realDay's branches stay valid
   function recoverySubject(){
     const d=studyDate();
     const yesterday=new Date(d+'T12:00:00');yesterday.setDate(yesterday.getDate()-1);const iso=yesterday.getFullYear()+'-'+String(yesterday.getMonth()+1).padStart(2,'0')+'-'+String(yesterday.getDate()).padStart(2,'0');
@@ -674,8 +674,6 @@ body.habit-shh #hb-session-card {text-align:center;}
   }
   // day type for a date: saved override, else a normal free day (Sunday rest)
   const dayKind=d=>{const o=(labData().dayTypes||{})[d];if(o)return o;
-    // shortcut: Mon 16 Nov 2026's exam day is built in because it was needed before the Exam today button shipped; harmless after that date
-    if(d==='2026-11-16')return {t:'exam',name:'BEEE Practical',college:true,end:900,hours:6,from:480};
    const w=new Date(d+'T12:00:00').getDay();return w===0?{t:'rest'}:{t:'normal'};}; // college is a per-day toggle: most days are free days
   const parseMins=s=>{const v=String(s||'').trim(),h=/(\d+(?:\.\d+)?)\s*h\s*(\d+)?/i.exec(v);const n=h?+h[1]*60+ +(h[2]||0):parseFloat(v);return n>=30&&n<=300?Math.round(n):0;};
   // college day, in minutes after 10:30 (negative = morning). Wake is worked back from 9:00 and the Maths lecture length.
@@ -7814,8 +7812,6 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   ];
   PLANS.push(['recovery',8,'Recovery · one subject','2:00 PM','One lecture at your pace; stop by 10 PM, even if unfinished']);
   const calendarToday=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
-  if(calendarToday()==='2026-11-11')PLANS.push(['today',8,'Today only · 6:15 PM','6:15 PM','30 minutes of Maths and 2 hours of Physics; no Chemistry; finish by 10 PM']);
-  if(!['12','14'].includes(L.eightHourStart))L.eightHourStart='14';
   if(L.planHours===12)L.planHours=8;
   if(![4,6,7,8,10].includes(L.planHours))L.planHours=8;
   // An occasional ten-hour day must never silently become the next day's default.
@@ -7827,7 +7823,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   if (!L.planSince) L.planSince = today();
   // the normal day's start depends on whether spaced revision is due today
   const startAt = h => { const o = window.StudyPlan?.startFor?.(h); if (typeof o !== 'number') return ''; const m = (630 + o) % 1440, hr = Math.floor(m / 60); return `${hr % 12 || 12}:${String(m % 60).padStart(2, '0')} ${hr < 12 ? 'AM' : 'PM'}`; };
-  const current=()=>calendarToday()==='2026-11-11'&&L.eveningPlanDate===calendarToday()?'today':L.recoveryPlan?'recovery':L.planHours===8&&L.lateSchedule?'8L':L.planHours===6&&L.planLate?'6L':String(L.planHours);
+  const current=()=>L.recoveryPlan?'recovery':L.planHours===8&&L.lateSchedule?'8L':L.planHours===6&&L.planLate?'6L':String(L.planHours);
   L.planLog = L.planLog || {};
   L.dayHours = L.dayHours || {}; // today's explicit hours, independent of the weekday/day-type preset
   // the late-start plans were replaced by the self-adapting schedule
@@ -7892,7 +7888,6 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     },
     kgmaths: v => { const n = window.StudyPlan.parseMins(v.len), tmr = M.add(today(), 1); if (!n) return M.K?.('type it like 2h 35m, 155 or 2.5h'); (L.mathsNext = L.mathsNext || {})[tmr] = n; redo(); }
   });
-  let selectingEight=false;
   // Study hours, then Early / Normal / Late on free days. Times come from StudyPlan.routineOptions, so Friday's later IRL slot is handled.
   const VARS = [['early', 'Early'], ['normal', 'Normal'], ['late', 'Late']];
   const medsHM = off => { const m = ((630 + off) % 1440 + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
@@ -7994,24 +7989,10 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     window.HabitDesk?.refresh?.(); window.DeskStore?.setState?.({ habitRevision: Date.now() });
     setTimeout(() => M.render(), 50);
   }
-  function expireEveningPlan(){if(calendarToday()==='2026-11-11')return;const i=PLANS.findIndex(p=>p[0]==='today');if(i>=0)PLANS.splice(i,1);if(L.eveningPlanDate){L.eveningPlanDate=null;save();apply();window.HabitDesk?.refresh?.();}if(i>=0)M.render();}
-  setInterval(expireEveningPlan,30000);window.addEventListener('focus',expireEveningPlan);expireEveningPlan();
   function expireOccasional10(){if(L.planHours!==10||L.occasional10Date===today())return;L.planHours=8;L.occasional10Date=null;L.planSince=today();redo();}
   setInterval(expireOccasional10,60000);window.addEventListener('focus',expireOccasional10);
   M.ACTIONS.kgplan = b => {
-    if(b.dataset.v==='8'){selectingEight=!selectingEight;M.render();return;}
-    selectingEight=false;setPlan(b.dataset.v);
-  };
-  M.ACTIONS.kg8start = b => {
-    const v=b.dataset.v;if(v!=='12'&&v!=='14')return;
-    const changed=L.eightHourStart!==v;
-    L.eightHourStart=v; selectingEight=false;
-    // Choosing a new start must clear an old 're-plan from now' cutoff.
-    const d=today(); if(changed){if(L.replanAt)delete L.replanAt[d];if(L.replanPush)delete L.replanPush[d];}
-    save();setPlan('8');
-    // If setPlan returned early because 8h was already active, still update UI/timetable.
-    window.HabitDesk?.refresh?.();window.DeskStore?.setState?.({habitRevision:Date.now()});
-    M.render();
+    setPlan(b.dataset.v);
   };
   window.__kgSetPlan = setPlan;
   window.__kgPlanGo = () => M.go('today');
