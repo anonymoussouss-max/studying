@@ -67,12 +67,16 @@ test('"I\'m home now" late: what does not fit before dinner moves to tomorrow', 
   assert.strictEqual(clock(row(rows, 'meal-1').start), '23:00');
 });
 
-test('holiday: 10 hours from 10:30 with a Mock / backlog / test block', () => {
+test('holiday: 8 hours by default with a free morning; 10 hours when chosen', () => {
   const P = plan(at(SAT, '11:00'));
-  const rows = P.fallback(6);
-  assert.strictEqual(P.hours(), 10);
-  assert.strictEqual(clock(rows.find(r => r.kind === 'study').start), '10:30');
-  assert.ok(rows.some(r => r.id.startsWith('mock-chunk')));
+  assert.strictEqual(P.hours(), 8);
+  assert.strictEqual(clock(P.fallback(6).find(r => r.kind === 'study').start), '14:00');
+  assert.strictEqual(plan(at(SAT, '11:00'), { dayHours: { [SAT]: 10 } }).hours(), 10);
+});
+
+test('re-planned after dinner: what does not fit is still named, on the wind-down row', () => {
+  const late = 20 * 60 - 630, rows = plan(`${SAT}T20:00:00`, { replanAt: { [SAT]: late } }).fallback(6);
+  assert.match(row(rows, 'wind').title, /moves to tomorrow: .*Physics \d+ min.*Chemistry \d+ min/);
 });
 
 test('the desk day starts at 4:00 AM: 5:00 AM belongs to the same calendar day', () => {
@@ -89,7 +93,7 @@ test('no separate spaced-revision blocks: older material lives inside practice, 
   const plain = plan(at(MON, '07:00'), { mathsNext: { [MON]: 155 } }).fallback(1);
   const sum = rows => rows.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0);
   assert.strictEqual(sum(college), sum(plain));
-  assert.strictEqual(holiday.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0), 600);
+  assert.strictEqual(holiday.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0), 480);
 });
 
 test('subject practice blocks carry a "mix in older material" note', () => {

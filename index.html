@@ -854,12 +854,13 @@ body.habit-shh #hb-session-card {text-align:center;}
     t=at;let since=0,n=0;
     for(const f of fixed){
       const end=Math.min(f[5],until);
-      while(q.length&&end-t>=15){const p=q[0],m=Math.min(50,p.m,end-t);out.push([p.k+'-chunk-r'+n++,p.title,'study',m,p.b]);limits[p.k+'-chunk-r'+(n-1)]=m;t+=m;since+=m;p.m-=m;if(p.m<15)q.shift();
+      while(q.length&&end-t>=15){const p=q[0],m=Math.min(p.m-50<15?p.m:50,end-t);out.push([p.k+'-chunk-r'+n++,p.title,'study',m,p.b]);limits[p.k+'-chunk-r'+(n-1)]=m;t+=m;since+=m;p.m-=m;if(p.m<15)q.shift();
         if(q.length&&since>=150&&end-t>=40){out.push(['brk-r'+n++,'Rest · 20 minutes away from the desk','life',20,null]);t+=20;since=0;}}
       if(f[5]>t)out.push(['free-r'+n++,'Free time · unfinished work can wait','rest',f[5]-t,null]);
       t=f[5];if(/^meal|^lunch|^nap|^college|^sleep/.test(f[0]))since=0;
-      const moved=q.filter(p=>p.m>=15).map(p=>p.title.split(' · ')[0]+' '+p.m+' min');
-      out.push([f[0],f[0]==='meal-1'&&moved.length?f[1].split(' · ')[0]+' · moves to tomorrow: '+moved.join(', '):f[1],f[2],f[3],f[4]]);t+=f[3];}
+      out.push([f[0],f[1],f[2],f[3],f[4]]);t+=f[3];}
+    const moved=q.filter(p=>p.m>=15).map(p=>p.title.split(' · ')[0]+' '+p.m+' min'),fut=out.filter(r=>!r[5]),tag=fut.find(r=>r[0]==='meal-1')||fut.find(r=>r[0]==='wind')||fut[fut.length-1];
+    if(moved.length&&tag)tag[1]=tag[1].split(' · ')[0]+' · moves to tomorrow: '+moved.join(', ');
     return out;};
   const loggedToday=()=>{const d=studyDate(),out={};let desk={},habit={};try{desk=JSON.parse(root.localStorage.getItem('desk-needy-v1')||'{}');habit=JSON.parse(root.localStorage.getItem('ame-habit-v1')||'{}');}catch(_){}
     for(const [id,m] of Object.entries((desk.state||desk).days?.[d]?.completed||{}))if(Number.isFinite(+m)){const k=id.split('-')[0];out[k]=(out[k]||0)+ +m;}
@@ -3488,7 +3489,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     const blocks=window.StudySchedule?.(short,dow) || (short?window.StudyPlan.fallback(dow):[]),study=blocks.filter(b=>b.kind==='study');
     const target=study.reduce((n,b)=>n+b.minutes,0),logged=C.minutes(h,days(),today()),pct=target?Math.min(100,Math.round(logged*100/target)):0;
     const time=offset=>{const m=(630+offset)%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');};
-    return `<article class="hb-day-map hb-card" id="hb-day-map"><div class="hb-section-heading"><div><p class="hb-eyebrow">${esc(C.date(today()).toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'}))} · YOUR DAY</p><h2>${focus?esc(focus)+' is today’s focus.':'Sunday belongs to you.'}</h2><p>${focus?`${window.StudyPlan.shortHours()+'-hour plan'} · ${window.StudyPlan.need(true)} min today keeps the chain · sleep 01:00`:'A full rest day. You do not owe the desk a session.'}</p></div>${focus?(window.StudyPlan.hours()<12?'':button(short?'8h fallback on · switch to 12h':'Switch to 8h fallback','fallback','aria-pressed="'+short+'"')):button('Mark today rested','rest')}</div>
+    return `<article class="hb-day-map hb-card" id="hb-day-map"><div class="hb-section-heading"><div><p class="hb-eyebrow">${esc(C.date(today()).toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'}))} · YOUR DAY</p><h2>${focus?esc(focus)+' is today’s focus.':'Sunday belongs to you.'}</h2><p>${focus?`${(h=>h%1?'about '+Math.round(h):h)(window.StudyPlan.shortHours())+'-hour plan'} · ${window.StudyPlan.need(true)} min today keeps the chain · sleep 01:00`:'A full rest day. You do not owe the desk a session.'}</p></div>${focus?(window.StudyPlan.hours()<12?'':button(short?'8h fallback on · switch to 12h':'Switch to 8h fallback','fallback','aria-pressed="'+short+'"')):button('Mark today rested','rest')}</div>
     ${focus?`<div class="hb-day-progress"><strong>${Math.round(logged)} / ${target} min logged</strong><span>${logged>=window.StudyPlan.need(true)?'Today counts 🌙':Math.max(0,Math.ceil(window.StudyPlan.need(true)-logged))+' min until today counts'}</span></div><progress max="100" value="${pct}" aria-label="Today’s study progress">${pct}%</progress><details><summary>See the ${short?window.StudyPlan.shortHours():'12'}-hour schedule · ${study.length} study blocks</summary><ol class="hb-timeline">${blocks.map(b=>`<li class="hb-block-${b.kind}"><time>${time(b.start)}–${time(b.end)}</time><span><strong>${esc(b.title)}</strong><small>${b.minutes}m · ${esc(b.kind==='study' && b.id==='focus'?'today’s priority':b.kind)}</small></span>${b.kind==='study'?button('Start timer','block-task','data-block="'+esc(b.id)+'" aria-label="Choose '+esc(b.title)+'"'):''}</li>`).join('')}</ol><p class="hb-caption">A plan is a guide. Only saved work counts. Switching keeps your logs; each plan caps its own blocks.</p></details>`:'<p>Walk, eat, see someone, do something with no score attached. ♡</p>'}</article>`;
   }
   function restartView() {return `<details class="hb-card hb-extra"><summary>Make this feel like something I chose</summary><form id="hb-reason" class="hb-stack"><label>What do I want studying to make possible?<textarea name="reason" rows="2" maxlength="300" placeholder="Something that matters to you, beyond a score.">${esc(settings().reason || '')}</textarea></label><button type="submit">Keep my reason</button></form><p>Try one small question before deciding how the whole day will go.</p></details>`;}
@@ -7857,7 +7858,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   const nowOff = () => { const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); return (m < 240 ? m + 1440 : m) - 630; };
   const replan = msg => { const d = today(); if (Date.now() - (L.replanTs || 0) < 600000) return; (L.replanAt = L.replanAt || {})[d] = nowOff(); L.replanTs = Date.now(); redo(); if (msg) M.K?.(msg); };
   const lateTalk = (late, push) => { const hm = late >= 60 ? `${Math.floor(late / 60)} h ${late % 60} min` : `${late} minutes`;
-    const text = push >= late ? `You started ${hm} late. I've moved dinner and bedtime ${push} minutes later so all of today's study still fits. Tomorrow's wake time doesn't move, so let's not make it a habit.` : push ? `You started ${hm} late. I've moved bedtime to 1:00 AM, which is as late as I'll go, and the study that still doesn't fit is listed under dinner as moving to tomorrow.` : `You started ${hm} late. Bedtime is already 1:00 AM, so I've trimmed today to what still fits. The rest is listed under dinner as moving to tomorrow.`;
+    const text = push >= late ? `You started ${hm} late. I've moved dinner and bedtime ${push} minutes later so all of today's study still fits. Tomorrow's wake time doesn't move, so let's not make it a habit.` : push ? `You started ${hm} late. I've moved bedtime to 1:00 AM, which is as late as I'll go, and the study that still doesn't fit is listed in tonight's plan as moving to tomorrow.` : `You started ${hm} late. Bedtime is already 1:00 AM, so I've trimmed today to what still fits. The rest is listed in tonight's plan as moving to tomorrow.`;
     M.duo?.([['i', text]]); window.__irohaSay?.(text, { force: 1, face: 'study', delay: 400 }); };
   let wasActive = false, activeFrom = null;
   setInterval(() => {
@@ -7871,7 +7872,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   }, 30000);
   const redo = () => { save(); apply(); window.HabitDesk?.refresh?.(); window.DeskStore?.setState?.({ habitRevision: Date.now() }); setTimeout(() => M.render(), 50); };
   Object.assign(M.ACTIONS, {
-    kgday: b => { const v = b.dataset.v, d = today(); if (v === 'exam') { examOpen = true; return M.render(); } examOpen = false; L.recoveryPlan = false; if (L.replanAt) delete L.replanAt[d]; if (L.replanPush) delete L.replanPush[d]; if (L.dayHours) delete L.dayHours[d]; L.dayTypes = L.dayTypes || {}; if (v === 'auto') delete L.dayTypes[d]; else L.dayTypes[d] = ['holiday','rest','normal'].includes(v) ? { t: v } : { t: 'college', end: +v.slice(1) }; if(L.planHours===10){L.planHours=8;L.occasional10Date=null;} /* Choosing a day type exits the one-off 10h plan. */ if (L.homeAt) delete L.homeAt[d]; redo(); },
+    kgday: b => { const v = b.dataset.v, d = today(); if (v === 'exam') { examOpen = true; return M.render(); } examOpen = false; L.recoveryPlan = false; if (L.replanAt) delete L.replanAt[d]; if (L.replanPush) delete L.replanPush[d]; if (L.dayHours) delete L.dayHours[d]; L.dayTypes = L.dayTypes || {}; if (v === 'auto') delete L.dayTypes[d]; else L.dayTypes[d] = ['holiday','rest','normal'].includes(v) ? { t: v } : { t: 'college', end: +v.slice(1) }; if(L.planHours===10){L.planHours=8;L.occasional10Date=null;} /* Choosing a day type exits the one-off 10h plan. */ if (L.homeAt) delete L.homeAt[d]; redo(); M.K?.(v === 'auto' ? 'back to the weekday default for today 🌙' : 'today is set: ' + ({ c900: 'college until 3 PM', c1020: 'college until 5 PM', normal: 'normal / free day', holiday: 'holiday', rest: 'rest day' })[v] + ' 🌙'); },
     kgreplan: () => { L.replanTs = 0; replan('re-planned the rest of today from now 🌙'); },
     kghome: () => { const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); (L.homeAt = L.homeAt || {})[today()] = (m < 240 ? m + 1440 : m) - 630; redo(); M.K?.("welcome back! lunch first, then the evening is rebuilt from now 🌙"); }
   });
@@ -11529,6 +11530,10 @@ html[data-desk-theme] body #kg-main :is(.hb-primary,.kl-primary):not(:disabled):
 html[data-desk-theme] #kg-main :is(.kl-conf,.kl-seg) [aria-pressed="true"],
 html[data-desk-theme] #moon-lab .kl-tabs [aria-current="page"] {
   background:var(--desk-soft);color:var(--desk-accent);border-color:var(--desk-accent);box-shadow:none;
+}
+html[data-desk-theme] #kg-main #moon-lab .kg-plan-row [aria-pressed="true"],
+html[data-desk-theme] #kg-main #moon-lab .kg-plan-row [aria-pressed="true"]:hover {
+  background:var(--desk-accent);color:var(--desk-on-accent);border-color:var(--desk-accent);box-shadow:none;
 }
 html[data-desk-theme] #kg-main progress,
 html[data-desk-theme] #kg-main progress::-webkit-progress-bar {background:var(--desk-soft);}
