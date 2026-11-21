@@ -607,7 +607,7 @@ body.habit-shh #hb-session-card {text-align:center;}
 /* The eight-hour fallback is shared by every view and companion calculation. */
 (function(root){
   'use strict';
-  const focus={1:'Mathematics',2:'Physics',3:'Chemistry',4:'Mathematics',5:'Physics',6:'Chemistry'};
+  const focus={0:'Mathematics',1:'Mathematics',2:'Physics',3:'Chemistry',4:'Mathematics',5:'Physics',6:'Chemistry'};
   const limits={'maths-part2':70,'maths-part3':35,'physics-part2':40,'chem-part2':40,maths:210,'maths-rev':150,physics:210,'physics-rev':150,chem:210,errors:60,recall:60,'maths-hw':90,'maths-sp':90,'physics-sp':90,'chem-sp':90,'chem-rev':150,focus:120};
   const full={maths:150,'maths-rev':90,physics:150,'physics-rev':60,chem:150,errors:60,recall:60,'chem-rev':30,focus:180};
   // The chosen plan lives with the Moon Lab data, so sync and backups carry it.
@@ -672,11 +672,11 @@ body.habit-shh #hb-session-card {text-align:center;}
     const lectures=(labData().lectures||[]).filter(x=>x.made&&x.made<d&&['Maths','Physics','Chemistry'].includes(x.subj)).slice().sort((a,b)=>String(a.made).localeCompare(String(b.made)));
     const last=lectures.at(-1)?.subj;return {Maths:'Physics',Physics:'Chemistry',Chemistry:'Maths'}[last]||'Maths';
   }
-  // day type for a date: saved override, else Mon–Fri college until 3 PM, Saturday holiday, Sunday rest
+  // day type for a date: saved override, else a normal free day (Sunday rest)
   const dayKind=d=>{const o=(labData().dayTypes||{})[d];if(o)return o;
     // shortcut: Mon 16 Nov 2026's exam day is built in because it was needed before the Exam today button shipped; harmless after that date
     if(d==='2026-11-16')return {t:'exam',name:'BEEE Practical',college:true,end:900,hours:6,from:480};
-   const w=new Date(d+'T12:00:00').getDay();return w===0?{t:'rest'}:w===6?{t:'holiday'}:{t:'college',end:900};};
+   const w=new Date(d+'T12:00:00').getDay();return w===0?{t:'rest'}:{t:'normal'};}; // college is a per-day toggle: most days are free days
   const parseMins=s=>{const v=String(s||'').trim(),h=/(\d+(?:\.\d+)?)\s*h\s*(\d+)?/i.exec(v);const n=h?+h[1]*60+ +(h[2]||0):parseFloat(v);return n>=30&&n<=300?Math.round(n):0;};
   // college day, in minutes after 10:30 (negative = morning). Wake is worked back from 9:00 and the Maths lecture length.
   function collegeDay(L,kind){
@@ -708,64 +708,66 @@ body.habit-shh #hb-session-card {text-align:center;}
     put('meal-1',moved.length&&t>=750?'Dinner · moves to tomorrow: '+moved.join(', '):'Dinner','life',20);put('wind','Wind down','life',20);put('sleep','Sleep','sleep',1440+rows.origin-t);
     return rows;
   }
-  // 2026-11: Normal is eight NET study hours, noon–9 PM or 2 PM–11:15 PM.
-  // Normal subject budgets: Maths lecture 120 + revision 60; Physics lecture 90 + spaced 60; Chemistry lecture 90 + revision 60.
-  // The optional ten-hour plan is for occasional free days, 11 AM–11:05 PM (125 min of breaks).
-  // College/exam/recovery remain separate, because a 2 PM start clashes with college attendance.
-  function freeDaySchedule(hours){
-    const ten=hours===10,noon=!ten && labData().eightHourStart==='12',start=ten?30:noon?90:210,rows=[];
-    let t=0;
-    const put=(id,title,kind,m,b=null)=>{if(m>0){rows.push([id,title,kind,m,b]);t+=m;if(kind==='study')limits[id]=m;}};
-    put('free-morning','Morning · breakfast, errands and personal time','rest',start);
-    const normal=[
-      ['maths-n1','Mathematics · lecture and worked examples','study',120,'maths'],
-      ['brk-n1','Break · stretch and water','life',15],
-      ['physics-n1','Physics · lecture and worked problems','study',90,'physics'],
-      ['brk-n2','Break · eyes off the screen','life',10],
-      ['chem-n1','Chemistry · lecture, concepts and notes','study',90,'chemistry'],
-      ['meal-1','Meal · away from the desk','life',30],
-      ['maths-n2','Mathematics · revision, homework and spaced practice','study',60,'maths'],
-      ['brk-n3','Break · movement and water','life',10],
-      ['physics-n2','Physics · spaced revision, problems and corrections','study',60,'physics'],
-      ['brk-n4','Break · stand, drink water','life',10],
-      ['chem-n2','Chemistry · revision, questions and active recall','study',60,'chemistry']
-    ];
-    // 12 PM option: 480 minutes of study from noon to 8:30 PM, three 10-minute breaks,
-    // followed by the protected 8:30–9:00 PM dinner/offline break. Lunch is before noon.
-    // Keep study IDs identical across the two 8-hour versions so progress follows the plan.
-    const normalNoon=[
-      ['maths-n1','Mathematics · lecture and worked examples','study',120,'maths'],
-      ['brk-n1','Break · water and stretch (2:00–2:10)','life',10],
-      ['physics-n1','Physics · lecture and worked problems','study',90,'physics'],
-      ['brk-n2','Break · snack and eyes off screen (3:40–3:50)','life',10],
-      ['chem-n1','Chemistry · lecture, concepts and notes','study',90,'chemistry'],
-      ['brk-n3','Break · water and movement (5:20–5:30)','life',10],
-      ['maths-n2','Mathematics · revision and homework','study',60,'maths'],
-      ['physics-n2','Physics · spaced revision and corrections','study',60,'physics'],
-      ['chem-n2','Chemistry · revision and active recall','study',60,'chemistry'],
-      ['meal-1','Protected dinner / offline break · 8:30–9:00 PM','life',30]
-    ];
-    const occasional=[
-      ['maths-o1','Mathematics · lecture and applications','study',90,'maths'],
-      ['brk-o1','Break · water and movement','life',15],
-      ['physics-o1','Physics · concepts and problems','study',90,'physics'],
-      ['brk-o2','Break · leave the desk','life',15],
-      ['chem-o1','Chemistry · lecture and retrieval','study',90,'chemistry'],
-      ['brk-o3','Break · stretch and snack','life',15],
-      ['maths-o2','Mathematics · homework and weak problems','study',90,'maths'],
-      ['brk-o4','Longer break · rest your eyes','life',25],
-      ['physics-o2','Physics · practice and corrections','study',90,'physics'],
-      ['meal-1','Dinner · away from the desk','life',40],
-      ['chem-o2','Chemistry · questions and spaced reviews','study',90,'chemistry'],
-      ['brk-o5','Break · water and stretch','life',15],
-      ['mock-o','Mixed recall / mock · review errors','study',60,null]
-    ];
-    for(const r of ten?occasional:noon?normalNoon:normal)put(...r);
-    // Last study ends at 20:30 (12 PM normal), 23:15 (2 PM normal), or 23:05 (occasional).
-    // Sleep is never pushed later than midnight just to hit a study quota.
-    put('wind','Wind down · books closed','life',Math.max(0,810-t));
-    put('sleep','Sleep','sleep',1440-t);
-    return rows;
+  // ---- the daily routine (free days): study fits between fixed anchors; wind-down (11:30 PM) and sleep (1:00-10:30 AM) never move ----
+  // Offsets are minutes after 10:30 AM. Night medication makes a steady wind-down and bedtime non-negotiable, so study always stops by 11:30 PM.
+  const STOP=780,SLEEP=870,R_HOURS=[4,6,7,8,10,12,16];
+  const anchors=dow=>[[0,'tea-am','Brush teeth, morning tea',30],[360,'lunch','Lunch · away from the desk',30],[540,'tea-pm','Evening tea',30],[dow===5?630:600,'irl','IRL commitments',30]];
+  // the 8-hour split, scaled: Maths 37.5%, Physics and Chemistry 31.25% each; about two thirds lecture, one third revision; 10 h+ adds a mock
+  function routineBlocks(h){
+    const mock=h>=10?60:0,tot=h*60-mock,m=Math.round(tot*.375/5)*5,p=Math.round(tot*.3125/5)*5,c=tot-m-p,lec=x=>Math.round(x*2/3/5)*5;
+    const b=[['maths-n1','Mathematics · lecture and worked examples',lec(m),'maths'],['physics-n1','Physics · lecture and worked problems',lec(p),'physics'],['chem-n1','Chemistry · lecture, concepts and notes',lec(c),'chemistry'],
+      ['maths-n2','Mathematics · revision and homework',m-lec(m),'maths'],['physics-n2','Physics · revision and corrections',p-lec(p),'physics'],['chem-n2','Chemistry · revision and active recall',c-lec(c),'chemistry']];
+    if(mock)b.push(['mock-o','Mixed recall / mock · review errors',mock,null]);
+    return b.filter(x=>x[2]>0);
+  }
+  // a 5-minute "Night meds" line at the set time; never inside a study block (it moves to the block's end)
+  function addMeds(rows,off){
+    let t=0;for(let i=0;i<rows.length;i++){const r=rows[i],s=t,e=t+r[3];t=e;if(off>=e)continue;if(r[2]==='study'){off=e;continue;}
+      const at=Math.max(s,off),m=Math.min(5,e-at),parts=[[r[0],r[1],r[2],at-s,r[4]],['meds','Night meds · same time every night','life',m,null],[r[0]+'-2',r[1],r[2],e-at-m,r[4]]].filter(x=>x[3]>0);
+      rows.splice(i,1,...parts);return;}
+  }
+  // lay the day out with study starting at S; null when it can't finish by the 11:30 PM wind-down
+  function layRoutine(h,S,dow,meds){
+    const A=anchors(dow).sort((a,b)=>a[0]-b[0]),rows=[],q=routineBlocks(h).map(x=>({id:x[0],title:x[1],m:x[2],b:x[3],n:0}));let t=0,ai=0,since=0,k=0,first=null,last=0;
+    const put=(id,title,kind,m,b=null)=>{if(m>0){rows.push([id,title,kind,m,b]);t+=m;}};
+    const next=()=>ai<A.length?A[ai][0]:STOP,anchor=()=>{const a=A[ai++];put(a[1],a[2],'life',a[3]);since=0;};
+    const fillTo=(x,title)=>{while(t<x){if(ai<A.length&&A[ai][0]<=t){anchor();continue;}put('free-'+k++,title,'rest',Math.min(x,next())-t);}};
+    fillTo(S,'Free time · your own time before study');
+    while(q.length){
+      if(t>=STOP)return null;
+      if(ai<A.length&&A[ai][0]<=t){anchor();continue;}
+      const room=Math.min(STOP,next())-t;
+      if(room<15){put('free-'+k++,'Short gap · stretch and water','rest',room);continue;}
+      if(since>=90&&room>=30){put('brk-'+k++,'Break · away from the desk','life',10);since=0;continue;}
+      const p=q[0];let m=Math.min(p.m,room,Math.max(15,120-since));
+      if(p.m-m>0&&p.m-m<15)m=p.m<=room?p.m:p.m-15; // never leave a sliver under 15 minutes
+      if(m<15){put('free-'+k++,'Short gap · stretch and water','rest',room);continue;}
+      if(first==null)first=t;
+      put(p.n?p.id+String.fromCharCode(97+p.n):p.id,p.title,'study',m,p.b);p.n++;p.m-=m;since+=m;last=t;if(!p.m)q.shift();
+    }
+    if(last>STOP)return null;
+    fillTo(STOP,'Free evening · study is done, no catch-up');
+    put('wind','Wind down · books closed, screens dim','life',SLEEP-STOP);
+    put('sleep','Sleep · protected','sleep',1440-SLEEP);
+    if(meds!=null&&meds>=0&&meds<SLEEP)addMeds(rows,meds);
+    rows.origin=0;rows.start=first;rows.end=last;return rows;
+  }
+  // Early starts at 11:00, Late as late as still fits, Normal halfway (on the half hour). Hours that can't fit are unavailable.
+  const optCache={};
+  function routineOptions(dow){
+    if(optCache[dow])return optCache[dow];const out={};
+    for(const h of R_HOURS){const e=layRoutine(h,30,dow);
+      if(!e){out[h]={ok:false,why:'Doesn’t fit before the 11:30 PM wind-down without cutting wind-down or sleep'};continue;}
+      let l=null,ls=30;for(let S=Math.min(STOP-15,STOP-h*60);S>=30&&!l;S-=5){l=layRoutine(h,S,dow);if(l)ls=S;}if(!l){l=e;ls=30;}
+      let n=null,ns=Math.round((30+ls)/2/30)*30;for(;ns>=30&&!n;ns-=30){n=layRoutine(h,ns,dow);if(n)break;}if(!n){n=e;ns=30;}
+      out[h]={ok:true,early:{S:30,start:e.start,end:e.end},normal:{S:ns,start:n.start,end:n.end},late:{S:ls,start:l.start,end:l.end}};}
+    return optCache[dow]=out;
+  }
+  function routineDay(L,dow){
+    const o=routineOptions(dow);let h=Number((L.dayHours||{})[studyDate()])||L.planHours||8;
+    if(!o[h]?.ok)h=R_HOURS.filter(x=>x<=h&&o[x]?.ok).pop()||8;
+    const v=['early','normal','late'].includes(L.planVariant)?L.planVariant:'normal';
+    return layRoutine(h,o[h][v].S,dow,L.medsAt);
   }
   function realDay(late=false){
     const L=labData(),special=eveningPlan(),recovery=L.recoveryPlan===studyDate()&&!special,six=L.planHours===6,stop=special||recovery?690:765,rows=[];let t=0,total=0,serial=0;
@@ -776,7 +778,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     if((kind.t==='college'||kind.t==='exam')&&!special&&!recovery)return collegeDay(L,kind);
     // Eight hours is the normal free-day plan; ten hours requires choosing Occasional.
     const freeDayHours=Math.min(10,Math.max(6,Number((L.dayHours||{})[studyDate()])||L.planHours||8));
-    if(!special&&!recovery&&(hol||kind.t==='normal')&&freeDayHours>=8)return freeDaySchedule(freeDayHours);
+    if(!special&&!recovery&&(hol||kind.t==='normal'))return routineDay(L,new Date(studyDate()+'T12:00:00').getDay());
     const holidayHours=freeDayHours;
     const start=special?465:recovery?210:hol?90:late||six&&L.planLate?210:90,cap=special?150:recovery?180:hol?holidayHours*60:six?360:480;
     put('free-morning',special?'Eat, rest and settle in · no catch-up before 6:15 PM':'Wake up and settle in · your own time before study','rest',start);
@@ -872,7 +874,7 @@ body.habit-shh #hb-session-card {text-align:center;}
   // `room` = minutes between today's bedtime and 1:00 AM. Only study that still doesn't fit moves to tomorrow.
   const lateStart=(mins,room=0)=>mins<=10?{replan:false,push:0}:{replan:true,push:Math.max(0,Math.min(Math.round(mins),Math.round(room)))};
   const fallbackRaw=()=>realDay(!!labData().lateSchedule);
-  const adapted=rows=>{const rp=(labData().replanAt||{})[studyDate()];const k=dayKind(studyDate());return rp==null?rows:replanFrom(rows,rp,loggedToday(),k.t==='exam'&&k.at?k.at-630-30:Infinity,(labData().replanPush||{})[studyDate()]||0);};
+  const adapted=rows=>{const rp=(labData().replanAt||{})[studyDate()];const k=dayKind(studyDate());return rp==null?rows:replanFrom(rows,rp,loggedToday(),k.t==='exam'&&k.at?k.at-630-30:Infinity,k.t==='normal'||k.t==='holiday'?0:(labData().replanPush||{})[studyDate()]||0);}; // free days: bedtime never moves
   // ---- skills (retention V1): lectures are the source, skills are what gets mixed into practice ----
   const gapD=(a,b)=>Math.round((Date.parse(a+'T12:00:00')-Date.parse(b+'T12:00:00'))/864e5);
   // one skill per lecture that no skill links to yet; running it again adds nothing
@@ -913,7 +915,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     .map(e=>e.d).sort().pop()||null;
   // each subject practice block reserves ~25% for older material (see Mix in on Today)
   const fallbackMix=(dow,h)=>fallback(dow,h).map(r=>r.kind==='study'&&/^(maths|physics|chem)-chunk/.test(r.id)&&r.minutes>=30?{...r,how:(r.how||'')+' Mix in about '+mixMinutes(r.minutes)+' min of older material: see Mix in on Today.'}:r);
-  const api={lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixMinutes,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={routineOptions,routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixMinutes,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -7811,7 +7813,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   if(calendarToday()==='2026-11-11')PLANS.push(['today',8,'Today only · 6:15 PM','6:15 PM','30 minutes of Maths and 2 hours of Physics; no Chemistry; finish by 10 PM']);
   if(!['12','14'].includes(L.eightHourStart))L.eightHourStart='14';
   if(L.planHours===12)L.planHours=8;
-  if(![6,8,10].includes(L.planHours))L.planHours=8;
+  if(![4,6,7,8,10].includes(L.planHours))L.planHours=8;
   // An occasional ten-hour day must never silently become the next day's default.
   if(L.planHours===10 && L.occasional10Date!==today()){L.planHours=8;L.planSince=today();}
   if(L.planHours!==10)L.occasional10Date=null;
@@ -7887,9 +7889,63 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     kgmaths: v => { const n = window.StudyPlan.parseMins(v.len), tmr = M.add(today(), 1); if (!n) return M.K?.('type it like 2h 35m, 155 or 2.5h'); (L.mathsNext = L.mathsNext || {})[tmr] = n; redo(); }
   });
   let selectingEight=false;
-  const card = () => `<section class="kl-card kg-plan"><p class="kl-eyebrow">YOUR STUDY DAY</p>${dayCard()}
-    <details open><summary class="kl-small">Study plans · 8 h normal, 6 h lighter, 10 h occasional, recovery</summary><div class="kg-plan-row" role="group" aria-label="Hours of study per day">${PLANS.map(([k, h, label, at]) => `<button data-a="kgplan" data-v="${k}" aria-pressed="${current() === k}"><b>${label}</b><small>${k==='8'?'Starts ' + (L.eightHourStart==='12'?'12:00 PM':'2:00 PM') + ' · change':'from '+at}</small></button>`).join('')}</div>${selectingEight ? `<div class="kl-row kg-eight-choice" role="group" aria-label="Choose 8-hour normal start time" style="margin-top:12px;padding:12px;border:1px solid var(--color-border);border-radius:12px;flex-wrap:wrap"><b class="kl-small" style="width:100%">Normal 8 hours — choose your start:</b><button type="button" class="kl-primary" data-a="kg8start" data-v="12" aria-pressed="${L.eightHourStart==='12'}">12:00 PM · finish study 8:30 PM, dinner until 9</button><button type="button" class="kl-ghost" data-a="kg8start" data-v="14" aria-pressed="${L.eightHourStart==='14'}">2:00 PM · finish 11:15 PM</button></div>` : ''}</details>
-    <p class="kl-small">${window.__kgOnBreak ? 'Starts when your break ends. ' : ''}${current()==='8'?(L.eightHourStart==='12'?'Noon option: 12:00 PM–8:30 PM study, then protected 8:30–9:00 PM dinner. Three short breaks; eat lunch before starting.':'Afternoon option: 2:00–11:15 PM, with 75 min of breaks.'):(PLANS.find(p => p[0] === current()) || PLANS[0])[4]}. Today: ${Math.round(window.StudyPlan.hours()*60)} planned study minutes, excluding breaks. ${current()==='today'||current()==='recovery'?'Stop by 10 PM.':window.StudyPlan.dayKind(today()).t==='college'?'College-day timing adapts to attendance; the 2 PM free-day schedule does not apply.':window.StudyPlan.dayKind(today()).t==='normal'||window.StudyPlan.dayKind(today()).t==='holiday'?'Wind down after the last block; no late catch-up.':'Meals and sleep take priority.'} ${current()==='recovery'?'Today’s subject: '+window.StudyPlan.recoverySubject()+'. ':''}Stop each chunk when its timer ends; carry unfinished work forward, never borrow from a break.</p></section>`;
+  // Study hours, then Early / Normal / Late on free days. Times come from StudyPlan.routineOptions, so Friday's later IRL slot is handled.
+  const VARS = [['early', 'Early'], ['normal', 'Normal'], ['late', 'Late']];
+  const medsHM = off => { const m = ((630 + off) % 1440 + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+  const routineInfo = () => {
+    const SP = window.StudyPlan, d = today(), k = SP.dayKind(d).t, free = k === 'normal' || k === 'holiday', dow = new Date(d + 'T12:00:00').getDay();
+    const o = SP.routineOptions ? SP.routineOptions(dow) : {}, h = Number((L.dayHours || {})[d]) || L.planHours || 8, v = VARS.some(x => x[0] === L.planVariant) ? L.planVariant : 'normal';
+    return { SP, d, k, free, dow, o, h, v };
+  };
+  const picker = () => {
+    const { SP, free, o, h, v } = routineInfo(), rec = current() === 'recovery', off = (SP.routineHours || []).filter(x => free && !o[x]?.ok);
+    const hrs = (SP.routineHours || []).map(x => { const bad = free && !o[x]?.ok; return `<button type="button" data-a="kghrs" data-v="${x}" aria-pressed="${!rec && x === h}"${bad ? ` aria-disabled="true" class="kg-off" title="${esc(o[x].why)}"` : ''}><b>${x} h</b>${bad ? '<small>doesn’t fit</small>' : ''}</button>`; }).join('');
+    const vars = free && o[h]?.ok && !rec ? `<div class="kg-plan-row" role="group" aria-label="When to study">${VARS.map(([id, label]) => `<button type="button" data-a="kgvar" data-v="${id}" aria-pressed="${v === id}"><b>${label}</b><small>${hhmm(o[h][id].start)} – ${hhmm(o[h][id].end)}</small></button>`).join('')}</div>` : '';
+    const meds = `<form data-f="kgmeds" class="kl-row"><label class="kl-small">Night meds at <input type="time" name="at" value="${L.medsAt != null ? medsHM(L.medsAt) : ''}"></label><button>${L.medsAt != null ? 'Change' : 'Set'}</button>${L.medsAt != null ? `<span class="kl-small">Shown in tonight's plan at ${hhmm(L.medsAt)}</span>` : '<b class="kl-small">Set your night meds time so it shows in the plan.</b>'}</form>`;
+    return `<details open><summary class="kl-small">Study hours · then Early, Normal or Late</summary><div class="kg-plan-row" role="group" aria-label="Hours of study today">${hrs}<button type="button" data-a="kgplan" data-v="recovery" aria-pressed="${rec}"><b>Recovery</b><small>one subject</small></button></div>${vars}
+      ${off.length ? `<p class="kl-small">${off.join(' h and ')} h don’t fit before the 11:30 PM wind-down without cutting wind-down or sleep, so they stay off.</p>` : ''}${meds}</details>`;
+  };
+  const card = () => {
+    const { SP, k, free, o, h, v } = routineInfo(), r = current() === 'recovery';
+    const note = r ? 'Recovery: one lecture at your pace. Stop by 10 PM.' : free && o[h]?.ok ? `Today: ${h} h, ${v}, study ${hhmm(o[h][v].start)} – ${hhmm(o[h][v].end)}. Fixed every day: morning tea 10:30, lunch 4:30, evening tea 7:30, IRL 8:30 PM (Fridays 9:00), wind-down 11:30 PM, sleep 1:00–10:30 AM. If you fall behind, the plan re-lays itself from now; wind-down and sleep never move.` : k === 'college' ? 'College-day timing adapts to attendance.' : 'Meals and sleep take priority.';
+    return `<section class="kl-card kg-plan"><p class="kl-eyebrow">YOUR STUDY DAY</p>${dayCard()}${picker()}
+    <p class="kl-small">${window.__kgOnBreak ? 'Starts when your break ends. ' : ''}${note} Today: ${Math.round(SP.hours() * 60)} planned study minutes, excluding breaks. ${r ? 'Today’s subject: ' + SP.recoverySubject() + '. ' : ''}Stop each chunk when its timer ends; carry unfinished work forward, never borrow from a break.</p></section>`;
+  };
+  const clearReplan = d => { if (L.replanAt) delete L.replanAt[d]; if (L.replanPush) delete L.replanPush[d]; };
+  Object.assign(M.ACTIONS, {
+    kghrs: b => {
+      const { SP, d, k, o, free } = routineInfo(), h = +b.dataset.v; if (!(SP.routineHours || []).includes(h)) return;
+      if (free && !o[h]?.ok) return M.K?.(`${h} hours doesn’t fit before wind-down at 11:30 PM. Wind-down and sleep stay protected 🌙`);
+      L.dayTypes = L.dayTypes || {};
+      if (k === 'rest') L.dayTypes[d] = { t: 'normal' };
+      if (k === 'exam') L.dayTypes[d] = { ...SP.dayKind(d), hours: h };
+      L.dayHours[d] = h; if (h !== L.planHours) L.planSince = today(); L.planHours = h; L.occasional10Date = h === 10 ? d : null;
+      L.recoveryPlan = false; L.eveningPlanDate = null; clearReplan(d); redo();
+    },
+    kgvar: b => { const v = b.dataset.v; if (!VARS.some(x => x[0] === v)) return; L.planVariant = v; clearReplan(today()); redo(); }
+  });
+  M.FORMS.kgmeds = v => {
+    const s = String(v.at || '').trim(); if (!s) { delete L.medsAt; return redo(); }
+    const [hh, mm] = s.split(':').map(Number), m = hh * 60 + (mm || 0), off = (m < 240 ? m + 1440 : m) - 630;
+    if (!(off >= 450 && off < 870)) return M.K?.('pick a time between 6 PM and 12:55 AM, before sleep at 1:00 🌙');
+    L.medsAt = off; redo(); M.K?.(`night meds at ${hhmm(off)} every night, right there in the plan 🌙`);
+  };
+  // Adaptive to the clock: on a free day, when what's still owed and what the plan still has ahead drift 15+ minutes apart
+  // (you started late, studied off the timer, or finished early), re-lay the rest of today from now. At most every 15 minutes,
+  // never during a session, and wind-down, meds and sleep never move (push 0).
+  setInterval(() => {
+    const SP = window.StudyPlan; if (!SP?.fallbackRaw || !SP.loggedToday || document.hidden || window.__kgSession?.()) return;
+    const d = today(), k = SP.dayKind(d).t; if ((k !== 'normal' && k !== 'holiday') || L.recoveryPlan) return;
+    if (Date.now() - (L.autoReplanTs || 0) < 900000) return;
+    const t = nowOff(); if (t < 30 || t >= 760) return;
+    const planned = SP.fallbackRaw().filter(r => r[2] === 'study').reduce((n, r) => n + r[3], 0);
+    const logged = Object.values(SP.loggedToday()).reduce((a, b) => a + (+b || 0), 0), owed = Math.max(0, planned - logged);
+    const ahead = SP.fallback(new Date(d + 'T12:00:00').getDay()).filter(r => r.kind === 'study').reduce((n, r) => n + Math.max(0, r.end - Math.max(r.start, t)), 0);
+    if (Math.abs(owed - ahead) < 15) return;
+    (L.replanAt = L.replanAt || {})[d] = Math.floor(t / 5) * 5; if (L.replanPush) delete L.replanPush[d]; L.autoReplanTs = Date.now();
+    if (L.autoSaid !== d) { L.autoSaid = d; const text = owed > ahead ? 'You’re a little off the plan, so I moved the rest of today to start from now. Meals, wind-down and sleep stay exactly where they are.' : 'You’re ahead of the plan, so I pulled the rest of today forward. Same bedtime.'; window.__irohaSay?.(text, { face: 'study', delay: 300 }); }
+    redo();
+  }, 60000);
   const todayPanel = M.PANELS.today;
   M.PANELS.today = () => card() + todayPanel();
   function setPlan(key) {
@@ -10489,6 +10545,7 @@ body.kg-calm .kq-steam path{animation:none;opacity:.35}
 .kv-lens,.kv-hud{display:none}
 body:is(.kv-on,.kv-desk) #kg-nav{display:none!important}
 body.kg-shell.kg-sec-library #habit-desk{display:none!important}
+#kg-main .kg-plan-row [aria-disabled="true"]{opacity:.45;cursor:not-allowed}
 #kg-scene .kq-start{display:none!important}
 /* the desk */
 body.kv-desk #kg-main>:not(#kg-scene){display:none!important}
