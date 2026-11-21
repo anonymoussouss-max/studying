@@ -17,7 +17,7 @@ const TUE = '2026-11-17', EXAM = { t: 'exam', name: 'BEEE Practical', college: t
 test('today (Mon 16 Nov) defaults to the BEEE Practical exam day', () => {
   const P = plan('2026-11-16T08:05:00');
   assert.strictEqual(P.dayKind('2026-11-16').name, 'BEEE Practical');
-  assert.strictEqual(P.dayKind(TUE).t, 'college');
+  assert.strictEqual(P.dayKind(TUE).t, 'normal'); // college is a per-day toggle now
 });
 
 test('college exam day: 8-9 AM prep, no study during college, about 6 h in all, every block is exam prep', () => {
@@ -96,14 +96,12 @@ test('a college day started 2 h late: bedtime moves to 1 AM, not later, and only
   assert.strictEqual(clock(re.find(r => r.id === 'sleep').start), '01:00');
 });
 
-test('40 min late: dinner, wind-down and bedtime move 40 min later and every planned study minute still fits', () => {
-  const base = plan(`${SAT}T11:10:00`).fallback(6), first = base.find(r => r.kind === 'study').start;
-  const re = plan(`${SAT}T11:10:00`, { replanAt: { [SAT]: first + 40 }, replanPush: { [SAT]: 40 } }).fallback(6);
+test('40 min late on a free day: wind-down, sleep and meals stay put, even with a saved push', () => {
+  const base = plan(`${SAT}T11:10:00`, { medsAt: 840 }).fallback(6), first = base.find(r => r.kind === 'study').start;
+  const re = plan(`${SAT}T11:10:00`, { medsAt: 840, replanAt: { [SAT]: first + 40 }, replanPush: { [SAT]: 40 } }).fallback(6);
   const s = (rows, id) => rows.find(r => r.id === id).start;
-  for (const id of ['meal-1', 'wind', 'sleep']) assert.strictEqual(s(re, id), s(base, id) + 40, id);
-  const fut = rows => rows.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0);
-  assert.strictEqual(fut(re), fut(base));
-  assert.ok(!re.some(r => /moves to tomorrow/.test(r.title)));
+  for (const id of ['lunch', 'tea-pm', 'irl', 'wind', 'meds', 'sleep']) assert.strictEqual(s(re, id), s(base, id), id);
+  assert.ok(re.filter(r => r.kind === 'study').every(r => r.end <= 780), 'study after 11:30 PM');
 });
 
 test('2 h late: bedtime stays, hours are cut and the rest is named', () => {
