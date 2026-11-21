@@ -10475,11 +10475,164 @@ body.kg-calm .kq-steam path{animation:none;opacity:.35}
     $('kq-clock').textContent = (h ? h + ':' + String(m).padStart(2, '0') : String(m)) + ':' + String(s).padStart(2, '0');
     $('kq-what').textContent = short(cur.title) + ' · time left';
   }
-  $('kq-start').onclick = () => { const rec = document.querySelector('#moon-lab [data-a="kgrec"]'); if (rec) return rec.click(); document.querySelector('#moon-lab .kg-plan')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); };
+  $('kq-start').onclick = () => { const rec = document.querySelector('#moon-lab [data-a="kgrec"]'); if (rec) return rec.click(); document.querySelector('.kv-spot[data-kv="today"]')?.click(); };
   paintPlan(); paintClock();
-  setInterval(() => { if (!document.hidden && scene.offsetParent) { paintClock(); startLabel(); } }, 1000);
+  setInterval(() => { if (!document.hidden) { paintClock(); startLabel(); } }, 1000);
   setInterval(paintPlan, 30000);
   addEventListener('moonlab:render', () => { rowsAt = 0; setTimeout(paintPlan, 80); });
+})();
+</script>
+<style id="kg-visor-style">
+/* Visor desk: home is only the desk room; every page opens inside a helmet visor with a back-to-desk button. */
+:root{--kv-top:0px;--kv-r:min(13vw,150px)/min(11vw,120px)}
+.kv-lens,.kv-hud{display:none}
+body:is(.kv-on,.kv-desk) #kg-nav{display:none!important}
+/* the desk */
+body.kv-desk #kg-main>:not(#kg-scene){display:none!important}
+body.kv-desk #kg-main{margin-top:14px;margin-bottom:28px}
+body.kv-desk #kg-main #kg-scene.quarters{width:min(100%,calc((100vh - var(--kv-top) - 44px) * 1000 / 620));margin-inline:auto}
+body.kv-desk #kg-scene.quarters .kq-hud{display:none}
+body.kv-desk #kg-scene.quarters .kq-visor{border-color:rgba(140,200,235,.14);box-shadow:none}
+.kv-spot{position:absolute;z-index:6;margin:0;padding:0;border:0;border-radius:14px;background:none;cursor:pointer;font-family:inherit}
+.kv-spot::after{content:"";position:absolute;inset:-5px;border-radius:inherit;transition:box-shadow .2s ease}
+.kv-spot:hover::after,.kv-spot:focus-visible::after{box-shadow:0 0 0 2px rgba(159,240,251,.75),0 0 26px rgba(103,232,249,.35)}
+.kv-spot:focus-visible{outline:none}
+.kv-spot span{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translate(-50%,4px);opacity:0;white-space:nowrap;padding:4px 11px;border:1px solid rgba(103,232,249,.45);border-radius:999px;background:rgba(7,13,24,.92);color:#eaf8fc;font-size:12px;font-weight:600;line-height:1.3;transition:opacity .2s ease,transform .2s ease;pointer-events:none}
+.kv-spot.on span,.kv-spot:hover span,.kv-spot:focus-visible span{opacity:1;transform:translate(-50%,0)}
+.kv-spot.on span{color:#9ff0fb}
+/* the visor */
+html body.kv-on{background:radial-gradient(ellipse 125% 50% at 50% 122%,rgba(150,210,255,.5) 0,rgba(80,150,230,.28) 40%,rgba(20,50,110,0) 52%),radial-gradient(ellipse 115% 46% at 50% 124%,#1d4f8c 0,#123a6c 42%,#081a35 49%,rgba(5,10,22,0) 49.6%),radial-gradient(1.2px 1.2px at 12% 22%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 31% 12%,#cfe 50%,transparent 51%),radial-gradient(1.3px 1.3px at 58% 30%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 77% 16%,#dff 50%,transparent 51%),radial-gradient(1px 1px at 88% 40%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 22% 48%,#bde 50%,transparent 51%),radial-gradient(1.2px 1.2px at 69% 52%,#fff 50%,transparent 51%),#040914!important;background-attachment:fixed!important}
+body.kv-on #kg-main{box-sizing:border-box;margin-top:142px!important;margin-bottom:120px!important;padding-inline:clamp(0px,calc(60px - (100vw - 1000px) / 2),46px)}
+body.kv-on.kg-docked #kg-main{padding-left:46px}
+body.kv-on .kv-lens{display:block;position:fixed;z-index:40;inset:calc(var(--kv-top) + 10px) 14px 14px;border-radius:var(--kv-r);pointer-events:none;box-shadow:0 0 0 200vmax #03060c,inset 0 0 0 1.5px rgba(140,200,235,.4),inset 0 0 0 10px rgba(3,6,12,.6),inset 0 0 130px rgba(103,232,249,.11)}
+.kv-lens::before{content:"";position:absolute;inset:24px;border-radius:inherit;border:1px solid rgba(103,232,249,.16)}
+.kv-lens::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(118deg,rgba(255,255,255,.06) 0,rgba(255,255,255,0) 24%,rgba(255,255,255,0) 72%,rgba(160,220,255,.05) 100%)}
+.kv-lens.in{animation:kv-in .55s cubic-bezier(.2,.8,.2,1)}
+@keyframes kv-in{from{transform:scale(1.14);opacity:0}to{transform:none;opacity:1}}
+body.kv-on .kv-hud{display:block;position:fixed;z-index:41;inset:calc(var(--kv-top) + 10px) 14px 14px;pointer-events:none;color:#e6f4f9;font-family:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+.kv-hud>:not(.kv-fade,.kv-ticks){pointer-events:auto}
+.kv-hud.in>:not(.kv-fade){animation:kv-hud .6s .15s ease both}
+@keyframes kv-hud{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.kv-fade{position:absolute;left:0;right:0;pointer-events:none}
+.kv-fade.t{top:0;height:118px;border-radius:var(--kv-r);border-bottom-left-radius:0;border-bottom-right-radius:0;background:linear-gradient(#03060c 0,rgba(3,6,12,.9) 62%,rgba(3,6,12,0))}
+.kv-fade.b{bottom:0;height:92px;background:linear-gradient(0deg,rgba(3,6,12,.92) 0,rgba(3,6,12,0))}
+.kv-ticks{position:absolute;top:24%;height:52%;width:16px;color:rgba(103,232,249,.4)}
+.kv-ticks.l{left:8px}.kv-ticks.r{right:8px;transform:scaleX(-1)}
+.kv-tab{position:absolute;top:0;left:50%;transform:translateX(-50%);min-width:240px;padding:6px 34px 8px;text-align:center;background:linear-gradient(#0c1c31,#071120);border:1.5px solid rgba(103,232,249,.55);border-top:0;border-radius:0 0 22px 22px;box-shadow:0 8px 28px -8px rgba(103,232,249,.35)}
+.kv-hud.in .kv-tab{animation-name:kv-tab}
+@keyframes kv-tab{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translateX(-50%)}}
+.kv-tab::before,.kv-tab::after{content:"";position:absolute;top:12px;width:min(20vw,250px);height:2px;background:linear-gradient(90deg,rgba(103,232,249,0),rgba(103,232,249,.6))}
+.kv-tab::before{right:calc(100% + 6px)}.kv-tab::after{left:calc(100% + 6px);transform:scaleX(-1)}
+.kv-tab b{display:block;font-size:34px;font-weight:600;line-height:1.05;letter-spacing:.06em;font-variant-numeric:tabular-nums;text-shadow:0 0 18px rgba(103,232,249,.45)}
+.kv-tab span{display:block;margin-top:2px;color:#8fe9f6;font-size:10.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase}
+.kv-panel{position:absolute;top:16px;width:min(250px,24vw);padding:10px 14px;border:1px solid rgba(103,232,249,.3);border-radius:12px;background:rgba(6,14,26,.8)}
+.kv-tl{left:max(5.5%,60px)}.kv-tr{right:max(5.5%,60px)}
+.kv-label{margin:0;color:#8fe9f6;font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
+.kv-sub{margin:1px 0 0;color:#9fb6c8;font-size:12px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kv-gauge{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:8px;align-items:center;margin-top:6px;font-size:11.5px;color:#b9cddb}
+.kv-gauge i{display:block;height:5px;border-radius:3px;background:rgba(103,232,249,.14);overflow:hidden}
+.kv-gauge i b{display:block;height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,#5eead4,#9ff0fb);transition:width .6s ease}
+.kv-gauge em{font-style:normal;font-variant-numeric:tabular-nums;color:#e6f4f9}
+.kv-next{margin:3px 0 0;font-size:13px;line-height:1.4;color:#dbe9f1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kv-next b{color:#fff;font-weight:650}
+.kv-ecg{display:block;width:100%;height:22px;margin:4px 0 2px}
+.kv-ecg path{fill:none;stroke:#5eead4;stroke-width:1.6;stroke-linejoin:round;stroke-dasharray:240;animation:kv-ecg 3.2s linear infinite}
+@keyframes kv-ecg{from{stroke-dashoffset:480}to{stroke-dashoffset:0}}
+.kv-dock{position:absolute;left:max(5.5%,60px);right:max(5.5%,60px);bottom:16px;display:flex;align-items:center;justify-content:center;gap:14px}
+.kv-dock button{min-height:38px;margin:0;padding:7px 14px;border:1px solid rgba(103,232,249,.35);border-radius:999px;background:rgba(6,14,26,.86);color:#dcebf3;font:600 13px/1.2 inherit;font-family:inherit;cursor:pointer;white-space:nowrap}
+.kv-dock button:hover{border-color:rgba(159,240,251,.8);color:#fff}
+.kv-dock button:focus-visible{outline:2px solid #9ff0fb;outline-offset:2px}
+.kv-back{background:#9ff0fb!important;color:#08202a!important;border-color:#9ff0fb!important}
+.kv-back:hover{background:#c4f7fd!important}
+.kv-rooms{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.kv-rooms button[aria-current="page"]{border-color:#9ff0fb;color:#9ff0fb;box-shadow:inset 0 0 0 1px #9ff0fb}
+/* today's schedule visor: the greeting and flight plan become the header panels */
+body.kv-today #kg-main #kg-scene.quarters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:0;border:0;border-radius:0;background:none;box-shadow:none;overflow:visible}
+body.kv-today #kg-scene.quarters>:is(.kq-stage,.kq-doorbar,.kgs-talk){display:none!important}
+body.kv-today #kg-scene.quarters .kq-hud{position:static;width:auto;backdrop-filter:none;background:rgba(6,14,26,.82)}
+body.kg-calm .kv-lens.in,body.kg-calm .kv-hud.in>*,body.kg-calm .kv-ecg path{animation:none}
+@media(max-width:860px){.kv-tab b{font-size:26px}.kv-panel{width:min(210px,26vw)}}
+@media(max-width:720px){
+  :root{--kv-r:30px/38px}
+  body.kv-on .kv-lens,body.kv-on .kv-hud{inset:calc(var(--kv-top) + 4px) 6px 6px}
+  .kv-lens::before{inset:12px}
+  .kv-panel,.kv-ticks,.kv-tab::before,.kv-tab::after{display:none}
+  .kv-tab{min-width:0;padding:3px 18px 5px;border-radius:0 0 16px 16px}.kv-tab b{font-size:19px}.kv-tab span{font-size:9px;letter-spacing:.12em}
+  .kv-fade.t{height:104px}.kv-fade.b{height:40px}
+  .kv-dock{left:12px;right:12px;top:46px;bottom:auto;justify-content:flex-start;gap:6px}
+  .kv-dock button{min-height:40px;padding:6px 11px;font-size:12.5px}
+  body.kv-on #kg-main{margin-top:108px!important;margin-bottom:40px!important;padding-inline:8px}
+  body.kv-today #kg-main #kg-scene.quarters{grid-template-columns:1fr;gap:10px}
+  body.kv-today #kg-scene.quarters .kq-hud{margin:0}
+  .kq-doorbar{grid-template-columns:repeat(auto-fit,minmax(72px,1fr))!important}
+  body.kv-desk #kg-main #kg-scene.quarters{width:100%}
+}
+@media(prefers-reduced-motion:reduce){.kv-lens.in,.kv-hud.in>*,.kv-ecg path{animation:none}}
+</style>
+<script id="kg-visor-script">
+/* ===== Visor desk: the desk room is home; each page opens inside a visor with a back-to-desk button ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab, scene = document.getElementById('kg-scene'), B = document.body;
+  if (!M || !scene || !scene.classList.contains('quarters')) return;
+  const $ = id => document.getElementById(id);
+  const ROOMS = [['today', 'Today', "Today's schedule"], ['study', 'Study', 'Guided sessions'], ['library', 'Library', 'Notes and methods'], ['progress', 'Progress', 'Evidence and skills'], ['plan', 'Planner', 'Week and calendar'], ['company', 'Company', 'Time with them, no studying'], ['settings', 'Settings', 'Theme and setup']];
+  const SPOTS = [['settings', 'Settings · the lamp', 28, 63.2, 8.2, 19.7], ['today', "Today's schedule", 37, 76.8, 10.8, 9.4], ['company', 'Company · tea break', 68.5, 71, 5, 11.6]];
+  const stage = scene.querySelector('.kq-stage');
+  stage?.insertAdjacentHTML('beforeend', SPOTS.map(([k, l, x, y, w, h]) => `<button type="button" class="kv-spot${k === 'today' ? ' on' : ''}" data-kv="${k}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%" aria-label="${l}"><span>${l}</span></button>`).join(''));
+  const dbar = scene.querySelector('.kq-doorbar');
+  dbar?.insertAdjacentHTML('afterbegin', '<button type="button" data-kv="today" style="--rim:#9ff0fb">Schedule</button>');
+  dbar?.insertAdjacentHTML('beforeend', '<button type="button" data-kv="company" style="--rim:#f2a7c3">Company</button><button type="button" data-kv="settings" style="--rim:#8fa3b8">Settings</button>');
+  const ticks = s => `<svg class="kv-ticks ${s}" viewBox="0 0 16 200" preserveAspectRatio="none" aria-hidden="true">${Array.from({ length: 21 }, (_, i) => `<path d="M0 ${i * 10 || 1}h${i % 5 ? 6 : 14}" stroke="currentColor" stroke-width="1.2"/>`).join('')}</svg>`;
+  const lens = document.createElement('div'); lens.className = 'kv-lens'; lens.setAttribute('aria-hidden', 'true');
+  const hud = document.createElement('div'); hud.className = 'kv-hud';
+  hud.innerHTML = `<div class="kv-fade t" aria-hidden="true"></div><div class="kv-fade b" aria-hidden="true"></div>${ticks('l')}${ticks('r')}
+<div class="kv-tab" aria-hidden="true"><b id="kv-clock">--:--</b><span id="kv-what"></span></div>
+<section class="kv-panel kv-tl" aria-label="Where you are"><p class="kv-label" id="kv-room"></p><p class="kv-sub" id="kv-roomsub"></p><div class="kv-gauge"><span>Today</span><i><b id="kv-today-bar"></b></i><em id="kv-today"></em></div><div class="kv-gauge"><span>Chain</span><i><b id="kv-chain-bar"></b></i><em id="kv-chain"></em></div></section>
+<section class="kv-panel kv-tr" aria-label="Up next"><p class="kv-label">Up next</p><p class="kv-next" id="kv-next"></p><svg class="kv-ecg" viewBox="0 0 160 24" preserveAspectRatio="none" aria-hidden="true"><path d="M0 14h36l6-10 7 18 6-13 5 5h38l5-8 6 15 5-11 4 4h42"/></svg><p class="kv-sub" id="kv-moon"></p></section>
+<nav class="kv-dock" aria-label="Rooms"><button type="button" class="kv-back" data-kv="desk">← Back to desk</button><div class="kv-rooms">${ROOMS.map(([id, n]) => `<button type="button" data-kv="${id}">${n}</button>`).join('')}</div></nav>`;
+  B.append(lens, hud);
+
+  let todayOpen = false, key = '';
+  const cur = () => (ROOMS.find(([id]) => B.classList.contains('kg-sec-' + id)) || ['today'])[0];
+  function gauges() {
+    try {
+      const d = M.today(), need = window.StudyPlan ? window.StudyPlan.need(!!(M.days()[d] || {}).shortDay) : 576, got = Math.round(M.mins(d)), chain = M.hist().chain || 0;
+      $('kv-today').textContent = `${got}/${need} min`; $('kv-today-bar').style.width = Math.min(100, need ? got / need * 100 : 0) + '%';
+      $('kv-chain').textContent = `${chain} ${chain === 1 ? 'day' : 'days'}`; $('kv-chain-bar').style.width = Math.min(100, chain / 30 * 100) + '%';
+    } catch (e) {}
+    const n = $('kq-next'); $('kv-next').innerHTML = n && n.innerHTML ? n.innerHTML.replace(/^Up next · /, '') : 'Nothing else today';
+    $('kv-moon').textContent = $('kgs-phase')?.textContent || '';
+  }
+  function clock() {
+    if (!B.classList.contains('kv-on')) return;
+    $('kv-clock').textContent = $('kq-clock')?.textContent || '';
+    $('kv-what').textContent = $('kq-what')?.textContent || '';
+  }
+  function sync() {
+    const s = cur(); if (s !== 'today') todayOpen = false;
+    const desk = s === 'today' && !todayOpen && !B.classList.contains('kg-session') && !B.classList.contains('habit-shh');
+    const k = s + desk; if (k === key) return; key = k;
+    const was = B.classList.contains('kv-on');
+    B.classList.toggle('kv-desk', desk); B.classList.toggle('kv-on', !desk); B.classList.toggle('kv-today', s === 'today' && !desk);
+    if (!desk && !was) for (const el of [lens, hud]) { el.classList.remove('in'); void el.offsetWidth; el.classList.add('in'); }
+    const r = ROOMS.find(x => x[0] === s); $('kv-room').textContent = r[1]; $('kv-roomsub').textContent = r[2];
+    for (const b of hud.querySelectorAll('.kv-rooms [data-kv]')) b.setAttribute('aria-current', !desk && b.dataset.kv === s ? 'page' : 'false');
+    gauges(); clock();
+  }
+  function to(k) {
+    if (k === 'desk' || k === 'today') { todayOpen = k === 'today'; if (cur() !== 'today') M.go('today'); else { key = ''; sync(); } scrollTo({ top: 0 }); return; }
+    M.go(k);
+  }
+  addEventListener('click', e => { const b = e.target.closest('[data-kv]'); if (!b || !(scene.contains(b) || hud.contains(b))) return; e.preventDefault(); to(b.dataset.kv); });
+  const bar = $('kg-bar'); let raf = 0;
+  const top = () => { raf = 0; const t = bar && bar.offsetParent !== null ? Math.max(0, bar.getBoundingClientRect().bottom) : 0; document.documentElement.style.setProperty('--kv-top', t + 'px'); };
+  const q = () => { if (!raf) raf = requestAnimationFrame(top); };
+  addEventListener('scroll', q, { passive: true }); addEventListener('resize', q); top();
+  new MutationObserver(sync).observe(B, { attributes: true, attributeFilter: ['class'] });
+  addEventListener('moonlab:render', () => setTimeout(gauges, 120));
+  setInterval(() => { if (!document.hidden) clock(); }, 1000);
+  setInterval(() => { if (!document.hidden && B.classList.contains('kv-on')) gauges(); }, 30000);
+  sync();
 })();
 </script>
 <script id="kg-chats-script">
