@@ -99,6 +99,8 @@ test('no separate spaced-revision blocks: older material lives inside practice, 
 test('subject practice blocks carry a "mix in older material" note', () => {
   const rows = plan(at(MON, '07:00'), { dayTypes: { [MON]: { t: 'college', end: 900 } }, mathsNext: { [MON]: 155 } }).fallback(1);
   assert.match(rows.find(r => r.id.startsWith('physics-chunk')).how, /Mix in about \d+ min of older material/);
+  const mins = rows.map(r => +((r.how || '').match(/Mix in about (\d+) min/) || [0, 0])[1]).reduce((a, b) => a + b, 0);
+  assert.ok(mins > 0 && mins <= 15, 'mix notes add up to the daily allowance, got ' + mins);
 });
 
 test('after college comes a 3-hour nap instead of lunch, then study resumes', () => {

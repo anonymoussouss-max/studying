@@ -887,7 +887,11 @@ body.habit-shh #hb-session-card {text-align:center;}
   const pickMix=(skills,subj,today,n=3)=>{const rank=s=>s.strength==='shaky'?0:s.strength==='new'?1:2;
     return (skills||[]).filter(s=>(!subj||s.subj===subj)&&s.made&&s.made<today&&s.lastTested!==today&&!(s.lastTested&&gapD(today,s.lastTested)<restDays(s)))
       .sort((a,b)=>rank(a)-rank(b)||String(a.lastTested||a.made).localeCompare(String(b.lastTested||b.made))).slice(0,n);};
-  const mixMinutes=m=>Math.round(m*0.25/5)*5; // shortcut: fixed 25% share, make it adaptive after the 4-week trial
+  // the day's older-material allowance (Settings: 10, 15 or 20 min), minus what Mix In has already used today
+  const mixLeft=()=>{const L0=labData(),b=[10,15,20].includes(Number(L0.deskSettings?.reviewMinutes))?Number(L0.deskSettings.reviewMinutes):15,t=studyDate();
+    return Math.max(0,b-(L0.log||[]).filter(e=>e.d===t).reduce((n,e)=>n+(Number.isFinite(e.budgetMinutes)&&e.budgetMinutes>0?e.budgetMinutes:0),0));};
+  // spread that one allowance over the practice blocks in 5-minute pieces, earliest first; it never adds up to more than the allowance
+  const mixAllot=(n,left)=>{const u=Math.floor(Math.max(0,left)/5),out=Array(n).fill(0);for(let i=0;i<u&&n;i++)out[i%n]+=5;return out;};
   // the day's small recall queue: at most 3 open misses, knowledge gaps first, then oldest due
   const recallToday=(attempts,today)=>(attempts||[]).filter(x=>x&&!x.ok&&x.due&&x.due<=today)
     .sort((a,b)=>(a.cause==='knowledge gap'?0:1)-(b.cause==='knowledge gap'?0:1)||a.due.localeCompare(b.due)).slice(0,3);
@@ -914,9 +918,10 @@ body.habit-shh #hb-session-card {text-align:center;}
   const previousSkillDate=(log,id,today)=>(log||[]).filter(e=>(e.sk||e.skillId)===id&&/^\d{4}-\d{2}-\d{2}$/.test(e.d||'')&&e.d<today&&
     (['ok','hint','miss'].includes(e.result)||(typeof e.ok==='boolean'&&(e.mix||e.t==='skill'))||['indep','help','notyet'].includes(e.ev)))
     .map(e=>e.d).sort().pop()||null;
-  // each subject practice block reserves ~25% for older material (see Mix in on Today)
-  const fallbackMix=(dow,h)=>fallback(dow,h).map(r=>r.kind==='study'&&/^(maths|physics|chem)-chunk/.test(r.id)&&r.minutes>=30?{...r,how:(r.how||'')+' Mix in about '+mixMinutes(r.minutes)+' min of older material: see Mix in on Today.'}:r);
-  const api={routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixMinutes,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  // practice blocks share the one daily older-material allowance (see Mix in on Today), not a share of every block
+  const fallbackMix=(dow,h)=>{const rows=fallback(dow,h),ok=r=>r.kind==='study'&&/^(maths|physics|chem)-chunk/.test(r.id)&&r.minutes>=30,n=rows.filter(ok).length,left=mixLeft(),a=mixAllot(n,left);let i=0;
+    return rows.map(r=>{if(!ok(r))return r;const m=a[i++];return m?{...r,how:(r.how||'')+' Mix in about '+m+' min of older material ('+left+' min left of today\'s allowance): see Mix in on Today.'}:r;});};
+  const api={routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -8286,7 +8291,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   window.__kgCoachNote = () => {
     if (window.__kgOnBreak) return '';
     const n = due(), lec = window.__kgLecDue?.() || [], pend = window.__kgLecPending?.();
-    return (window.__kgStepNote?.() || '') + `\n\n[not typed by me, background: ${n ? `I have ${n} spaced-repetition item${n === 1 ? '' : 's'} (cards, misses and lectures) due today. Mention them only when I ask what to do next or have just finished something; if I'm working on a problem, stay with that problem.` : 'No spaced reviews are due today.'}${lec.length ? ` Older skills to mix into today's practice (about a quarter of each block): ${lec.slice(0, 6).join('; ')}. They're under "Mix in" on Today.` : ''}${pend ? ` I just finished a ${pend} lecture and haven't logged it yet. When it fits the conversation, ask what it covered and remind me I can log it on Today with the PDF or photos of my notes.` : ''} Only if I'm talking about how to revise: steer me from rereading, highlighting or copying toward active recall, blurting, Feynman or a self-test. ${soft() ? "It's a hard day for me, so go gently, but don't keep saying so: one kind line in the whole conversation is enough." : ''}]`;
+    return (window.__kgStepNote?.() || '') + `\n\n[not typed by me, background: ${n ? `I have ${n} spaced-repetition item${n === 1 ? '' : 's'} (cards, misses and lectures) due today. Mention them only when I ask what to do next or have just finished something; if I'm working on a problem, stay with that problem.` : 'No spaced reviews are due today.'}${lec.length ? ` Older skills to mix into today's practice: ${lec.slice(0, 6).join('; ')}. They're under "Mix in" on Today. The whole day's older-material allowance has ${(() => { try { return window.MoonLab?.reviewPlan?.()?.remainingMinutes ?? 15; } catch (e) { return 15; } })()} min left; don't suggest more than that.` : ''}${pend ? ` I just finished a ${pend} lecture and haven't logged it yet. When it fits the conversation, ask what it covered and remind me I can log it on Today with the PDF or photos of my notes.` : ''} Only if I'm talking about how to revise: steer me from rereading, highlighting or copying toward active recall, blurting, Feynman or a self-test. ${soft() ? "It's a hard day for me, so go gently, but don't keep saying so: one kind line in the whole conversation is enough." : ''}]`;
   };
   window.__kgCoachTick = tick;
   M.coachDue = due;
@@ -8295,7 +8300,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
 </script>
 <script id="kg-lectures-script">
 /* ===== Lecture log: after each lecture Iroha asks what you studied, keeps the PDF or note photos on this device,
-   and brings the topic back on days 1, 3, 5 and 7, then 14, 30 and 60. ===== */
+   and checks it with a fresh problem after about 3, 10, 30 and 60 days; its skills also return in Mix In. ===== */
 (function () {
   'use strict';
   const M = window.MoonLab; if (!M) return;
@@ -8475,7 +8480,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     input.addEventListener('change',async()=>{
       if(!input.files?.length)return;
       const status=options.status;if(status)status.textContent='Saving attachments…';
-      const e=existing||{id:'lec'+(crypto.randomUUID?.()||Date.now()),subj:options.subject||'Maths',ch:'',topic:String(options.title||'New lecture').trim().slice(0,120),details:'',made:today(),stage:0,due:add(today(),1),files:[],reviews:0};
+      const e=existing||{id:'lec'+(crypto.randomUUID?.()||Date.now()),subj:options.subject||'Maths',ch:'',topic:String(options.title||'New lecture').trim().slice(0,120),details:'',made:today(),stage:0,due:add(today(),GAPS[0]),files:[],reviews:0};
       try{
         const result=await saveLectureAttachments(e,[...input.files]);
         if(result.saved){if(!existing)L.lectures.push(e);save();focusSession='';focusNoteNode=null;window.HabitDesk?.refresh?.();if(options.done)options.done(e);}
@@ -8592,7 +8597,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     const names = String(v.skills || '').split(/[,;\n]/).map(x => x.trim()).filter(Boolean).slice(0, 3);
     if (names.length) L.skills = (L.skills || []).concat(names.map((n, i) => ({ id: 'sk-' + e.id + '-' + i, name: n.slice(0, 120), subj: e.subj, ch: e.ch, lectures: [e.id], made: e.made, lastTested: null, last: null, strength: 'new' })));
     syncSkills(); save(); refreshPlan(); M.render();
-    M.I(`Logged: ${label(e)}. First revision tomorrow, then days 3, 5, 7, 14, 30 and 60.${e.files.length ? ` ${e.files.length} file${e.files.length === 1 ? '' : 's'} kept.` : ''}`, { face: 'approve' });
+    M.I(`Logged: ${label(e)}. First check in ${GAPS[0]} days with a fresh problem, then around day 10, 30 and 60 while you keep getting it on your own. Its skills also come back in Mix In, inside your daily older-material allowance.${e.files.length ? ` ${e.files.length} file${e.files.length === 1 ? '' : 's'} kept.` : ''}`, { face: 'approve' });
     // scanned pages and photos are read into text now, in the background, so tomorrow's revision is ready
     setTimeout(() => readNotes(e).then(() => names.length ? 0 : autoSkills(e)).catch(() => {}), 1500);
   };
@@ -8777,7 +8782,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     L.lecAsked[k] = 1; L.lecPending = { subj: SUBJ[id], date: today() }; save(); M.render();
     const soft = !!window.__kgGentle || ['heavy', 'hard', 'lowest'].includes(L.mood?.[today()]);
     if (soft) M.K(`${SUBJ[id].toLowerCase()} lecture done! when you can, jot what it was about on Today, with the pdf or a photo of your notes. iroha will bring it back for revision 🌙`);
-    else M.I(`${SUBJ[id]} lecture done. While it's fresh, let's log it on Today: chapter, topic, the main ideas and anything that confused you. If this chapter has no notes yet, attach the PDF or photos. I'll bring it back on days 1, 3, 5, 7, 14, 30 and 60.`, { face: 'study' });
+    else M.I(`${SUBJ[id]} lecture done. While it's fresh, let's log it on Today: chapter, topic, the main ideas and anything that confused you. If this chapter has no notes yet, attach the PDF or photos. I'll check it with a fresh problem in ${GAPS[0]} days, and its skills come back in Mix In inside your daily allowance.`, { face: 'study' });
   }
   setTimeout(tick, 9000); setInterval(tick, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(tick, 1500); });
@@ -9224,10 +9229,11 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       const lines = f.attempt.split(/\n+|(?<=[.!?])\s+/).map(s => s.trim()).filter(s => s.length > 3);
       // your own recap makes the best close-out recall; the attempt fills in if you skipped it
       const recall = [f.rc1, f.rc2, f.rc3, ...lines, f.goal, noGap(f) ? '' : f.gap, f.fix, f.topic].map(x => String(x || '').trim()).filter(x => x && !/^\W*none\b/i.test(x));
-      set('win', `${A.name}: ${f.topic}${f.fixed ? ', gap repaired' : noGap(f) ? ', no gaps found' : ''}`); set('mood', mood || 'calm');
+      const ev = evidence(f)[0];
+      set('win', `${A.name}: ${f.topic}${f.fixed ? ', gap repaired' : noGap(f) ? (ev === 'indep' ? ', no gaps found' : ', no gap flagged (not verified)') : ''}`); set('mood', mood || 'calm');
       [1, 2, 3].forEach(i => set('recall' + i, recall[i - 1] || f.topic));
       set('discovery', noGap(f) ? '' : f.gap);
-      set('attempts', f.act === 'solve' ? 1 : 0); set('correct', f.act === 'solve' && noGap(f) ? 1 : 0);
+      set('attempts', f.act === 'solve' ? 1 : 0); set('correct', f.act === 'solve' && ev === 'indep' ? 1 : 0);
       set('next', !noGap(f) && !f.fixed && f.fix && !/^\W*none\s*(?:[.!,:;\-—]|$)/i.test(f.fix) ? f.fix : `Review ${f.topic}`);
       c.requestSubmit();
     }, 120);
@@ -9239,12 +9245,19 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   const parkedNow = f => (L.parked || []).filter(p => !p.done && f.started && p.at >= f.started).length;
   const parkForm = f => f.parking ? `<form data-f="park" class="kg-park kl-row"><input name="t" required maxlength="200" placeholder="Something to deal with later, e.g. reply to that message" aria-label="A thought to park"><button>Park it</button></form>` : '';
   const busyBtn = (f, who, label) => f.busy === who ? `${who === 'kaguya' ? 'Kaguya' : 'Iroha'} is reading…` : label;
+  // the skill a session's result is credited to: chosen here, else the lecture's only skill. Several skills and no choice means no credit.
+  const skillOpts = (f, all) => { const list = (L.skills || []).filter(s => all || !f.lec || (s.lectures || []).includes(f.lec) || s.id === f.skillId);
+    return `<option value="">${f.lec && list.length > 1 ? 'Pick one so it gets credit' : 'None'}</option>` + list.slice(0, 80).map(s => `<option value="${esc(s.id)}" data-lec="${esc((s.lectures || []).join(' '))}" ${s.id === f.skillId ? 'selected' : ''}>${esc(s.name)}${s.ch ? ' · ' + esc(chLabel(s.ch)) : ''}</option>`).join(''); };
+  const chLabel = ch => (typeof M.chName === 'function' ? M.chName(ch) : '') || ch;
+  const skillPick = f => (L.skills || []).length ? `<label>Skill that gets credit <select name="sk" data-flowsk>${skillOpts(f, true)}</select></label><p class="kl-small kg-flow-hint">When a lecture has several skills, pick the one you're practising. Without a pick, only a lecture with a single skill gets credit.</p>` : '';
+  const creditName = f => { const id = window.StudyPlan.creditTarget(L.skills || [], { sk: f.skillId, lec: f.lec }); return id ? (L.skills || []).find(s => s.id === id)?.name || '' : ''; };
   function goalStep(f) {
     const lecs = (L.lectures || []).filter(e => e.topic).sort((a, b) => (a.due && a.due <= today() ? 0 : 1) - (b.due && b.due <= today() ? 0 : 1) || (b.made || '').localeCompare(a.made || '')).slice(0, 20);
     return `<form data-f="flowgoal" class="kl-stack"><p class="kl-eyebrow">GUIDED SESSION</p><h2>What will you work on?</h2>
       <fieldset class="kg-acts"><legend class="kl-small">Pick how you'll practise</legend>${Object.entries(ACTS).map(([k, a]) => `<label class="kg-act"><input type="radio" name="act" value="${k}" ${f.act === k ? 'checked' : ''} required><b>${a.icon} ${a.name}</b><span>${esc(a.what)}</span><small>Good for ${esc(a.best)}</small></label>`).join('')}</fieldset>
       <div class="kg-flow-grid"><label>Subject <select name="subj">${SUBJS.map(s => `<option ${s === f.subj ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
       <label>From a lecture (optional) <select name="lec"><option value="">None</option>${lecs.map(e => `<option value="${e.id}" ${e.id === f.lec ? 'selected' : ''}>${esc(lecLabel(e))}${e.due && e.due <= today() ? ' · due' : ''}</option>`).join('')}</select></label></div>
+      ${skillPick(f)}
       <label>Topic <input name="topic" maxlength="120" value="${esc(f.topic)}" placeholder="e.g. Log inequalities with base below 1"></label>
       <label>Core goal: what does done look like? <input name="goal" maxlength="200" value="${esc(f.goal)}" placeholder="e.g. Solve two orbital-energy problems and explain the sign convention"></label>
       <p class="kl-small kg-flow-hint">Something you can check at the end: a number of problems, a derivation, or "explain why…". Finishing the core goal is enough; nothing more gets added.</p>
@@ -9358,6 +9371,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       <label>Source and page / problem <input data-flow="verificationSource" maxlength="200" value="${esc(f.verificationSource || '')}" placeholder="e.g. textbook, exercise 4.2, problem 6"></label>
       <label class="kl-check"><input type="checkbox" data-flow="verified" ${f.verified ? 'checked' : ''}> I checked the reasoning and result against this source</label>
       <label class="kl-check"><input type="checkbox" data-flow="transfer" ${f.transfer ? 'checked' : ''}> This used the idea in an unfamiliar setting (my assessment)</label></div>
+      ${(L.skills || []).length ? `<label class="kg-flow-credit">Skill credit <select data-flow="skillId">${skillOpts(f, false)}</select></label><p class="kl-small" data-credit-note>${creditName(f) ? (ev === 'ungraded' ? `${esc(creditName(f))} is picked, but nothing is credited until the result is graded and checked.` : `This result counts for ${esc(creditName(f))}.`) : 'No skill gets credit for this session. Pick one above if it practised a skill.'}</p>` : ''}
       <ul class="kl-list">${f.goal ? `<li><b>Goal:</b> ${esc(f.goal)}</li>` : ''}<li><b>Gap:</b> ${gap ? esc(f.gap) : noGap(f) ? 'none found' : 'not graded'}</li>${gap ? `<li><b>Repair:</b> ${f.fixed ? 'done, and Iroha agrees' : f.repair.trim() ? 'done, not confirmed' : 'not done yet'}</li>` : ''}${f.dispute ? `<li><b>Recheck:</b> ${esc(f.dispute)}</li>` : ''}${x ? `<li><b>Mistake notebook:</b> ${esc(missNext)}</li>` : ''}${f.warm.trim() ? '<li><b>Recall first:</b> done</li>' : ''}<li><b>Recap:</b> ${f.rc1 || f.rc2 || f.rc3 ? (f.rcfb ? 'written and checked' : 'written') : 'skipped'}${f.cardId ? ', one review item added' : ''}</li></ul>
       <form data-f="flowsave" class="kl-stack">
       ${gap && !f.fixed && !x ? '<label class="kl-check"><input type="checkbox" name="miss"> Add this important gap to my misses for later practice</label>' : ''}
@@ -9384,7 +9398,8 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       const A = ACTS[v.act]; if (!A) return M.I('Pick an activity first.', { face: 'study' });
       const e = v.lec && lecture(v.lec), topic = String(v.topic || '').trim() || e?.topic || '';
       if (!topic) return M.I('Name the topic, even roughly. It tells me what to check against.', { face: 'study' });
-      const f = L.flow = Object.assign(L.flow || blank(), { act: v.act, subj: SUBJS.includes(v.subj) ? v.subj : 'Maths', topic, goal: String(v.goal || '').trim(), lec: v.lec || '', mins: Math.max(5, Math.min(90, parseInt(v.mins) || A.mins)), stretch: String(v.stretch || '').trim(), energy: ['demanding', 'lighter'].includes(v.energy) ? v.energy : 'ordinary', opener: ['recall', 'predict'].includes(v.opener) ? v.opener : '' });
+      const sk = (L.skills || []).some(s => s.id === v.sk) ? v.sk : (window.StudyPlan.creditTarget(L.skills || [], { lec: v.lec || '' }) || '');
+      const f = L.flow = Object.assign(L.flow || blank(), { skillId: sk, act: v.act, subj: SUBJS.includes(v.subj) ? v.subj : 'Maths', topic, goal: String(v.goal || '').trim(), lec: v.lec || '', mins: Math.max(5, Math.min(90, parseInt(v.mins) || A.mins)), stretch: String(v.stretch || '').trim(), energy: ['demanding', 'lighter'].includes(v.energy) ? v.energy : 'ordinary', opener: ['recall', 'predict'].includes(v.opener) ? v.opener : '' });
       if (f.energy === 'lighter') f.mins = Math.min(f.mins, 15);
       if (f.act === 'predict') f.opener = 'predict';
       if (f.act === 'worked') { f.opener = ''; f.supported = true; }
@@ -9428,6 +9443,9 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     flowdrop: () => { if (!confirm('Discard this session? What you wrote here will be deleted. The desk timer keeps running until you end it on Today.')) return; L.flow = null; save(); M.render(); },
     flownew: () => M.flowStart({})
   });
+  document.addEventListener('change', e => { const t = e.target; if (t.name !== 'lec' || !t.closest?.('[data-f="flowgoal"]')) return; const s = t.form?.querySelector('[data-flowsk]'); if (!s) return;
+    const lec = t.value, opts = [...s.options].filter(o => o.value); for (const o of opts) o.hidden = !!lec && !o.dataset.lec.split(' ').includes(lec);
+    const vis = opts.filter(o => !o.hidden); if (s.selectedOptions[0]?.hidden) s.value = ''; if (lec && vis.length === 1) s.value = vis[0].value; s.options[0].textContent = lec && vis.length > 1 ? 'Pick one so it gets credit' : 'None'; });
   // drafts: every keystroke is kept
   let tSave = 0;
   document.addEventListener('input', e => {
@@ -9436,6 +9454,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     if (['attempt', 'ka', 'ref', 'example', 'exampleWhy'].includes(k)) { L.flow.verified = false; L.flow.graded = false; L.flow.fixed = false; }
     if (k === 'repair') { L.flow.verified = false; L.flow.fixed = false; }
     if (k === 'verificationSource') L.flow.verified = false;
+    if (k === 'skillId' && L.flow.step === 'save') { save(); M.render(); return; }
     clearTimeout(tSave); tSave = setTimeout(save, 400);
     if (e.target.type === 'checkbox' && L.flow.step === 'save') { save(); M.render(); }
   });
@@ -10746,6 +10765,21 @@ body.kg-calm .kv-lens.in,body.kg-calm .kv-hud.in>*,body.kg-calm .kv-ecg path{ani
   M.ACTIONS['exres-del'] = b => { const r = L.examResults.find(x => x.id === b.dataset.v); if (!r || !confirm(`Delete ${r.name} on ${r.date}?`)) return; L.examResults = L.examResults.filter(x => x !== r); save(); M.render(); };
 })();
 </script>
+<style id="kg-room-layout">
+/* with the chat open, the visor, its bottom nav and the page stop at the chat's edge instead of running underneath it */
+@media(min-width:1100px){
+  body.kg-docked.kg-dock-open.kg-sec-study:not(.kg-dock-wide){--dwb:380px}
+  body.kg-sec-study:not(.kg-dock-wide) #kg-dock{--dw:380px} /* compact chat while setting up and doing study */
+  body.kv-on.kg-docked.kg-dock-open :is(.kv-hud,.kv-lens){right:calc(var(--dwb,440px) + 14px)}
+  body.kg-docked.kg-dock-open .kv-dock{left:20px;right:20px;flex-wrap:wrap;gap:8px}
+}
+/* the floating room nav never covers the last card */
+body.kv-on #kg-main{padding-bottom:104px}
+/* focus mode on a running timer: its card shows on every page, so Study or Company never turns into an empty visor */
+body.kg-shell.habit-shh:not(.kg-flow-on) #habit-desk{display:block!important}
+/* every Study destination stays visible: tabs wrap instead of scrolling out of view */
+@media(min-width:721px){html body #kg-main #moon-lab .kl-tabs{flex-wrap:wrap!important;overflow-x:visible!important}}
+</style>
 <script id="kg-chats-script">
 /* ===== Two separate chat boxes: each follows its companion, neither covers the other ===== */
 (function () {

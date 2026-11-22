@@ -44,9 +44,12 @@ test('a skill made today is not mixed in yet', () => {
   assert.strictEqual(P.pickMix([sk({ id: 'today', made: TODAY })], 'Maths', TODAY).length, 0);
 });
 
-test('mix share is 25% of the block, in 5-minute steps', () => {
-  assert.strictEqual(P.mixMinutes(60), 15);
-  assert.strictEqual(P.mixMinutes(40), 10);
+test('older material shares one daily allowance across blocks, never more than it', () => {
+  assert.deepStrictEqual(P.mixAllot(3, 15), [5, 5, 5]);
+  assert.deepStrictEqual(P.mixAllot(3, 20), [10, 5, 5]);
+  assert.deepStrictEqual(P.mixAllot(4, 10), [5, 5, 0, 0]);
+  assert.deepStrictEqual(P.mixAllot(3, 0), [0, 0, 0]);
+  for (const [n, left] of [[2, 20], [5, 15], [6, 10]]) assert.ok(P.mixAllot(n, left).reduce((a, b) => a + b, 0) <= left);
 });
 
 test('recall queue never shows more than 3 items, knowledge gaps first', () => {
