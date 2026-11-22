@@ -889,7 +889,7 @@ body.habit-shh #hb-session-card {text-align:center;}
       .sort((a,b)=>rank(a)-rank(b)||String(a.lastTested||a.made).localeCompare(String(b.lastTested||b.made))).slice(0,n);};
   // the day's older-material allowance (Settings: 10, 15 or 20 min), minus what Mix In has already used today
   const mixLeft=()=>{const L0=labData(),b=[10,15,20].includes(Number(L0.deskSettings?.reviewMinutes))?Number(L0.deskSettings.reviewMinutes):15,t=studyDate();
-    return Math.max(0,b-(L0.log||[]).filter(e=>e.d===t).reduce((n,e)=>n+(Number.isFinite(e.budgetMinutes)&&e.budgetMinutes>0?e.budgetMinutes:0),0));};
+    return Math.max(0,b-[...(L0.log||[]),...(L0.reviewLedger||[])].filter(e=>e.d===t).reduce((n,e)=>n+(Number.isFinite(e.budgetMinutes)&&e.budgetMinutes>0?e.budgetMinutes:0),0));};
   // spread that one allowance over the practice blocks in 5-minute pieces, earliest first; it never adds up to more than the allowance
   const mixAllot=(n,left)=>{const u=Math.floor(Math.max(0,left)/5),out=Array(n).fill(0);for(let i=0;i<u&&n;i++)out[i%n]+=5;return out;};
   // the day's small recall queue: at most 3 open misses, knowledge gaps first, then oldest due
@@ -8361,7 +8361,9 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   syncSkills();
   const skill = id => (L.skills || []).find(s => s.id === id);
   const skLabel = s => [s.subj, s.ch ? M.chName(s.ch) : '', s.name].filter(Boolean).join(' · ');
-  M.reviewPlan = subj => SP().reviewQueue(L.skills,L.attempts,today(),L.deskSettings?.reviewMinutes,subj,L.log);
+  M.reviewPlan = subj => SP().reviewQueue(L.skills,L.attempts,today(),L.deskSettings?.reviewMinutes,subj,[...(L.log||[]),...(L.reviewLedger||[])]);
+  // older material done anywhere else (guided Diagnose, lecture checks) charges the same allowance: 5 min, once per item per day
+  M.chargeReview = (src, id) => { const d = today(); L.reviewLedger = (L.reviewLedger || []).filter(e => e.d >= add(d, -30)); if (L.reviewLedger.some(e => e.d === d && e.src === src && e.id === id)) return; L.reviewLedger.push({ d, src, id, budgetMinutes: 5 }); };
   window.__kgReviewPlan = M.reviewPlan;
   // weekly wildcard: the Maths or Physics skill untested for longest (3+ weeks), picked once per week
   const weekOf = d => M.add(d, -((new Date(d + 'T12:00:00').getDay() + 6) % 7));
@@ -8388,7 +8390,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     const event = { d, t: src === 'mix' ? 'recall' : 'skill', ok: result === 'ok', result, ch: s.ch || '', mix: 1, sk: id, skillId:id, att, src,
       sourceEvent:meta.sourceEvent||'', verified:meta.verified===true, verificationSource:String(meta.verificationSource||'').slice(0,300),
       delayed:result==='ok'&&!!previousDate, previousDate, transfer:result==='ok'&&meta.transfer===true,
-      budgetMinutes:M.reviewPlan().items.some(x=>x.type==='skill'&&x.id===id)?5:0 };
+      budgetMinutes:src!=='flow'&&s.made&&s.made<d?5:0 }; // any older skill costs its 5 min, queued or not; guided sessions charge once through the ledger
     L.skills = L.skills.map(x => x.id === id ? { ...SP().recordAttempt(x, result, d), att: { id: att, t: Date.now(), src, before, previousAtt:s.att||null, wildWeek:L.wildWeek||null } } : x);
     (L.log=L.log||[]).push(event);
     (L.revLog = L.revLog || []).push({ d, src: 'skill', ok: result === 'ok', gap: M.gap(d, s.lastTested || s.made || d), att });
@@ -8409,7 +8411,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   const INTR = [1, 3, 7, 14, 30];
   function recallMark(id, ok) {
     const x = (L.attempts || []).find(a => a.id === id); const d = today(); if (!x || x.ok || !x.due || x.due>d || x.lastSeen===d) return;
-    const budgetMinutes=M.reviewPlan().items.some(item=>item.type==='recall'&&item.id===id)?5:0;
+    const budgetMinutes=5; // a due miss is older material, queued today or not
     x.st = ok ? (x.st || 0) + 1 : 0; x.due = x.st >= 5 ? '' : add(d, INTR[Math.min(x.st, 4)]); x.reviews = (x.reviews || 0) + 1;
     x.lastSeen=d; L.log.push({ d, t: 'recall', ok, ch: x.ch || '', miss:id, budgetMinutes }); save(); M.render();
   }
@@ -8738,7 +8740,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   };
   function grade(id, ok) {
     const e = L.lectures.find(x => x.id === id); if (!e) return;
-    e.reviews = (e.reviews || 0) + 1;
+    e.reviews = (e.reviews || 0) + 1; M.chargeReview?.('lecture', id);
     // how long since you last saw it matters for what a success means
     (L.revLog = L.revLog || []).push({ d: today(), src: 'lecture', ok: !!ok, gap: M.gap(today(), e.lastGraded || e.made || today()) }); if (L.revLog.length > 2000) L.revLog = L.revLog.slice(-2000);
     e.lastGraded = today();
@@ -9149,10 +9151,13 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   const BLURT = ' This is a blurt: before Right, Gap and Repair, add four lines comparing it with the reference (or with what the topic needs if there is none), each starting with its label: "Recalled:" what I got right, "Missing:" what I left out, "Incorrect:" what I got wrong, "Unclear:" anything unreadable or uncertain in the source, or "None." for any of them. Accept diagrams in words and derivations, not only lists of facts.';
   const kagNote = f => f.kq ? `\n\nKaguya, listening, asked: "${f.kq}"\nMy answer: ${f.ka.trim() || '(I skipped it)'}` : '';
   const checkPrompt = (f, A, kag, extra = '') => `[guided session, not typed by me. Activity: ${A.name}: ${A.what} Subject: ${f.subj}. Topic: ${f.topic}.${f.goal ? ` My goal: ${f.goal}.` : ''}${notes(f)}]\n\nMy attempt:\n${f.attempt.trim()}${kag}\n\n[How to check it: ${A.check}${extra} Reply in plain text in exactly four short parts, each on its own line and starting with its label. "Right:" what is correct (say "Correct." plainly if all of it is). "Gap:" the single most important thing that is missing or wrong, and why it matters, or "None." "Repair:" one small task I can do in under five minutes that fixes that gap, or "None." "Type:" "Slip" if the idea and method were right but the execution went wrong (algebra, arithmetic, sign, units, copying, misreading), "Principle" if a law, definition, assumption or choice of method was wrong, or "None." if there is no gap. Nothing else.]`;
+  // what a check was asked about; a reply only counts if this is unchanged when it arrives
+  const sentKey = f => JSON.stringify([f.id, f.act, f.attempt, f.ka, f.ref, f.example, f.exampleWhy, f.topic]);
   async function check() {
     const f = L.flow, A = ACTS[f.act]; if (!f || f.busy) return;
     if (!f.attempt.trim()) return M.I('Write your attempt first. One line or one equation is enough if that is the answer.', { face: 'study' });
     f.busy = 'iroha'; f.dispute = ''; f.disputed = ''; f.verified = false; M.render();
+    const sent = sentKey(f);
     const kag = kagNote(f);
     // the note pages, when they're saved, so the check covers what you actually studied
     f._outline = f.lec ? await M.lecOutline?.(f.lec).catch?.(() => '') || '' : '';
@@ -9160,6 +9165,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     const reply = await ask('iroha', checkPrompt(f, A, kag, (ENERGY[f.energy] || '') + (f.act === 'blurt' ? BLURT : '')));
     delete f._outline;
     f.busy = '';
+    if (L.flow !== f || sentKey(f) !== sent) { f.graded = false; save(); M.render(); return M.I('Iroha was still checking when the answer changed, so that check was set aside. Check the new version.', { face: 'study' }); }
     if (!reply) { save(); M.render(); return dropped('your attempt is saved', 'the check'); }
     f.fb = reply; f.right = part(reply, 'Right', 'Gap|Repair|Type'); f.gap = part(reply, 'Gap', 'Repair|Right|Type'); f.fix = part(reply, 'Repair', 'Right|Gap|Type'); f.errType = errKind(part(reply, 'Type', 'Right|Gap|Repair'));
     f.graded = hasVerdict(reply, f.gap); f.checker = meta; f.alt = null;
@@ -9180,9 +9186,10 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   // disagreement stays unresolved until you choose, and an unclear recheck changes nothing.
   async function dispute() {
     const f = L.flow, A = ACTS[f?.act]; if (!f || f.busy || !A) return;
-    f.busy = 'iroha'; M.render();
+    f.busy = 'iroha'; M.render(); const sent = sentKey(f);
     const reply = await ask('iroha', checkPrompt(f, A, kagNote(f), ' I disagreed with an earlier check of this, so assess it completely fresh, from the question and my working alone. If you need the exact original question or a source to be sure, say that under Gap.'));
     f.busy = '';
+    if (L.flow !== f || sentKey(f) !== sent) { save(); M.render(); return M.I('Iroha was still checking when the answer changed, so that check was set aside. Check the new version.', { face: 'study' }); }
     if (!reply) { save(); M.render(); return dropped('nothing is lost', 'the recheck'); }
     const alt = { right: part(reply, 'Right', 'Gap|Repair|Type'), gap: part(reply, 'Gap', 'Repair|Right|Type'), fix: part(reply, 'Repair', 'Right|Gap|Type'), errType: errKind(part(reply, 'Type', 'Right|Gap|Repair')), by: meta };
     const none = x => /^\W*none\b/i.test(String(x).trim());
@@ -9213,9 +9220,10 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   async function checkRepair() {
     const f = L.flow; if (!f || f.busy) return;
     if (f.repair.trim().length < 5) return M.I('Do the repair first, then I will look.', { face: 'study' });
-    f.busy = 'iroha'; M.render();
+    f.busy = 'iroha'; M.render(); const sentRepair = JSON.stringify([f.id, f.repair, f.gap, f.fix]);
     const reply = await ask('iroha', `[guided session repair, not typed by me. Topic: ${f.topic}. The gap you found: ${f.gap} The repair task: ${f.fix}]\n\nMy repair:\n${f.repair.trim()}\n\n[In at most three short lines: does this fix the gap? Start with "Fixed." if it does. If it doesn't, start with "Still missing:" and say exactly what, kindly.]`);
-    f.busy = ''; if (reply) { f.rfb = reply; f.fixed = /^\W*fixed\b/i.test(reply); } else dropped('your repair is saved', 'the check');
+    f.busy = ''; if (L.flow !== f || JSON.stringify([f.id, f.repair, f.gap, f.fix]) !== sentRepair) { f.fixed = false; save(); M.render(); return M.I('Iroha was still checking when the answer changed, so that check was set aside. Check the new version.', { face: 'study' }); }
+    if (reply) { f.rfb = reply; f.fixed = /^\W*fixed\b/i.test(reply); } else dropped('your repair is saved', 'the check');
     save(); M.render();
   }
 
@@ -9322,7 +9330,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       ${f.act === 'blurt' ? `<details class="kg-flow-refbox" ${f.ref ? 'open' : ''}><summary>Reveal a reference to compare with (after your blank page)</summary><p class="kl-small">Write your blank page first. Then paste the part of your notes you're checking against, or leave this empty to compare with your lecture's notes.</p><textarea data-flow="ref" rows="5" maxlength="4000" aria-label="Reference from your notes">${esc(f.ref)}</textarea></details>` : ''}
       <p class="kl-small kg-flow-src">${esc(srcGuess(f))}</p>${f.energy === 'lighter' ? '<p class="kl-small">Lighter today: small is the plan.</p>' : ''}
       ${f.act === 'explain' ? (f.kq ? `<div class="kg-flow-k"><b>Kaguya</b><p>${esc(f.kq)}</p></div><textarea data-flow="ka" rows="3" maxlength="1500" aria-label="Your answer to Kaguya" placeholder="Answer her, simply (optional)">${esc(f.ka)}</textarea>` : `<div class="kl-row"><button data-a="flowlisten" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'kaguya', '🗣 Tell Kaguya')}</button><span class="kl-small">She asks the question a curious friend would.</span></div>`) : ''}
-      <label class="kl-check"><input type="checkbox" data-flow="supported" ${f.supported ? 'checked' : ''} ${f.act === 'worked' ? 'disabled' : ''}> I used a hint, notes or a solution while answering</label>
+      <label class="kl-check"><input type="checkbox" data-flow="supported" ${f.supported || f.peeked ? 'checked' : ''} ${f.act === 'worked' || f.peeked ? 'disabled' : ''}> I used a hint, notes or a solution while answering${f.peeked ? ' <span class="kl-small">(the Reference was opened, so this stays on. To show it on your own, try a fresh problem without it.)</span>' : ''}</label>
       <div class="kl-row"><button class="kl-primary" data-a="flowcheck" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'iroha', 'Check it with Iroha')}</button><button class="kl-ghost" data-a="flowto" data-v="save">Save without an AI check</button></div>`;
   }
   const backupModel = f => /gemini|groq/i.test(f.checker?.provider || '');
@@ -9353,8 +9361,9 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   }
   // the evidence behind any grade, in words: independent, with help, or not yet
   const evidence = f => {
-    if (f.requireVerification && (!f.verified || !String(f.verificationSource || '').trim())) return ['ungraded', 'Saved without source verification. No independent credit.'];
-    if (f.supported && f.disputed !== 'unresolved' && graded(f) && (noGap(f) || f.fixed)) return ['help', 'Checked with support. Try a fresh problem another day.'];
+    // every new result needs a checked source, including drafts saved before this rule existed
+    if (!f.verified || !String(f.verificationSource || '').trim()) return ['ungraded', 'Saved without source verification. No independent credit.'];
+    if ((f.supported || f.peeked) && f.disputed !== 'unresolved' && graded(f) && (noGap(f) || f.fixed)) return ['help', 'Checked with support. Try a fresh problem another day.'];
     if (f.disputed === 'unresolved') return ['ungraded', "Unresolved: two checks disagreed and you haven't chosen, so nothing is counted."];
     if (!graded(f)) return ['ungraded', "Not graded: Iroha's check didn't come back in a form the desk can trust, so nothing is counted."];
     const how = f.disputed === 'agrees' ? ', confirmed by a fresh recheck' : /^(first|second)$/.test(f.disputed) ? ', after two checks disagreed and you chose' : '';
@@ -9423,7 +9432,8 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       if (v.miss && gap && !x) L.attempts.push({ id: M.uid(), d, ts: Date.now(), ok: false, src: 'flow', ch: f.lec ? lecture(f.lec)?.ch || '' : '', q: `${f.topic}: ${f.gap}`.slice(0, 240), cause: f.errType === 'slip' ? 'careless slip' : f.errType === 'principle' ? 'knowledge gap' : /\b(sign|arithmetic|calculation|copied|copy|typo|units?|careless|slip|misread|rounding)\b/i.test(f.gap || '') ? 'careless slip' : /\b(concept|understand|definition|why|formula|idea|meaning)\b/i.test(f.gap || '') ? 'knowledge gap' : f.act === 'diagnose' ? 'careless slip' : 'knowledge gap', fix: (f.fix || '').slice(0, 200), due: window.LearningDesk?.roomy?.(M.add(d, 1)) || M.add(d, 1), st: 0 }); { const last = L.attempts[L.attempts.length - 1]; if (last?.src === 'flow' && last.due !== M.add(d, 1)) last.held = true; }
       const skillId = window.StudyPlan.creditTarget(L.skills || [], {sk:f.skillId,lec:f.lec});
       const result = skillId && ev !== 'ungraded' ? M.recordSkill?.(skillId, ev === 'indep' ? 'ok' : ev === 'help' ? 'hint' : 'miss', 'flow', {sourceEvent:f.id,verified:f.verified,verificationSource:f.verificationSource,transfer:f.transfer}) : null;
-      L.flowLog.push({ skillId, lec:f.lec || '', requireVerification:!!f.requireVerification, verified:!!f.verified, verificationSource:f.verificationSource || '', supported:!!f.supported, delayed:!!result?.delayed, transfer:ev === 'indep' && f.transfer === true, id: f.id, d, act: f.act, subj: f.subj, topic: f.topic, goal: f.goal, gap: gap ? f.gap.slice(0, 300) : '', errType: gap ? f.errType || '' : '', fixed: f.fixed, ev, disputed: f.disputed || '', miss: f.miss || '', by: f.checker?.provider || '', model: f.checker?.model || '', met: v.met || '', warm: !!f.warm.trim(), recap: !!(f.rc1 || f.rc2 || f.rc3), card: !!f.cardId, mins: f.started ? Math.min(180, Math.round((Date.now() - f.started - (f.away || 0)) / 60000)) : 0 }); // time away after "Leave for now" doesn't count
+      if (x || (skillId && ((L.skills || []).find(s => s.id === skillId)?.made || d) < d)) M.chargeReview?.('flow', f.id);
+      L.flowLog.push({ skillId, lec:f.lec || '', requireVerification:true, verified:!!f.verified, verificationSource:f.verificationSource || '', supported:!!(f.supported || f.peeked), delayed:!!result?.delayed, transfer:ev === 'indep' && f.transfer === true, id: f.id, d, act: f.act, subj: f.subj, topic: f.topic, goal: f.goal, gap: gap ? f.gap.slice(0, 300) : '', errType: gap ? f.errType || '' : '', fixed: f.fixed, ev, disputed: f.disputed || '', miss: f.miss || '', by: f.checker?.provider || '', model: f.checker?.model || '', met: v.met || '', warm: !!f.warm.trim(), recap: !!(f.rc1 || f.rc2 || f.rc3), card: !!f.cardId, mins: f.started ? Math.min(180, Math.round((Date.now() - f.started - (f.away || 0)) / 60000)) : 0 }); // time away after "Leave for now" doesn't count
       if (L.flowLog.length > 300) L.flowLog = L.flowLog.slice(-300);
       L.flow = null; save();
       closeDesk(f, v.mood);
@@ -9454,6 +9464,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     if (['attempt', 'ka', 'ref', 'example', 'exampleWhy'].includes(k)) { L.flow.verified = false; L.flow.graded = false; L.flow.fixed = false; }
     if (k === 'repair') { L.flow.verified = false; L.flow.fixed = false; }
     if (k === 'verificationSource') L.flow.verified = false;
+    if (k === 'supported' && (L.flow.peeked || L.flow.act === 'worked')) { L.flow.supported = true; e.target.checked = true; }
     if (k === 'skillId' && L.flow.step === 'save') { save(); M.render(); return; }
     clearTimeout(tSave); tSave = setTimeout(save, 400);
     if (e.target.type === 'checkbox' && L.flow.step === 'save') { save(); M.render(); }

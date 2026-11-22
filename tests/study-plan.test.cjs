@@ -168,3 +168,9 @@ test("woke after lunch time: lunch comes 30 min after morning tea, never skipped
   assert.strictEqual(rows.find(r => r.id === "lunch").start, 410);
   assert.ok(rows.some(r => r.kind === "study"));
 });
+
+test('the older-material allowance counts every completion in one ledger, whichever page it came from', () => {
+  const P = plan(at(MON, '12:00'), { deskSettings: { reviewMinutes: 15 }, log: [{ d: MON, t: 'recall', budgetMinutes: 5 }], reviewLedger: [{ d: MON, src: 'flow', id: 'a', budgetMinutes: 5 }, { d: MON, src: 'lecture', id: 'b', budgetMinutes: 5 }, { d: '2026-11-22', src: 'lecture', id: 'c', budgetMinutes: 5 }] });
+  assert.strictEqual(P.mixLeft(), 0);
+  assert.strictEqual(plan(at(MON, '12:00'), { deskSettings: { reviewMinutes: 15 }, reviewLedger: [{ d: MON, src: 'flow', id: 'a', budgetMinutes: 5 }] }).mixLeft(), 10);
+});
