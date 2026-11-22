@@ -989,7 +989,7 @@ body.habit-shh #hb-session-card {text-align:center;}
       return finish(seg,study,o,W);
     }
     // before lunch: 90 + 60 minutes of lecture (an early day also fits revision and homework), 20-minute breaks between
-    const early=W<=630,budget0=Math.max(60,Math.min(360,+o.budget||360)),preCap=Math.min(early?270:150,budget0),sizes=[[90,'L'],[60,'L'],[90,'R'],[40,'H']];let t=start,used=0,carry=null,i=0;
+    const early=W<=630,budget0=Math.max(60,Math.min(360,+o.budget||360)),gRes=o.german===0?0:30,preCap=Math.min(early?270:150,budget0-gRes),sizes=[[90,'L'],[60,'L'],[90,'R'],[40,'H']];let t=start,used=0,carry=null,i=0;
     if(start<T_LUNCH[0]){
       while(i<sizes.length&&used<preCap){const room=T_LUNCH[0]-t;if(room<15)break;const [sz,role]=sizes[i];const m=Math.min(sz,room,preCap-used);
         put(t,t+m,role);if(m<sz)carry={role,m:sz-m};used+=m;t+=m;i++;
@@ -1002,10 +1002,10 @@ body.habit-shh #hb-session-card {text-align:center;}
     for(const [s0,e0,role] of slots){const s=Math.max(s0,start);if(left<5)break;
       if(s0===1260){reached3=true;if(ext)break;}
       if(role==='G'){if(G===0){put(s,e0,'P');left-=e0-s;continue;}const g=Math.min(Gb,e0-s);put(s,s+g,'G');if(e0-s-g>=5)put(s+g,e0,'P');gDone=true;left-=e0-s;continue;}
-      let len=Math.min(e0-s,left),p=s;
+      const gLater=slots.some(x=>x[2]==='G'&&x[0]>s0);
+      let len=Math.min(e0-s,gDone||!gLater?left:left-gRes),p=s;
       if(carry&&s0===1020){const c=Math.min(carry.m,len);put(p,p+c,carry.role,{carry:true});p+=c;len-=c;left-=c;carry=null;}
       // German that won't be reached later today (an early day ends before 7:45 PM) goes into this block
-      const gLater=slots.some(x=>x[2]==='G'&&x[0]>s0)&&left-len>=30;
       if(!gDone&&!gLater&&Gb&&len>=Gb){put(p,p+Gb,'G');p+=Gb;len-=Gb;left-=Gb;gDone=true;}
       if(len>=5){put(p,p+len,role);left-=len;}
       if(s0===1020&&left>=5&&slots.some(x=>x[0]===1130))add(1110,1130,'life','brk-1110','Break · away from the desk',{brk:true});
@@ -1019,7 +1019,7 @@ body.habit-shh #hb-session-card {text-align:center;}
       const g=freeAfter(seg,start,Gb,T_DINNER[0]);if(g)put(g.s,g.s+Gb,'G');}
     else if(!gDone&&Gb>0)topUp(study,['P','H','R']); // its slot is gone: it takes the latest study time instead
     // more German than 30 minutes replaces other study: it never extends the day
-    topUp(study,['P','H']);
+    topUp(study,['P','H','R','L']);
     return finish(seg,study,o,W);
   }
   // first free interval of at least `len` minutes at or after `from`, before `until`
@@ -1091,7 +1091,7 @@ body.habit-shh #hb-session-card {text-align:center;}
   // fill study segments in time order. A lecture finished in an earlier block makes its revision eligible later the same day.
   function assign(segs,tasks,focus,o={}){
     const pool=o.pool||tasks.map(t=>Object.assign({},t)),deficitOrder=[focus,...SUB3.filter(s=>s!==focus)],rows=[];let n=0;
-    const pick=role=>{const open=pool.filter(t=>t.rem>=5&&t.ready!==false),owed=s=>open.some(x=>x.subj===s&&(x.type==='revision'||x.type==='homework'||(x.type==='lecture'&&x.cont)));
+    const pick=role=>{const open=pool.filter(t=>t.rem>=5&&t.ready!==false&&!(o.examPrep&&t.type==='lecture'&&!t.cont)),owed=s=>open.some(x=>x.subj===s&&(x.type==='revision'||x.type==='homework'||(x.type==='lecture'&&x.cont)));
       const live=open.filter(t=>!(t.type==='lecture'&&!t.cont&&owed(t.subj))),f=t=>t.subj===focus?0:1,by=(fn)=>live.filter(fn).sort((a,b)=>f(a)-f(b))[0];
       if(role==='L')return by(t=>t.type==='lecture'&&t.cont&&t.subj===focus)||by(t=>t.subj===focus&&t.type==='revision')||by(t=>t.subj===focus&&t.type==='homework')||by(t=>t.type==='lecture'&&t.subj===focus)||by(t=>t.type==='lecture'&&t.cont)||pick('P');
       if(role==='R')return by(t=>t.type==='lecture'&&t.cont)||by(t=>t.type==='revision')||pick('P');
@@ -8188,7 +8188,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     const sy = syl(), p = sy.pos[subj], n = SP().nextLecture(sy, subj), cur = p && p.course ? p : (n && !n.missing ? n : null); if (!cur) return null;
     const c = sy.courses[cur.course]; if (!c) return null; c.done = c.done || []; c.done[cur.ci] = Math.min(c.chapters[cur.ci][1] || 999, (c.done[cur.ci] || 0) + 1);
     const spent = (+((p && p.spent) || 0)) + (spentNow || 0); if (spent >= 30) { (sy.watch[subj] = sy.watch[subj] || []).push(Math.round(spent)); sy.watch[subj] = sy.watch[subj].slice(-30); }
-    const title = `${cur.chapter} · lecture ${cur.lec}`; sy.revs.push({ id: 'rv' + Date.now().toString(36), subj, title, done: false, made: today() }); delete sy.pos[subj]; S().flow = { d: today(), kind: 'revise', subj, title };
+    const title = `${cur.chapter} · lecture ${cur.lec}`; sy.revs.push({ id: 'rv' + Date.now().toString(36), subj, title, done: false, made: today() }); delete sy.pos[subj]; (sy.lastFin = sy.lastFin && typeof sy.lastFin === 'object' ? sy.lastFin : {})[subj] = Date.now(); S().flow = { d: today(), kind: 'revise', subj, title };
     audit('lecture finished', SN[subj] + ' · ' + title); return title;
   }
   // lecture time comes only from the paused-aware session timer; a ledger (syl.timerSeen) remembers what each session already gave,
@@ -8201,10 +8201,29 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     const min = Math.round(Math.min(+a.targetMs || Infinity, (+a.accruedMs || 0) + (a.running ? Date.now() - (+a.lastStart || Date.now()) : 0)) / 60000);
     const sy = syl(), seen = sy.timerSeen = sy.timerSeen && typeof sy.timerSeen === 'object' ? sy.timerSeen : {};
     const add = Math.max(0, min - (+seen[a.id] || 0)); seen[a.id] = Math.max(+seen[a.id] || 0, min);
-    const ks = Object.keys(seen); if (ks.length > 20) for (const k of ks.slice(0, ks.length - 20)) delete seen[k];
+    const ks = Object.keys(seen); if (ks.length > 300) for (const k of ks.slice(0, ks.length - 300)) delete seen[k];
     return add;
   }
   window.__kgTimerTake = timerTake;
+  // a saved lecture session (same subject, after that subject's last finished lecture, and not naming a different lecture number)
+  // is credited to the current lecture automatically; the ledger keeps every minute counted once
+  function syncLectureTime() {
+    let h; try { h = JSON.parse(localStorage.getItem('ame-habit-v1') || '{}'); } catch (_) { return false; }
+    const sy = syl(); if (sy.timerSince == null) { sy.timerSince = Date.now(); return true; } // only sessions from now on: older ones are never re-credited
+    const fin = sy.lastFin = sy.lastFin && typeof sy.lastFin === 'object' ? sy.lastFin : {}, floor = Date.now() - 14 * 864e5; let changed = false;
+    for (const s of (h.sessions || []).slice(-80)) {
+      if (!s || !s.id || !(+s.endedAt > floor)) continue;
+      const subj = SUB.find(x => String(s.subject || '').toLowerCase().startsWith(SUBKEY[x] || x)); if (!subj) continue;
+      if (+s.endedAt <= Math.max(+fin[subj] || 0, +sy.timerSince || 0)) continue;
+      if ((+(sy.timerSeen || {})[s.id] || 0) >= Math.round(+s.minutes || 0)) continue;
+      const n = SP().nextLecture(sy, subj), p = sy.pos[subj], lec = (p && p.lec) || (n && !n.missing && n.lec), m = String(s.task || '').match(/lecture\s+(\d+)/i);
+      if (m && lec && +m[1] !== +lec) continue;
+      const add = timerTake(subj, Object.assign({}, s, { accruedMs: (+s.minutes || 0) * 60000, running: false, targetMs: Infinity }));
+      if (add > 0 && saveTimestamp(subj, null, add)) changed = true;
+    }
+    return changed;
+  }
+  window.__kgSyncLectureTime = syncLectureTime;
   // ---- the card: three things up front (do this now, next protected break, change today); the rest folds away ----
   // folded sections remember being open across re-renders
   const keep = new Set((() => { try { return JSON.parse(sessionStorage.getItem('kg-day-open') || '[]'); } catch (_) { return []; } })());
@@ -8419,6 +8438,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   }
   const card = () => {
     if (!SP()?.templateDay) return '';
+    if (syncLectureTime()) save();
     const v = view();
     return `<section class="kl-card kg-plan kg-day"><p class="kl-eyebrow">YOUR STUDY DAY · ${esc(planLabel(v))}${v.info.examPrep ? ' · exam period: ' + esc(v.info.examPrep) : ''}</p>
       ${doNowHTML(v)}${deferredHTML(v)}${changesHTML()}
@@ -8439,7 +8459,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     kgdfood: () => { const d = today(), at = Math.ceil(nowC() / 5) * 5; (S().food[d] = S().food[d] || []).push({ at, len: 20 }); window.HabitDesk?.pauseActive?.(); audit('food break', clk(at)); redo('food break now. the plan makes room; nothing gets squeezed later 🌙'); },
     kgdgo: b => { if (b.dataset.v === 'resume') { M.go('today'); document.getElementById('hb-session-card')?.scrollIntoView({ behavior: 'smooth' }); return; }
       if (!window.HabitDesk?.startBlock) return toast('open the desk below to start a timer 🌙'); window.HabitDesk.startBlock(b.dataset.v); },
-    kgdlecdone: b => { const s = b.dataset.v; const t = finishLecture(s, timerTake(s)); if (!t) return toast('no lecture to finish for ' + SN[s]); redo(`${t} finished. its whole-lecture revision is next in line 🌙`); },
+    kgdlecdone: b => { const s = b.dataset.v; syncLectureTime(); const t = finishLecture(s, timerTake(s)); if (!t) return toast('no lecture to finish for ' + SN[s]); redo(`${t} finished. its whole-lecture revision is next in line 🌙`); },
     kgdrev: b => { const r = syl().revs.find(x => x.id === b.dataset.v); if (!r) return; r.done = true; r.doneD = today(); S().flow = { d: today(), kind: 'homework', subj: r.subj, title: r.title }; audit('revision done', SN[r.subj] + ' · ' + r.title); redo('revision marked done 🌙'); },
     kgdflow: () => { delete S().flow; redo(); },
     kgdgerman1: b => { const u = Math.max(0, (+S().germanUnit || 0) + (+b.dataset.v || 0)); S().germanUnit = u; audit('German unit', SP().germanTitle(u)); redo(+b.dataset.v > 0 ? 'next German unit is ready for your next German block 🌙' : ''); },
@@ -8464,7 +8484,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   });
   Object.assign(M.FORMS, {
     kgdwake: v => { const c = readClock(v.at); if (c == null) return toast('pick the time you woke up 🌙'); if (c > 1290) return toast('after 9:30 PM there is no study to plan. rest; tomorrow starts fresh 🌙'); const d = today(); S().wake[d] = Math.round(c / 5) * 5; delete S().switches[d]; if (WAKE[S().plan[d]]) S().plan[d] = 'auto'; audit('wake time', clk(c)); redo(); },
-    kgdts: v => { const s = v.subj; if (!SUB.includes(s)) return; const at = String(v.at || '').trim(); if (at && !/^\d{1,2}(:\d{2}){1,2}$/.test(at)) return toast('type it like 42:10 or 1:02:30 🌙'); const seen0 = JSON.stringify(syl().timerSeen || {}); const add = timerTake(s);
+    kgdts: v => { const s = v.subj; if (!SUB.includes(s)) return; const at = String(v.at || '').trim(); if (at && !/^\d{1,2}(:\d{2}){1,2}$/.test(at)) return toast('type it like 42:10 or 1:02:30 🌙'); syncLectureTime(); const seen0 = JSON.stringify(syl().timerSeen || {}); const add = timerTake(s);
       if (!saveTimestamp(s, at, add)) { syl().timerSeen = JSON.parse(seen0); return toast('no lecture in progress for ' + SN[s]); } delete syl().pos[s].lastBlock; delete syl().pos[s].lastAdd; audit('lecture timestamp', SN[s] + ' ' + at); redo('timestamp saved. it picks up from there next time 🌙'); },
     kghwadd: v => { const t = String(v.title || '').trim(); if (!t || !SUB.includes(v.subj)) return; if (S().flow && S().flow.kind === 'homework') delete S().flow; syl().hw.push({ id: 'hw' + Date.now().toString(36), subj: v.subj, title: t.slice(0, 140), essential: !v.extra, mins: Math.max(10, Math.min(300, +v.mins || SP().HWMIN[v.subj])), next: String(v.next || '').slice(0, 100), status: 'open', made: today() }); audit('homework added', t); redo(); },
     kghwprog: v => { const h = syl().hw.find(x => x.id === v.id); if (!h) return; h.done = String(v.done || '').trim().slice(0, 40); h.next = String(v.next || '').trim().slice(0, 60); const st = String(v.stuck || '').trim().slice(0, 60), fresh = st && st !== h.stuck;

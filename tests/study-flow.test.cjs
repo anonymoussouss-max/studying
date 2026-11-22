@@ -2,7 +2,8 @@
 // the week preview and week size, German units, homework next steps. All fixtures are synthetic.
 // Run: node --test tests/study-flow.test.cjs
 const test = require('node:test'), assert = require('node:assert'), fs = require('fs'), vm = require('vm'), path = require('path');
-const html = fs.readFileSync(process.env.KG_INDEX || path.join(__dirname, '..', 'index.html'), 'utf8');
+// line endings are normalised so the source checks pass on Windows checkouts (CRLF) too
+const html = fs.readFileSync(process.env.KG_INDEX || path.join(__dirname, '..', 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 const src = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).find(s => s.includes('root.StudyPlan=api'));
 const NOW = new Date('2026-11-23T12:00:00').getTime();
 class FixedDate extends Date { constructor(...a) { a.length ? super(...a) : super(NOW); } static now() { return NOW; } }
@@ -65,4 +66,42 @@ test('homework carries its next step into the plan, and essential stays distinct
   const tasks = SP.buildTasks(l, MON);
   assert.ok(tasks.some(t => t.type === 'homework' && /Ex 1\.2 · next: Q9/.test(t.title)));
   assert.ok(!tasks.some(t => /Extra set/.test(t.title)), 'additional homework is not scheduled');
+});
+
+// the lecture-time helpers, run against a synthetic syllabus and saved sessions
+function lectureCode() { return (html.match(/  const SUBKEY = [\s\S]*?window\.__kgSyncLectureTime = syncLectureTime;\n/) || [])[0]; }
+function lectureKit(sessions, now) {
+  const sy = { pos: {}, timerSince: now - 3600e3 }, store = { 'ame-habit-v1': JSON.stringify({ sessions }) };
+  const saveTimestamp = (subj, at, add) => { const p = sy.pos[subj] = sy.pos[subj] || { lec: 21 }; p.spent = (p.spent || 0) + add; return true; };
+  const SPf = () => ({ nextLecture: () => ({ lec: 21 }) });
+  return { sy, run: new Function('syl', 'window', 'Date', 'localStorage', 'SUB', 'SP', 'saveTimestamp', lectureCode() + 'return { timerTake, syncLectureTime };')(
+    () => sy, {}, { now: () => now }, { getItem: k => store[k] || null }, ['maths', 'physics', 'chem'], SPf, saveTimestamp) };
+}
+test('lecture time: a session saved and closed before any lecture button still counts, once', () => {
+  const now = Date.now(), ses = [{ id: 'a', subject: 'Maths', task: 'Watch Basic Mathematics · lecture 21 of 23', minutes: 55, endedAt: now - 600e3 },
+    { id: 'b', subject: 'Maths', task: 'Revise Basic Mathematics · lecture 20', minutes: 40, endedAt: now - 300e3 },
+    { id: 'c', subject: 'Maths', task: 'Watch Basic Mathematics · lecture 19 of 23', minutes: 30, endedAt: now - 200e3 },
+    { id: 'd', subject: 'Maths', task: 'Old lecture', minutes: 90, endedAt: now - 7200e3 }];
+  const k = lectureKit(ses, now);
+  assert.strictEqual(k.run.syncLectureTime(), true);
+  assert.strictEqual(k.sy.pos.maths.spent, 55, 'only the lecture 21 session counts: not revision, another lecture, or sessions from before the update');
+  assert.strictEqual(k.run.syncLectureTime(), false, 'a second pass adds nothing');
+  assert.strictEqual(k.sy.pos.maths.spent, 55);
+  k.sy.lastFin = { maths: now }; ses.push({ id: 'e', subject: 'Maths', task: 'Watch', minutes: 20, endedAt: now - 100e3 });
+  assert.strictEqual(k.run.syncLectureTime(), false, 'sessions before the lecture was finished do not move to the next lecture');
+});
+
+test('minimal and lighter weeks keep German: it is reserved before PCM time', () => {
+  for (const size of ['lighter', 'minimal']) for (const W of [600, 720]) for (const g of [15, 30, 45]) {
+    const t = SP.templateDay(lab({ german: g, weekSize: { [MON]: size }, wake: { [MON]: W } }), MON, 1, W, Object.assign({}, C0, { diplomaToday: 0 }));
+    const st = t.rows.filter(r => r.kind === 'study'), tot = st.reduce((n, r) => n + r.e - r.s, 0), ger = st.filter(r => r.subj === 'german').reduce((n, r) => n + r.e - r.s, 0);
+    assert.strictEqual(ger, g, size + ' week, wake ' + W + ': German ' + g);
+    assert.ok(tot <= (size === 'lighter' ? 270 : 150), 'and the day stays within its size');
+  }
+});
+
+test('week preview follows the exam-period rule: no new PCM lectures during diploma exam preparation', () => {
+  const w = week(lab({ exams: [{ id: 'e', name: 'W', from: '2026-11-23', end: '2026-11-26', days: [] }], germanExam: 'light' }));
+  for (const d of w.filter(x => x.d <= '2026-11-26')) assert.ok(!d.items.some(i => /^Watch /.test(i.title)), d.d + ' has no new lecture');
+  assert.ok(w.some(d => d.d > '2026-11-26' && d.items.some(i => /^Watch /.test(i.title))), 'lectures resume after the exam period');
 });
