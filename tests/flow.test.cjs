@@ -79,3 +79,55 @@ test('a draft reloaded mid-check is usable again and keeps the work', () => {
   assert.strictEqual(r.busy, ''); assert.strictEqual(r.attempt, 'my working'); assert.strictEqual(r.freshA, 'half done');
   assert.deepStrictEqual({ ...r.fadeAns }, {}); assert.strictEqual(r.fadeLvl, 2); assert.strictEqual(r.requireVerification, true);
 });
+
+test('a whole session is kept to reopen, and the newest 30 keep it; older ones drop the working', () => {
+  const w = K.workRecord({ exProb: 'Find v', attempt: 'v = 6.3', fb: 'Right: yes', repair: '', rfb: '' });
+  assert.strictEqual(w.attempt, 'v = 6.3'); assert.strictEqual(w.prob, 'Find v');
+  assert.strictEqual(K.workRecord({}), null);
+  const log = Array.from({ length: 32 }, (_, i) => ({ id: i, work: { attempt: 'w' + i } }));
+  const t = K.trimLog(log);
+  assert.strictEqual(t[0].work, undefined); assert.strictEqual(t[31].work.attempt, 'w31');
+});
+
+test('did the fix stick: a repaired gap becomes a later, different problem; an unrepaired one does not', () => {
+  const f = { id: 'f1', topic: 'Energy', gap: 'used ramp length', fixed: true, skillId: 'sk1', fix: 'use height', errType: 'principle' };
+  const s = K.stickItem(f, '2026-11-23', 'work-energy', '2026-11-26');
+  assert.match(s.q, /Did the fix stick\? A different problem on Energy: used ramp length/);
+  assert.strictEqual(s.src, 'stick'); assert.strictEqual(s.due, '2026-11-26'); assert.strictEqual(s.sk, 'sk1'); assert.strictEqual(s.ok, false);
+  assert.strictEqual(K.stickItem({ ...f, fixed: false }, '2026-11-23', '', ''), null);
+});
+
+test('the problem bank prefers the same skill, skips problems used in the last 7 days, oldest use first', () => {
+  const bank = [
+    { id: 'a', q: 'Ramp, 3 m high', sk: 'sk1', subj: 'Physics', lastUsed: '2026-11-20' },
+    { id: 'b', q: 'Ramp, 5 m high', sk: 'sk1', subj: 'Physics', lastUsed: '2026-11-01' },
+    { id: 'c', q: 'Pendulum energy', sk: 'sk2', subj: 'Physics', topic: 'energy', lastUsed: '' }
+  ];
+  assert.strictEqual(K.bankPick(bank, { sk: 'sk1' }, '2026-11-23').id, 'b');
+  assert.strictEqual(K.bankPick(bank.filter(b => b.id !== 'b'), { sk: 'sk1', subj: 'Physics', topic: 'energy loss' }, '2026-11-23').id, 'c', 'falls back to subject and topic');
+  assert.strictEqual(K.bankPick([], { sk: 'sk1' }, '2026-11-23'), null);
+});
+
+test('contrast and own checks reach Iroha only when written', () => {
+  const m = K.methodNote({ mPrin: 'energy', mCond: 'a collision: momentum', cUnits: 'm/s ok', cLim: 'h=0 gives 0' });
+  assert.match(m.given, /What would make the alternative the right method: a collision: momentum/);
+  assert.match(m.given, /Units: m\/s ok/); assert.match(m.given, /Limiting case: h=0 gives 0/);
+  assert.match(m.ask, /condition for the alternative/); assert.match(m.ask, /own checks are valid/);
+  const c = K.methodNote({ cAss: 'no friction' });
+  assert.match(c.given, /Assumptions: no friction/); assert.doesNotMatch(c.given, /method choice/);
+  assert.notStrictEqual(K.checkKey({ cLim: 'a' }), K.checkKey({ cLim: 'b' }));
+});
+
+test('confidently wrong: sure answers that still had a gap, in the last 14 days', () => {
+  const log = [{ d: '2026-11-20', conf: 'sure', gap: 'sign', topic: 'A' }, { d: '2026-11-20', conf: 'sure', gap: '', topic: 'B' }, { d: '2026-11-20', conf: 'unsure', gap: 'x', topic: 'C' }, { d: '2026-10-01', conf: 'sure', gap: 'y', topic: 'D' }];
+  assert.deepStrictEqual(K.confWrong(log, '2026-11-23').map(r => r.topic), ['A']);
+});
+
+test('merging a duplicate skill keeps both histories under the kept one', () => {
+  const skills = [{ id: 'a', name: 'Energy on ramps', lectures: ['l1'], lastTested: '2026-11-20', last: 'ok', strength: 'solid' }, { id: 'b', name: 'Work-energy theorem', lectures: ['l2'], lastTested: '2026-11-10', last: 'miss', strength: 'shaky' }];
+  const m = K.mergeSkills(skills, 'a', 'b');
+  assert.strictEqual(m.length, 1); assert.strictEqual(m[0].id, 'b'); assert.strictEqual(m[0].name, 'Work-energy theorem');
+  assert.deepStrictEqual([...m[0].lectures], ['l2', 'l1']); assert.strictEqual(m[0].lastTested, '2026-11-20'); assert.strictEqual(m[0].strength, 'solid');
+  assert.deepStrictEqual([...m[0].aliases], ['a']);
+  assert.strictEqual(K.mergeSkills(skills, 'a', 'a'), skills);
+});
