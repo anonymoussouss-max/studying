@@ -851,6 +851,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const what=t.type==='lecture'?(t.cont?'Continue the lecture from the saved timestamp. If a break or bedtime comes first, save the timestamp and stop; it continues next time.':'Watch the lecture and take notes as you go. Finish the whole lecture before revising it. If you have to stop, save the timestamp.')
       :t.type==='revision'?'Whole-lecture revision: first rebuild the main ideas from memory, then check your notes for missing or wrong parts, then rework a few examples on your own.'
       :t.type==='homework'?'Homework. Essential questions first. Park a question you are truly stuck on in Doubts with a note, and move on.'
+      :t.type==='astro'?'Astrophysics course: the next step from Study · Astrophysics course. This time replaces part of today\'s PCM; it does not add to the day.'
       :t.type==='german'?'German: a mix of listening, saying things out loud, a little reading and recalling useful words. Not just flashcards.'
       :t.type==='explore'?'Play with Physics or Maths: a puzzle, a derivation, a simulation or a question you are curious about. Stop whenever you like.'
       :t.type==='diploma'?'Diploma work. This time replaces part of today\'s PCM, it does not add to the day.'
@@ -898,7 +899,7 @@ body.habit-shh #hb-session-card {text-align:center;}
   const gapD=(a,b)=>Math.round((Date.parse(a+'T12:00:00')-Date.parse(b+'T12:00:00'))/864e5);
   // one skill per lecture that no skill links to yet; running it again adds nothing
   const skillsFromLectures=(lectures,skills)=>{const out=(skills||[]).slice(),linked=new Set(out.flatMap(s=>s.lectures||[]));
-    for(const e of lectures||[]){if(!e||!e.id||linked.has(e.id))continue;linked.add(e.id);
+    for(const e of lectures||[]){if(!e||!e.id||e.noSkill||linked.has(e.id))continue;linked.add(e.id);
       out.push({id:'sk-'+e.id,name:String(e.topic||'Lecture').slice(0,120),subj:e.subj||'',ch:e.ch||'',lectures:[e.id],made:e.made||'',lastTested:e.lastGraded||null,last:null,strength:(e.stage||0)>=2?'solid':'shaky'});}
     return out;};
   // older skills to mix into practice: shaky first, then new, then solid by longest untested; never one shown unaided in the last 7 days or made today
@@ -1020,6 +1021,12 @@ body.habit-shh #hb-session-card {text-align:center;}
     else if(!gDone&&Gb>0)topUp(study,['P','H','R']); // its slot is gone: it takes the latest study time instead
     // more German than 30 minutes replaces other study: it never extends the day
     topUp(study,['P','H','R','L']);
+    // Astrophysics course time replaces the latest PCM study of the day (never German, never the extended evening)
+    {let need=Math.max(0,Math.min(120,Math.round((+o.astro||0)/5)*5));
+      const one=study.slice().reverse().find(x=>['P','H','R','L'].includes(x.role)&&!x.ext&&x.e-x.s>=need); // one block when one is long enough
+      for(const role of ['P','H','R','L'])for(const x of (one?[one]:study.slice().reverse())){if(need<5)break;if(x.role!==role||x.ext)continue;const take=Math.min(need,x.e-x.s);
+        if(x.e-x.s-take<5){x.role='A';need-=x.e-x.s;}else{study.push({s:x.e-take,e:x.e,role:'A'});x.e-=take;need-=take;}}
+      study.sort((a,b)=>a.s-b.s);for(let k=study.length-1;k>0;k--)if(study[k].role==='A'&&study[k-1].role==='A'&&study[k-1].e===study[k].s){study[k-1].e=study[k].e;study.splice(k,1);}}
     return finish(seg,study,o,W);
   }
   // first free interval of at least `len` minutes at or after `from`, before `until`
@@ -1101,6 +1108,7 @@ body.habit-shh #hb-session-card {text-align:center;}
       if(g.kind!=='study'){rows.push(g);continue;}
       if(o.now!=null&&g.e<=o.now){rows.push(Object.assign({},g,{title:'Earlier study block',past:true,subj:null}));continue;}
       if(g.role==='G'){rows.push(Object.assign({},g,{subj:'german',title:o.germanUnit!=null?germanTitle(o.germanUnit):GERMAN[(o.dayNo||0)%4],task:{type:'german'}}));continue;}
+      if(g.role==='A'){rows.push(Object.assign({},g,{subj:'astro',title:'Astrophysics course · '+(o.astroTitle||'next step on the course page'),task:{type:'astro'}}));continue;}
       if(g.role==='X'){rows.push(Object.assign({},g,{subj:'explore',title:'Exploration · a puzzle, a derivation, a simulation or a question you like (stop whenever)',task:{type:'explore'}}));continue;}
       if(g.role==='D'){rows.push(Object.assign({},g,{subj:'diploma',title:o.examPrep?'Diploma exam preparation':'Diploma work · assignments and submissions',task:{type:'diploma'}}));continue;}
       if(g.role==='Gphys'){rows.push(Object.assign({},g,{subj:'physics',title:'Physics · 15 minutes, then decide. Stopping after this is a complete day.',task:{type:'gentle'}}));continue;}
@@ -1129,7 +1137,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const examDays=[],prep=S.exams.find(x=>x&&x.from&&x.end&&x.from<=dayIso&&dayIso<=x.end);
     for(const x of S.exams)for(const d of (x&&x.days)||[])if(d&&d.d===dayIso){const at=+d.at,len=Math.max(180,+d.len||180),tr=Math.max(0,+d.travel||45);if(at>0)examDays.push({s:at-tr,e:at+len+tr,id:'exam-'+at,title:`${x.name||'Diploma exam'} · travel, exam and breaks`});}
     const food=((S.food||{})[dayIso]||[]).filter(f=>f&&+f.at>0).map((f,i)=>({s:+f.at,e:+f.at+Math.max(10,Math.min(45,+f.len||20)),id:'food-'+i,title:'Food break'}));
-    const opt=p=>({extend:!!(S.extend||{})[dayIso]&&!['sunday','gentle','reduced','stop'].includes(p),german:prep?(S.germanExam==='pause'?0:S.germanExam==='light'?15:S.german):S.german,pianoAt:(S.piano||{})[dayIso],pianoLen:S.pianoLen,budget:WEEK_BUDGET[(S.weekSize||{})[mondayOf(dayIso)]]||undefined,blockers:examDays.concat(food),edits:((S.edits||{})[dayIso]||[])});
+    const opt=p=>({astro:astroMinutes(S,dayIso),extend:!!(S.extend||{})[dayIso]&&!['sunday','gentle','reduced','stop'].includes(p),german:prep?(S.germanExam==='pause'?0:S.germanExam==='light'?15:S.german):S.german,pianoAt:(S.piano||{})[dayIso],pianoLen:S.pianoLen,budget:WEEK_BUDGET[(S.weekSize||{})[mondayOf(dayIso)]]||undefined,blockers:examDays.concat(food),edits:((S.edits||{})[dayIso]||[])});
     // switching plan mid-day keeps everything before the switch as it was and re-plans only what is left
     const sw=((S.switches||{})[dayIso]||[]).filter(x=>x&&x.at>W).sort((a,b)=>a.at-b.at);let segs;
     if(!sw.length){segs=skeleton(W,plan,Object.assign(opt(plan),{from:nowClock}));}
@@ -1146,11 +1154,35 @@ body.habit-shh #hb-session-card {text-align:center;}
 
     const tasks=ctx.pool?[]:buildTasks(L,dayIso,{noNewLectures:!!prep});
     const focus=dayFocus(L,dayIso,ctx.actual14||{});
-    const {rows,deferred}=assign(segs,tasks,focus,{now:nowClock,dayNo:Math.floor(Date.parse(dayIso+'T12:00:00')/864e5),firstOfDay:!ctx.loggedAny,examPrep:!!prep,pool:ctx.pool,week:!!ctx.pool,syl:L.syl||{},germanUnit:+S.germanUnit||0});
+    const {rows,deferred}=assign(segs,tasks,focus,{now:nowClock,dayNo:Math.floor(Date.parse(dayIso+'T12:00:00')/864e5),firstOfDay:!ctx.loggedAny,examPrep:!!prep,astroTitle:astroNext(L.astro,dayIso).text,pool:ctx.pool,week:!!ctx.pool,syl:L.syl||{},germanUnit:+S.germanUnit||0});
     const cut=(segs.cuts||[]).reduce((a,c)=>a+c.m,0);
     return {rows,deferred,cutMinutes:cut,plan,chosen,wake:W,focus,extend:!!opt(plan).extend,examPrep:prep?prep.name||'Diploma exams':'',examDays:examDays.length,switched:sw.length};
   }
   const WEEK_BUDGET={lighter:270,minimal:150};
+  // ---- Astrophysics course ----
+  // daily course minutes: your chosen amount, or a deadline adjustment you applied (only until its date)
+  function astroMinutes(S,d){const a=(S&&S.astro)||{},b=a.boost;return Math.max(0,Math.min(120,+(b&&b.until&&d<=b.until?b.min:a.min)||0));}
+  // lecture state: watching is tracked by you; practised and checked come only from saved practice evidence
+  const ASTRO_STATES=['Not started','In progress','Watched','Practised','Checked'];
+  function astroState(l,ev){ev=ev||{};if(ev.checked)return 'Checked';if(ev.practised)return 'Practised';return l&&l.watch==='watched'?'Watched':l&&l.watch==='progress'?'In progress':'Not started';}
+  const astroDay=l=>'Day '+(l.day||'?')+(l.title?' · '+l.title:'');
+  // one clear next action, from actual work: a deadline within 3 days, a lecture in progress, a recap after watching, open work, then the next lecture
+  function astroNext(C,today,evOf){C=C||{};const lec=(C.lectures||[]).slice().sort((a,b)=>(+a.day||0)-(+b.day||0)),ev=evOf||(()=>({})),d=today||'';
+    const open=(C.tasks||[]).filter(t=>t&&!t.done),soon=open.filter(t=>t.due&&t.dueOk&&d&&t.due>=d&&t.due<=addDays(d,3)).sort((a,b)=>a.due.localeCompare(b.due))[0];
+    if(soon)return {kind:'task',id:soon.id,text:'Work on '+soon.title+' (due '+soon.due+')'};
+    const prog=lec.find(l=>l.watch==='progress');if(prog)return {kind:'resume',id:prog.id,text:'Resume '+astroDay(prog)+(prog.resume?' from '+prog.resume:'')};
+    const recap=lec.find(l=>l.watch==='watched'&&!ev(l).practised);if(recap)return {kind:'recap',id:recap.id,text:'3-5 minute closed-note recap of '+astroDay(recap)+', then practise it'};
+    const t=open.slice().sort((a,b)=>String(a.due||'9').localeCompare(String(b.due||'9')))[0];if(t)return {kind:'task',id:t.id,text:'Work on '+t.title+(t.due?' (due '+t.due+(t.dueOk?'':', date not confirmed')+')':'')};
+    const nx=lec.find(l=>!l.watch||l.watch==='none');if(nx)return {kind:'watch',id:nx.id,text:'Watch '+astroDay(nx)};
+    return {kind:'done',id:'',text:lec.length?'All lectures watched: practise one you have not checked yet':'Add the first lecture'};}
+  function addDays(d,k){const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+k);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');}
+  // deadline conflicts: confirmed due dates whose remaining work does not fit the course time before them
+  // (course days are Monday-Saturday; days off are not counted). Proposes a temporary daily amount, never above 120 min, always replacing PCM.
+  function astroConflicts(L,d){const C=L.astro||{},S=schedOf(L),out=[];let need=0;
+    const due=(C.tasks||[]).filter(t=>t&&!t.done&&t.due&&t.dueOk&&t.due>=d).sort((a,b)=>a.due.localeCompare(b.due));
+    for(const t of due){need+=Math.max(10,+t.mins||60);let avail=0,days=0;for(let x=d;x<t.due;x=addDays(x,1)){const dow=new Date(x+'T12:00:00').getDay();if(dow===0||((L.dayTypes||{})[x]||{}).t==='rest')continue;days++;avail+=astroMinutes(S,x);}
+      if(need>avail){const per=days?Math.min(120,Math.ceil(need/days/15)*15):null;out.push({id:t.id,title:t.title,due:t.due,need,avail,days,per,fits:!!per&&per*days>=need});}}
+    return out;}
   const mondayOf=d=>{const w=new Date(d+'T12:00:00').getDay();return add8(d,w===0?-6:1-w);};
   // the next 7 days with one shared queue: what is expected to fit, with German and diploma reserved
   function weekPreview(L,start,now,ctx0={}){
@@ -1219,7 +1251,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const daysLeft=w===0?0:7-w,loggedAny=ss.some(s=>s&&s.date===day&&s.subject!=='Other'&&(+s.minutes||0)>0)||Object.values(((desk.state||desk).days||{})[day]?.completed||{}).some(x=>+x>0)||!!(habit.active&&habit.active.date===day);
     return {actual14:a14,loggedAny,diplomaToday:daysLeft?Math.max(0,Math.ceil((target-dipDone)/daysLeft/5)*5):0,diplomaTarget:target,diplomaDone:dipDone,monday:mon};}
   const nowClock=()=>{const n=new Date();let m=n.getHours()*60+n.getMinutes();if(m<240)m+=1440;return m;};
-  const api={weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,forecast:(L,hist)=>forecast(L||labData(),hist||{}),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,forecast:(L,hist)=>forecast(L||labData(),hist||{}),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -1238,7 +1270,7 @@ body.habit-shh #hb-session-card {text-align:center;}
   function add(iso, n) { const d = date(iso); d.setDate(d.getDate()+n); return calendar(d); }
   function gap(a,b) { return Math.round((Date.UTC(...a.split('-').map((v,i)=>Number(v)-(i===1?1:0)))-Date.UTC(...b.split('-').map((v,i)=>Number(v)-(i===1?1:0))))/86400000); }
   function monday(iso) { const dow = date(iso).getDay(); return add(iso, dow === 0 ? -6 : 1-dow); }
-  const subject = id => id.startsWith('maths') ? 'Maths' : id.startsWith('physics') ? 'Physics' : id.startsWith('chem') ? 'Chemistry' : id.startsWith('german') ? 'German' : id.startsWith('diploma') ? 'Diploma' : id.startsWith('explore') ? 'Mixed' : id === 'focus' ? 'Mixed' : ['errors','recall'].includes(id) ? 'Mixed' : null;
+  const subject = id => id.startsWith('maths') ? 'Maths' : id.startsWith('physics') ? 'Physics' : id.startsWith('chem') ? 'Chemistry' : id.startsWith('german') ? 'German' : id.startsWith('astro') ? 'Astrophysics' : id.startsWith('diploma') ? 'Diploma' : id.startsWith('explore') ? 'Mixed' : id === 'focus' ? 'Mixed' : ['errors','recall'].includes(id) ? 'Mixed' : null;
   const limits = { maths:150, 'maths-rev':90, physics:150, 'physics-rev':60, chem:150, 'chem-rev':50, focus:180, errors:60, recall:60 };
   function fresh() { return { version:1, sessions:[], mistakes:[], rests:[], plans:{}, quests:{}, drops:[], milestones:[], claimed:0, next:null, active:null, break:null, settings:{ energy:'medium', cueTime:'12:00', cueAfter:'breakfast', cuePlace:'my desk', theme:'rose', soundtrack:'library', ambient:{ rain:0, hush:0, piano:.25 }, coStudy:false, treat:'', exam:'', weeklySessions:5, weeklyQuestions:30 }, lastBackup:0 }; }
   function validState(h) {
@@ -3951,7 +3983,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
   }
   const actions={
     fallback:()=>{const form=$('hb-start'),draft=form?formObject(form):null;patchDay(today(),{shortDay:!days()[today()]?.shortDay});render();if(draft){const fresh=$('hb-start');for(const [name,value] of Object.entries(draft)){const el=fresh.elements[name];if(el)el.type==='checkbox'?el.checked=true:el.value=value;}}toast(days()[today()]?.shortDay?'Eight hours. Today’s focus stays protected; enjoy the breaks.':'Twelve-hour plan restored. Your saved work is intact.');},
-    'block-task':el=>{if(h.active){window.MoonLab?.go('today');document.body.classList.add('kg-session');view='start';render();$('hb-session-card')?.scrollIntoView({behavior:'smooth',block:'start'});toast('Your current timer is already open. Finish it before starting another block.');return;}const b=window.StudySchedule(!!days()[today()]?.shortDay,C.date(today()).getDay()).find(b=>b.id===el.dataset.block);if(!b){toast('This block is no longer in today’s plan. Refresh and try again.');return;}const subject=b.id==='focus'?window.StudyPlan.focus[C.date(today()).getDay()]:({maths:'Maths',physics:'Physics',chemistry:'Chemistry'}[b.bucket]||(/^german/.test(b.id)?'German':/^diploma/.test(b.id)?'Diploma':'Mixed'));window.MoonLab?.go('today');document.body.classList.add('kg-session');view='start';render();try{begin({phone:true,subject:subject==='Mathematics'?'Maths':subject,task:b.title,topic:b.title,kind:b.id==='errors'?'mistakes':'recall',minutes:Math.min(180,b.minutes),hard:false});$('hb-session-card')?.scrollIntoView({behavior:'smooth',block:'start'});}catch(err){toast(err.message||'Could not start the timer.');}},
+    'block-task':el=>{if(h.active){window.MoonLab?.go('today');document.body.classList.add('kg-session');view='start';render();$('hb-session-card')?.scrollIntoView({behavior:'smooth',block:'start'});toast('Your current timer is already open. Finish it before starting another block.');return;}const b=window.StudySchedule(!!days()[today()]?.shortDay,C.date(today()).getDay()).find(b=>b.id===el.dataset.block);if(!b){toast('This block is no longer in today’s plan. Refresh and try again.');return;}const subject=b.id==='focus'?window.StudyPlan.focus[C.date(today()).getDay()]:({maths:'Maths',physics:'Physics',chemistry:'Chemistry'}[b.bucket]||(/^german/.test(b.id)?'German':/^astro/.test(b.id)?'Astrophysics':/^diploma/.test(b.id)?'Diploma':'Mixed'));window.MoonLab?.go('today');document.body.classList.add('kg-session');view='start';render();try{begin({phone:true,subject:subject==='Mathematics'?'Maths':subject,task:b.title,topic:b.title,kind:b.id==='errors'?'mistakes':'recall',minutes:Math.min(180,b.minutes),hard:false});$('hb-session-card')?.scrollIntoView({behavior:'smooth',block:'start'});}catch(err){toast(err.message||'Could not start the timer.');}},
     rescue:()=>{const f=$('hb-start');f.elements.minutes.value=5;f.elements.kind.value='review';f.elements.hard.checked=false;f.elements.task.value='Open my notes, choose one question, and attempt the first step';f.elements.phone.focus();say('you don’t have to feel ready. open the page, try one step for five minutes, then decide. tiny steps still count!');window.__irohaSay?.('Just five minutes. If it\'s awful after that, we\'ll talk.',{face:'stern'});},
     'use-next':()=>{if(h.active){toast('Finish the current session first.');return;}view='start';render();const n=next(),f=$('hb-start');f.elements.task.value=n.task;f.elements.topic.value=n.topic;f.elements.subject.value=n.subject;f.elements.kind.value=sleeping()?'review':n.kind;f.elements.task.focus();},
     minimum:()=>{const f=$('hb-start');f.elements.minutes.value=5;f.elements.kind.value='review';f.elements.hard.checked=false;f.elements.phone.focus();toast('Five minutes is enough. Check the phone ritual and press play.');},
@@ -8991,29 +9023,36 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
         <p class="kl-small">${(L.lecLens[s] || []).length >= 3 ? `Recorded median ${hm(median(L.lecLens[s]))} from ${Math.min(15, L.lecLens[s].length)} lectures (for flexible estimates)` : 'Keep recording lecture lengths for personalised estimates; the Normal timetable stays fixed.'}</p>`).join('')}
         <button>Save lengths</button></form></section>`;
     return `<section class="kl-card"><p class="kl-eyebrow">LECTURE NOTES</p><h2>Your lectures, on a spaced schedule</h2><p>Each lecture comes back as a fresh problem after about 3, 10, 30 and 60 days; any problem you solve on its chapter on your own counts. Files stay on this device.</p><button data-a="kglecnew">+ Log a lecture</button></section>` + lensCard
-      + (list.length ? list.map(e => `<section class="kl-card kl-mini kg-lecrow"><div><b>${esc(label(e))}</b><small>${e.due ? (M.onBreak?.() ? 'Revisions paused for your break' : `Next revision ${e.due <= today() ? 'today' : esc(e.due)}`) : 'Done: all 4 checks'} · ${e.files?.length || 0} file${e.files?.length === 1 ? '' : 's'}${progressText(e)}</small></div>
+      + (list.length ? list.map(e => `<section class="kl-card kl-mini kg-lecrow"><div><b>${esc(label(e))}</b><small>${e.astro ? 'Astrophysics course notes' : e.due ? (M.onBreak?.() ? 'Revisions paused for your break' : `Next revision ${e.due <= today() ? 'today' : esc(e.due)}`) : 'Done: all 4 checks'} · ${e.files?.length || 0} file${e.files?.length === 1 ? '' : 's'}${progressText(e)}</small></div>
         <div class="kl-row"><button data-a="kgnotesopen" data-v="${esc(e.id)}">View notes / PDF</button><button data-a="kgnotesattach" data-v="${esc(e.id)}">Attach PDF / photos</button><button data-a="kglecrev" data-v="${e.id}">Revise now</button><button class="kl-ghost" data-a="kglecdel" data-v="${e.id}">Delete</button></div></section>`).join('')
         : '<section class="kl-card kl-mini"><p class="kl-small">Nothing yet. After your next lecture, Iroha will ask you to log it.</p></section>');
   };
   M.SECTIONS.study.splice(1, 0, ['notes', '📚 Notes']);
 
   // Save original PDFs before any optional AI reading; uploading works offline.
+  async function htmlRecord(file){
+    const text=await file.text();if(text.length>3*1024*1024)throw new Error('HTML notes over 3 MB');
+    const doc=new DOMParser().parseFromString(text,'text/html');doc.querySelectorAll('script,style,noscript').forEach(n=>n.remove());doc.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,div,br,tr,section,article,pre,blockquote').forEach(n=>n.after('\n'));
+    const lines=String(doc.body?doc.body.textContent:'').split(/\n+/).map(s=>s.replace(/\s+/g,' ').trim()).filter(s=>s.length>2);
+    return {kind:'html',name:file.name,text,outline:lines.join('\n').slice(0,5000),read:true};
+  }
   async function saveLectureAttachments(e,picked){
     const errors=[];let saved=0;
     for(const file of picked){
       try{
-        const pdf=/pdf/i.test(file.type)||/\.pdf$/i.test(file.name);
-        if(!pdf&&!/^image\//.test(file.type))throw new Error('Choose a PDF or image');
+        const pdf=/pdf/i.test(file.type)||/\.pdf$/i.test(file.name),html=/html/i.test(file.type)||/\.html?$/i.test(file.name);
+        if(!pdf&&!html&&!/^image\//.test(file.type))throw new Error('Choose a PDF, HTML notes or an image');
         if(file.size>40*1024*1024)throw new Error('File exceeds 40 MB');
         const id=e.id+'-'+(crypto.randomUUID?.()||Date.now()+'-'+Math.random());
-        const rec=pdf?{kind:'pdf',name:file.name,blob:file,read:false}:{kind:'img',name:file.name,img:await window.__kgShrink(file)};
+        // HTML notes are stored as text and treated as material only (they are shown with scripts blocked)
+        const rec=pdf?{kind:'pdf',name:file.name,blob:file,read:false}:html?await htmlRecord(file):{kind:'img',name:file.name,img:await window.__kgShrink(file)};
         await putFile(id,rec);(e.files||(e.files=[])).push(id);saved++;
       }catch(err){errors.push(file.name+': '+err.message);}
     }
     return {saved,errors};
   }
   function pickLecturePDF(existing,options={}){
-    const input=document.createElement('input');input.type='file';input.accept='application/pdf,.pdf,image/*';input.multiple=true;
+    const input=document.createElement('input');input.type='file';input.accept='application/pdf,.pdf,text/html,.html,.htm,image/*';input.multiple=true;
     input.addEventListener('change',async()=>{
       if(!input.files?.length)return;
       const status=options.status;if(status)status.textContent='Saving attachments…';
@@ -9026,6 +9065,10 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
       }catch(err){if(status)status.textContent='Could not save: '+err.message;}
     });input.click();
   }
+  // for the Astrophysics course: attach, replace and read notes through this same store (and so the same backup)
+  M.pickNotes = pickLecturePDF;
+  M.saveNotesFiles = saveLectureAttachments;
+  M.notesFile = { get: getFile, del: delFile };
   M.ACTIONS.kgnotesattach=b=>{const e=L.lectures.find(x=>x.id===b.dataset.v);if(e)pickLecturePDF(e,{done:()=>M.ACTIONS.kgnotesopen({dataset:{v:e.id}})});};
   // Keep the actual viewer node across timer redraws so pause/resume retains the PDF page.
   let focusNoteNode=null,focusSession='',focusURL='',focusRequest=0;
@@ -9249,7 +9292,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     document.getElementById('kg-lecpick')?.remove();
     const box = document.createElement('div'); box.id = 'kg-lecpick'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Lectures');
     const rows = q => L.lectures.filter(e => !q || label(e).toLowerCase().includes(q)).sort((a, b) => b.made.localeCompare(a.made)).slice(0, 60)
-      .map(e => `<li><span><b>${esc(label(e))}</b><small>${e.due ? (e.due <= today() ? 'due today' : 'next ' + esc(e.due)) : 'all revisions done'} · ${e.files?.length || 0} file${e.files?.length === 1 ? '' : 's'}</small></span><span class="kg-lp-btns"><button data-lp="open" data-v="${esc(e.id)}">Notes</button><button data-lp="rev" data-v="${esc(e.id)}">Revise</button></span></li>`).join('') || '<li><small>No lectures match.</small></li>';
+      .map(e => `<li><span><b>${esc(label(e))}</b><small>${e.astro ? 'Astrophysics course notes' : e.due ? (e.due <= today() ? 'due today' : 'next ' + esc(e.due)) : 'all revisions done'} · ${e.files?.length || 0} file${e.files?.length === 1 ? '' : 's'}</small></span><span class="kg-lp-btns"><button data-lp="open" data-v="${esc(e.id)}">Notes</button><button data-lp="rev" data-v="${esc(e.id)}">Revise</button></span></li>`).join('') || '<li><small>No lectures match.</small></li>';
     box.innerHTML = `<div class="kg-lp-head"><b>Your lectures</b><button data-lp="close" aria-label="Close">×</button></div><input type="search" placeholder="Search by subject, chapter or topic" aria-label="Search lectures"><ul>${rows('')}</ul>`;
     document.body.appendChild(box);
     const ul = box.querySelector('ul'), inp = box.querySelector('input'); inp.focus();
@@ -9715,7 +9758,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   const NAMES = { goal: 'Goal', warmup: 'Recall / predict', example: 'Example', attempt: 'Attempt', feedback: 'Feedback', repair: 'Repair', recap: 'Recap', save: 'Save' };
   // the opener step only appears when you chose one
   const stepsOf = f => ['goal', ...(f.opener ? ['warmup'] : []), ...(f.act === 'worked' ? ['example'] : []), 'attempt', 'feedback', 'repair', 'recap', 'save'];
-  const SUBJS = ['Maths', 'Physics', 'Chemistry', 'Mixed'];
+  const SUBJS = ['Maths', 'Physics', 'Chemistry', 'Astrophysics', 'Mixed'];
   L.flowLog = L.flowLog || [];
   if (L.flow) L.flow = window.FlowKit.restore(L.flow); // a reload mid-check: usable again, work kept
   const blank = o => Object.assign({ id: M.uid(), act: '', subj: 'Maths', topic: '', goal: '', lec: '', miss: '', dispute: '', disputed: '', stretch: '', opener: '', warm: '', rc1: '', rc2: '', rc3: '', rcfb: '', since: '', rq: '', ra: '', cardId: '', energy: 'ordinary', ref: '', cmp: null, src: '', parking: false, mins: 25, step: 'goal', attempt: '', kq: '', ka: '', fb: '', right: '', gap: '', fix: '', repair: '', rfb: '', fixed: false, made: today(), started: 0, desk: false, busy: '', requireVerification: true, verified: false, verificationSource: '', supported: false, transfer: false, example: '', exampleWhy: '' }, o || {});
@@ -9752,7 +9795,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   /* ---------- asking the companions ---------- */
   const notes = f => {
     const e = f.lec && lecture(f.lec), x = missOf(f);
-    return (f._outline ? ` Outline of my saved notes for that lecture, one line per page: ${f._outline}.` : '') + (f.act === 'blurt' && f.ref.trim() ? ` The reference I'm comparing my blurt against: "${f.ref.trim().slice(0, 3000)}".` : '') + (e?.details ? ` What I wrote right after that lecture: "${e.details.slice(0, 1200)}".` : '') + (x ? ` This is a mistake from my notebook: "${x.q}"${x.cause ? `, logged as ${x.cause}` : ''}${x.fix ? `, with the fix I wrote then: "${x.fix}"` : ''}.` : '');
+    return (f.subj === 'Astrophysics' ? ' This is my beginner astrophysics course: I have not done calculus or university physics, so keep the level there, answer my latest question first, and separate established knowledge from what is uncertain.' : '') + (f._outline ? ` Outline of my saved notes for that lecture, one line per page: ${f._outline}.` : '') + (f.act === 'blurt' && f.ref.trim() ? ` The reference I'm comparing my blurt against: "${f.ref.trim().slice(0, 3000)}".` : '') + (e?.details ? ` What I wrote right after that lecture: "${e.details.slice(0, 1200)}".` : '') + (x ? ` This is a mistake from my notebook: "${x.q}"${x.cause ? `, logged as ${x.cause}` : ''}${x.fix ? `, with the fix I wrote then: "${x.fix}"` : ''}.` : '');
   };
   const errKind = t => /principle/i.test(t || '') ? 'principle' : /slip/i.test(t || '') ? 'slip' : '';
   const errTag = f => f.errType ? ` <span class="learning-status" title="${f.errType === 'slip' ? 'The idea was right; the working slipped' : 'A law, definition, assumption or method choice was wrong'}">${f.errType === 'slip' ? 'Slip' : 'Principle'}</span>` : '';
@@ -10167,7 +10210,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       const skillId = window.StudyPlan.creditTarget(L.skills || [], {sk:f.skillId,lec:f.lec});
       const result = skillId && ev !== 'ungraded' ? M.recordSkill?.(skillId, ev === 'indep' ? 'ok' : ev === 'help' ? 'hint' : 'miss', 'flow', {sourceEvent:f.id,verified:f.verified,verificationSource:f.verificationSource,transfer:f.transfer}) : null;
       if (x || (skillId && ((L.skills || []).find(s => s.id === skillId)?.made || d) < d)) M.chargeReview?.('flow', f.id);
-      L.flowLog.push({ stick: !!f.stick, prob: f.probQ ? String(f.probQ).slice(0, 1500) : '', probBank: f.probBank || '', synth: f.synth || null, hint: f.hintMax || 0, next: String(f.nextStep || '').trim().slice(0, 200), contract: f.contract || 'stop', work: window.FlowKit.workRecord(f), conf: ['sure', 'unsure', 'guess'].includes(f.conf) ? f.conf : '', bank: f.freshBank || '', fresh: window.FlowKit.freshRecord(f), fade: f.act === 'worked' ? f.fadeMax || 0 : undefined, method: hasMethod(f) ? { p: String(f.mPrin).trim().slice(0, 160), w: String(f.mWhy || '').trim().slice(0, 240), a: String(f.mAlt || '').trim().slice(0, 240) } : null, skillId, lec:f.lec || '', requireVerification:true, verified:!!f.verified, verificationSource:f.verificationSource || '', supported:!!(f.supported || f.peeked), delayed:!!result?.delayed, transfer:ev === 'indep' && f.transfer === true, id: f.id, d, act: f.act, subj: f.subj, topic: f.topic, goal: f.goal, gap: gap ? f.gap.slice(0, 300) : '', errType: gap ? f.errType || '' : '', fixed: f.fixed, ev, disputed: f.disputed || '', miss: f.miss || '', by: f.checker?.provider || '', model: f.checker?.model || '', met: v.met || '', warm: !!f.warm.trim(), recap: !!(f.rc1 || f.rc2 || f.rc3), card: !!f.cardId, mins: f.started ? Math.min(180, Math.round((Date.now() - f.started - (f.away || 0)) / 60000)) : 0 }); // time away after "Leave for now" doesn't count
+      L.flowLog.push({ stick: !!f.stick, prob: f.probQ ? String(f.probQ).slice(0, 1500) : '', probBank: f.probBank || '', synth: f.synth || null, hint: f.hintMax || 0, next: String(f.nextStep || '').trim().slice(0, 200), contract: f.contract || 'stop', work: window.FlowKit.workRecord(f), conf: ['sure', 'unsure', 'guess'].includes(f.conf) ? f.conf : '', bank: f.freshBank || '', fresh: window.FlowKit.freshRecord(f), fade: f.act === 'worked' ? f.fadeMax || 0 : undefined, method: hasMethod(f) ? { p: String(f.mPrin).trim().slice(0, 160), w: String(f.mWhy || '').trim().slice(0, 240), a: String(f.mAlt || '').trim().slice(0, 240) } : null, skillId, lec:f.lec || '', requireVerification:true, verified:!!f.verified, verificationSource:f.verificationSource || '', supported:!!(f.supported || f.peeked), delayed:!!result?.delayed, transfer:ev === 'indep' && f.transfer === true, id: f.id, d, act: f.act, srcKind: f.src || '', subj: f.subj, topic: f.topic, goal: f.goal, gap: gap ? f.gap.slice(0, 300) : '', errType: gap ? f.errType || '' : '', fixed: f.fixed, ev, disputed: f.disputed || '', miss: f.miss || '', by: f.checker?.provider || '', model: f.checker?.model || '', met: v.met || '', warm: !!f.warm.trim(), recap: !!(f.rc1 || f.rc2 || f.rc3), card: !!f.cardId, mins: f.started ? Math.min(180, Math.round((Date.now() - f.started - (f.away || 0)) / 60000)) : 0 }); // time away after "Leave for now" doesn't count
       if (L.flowLog.length > 300) L.flowLog = L.flowLog.slice(-300);
       L.flowLog = window.FlowKit.trimLog(L.flowLog);
       // a failed fresh problem is the mistake worth revisiting: its own question and working, linked to the skill and the repair
@@ -13278,6 +13321,7 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
     const sc = S(), wk = SP().schedCtx(v.d), def = (v.info.deferred || []).map(x => x.title).join('; ');
     return `\n\n[not typed by me: today's desk schedule. Plan: ${name}, woke ${clk(v.info.wake)}. Planned study ${dur(v.planned)} (German ${sc.german} min included). Actually studied today by my timer: ${dur(v.done)}${v.a ? `; a session timer is ${v.a.running ? 'running' : 'paused'} at ${v.sess} min` : ''}. Now: ${cur}. Next protected break: ${v.nextBreak ? `${v.nextBreak.title} at ${hm(v.nextBreak.start)}` : 'none left'}. Still ahead: ${left}.${def ? ` Deferred to the next study day: ${def}.` : ''} Diploma this week: ${wk.diplomaDone} of ${wk.diplomaTarget} min${v.info.examPrep ? `; diploma exam period (${v.info.examPrep}): diploma first, new PCM lectures paused` : ''}. Bedtime 1:30 AM never moves. Planned minutes are not studied minutes: never claim or invent study time.]`;
   };
+  { const base = window.__kgScheduleNote; window.__kgScheduleNote = () => (base() || '') + (window.__kgAstroNote?.() || ''); }
   const ADMIN = `\n\n[Desk admin: you may change the study desk's saved data, but only when the user's own typed message in this turn asks for it (or plainly agrees to your suggestion). To make a change, put one line per change in your reply, exactly like <<desk {"op":"food","at":"5:30 PM","len":20}>> (max 5). The line itself is hidden; the site shows it to the user as a proposal with an Apply button, and nothing changes until they tap it. So say you've proposed it, never that it's done. Ops: plan {plan: auto|normal|early|late|later|verylate|sunday|gentle|reduced|stop} · wake {at} · extend {on} · food {at,len} · block {block: id or its start time, start, end} for moving a lecture, break or rest · piano {at,len} · german {min 15-90, replaces PCM time} · focus {subj} · diploma {week minutes} · exam {from,end,name,german: light|pause|normal} · examday {date,at,len,travel} · lecture {subj,at:"1:02:30"} · lecturedone {subj} · revisiondone {subj} · homework {subj,title,mins,essential} · hwdone {title} · doubt {text} · progress {course,chapter,done,count} · addchapter {course,name,count} · dayoff {date} · meds {at} · set {path:"sched.x" or "syl.x" or "deskSettings.x", value}. Never log study minutes (planned time is not study), never schedule past 1:30 AM, and never claim a change is made: the user applies it. Ordinary switching is on the Today card; the user never needs your permission to rest, eat or stop.]`;
   window.__kgAdminNote = {
     iroha: ADMIN + `\n\n[Difficult days, when the user says starting is hard: suggest 15 minutes of Physics and then reassessing (op plan gentle). Those 15 minutes are real study and can be the whole day; don't push for more. If they sound ill, exhausted or distressed, offer a lighter day (plan reduced) or a full day off (dayoff), with no catch-up. If it's unclear, ask one gentle question. You have no authority to grant or refuse rest: if they stop, that is final.]`,
@@ -13353,5 +13397,220 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
   M.render?.();
 })();
 
+</script>
+<script id="kg-astro-script">
+/* ===== Astrophysics course (Study · Astrophysics course), first version, 22 Nov 2026.
+   Reuses what the desk already has: lecture notes storage (files in the browser, included in the full backup), guided sessions
+   (Recall / Explain / Solve / Diagnose, with the desk timer and exact-skill credit), the review allowance (each lecture gets one skill
+   in the existing pool, no new queue) and the planner (course time replaces PCM time). Unknown course facts stay "Not confirmed". ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab; if (!M || !window.StudyPlan || !M.SECTIONS?.study) return;
+  const { L, save, today, esc } = M, SP = () => window.StudyPlan;
+  const FOLDER = 'https://drive.google.com/drive/folders/1chA7950-lYeGPT8xkoGlSjhWSVm7tRCP';
+  const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  // ---- data (additive: nothing existing is changed) ----
+  if (!L.astro || typeof L.astro !== 'object') {
+    L.astro = { v: 1, folder: FOLDER, sel: '', details: { provider: 'Astrophysics November Ranker Series (name taken from the recording folder)' }, tasks: [], checklist: [], practice: null,
+      lectures: [1, 2].map(n => ({ id: uid('al'), day: n, title: '', url: FOLDER, resume: '', watch: 'none', notesId: '', mine: '', doubts: [], made: today() })) };
+    save();
+  }
+  const C = () => L.astro;
+  { const c = C(); for (const k of ['lectures', 'tasks', 'checklist']) if (!Array.isArray(c[k])) c[k] = []; if (!c.details || typeof c.details !== 'object') c.details = {}; }
+  const S = () => { const s = L.sched = L.sched || {}; if (!s.astro || typeof s.astro !== 'object') s.astro = { min: 0 }; return s; };
+  const audit = (a, d) => window.__kgDeskAudit?.(a, d);
+  const lecOf = id => C().lectures.find(l => l.id === id);
+  const byDay = () => C().lectures.slice().sort((a, b) => (+a.day || 0) - (+b.day || 0) || String(a.made).localeCompare(String(b.made)));
+  const nc = v => String(v || '').trim() ? esc(String(v).trim()) : '<i>Not confirmed</i>';
+  const name = l => SP().astroDay(l);
+  // the lecture's notes live in the desk's own notes store, so attachments, the reader and backups all work as for PCM lectures
+  function notesEntry(l, create = true) {
+    let e = l.notesId && (L.lectures || []).find(x => x.id === l.notesId);
+    if (!e && create) { e = { id: 'lec' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), subj: 'Astrophysics', ch: '', topic: ('Astrophysics · ' + name(l)).slice(0, 120), details: '', made: today(), stage: 0, due: '', files: [], reviews: 0, astro: true };
+      (L.lectures = L.lectures || []).push(e); l.notesId = e.id; save(); }
+    return e || null;
+  }
+  // practice evidence for a lecture: practised = any saved guided session; checked = solved on your own, no help, checked against a named source
+  function ev(l) {
+    const list = l.notesId ? (L.flowLog || []).filter(x => x && x.lec === l.notesId) : [];
+    return { list, practised: list.length > 0, checked: list.some(x => x.ev === 'indep' && x.verified && String(x.verificationSource || '').trim() && !x.supported) };
+  }
+  const state = l => SP().astroState(l, ev(l));
+  const evLabel = x => x.verified && String(x.verificationSource || '').trim() ? 'Checked using a named source: ' + x.verificationSource : /^notes/.test(x.srcKind || '') ? 'Iroha checked it against your supplied notes (not independently verified)' : 'AI-generated feedback, not independently verified';
+  const evResult = x => x.ev === 'indep' ? (x.verified ? 'solved on your own' : 'solved, no source check yet (not counted as independent)') : x.ev === 'help' ? 'with help (no independent credit)' : x.ev === 'notyet' ? 'not yet' : 'saved without a graded check';
+  const next = () => SP().astroNext(C(), today(), ev);
+  // planner time vs your timer, kept apart
+  function times() {
+    const v = window.__kgDayView?.(), planned = v ? v.rows.filter(r => r.kind === 'study' && r.subj === 'astro').reduce((n, r) => n + r.minutes, 0) : 0;
+    let done = 0; try { const h = JSON.parse(localStorage.getItem('ame-habit-v1') || '{}'); done = (h.sessions || []).filter(s => s.date === today() && s.subject === 'Astrophysics').reduce((n, s) => n + (+s.minutes || 0), 0); } catch (_) {}
+    const a = window.__kgSession?.(); if (a && a.subject === 'Astrophysics') done += Math.min(+a.targetMs || Infinity, (+a.accruedMs || 0) + (a.running ? Date.now() - a.lastStart : 0)) / 60000;
+    const row = v && v.ahead.find(r => r.subj === 'astro');
+    return { planned, done: Math.round(done), row };
+  }
+  // ---- the page ----
+  const chip = t => `<span class="learning-status">${esc(t)}</span>`;
+  function homeHTML() {
+    const c = C(), n = next(), t = times(), lecs = byDay();
+    const l = n.id && lecOf(n.id), task = n.kind === 'task' && c.tasks.find(x => x.id === n.id);
+    let btns = '';
+    if (l && (n.kind === 'watch' || n.kind === 'resume')) btns = `${l.url ? `<a class="kl-primary kl-btnlink" href="${esc(l.url)}" target="_blank" rel="noopener">▶ Open recording</a>` : ''}<button type="button" data-a="astrowatch" data-v="${esc(l.id)}:${n.kind === 'watch' ? 'progress' : 'watched'}">${n.kind === 'watch' ? 'Mark in progress' : '✓ Watched'}</button>`;
+    if (l && n.kind === 'recap') btns = `<button type="button" class="kl-primary" data-a="astropractise" data-v="${esc(l.id)}:blurt">Start the 5-minute recap</button><button type="button" data-a="astrosel" data-v="${esc(l.id)}">Open the lecture</button>`;
+    if (task) btns = `${task.lec ? `<button type="button" data-a="astrosel" data-v="${esc(task.lec)}">Open its lecture</button>` : ''}<button type="button" data-a="astrotask" data-v="${esc(task.id)}">✓ Done</button>`;
+    const timer = t.row ? `<button type="button" data-a="kgdgo" data-v="${esc(t.row.id)}">⏱ Start the course timer</button>` : '';
+    const waiting = [...lecs.filter(x => x.watch === 'progress').map(x => `${esc(name(x))}: in progress${x.resume ? ', resume from ' + esc(x.resume) : ''}`),
+      ...lecs.filter(x => x.watch === 'watched' && !ev(x).practised).map(x => `${esc(name(x))}: watched, not practised yet`),
+      ...c.tasks.filter(x => !x.done).map(x => `${esc(x.title)}${x.due ? ' · due ' + esc(x.due) + (x.dueOk ? '' : ' (not confirmed)') : ''}`)];
+    const dl = c.tasks.filter(x => !x.done && x.due && x.dueOk && x.due >= today()).sort((a, b) => a.due.localeCompare(b.due));
+    const counts = SP().ASTRO_STATES.map(s => [s, lecs.filter(x => state(x) === s).length]);
+    const conf = SP().astroConflicts(L, today());
+    return `<section class="kl-card kg-astro"><p class="kl-eyebrow">ASTROPHYSICS COURSE · ${nc(c.details.provider)}</p>
+      <h3>Next: ${esc(n.text)}</h3><div class="kl-row" style="flex-wrap:wrap">${btns}${timer}</div>
+      <p class="kl-small">Course time today: <b>${t.planned} min planned</b> on your day plan · <b>${t.done} min</b> on your timer. ${S().astro.min ? `${S().astro.min} min a day replaces part of your PCM time; the day's total stays the same.` : 'No daily course time is set, so the plan has no course block (set it below).'}</p>
+      ${conf.map(x => `<div class="kg-day-note"><p class="kl-small"><b>Deadline conflict:</b> ${esc(x.title)} is due ${esc(x.due)} and needs about ${x.need} min of course work by then, but your plan has ${x.avail} min of course time on the ${x.days} study day${x.days === 1 ? '' : 's'} before it.${x.per ? ` Suggestion: ${x.per} min a day of course time until ${esc(x.due)}, taken from PCM time (no extra hours)${x.fits ? '' : '; even that may not be enough, so consider asking for an extension'}.` : ' There are no study days left before it.'}</p>${x.per && !(S().astro.boost && +S().astro.boost.min >= x.per && S().astro.boost.until >= x.due) ? `<div class="kl-row"><button type="button" class="kl-primary" data-a="astroboost" data-v="${x.per}:${esc(x.due)}">Apply</button></div>` : x.per ? '<p class="kl-small">That suggestion is already applied.</p>' : ''}</div>`).join('')}
+      <div class="kg-astro-grid"><div><p class="kl-small"><b>Waiting for you</b></p>${waiting.length ? `<ul class="kl-list">${waiting.map(w => `<li>${w}</li>`).join('')}</ul>` : '<p class="kl-small">Nothing waiting.</p>'}</div>
+      <div><p class="kl-small"><b>Confirmed deadlines</b></p>${dl.length ? `<ul class="kl-list">${dl.map(x => `<li>${esc(x.due)} · ${esc(x.title)}</li>`).join('')}</ul>` : '<p class="kl-small">None confirmed yet.</p>'}<p class="kl-small">Assessment: ${nc(c.details.assessDate)}${c.details.assessFormat ? ' · ' + esc(c.details.assessFormat) : ''}</p></div>
+      <div><p class="kl-small"><b>Progress</b> (from what you've actually done)</p><p class="kl-small">${counts.map(([s, k]) => `${s} ${k}`).join(' · ')} · assignments ${c.tasks.filter(x => x.done).length}/${c.tasks.length} done</p><p class="kl-small">Watched isn't mastered: a lecture counts as checked only when you solve its practice on your own and check it against a named source.</p></div></div>
+      <form data-f="astromin" class="kl-row" style="flex-wrap:wrap"><label class="kl-small">Course time a day <select name="min">${[0, 15, 30, 45, 60, 90].map(m => `<option value="${m}" ${+S().astro.min === m ? 'selected' : ''}>${m ? m + ' min' : 'none'}</option>`).join('')}</select></label><button>Save</button>${S().astro.boost ? `<span class="kl-small">Applied: ${S().astro.boost.min} min a day until ${esc(S().astro.boost.until)} <button type="button" class="kl-ghost" data-a="astroboost" data-v="clear">Undo</button></span>` : ''}<span class="kl-small">Taken from PCM time, never added on top. Sunday and difficult-day plans have none.</span></form></section>`;
+  }
+  function libraryHTML() {
+    const c = C(), lecs = byDay();
+    const rows = lecs.map(l => `<li><button type="button" class="kl-ghost" data-a="astrosel" data-v="${esc(l.id)}" aria-pressed="${c.sel === l.id}">${esc(name(l))}</button> ${chip(state(l))}${notesEntry(l, false)?.files?.length ? ' <small>notes attached</small>' : ''}</li>`).join('');
+    return `<section class="kl-card"><p class="kl-eyebrow">LECTURES</p><ul class="kl-list">${rows || '<li>No lectures yet.</li>'}</ul>
+      <form data-f="astroadd" class="kl-row" style="flex-wrap:wrap"><label class="kl-small">Day <input name="day" type="number" min="1" max="60" required style="width:4.5em" value="${(Math.max(0, ...lecs.map(l => +l.day || 0)) + 1)}"></label><input name="title" maxlength="120" placeholder="Lecture title"><input name="url" type="url" maxlength="400" placeholder="Recording link (optional)"><button>Add lecture</button></form></section>`;
+  }
+  function lectureHTML(l) {
+    const e = notesEntry(l, false), files = e?.files || [], E = ev(l), st = state(l), tasks = C().tasks.filter(t => t.lec === l.id);
+    const W = [['none', 'Not started'], ['progress', 'In progress'], ['watched', 'Watched']];
+    const prac = [['recall', 'Recall', 'rebuild the main ideas without notes'], ['explain', 'Explain', 'explain one idea in plain words (Kaguya listens, Iroha checks)'], ['solve', 'Solve', 'a beginner calculation, only where the lecture has one'], ['diagnose', 'Diagnose', 'repair a misconception']];
+    return `<section class="kl-card kg-astro-lec"><p class="kl-eyebrow">${esc(name(l)).toUpperCase()} · ${esc(st)}</p>
+      <form data-f="astrolec" class="kl-row" style="flex-wrap:wrap"><input type="hidden" name="id" value="${esc(l.id)}"><label class="kl-small">Day <input name="day" type="number" min="1" max="60" value="${esc(l.day)}" style="width:4.5em"></label><label class="kl-small">Title <input name="title" maxlength="120" value="${esc(l.title || '')}" placeholder="Not confirmed"></label><label class="kl-small">Recording <input name="url" type="url" maxlength="400" value="${esc(l.url || '')}"></label><label class="kl-small">Resume from <input name="resume" maxlength="20" value="${esc(l.resume || '')}" placeholder="1:02:30" style="width:6em"></label><button>Save</button></form>
+      <div class="kl-row" style="flex-wrap:wrap">${l.url ? `<a class="kl-btnlink" href="${esc(l.url)}" target="_blank" rel="noopener">▶ Open recording</a>` : ''}<span role="group" aria-label="Watching">${W.map(([k, t]) => `<button type="button" class="kl-ghost" data-a="astrowatch" data-v="${esc(l.id)}:${k}" aria-pressed="${(l.watch || 'none') === k}">${t}</button>`).join(' ')}</span></div>
+      <p class="kl-small">Practised and Checked come from saved practice, not from watching. ${E.checked ? 'Checked: solved on your own and checked against a named source.' : E.practised ? 'Practised: at least one saved session.' : ''}</p>
+      <p class="kl-small"><b>Notes</b> ${files.length ? `· ${files.length} file${files.length === 1 ? '' : 's'}` : '· none attached yet'}</p>
+      <div class="kl-row" style="flex-wrap:wrap">${files.map((fid, i) => `<button type="button" data-a="astroview" data-v="${esc(l.id)}:${esc(fid)}">View file ${i + 1}</button><button type="button" class="kl-ghost" data-a="astroopen" data-v="${esc(fid)}">Open separately</button>`).join('')}<button type="button" data-a="astroattach" data-v="${esc(l.id)}">📎 Attach notes (PDF, HTML or photos)</button>${files.length ? `<button type="button" class="kl-ghost" data-a="astroreplace" data-v="${esc(l.id)}">Replace notes</button>` : ''}<span class="kl-small" data-k="astro-status"></span></div>
+      <div id="kg-astro-slot"></div>
+      <form data-f="astromine"><input type="hidden" name="id" value="${esc(l.id)}"><label class="kl-small">My notes<textarea name="t" rows="4" maxlength="6000" style="width:100%">${esc(l.mine || '')}</textarea></label><button>Save my notes</button></form>
+      <p class="kl-small"><b>Questions and doubts</b></p><ul class="kl-list">${(l.doubts || []).map(d => `<li${d.done ? ' style="opacity:.6"' : ''}>${esc(d.q)} ${d.done ? chip('resolved') : ''}<div class="kl-row"><button type="button" class="kl-ghost" data-a="astroask" data-v="${esc(l.id)}:${esc(d.id)}">Ask Iroha</button><button type="button" class="kl-ghost" data-a="astrodoubt" data-v="${esc(l.id)}:${esc(d.id)}">${d.done ? 'Reopen' : 'Resolved'}</button></div>${d.a ? `<p class="kl-small" style="white-space:pre-wrap"><b>${esc(d.src || 'AI-generated answer, not independently verified')}:</b> ${esc(d.a)}</p>` : ''}</li>`).join('')}</ul>
+      <form data-f="astroq" class="kl-row"><input type="hidden" name="id" value="${esc(l.id)}"><input name="q" maxlength="400" required placeholder="A question about this lecture"><button>Add</button></form>
+      <p class="kl-small"><b>Practise this lecture</b> (guided session, on your desk timer)</p><div class="kl-row" style="flex-wrap:wrap">${l.watch === 'watched' ? `<button type="button" class="kl-primary" data-a="astropractise" data-v="${esc(l.id)}:blurt" title="Closed notes, about 3-5 minutes">5-minute closed-note recap</button>` : ''}${prac.map(([k, t, w]) => `<button type="button" data-a="astropractise" data-v="${esc(l.id)}:${k}" title="${esc(w)}">${t}</button>`).join('')}</div>
+      ${E.list.length ? `<ul class="kl-list">${E.list.slice(-6).reverse().map(x => `<li>${esc(x.d)} · ${esc(x.act)} · ${esc(evResult(x))}<br><small>${esc(evLabel(x))}</small></li>`).join('')}</ul>` : ''}
+      ${tasks.length ? `<p class="kl-small"><b>Assignments for this lecture:</b> ${tasks.map(t => esc(t.title) + (t.done ? ' ✓' : '')).join(' · ')}</p>` : ''}</section>`;
+  }
+  function workHTML() {
+    const c = C(), d = c.details, fmtOk = !!String(d.assessFormat || '').trim();
+    const opts = byDay().map(l => `<option value="${esc(l.id)}">${esc(name(l))}</option>`).join('');
+    return `<details class="kl-card" data-keep="astro-work"><summary><b>Assignments, practice and the assessment</b></summary>
+      <ul class="kl-list">${c.tasks.map(t => `<li${t.done ? ' style="opacity:.6"' : ''}>${esc(t.title)} <small>${t.due ? 'due ' + esc(t.due) + (t.dueOk ? '' : ' (not confirmed)') : 'no due date'} · about ${t.mins || 60} min${t.lec && lecOf(t.lec) ? ' · ' + esc(name(lecOf(t.lec))) : ''}</small> <button type="button" class="kl-ghost" data-a="astrotask" data-v="${esc(t.id)}">${t.done ? 'Reopen' : 'Done'}</button></li>`).join('') || '<li>No assignments yet.</li>'}</ul>
+      <form data-f="astrotaskadd" class="kl-row" style="flex-wrap:wrap"><input name="title" required maxlength="140" placeholder="Assignment or submission"><select name="lec"><option value="">No lecture</option>${opts}</select><label class="kl-small">Due <input name="due" type="date"></label><label class="kl-small"><input type="checkbox" name="ok"> date confirmed</label><label class="kl-small">min <input name="mins" type="number" min="10" max="600" value="60" style="width:5em"></label><button>Add</button></form>
+      <p class="kl-small"><b>Unofficial practice questions</b>: AI-generated from the lectures you've covered. They are not actual exam questions.</p>
+      <div class="kl-row" style="flex-wrap:wrap"><button type="button" data-a="astroprac">Ask Iroha for 3 unofficial questions</button>${fmtOk ? `<button type="button" data-a="astrotimed">Timed practice in the confirmed format</button>` : '<span class="kl-small">Timed practice opens once the real assessment format is confirmed below.</span>'}</div>
+      ${c.practice ? `<p class="kl-small"><b>Unofficial, AI-generated (${esc(c.practice.d)}):</b></p><div class="kl-small" style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(c.practice.text)}</div>` : ''}
+      <p class="kl-small"><b>Internship / LOR checklist</b></p><ul class="kl-list">${c.checklist.map(x => `<li><label class="kl-check"><input type="checkbox" data-a="astrocheck" data-v="${esc(x.id)}" ${x.done ? 'checked' : ''}> ${esc(x.t)}</label></li>`).join('') || '<li>Nothing yet. Add the actions the course actually asks for.</li>'}</ul>
+      <form data-f="astrocheckadd" class="kl-row"><input name="t" required maxlength="200" placeholder="e.g. Ask the coordinator how the LOR is decided"><button>Add</button></form></details>`;
+  }
+  function detailsHTML() {
+    const d = C().details, sel = (n, v, o) => `<select name="${n}">${o.map(([k, t]) => `<option value="${k}" ${String(v || '') === k ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+    const NC = [['', 'Not confirmed'], ['yes', 'Yes'], ['no', 'No']];
+    const proof = d.proofId && (L.lectures || []).find(x => x.id === d.proofId);
+    return `<details class="kl-card" data-keep="astro-details"><summary><b>Course details</b> · blank means "Not confirmed"</summary>
+      <form data-f="astrodetails" class="kg-astro-form"><label>Course / provider <input name="provider" maxlength="160" value="${esc(d.provider || '')}"></label><label>Start <input name="start" type="date" value="${esc(d.start || '')}"></label><label>End <input name="end" type="date" value="${esc(d.end || '')}"></label>
+      <label>Assessment date <input name="assessDate" type="date" value="${esc(d.assessDate || '')}"></label><label>Assessment format <input name="assessFormat" maxlength="200" value="${esc(d.assessFormat || '')}" placeholder="Not confirmed"></label>
+      <label>Internship requirements <textarea name="internship" maxlength="1000" rows="2" placeholder="Not confirmed">${esc(d.internship || '')}</textarea></label><label>LOR requirements <textarea name="lor" maxlength="1000" rows="2" placeholder="Not confirmed">${esc(d.lor || '')}</textarea></label>
+      <label>Where these details come from (link) <input name="proofLink" type="url" maxlength="400" value="${esc(d.proofLink || '')}"></label>
+      <fieldset><legend class="kl-small">Your status, each one separate</legend><label>Assessment completed ${sel('done', d.done, [['', 'Not yet'], ['yes', 'Completed']])}</label><label>Passed ${sel('passed', d.passed, NC)}</label><label>Internship eligible ${sel('intern', d.intern, NC)}</label><label>LOR eligible ${sel('lorOk', d.lorOk, NC)}</label></fieldset>
+      <button class="kl-primary">Save details</button></form>
+      <div class="kl-row" style="flex-wrap:wrap"><button type="button" data-a="astroproof">📎 Attach the requirements document</button>${proof?.files?.length ? proof.files.map((fid, i) => `<button type="button" class="kl-ghost" data-a="astroopen" data-v="${esc(fid)}">Open document ${i + 1}</button>`).join('') : ''}<span class="kl-small" data-k="astro-status"></span></div>
+      <p class="kl-small">Completing the course, passing the assessment, internship eligibility and an LOR are separate. Nothing here assumes one follows from another.</p></details>`;
+  }
+  M.SECTIONS.study.push(['astro', '🔭 Astrophysics course']);
+  M.PANELS.astro = () => { const c = C(), l = c.sel && lecOf(c.sel); return homeHTML() + libraryHTML() + (l ? lectureHTML(l) : '') + workHTML() + detailsHTML(); };
+  // ---- the notes viewer: kept across redraws, so the timer ticking never reloads the PDF ----
+  let view = null; const urls = {};
+  const missing = '<p class="kl-small">This attachment isn\'t in this browser any more (site data cleared, or another device). Restore a full backup that includes it, or attach the file again.</p>';
+  async function recURL(fid) {
+    if (urls[fid]) return urls[fid]; const r = await M.notesFile.get(fid); if (!r) return null;
+    if (r.kind === 'pdf' && r.blob instanceof Blob) return urls[fid] = URL.createObjectURL(r.blob);
+    if (r.kind === 'html') return urls[fid] = URL.createObjectURL(new Blob([`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob: https:; style-src 'unsafe-inline' https:; font-src https: data:">` + r.text], { type: 'text/html' }));
+    if (r.kind === 'img' && r.img) return urls[fid] = URL.createObjectURL(await (await fetch(r.img)).blob());
+    return null;
+  }
+  async function showFile(lid, fid) {
+    const box = document.createElement('div'); box.className = 'kg-astro-view'; view = { lid, fid, node: box }; box.innerHTML = '<p class="kl-small">Opening…</p>'; place();
+    const r = await M.notesFile.get(fid); if (!view || view.fid !== fid) return;
+    if (!r) { box.innerHTML = missing; return; }
+    const close = '<div class="kl-row"><button type="button" class="kl-ghost" data-a="astroviewclose">Close viewer</button><button type="button" class="kl-ghost" data-a="astroopen" data-v="' + esc(fid) + '">Open separately</button></div>';
+    if (r.kind === 'html') { box.innerHTML = close; const f = document.createElement('iframe'); f.setAttribute('sandbox', ''); f.title = r.name || 'Notes'; f.srcdoc = r.text; f.style.cssText = 'width:100%;height:70vh;border:0;background:#fff;border-radius:10px'; box.appendChild(f); return; }
+    const u = await recURL(fid); if (!u) { box.innerHTML = missing; return; }
+    box.innerHTML = close + (r.kind === 'pdf' ? `<iframe src="${esc(u)}" title="${esc(r.name || 'Notes PDF')}" style="width:100%;height:70vh;border:0"></iframe>` : `<img src="${esc(u)}" alt="${esc(r.name || 'Notes photo')}" style="max-width:100%">`);
+  }
+  function place() { const slot = document.getElementById('kg-astro-slot'); if (!slot || !view) return; if (view.lid !== C().sel) { view = null; return; } if (slot.firstChild !== view.node || slot.childNodes.length !== 1) slot.replaceChildren(view.node); }
+  addEventListener('moonlab:render', () => setTimeout(place, 0));
+  const status = t => document.querySelectorAll('[data-k="astro-status"]').forEach(s => { s.textContent = t; });
+  const redo = msg => { save(); M.render(); if (msg) M.K?.(msg); };
+  const split = v => { const i = String(v).indexOf(':'); return [String(v).slice(0, i), String(v).slice(i + 1)]; };
+  Object.assign(M.ACTIONS, {
+    astrosel: b => { C().sel = C().sel === b.dataset.v ? '' : b.dataset.v; redo(); setTimeout(() => document.querySelector('.kg-astro-lec')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); },
+    astrowatch: b => { const [id, w] = split(b.dataset.v), l = lecOf(id); if (!l || !['none', 'progress', 'watched'].includes(w)) return; l.watch = w; if (w === 'watched') l.watchedD = today(); audit('astro lecture', name(l) + ' · ' + w); redo(w === 'watched' ? 'watched. a 3-5 minute closed-note recap is next, when you are ready 🌙' : ''); },
+    astroattach: b => { const l = lecOf(b.dataset.v); if (!l) return; const e = notesEntry(l); M.pickNotes(e, { status: document.querySelector('[data-k="astro-status"]'), done: () => { audit('astro notes attached', name(l)); redo(); } }); },
+    astroreplace: b => { const l = lecOf(b.dataset.v); if (!l) return; const e = notesEntry(l), old = (e.files || []).slice();
+      if (!confirm('Replace the notes for ' + name(l) + '? The old files are removed only after the new ones are saved.')) return;
+      M.pickNotes(e, { status: document.querySelector('[data-k="astro-status"]'), done: async () => { e.files = e.files.filter(f => !old.includes(f)); for (const f of old) { await M.notesFile.del(f); delete urls[f]; } view = null; audit('astro notes replaced', name(l)); redo('notes replaced 🌙'); } }); },
+    astroview: b => { const [lid, fid] = split(b.dataset.v); showFile(lid, fid); },
+    astroviewclose: () => { view = null; document.querySelector('.kg-astro-view')?.remove(); },
+    astroopen: async b => { const w = window.open('', '_blank'); const u = await recURL(b.dataset.v); if (u && w) w.location = u; else { w?.close(); status('That attachment is missing from this browser. Restore a full backup or attach it again.'); } },
+    astropractise: b => { const [id, act] = split(b.dataset.v), l = lecOf(id); if (!l) return; const e = notesEntry(l);
+      M.flowStart({ lec: e.id, act, subj: 'Astrophysics', topic: (act === 'blurt' ? 'Closed-note recap · ' : '') + name(l) }); },
+    astrodoubt: b => { const [id, did] = split(b.dataset.v), d = (lecOf(id)?.doubts || []).find(x => x.id === did); if (!d) return; d.done = !d.done; redo(); },
+    astroask: async b => { const [id, did] = split(b.dataset.v), l = lecOf(id), d = (l?.doubts || []).find(x => x.id === did); if (!d) return; if (!window.__kgAsk) return M.K?.('Iroha is unavailable right now 🌙');
+      const e = notesEntry(l, false), outline = e ? await (M.lecOutline?.(e.id) || Promise.resolve('')).catch(() => '') : '';
+      b.disabled = true; b.textContent = 'asking Iroha…';
+      const msg = `[Astrophysics course question, ${name(l)}. I'm a beginner: no calculus or university physics. Answer this question first, briefly and accurately; separate what is established from what is uncertain.${outline ? ' Use my lecture notes below as the main source and say if your answer goes beyond them.\nMy notes (one line per page or section):\n' + outline : ' I have no notes attached for this lecture.'}]\n\n${d.q}`;
+      let r = null; try { r = await window.__kgAsk('iroha', msg); } catch (_) {}
+      const text = r && typeof r.reply === 'string' ? r.reply.trim() : '';
+      if (!text) { b.disabled = false; b.textContent = 'Ask Iroha'; return M.K?.('Iroha could not answer just now 🌙'); }
+      d.a = text.slice(0, 3000); d.src = outline ? 'Iroha, using your supplied notes (not independently verified)' : 'AI-generated answer, not independently verified'; redo(); },
+    astrotask: b => { const t = C().tasks.find(x => x.id === b.dataset.v); if (!t) return; t.done = !t.done; t.doneD = t.done ? today() : ''; audit('astro assignment', t.title + (t.done ? ' done' : ' reopened')); redo(); },
+    astrocheck: b => { const x = C().checklist.find(y => y.id === b.dataset.v); if (!x) return; x.done = !x.done; redo(); },
+    astroboost: b => { const s = S(); if (b.dataset.v === 'clear') { delete s.astro.boost; audit('astro course time', 'deadline adjustment undone'); return redo(); }
+      const [m, until] = split(b.dataset.v); if (!(+m > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(until)) return; s.astro.boost = { min: Math.min(120, +m), until }; audit('astro course time', m + ' min a day until ' + until); redo('applied. course time comes out of PCM time until then; the day is no longer 🌙'); },
+    astroprac: async b => { if (!window.__kgAsk) return M.K?.('Iroha is unavailable right now 🌙');
+      const covered = byDay().filter(l => l.watch === 'watched' || ev(l).practised).map(name); if (!covered.length) return M.K?.('mark a lecture watched first, so the questions cover what you have seen 🌙');
+      b.disabled = true; b.textContent = 'asking Iroha…';
+      let r = null; try { r = await window.__kgAsk('iroha', `[Astrophysics course. Write 3 short UNOFFICIAL practice questions on lectures I've covered: ${covered.join('; ')}. Beginner level, no calculus. One conceptual, one about interpreting something (e.g. a spectrum or a stellar class), one simple calculation only if those lectures had one. Do not present them as real exam questions, and don't give answers yet.]`); } catch (_) {}
+      const text = r && typeof r.reply === 'string' ? r.reply.trim() : ''; if (!text) { b.disabled = false; b.textContent = 'Ask Iroha for 3 unofficial questions'; return M.K?.('Iroha could not answer just now 🌙'); }
+      C().practice = { d: today(), text: text.slice(0, 3000) }; redo(); },
+    astrotimed: () => { const f = String(C().details.assessFormat || '').trim(); if (!f) return; M.flowStart({ act: 'solve', subj: 'Astrophysics', topic: ('Timed practice (unofficial) in the ' + f + ' format').slice(0, 120) }); },
+    astroproof: () => { const d = C().details; let e = d.proofId && (L.lectures || []).find(x => x.id === d.proofId);
+      if (!e) { e = { id: 'lec' + Date.now().toString(36) + 'p', subj: 'Astrophysics', ch: '', topic: 'Astrophysics course · requirements document', details: '', made: today(), stage: 0, due: '', files: [], reviews: 0, astro: true, noSkill: true }; (L.lectures = L.lectures || []).push(e); d.proofId = e.id; save(); }
+      M.pickNotes(e, { status: document.querySelector('.kg-astro-form + .kl-row [data-k="astro-status"]'), done: () => redo() }); }
+  });
+  Object.assign(M.FORMS, {
+    astromin: v => { const m = +v.min; if (![0, 15, 30, 45, 60, 90].includes(m)) return; S().astro.min = m; audit('astro course time', m + ' min a day'); redo(m ? `${m} min of course time a day, taken from PCM time 🌙` : 'no daily course time 🌙'); },
+    astroadd: v => { const day = Math.max(1, Math.min(60, Math.round(+v.day || 1))), l = { id: uid('al'), day, title: String(v.title || '').trim().slice(0, 120), url: /^https?:\/\//i.test(v.url || '') ? String(v.url).slice(0, 400) : '', resume: '', watch: 'none', notesId: '', mine: '', doubts: [], made: today() };
+      C().lectures.push(l); C().sel = l.id; audit('astro lecture added', name(l)); redo(); },
+    astrolec: v => { const l = lecOf(v.id); if (!l) return; l.day = Math.max(1, Math.min(60, Math.round(+v.day || l.day || 1))); l.title = String(v.title || '').trim().slice(0, 120); l.url = /^https?:\/\//i.test(v.url || '') ? String(v.url).slice(0, 400) : '';
+      l.resume = String(v.resume || '').trim().slice(0, 20); if (l.resume && (l.watch || 'none') === 'none') l.watch = 'progress';
+      const e = notesEntry(l, false); if (e) { e.topic = ('Astrophysics · ' + name(l)).slice(0, 120); const sk = (L.skills || []).find(s => s.id === 'sk-' + e.id); if (sk) sk.name = e.topic; }
+      redo('saved 🌙'); },
+    astromine: v => { const l = lecOf(v.id); if (!l) return; l.mine = String(v.t || '').slice(0, 6000); redo('your notes are saved 🌙'); },
+    astroq: v => { const l = lecOf(v.id), q = String(v.q || '').trim(); if (!l || !q) return; (l.doubts = l.doubts || []).push({ id: uid('aq'), q: q.slice(0, 400), d: today(), done: false }); redo(); },
+    astrotaskadd: v => { const t = String(v.title || '').trim(); if (!t) return; C().tasks.push({ id: uid('at'), title: t.slice(0, 140), lec: lecOf(v.lec) ? v.lec : '', due: /^\d{4}-\d{2}-\d{2}$/.test(v.due || '') ? v.due : '', dueOk: !!v.ok && !!v.due, mins: Math.max(10, Math.min(600, Math.round(+v.mins || 60))), done: false, made: today() }); audit('astro assignment added', t); redo(); },
+    astrocheckadd: v => { const t = String(v.t || '').trim(); if (!t) return; C().checklist.push({ id: uid('ac'), t: t.slice(0, 200), done: false }); redo(); },
+    astrodetails: v => { const d = C().details; for (const k of ['provider', 'assessFormat']) d[k] = String(v[k] || '').trim().slice(0, 200); for (const k of ['internship', 'lor']) d[k] = String(v[k] || '').trim().slice(0, 1000);
+      for (const k of ['start', 'end', 'assessDate']) d[k] = /^\d{4}-\d{2}-\d{2}$/.test(v[k] || '') ? v[k] : ''; d.proofLink = /^https?:\/\//i.test(v.proofLink || '') ? String(v.proofLink).slice(0, 400) : '';
+      d.done = v.done === 'yes' ? 'yes' : ''; for (const k of ['passed', 'intern', 'lorOk']) d[k] = ['yes', 'no'].includes(v[k]) ? v[k] : ''; audit('astro details', 'saved'); redo('course details saved 🌙'); }
+  });
+  // what the companions see: the current course task and the course rules, nothing personal
+  window.__kgAstroNote = () => {
+    const c = C(); if (!c.lectures.length && !c.tasks.length) return '';
+    const a = window.__kgSession?.(), f = L.flow && L.flow.subj === 'Astrophysics' && L.flow.step !== 'goal' ? L.flow : null, l = c.sel && lecOf(c.sel);
+    const cur = a && a.subject === 'Astrophysics' ? `a course timer is running on "${a.task || a.topic || 'course work'}"` : f ? `a guided session (${f.act}) on ${f.topic}` : l ? `looking at ${name(l)} (${state(l)})` : 'no course task open';
+    const d = c.details, k = v => String(v || '').trim() || 'not confirmed';
+    return `\n\n[not typed by me: Astrophysics course (beginner level: no calculus or university physics assumed). Right now: ${cur}. Next action: ${next().text}. Assessment ${k(d.assessDate)}, format ${k(d.assessFormat)}; internship and LOR requirements ${String(d.internship || d.lor || '').trim() ? 'are in my course details' : 'are not confirmed'}. For course questions: answer my latest question before suggesting a task; concise, natural explanations; praise rarely and specifically; separate established knowledge from uncertainty; never say finishing the course guarantees an internship or an LOR. Kaguya: during Explain, be warm company and ask natural questions; don't pretend not to understand; don't nudge me while I'm working.]`;
+  };
+  const css = document.createElement('style');
+  css.textContent = '.kg-astro-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:8px 0}@media (max-width:760px){.kg-astro-grid{grid-template-columns:1fr}}.kg-astro-form{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}.kg-astro-form label{display:flex;flex-direction:column;gap:4px}.kg-astro-form textarea,.kg-astro-form input{width:100%}.kl-btnlink{display:inline-flex;align-items:center;padding:6px 12px;border-radius:10px;border:1px solid currentColor;text-decoration:none}';
+  document.head.appendChild(css);
+})();
 </script>
 </body></html>
