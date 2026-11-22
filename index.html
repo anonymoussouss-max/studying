@@ -9288,12 +9288,28 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       <textarea data-flow="warm" rows="7" maxlength="3000" aria-label="${predict ? 'What might help, and your prediction' : 'What you remember'}">${esc(f.warm)}</textarea>
       <div class="kl-row"><button class="kl-primary" data-a="flowto" data-v="${f.act === 'worked' ? 'example' : 'attempt'}">${f.act === 'predict' ? 'Prediction saved, now observe' : 'Continue'}</button><button class="kl-ghost" data-a="flowwarmskip">Skip it</button></div>`;
   }
+  // Faded worked example: full solution -> the later steps hidden for you to fill in -> more hidden -> a similar problem on your own.
+  // Steps are the example's lines; the first line (the problem) always stays visible. Backward fading: the last steps go first.
+  const exLines = f => String(f.example || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 30);
+  const fadeHidden = f => { const n = exLines(f).length - 1; if (n < 2) return []; const k = Math.min(n, f.fadeLvl >= 2 ? Math.max(2, Math.round(n * 2 / 3)) : Math.max(1, Math.round(n / 3))); return Array.from({ length: k }, (_, i) => n - k + 1 + i); };
+  function fadeStep(f) {
+    const L1 = exLines(f), hid = new Set(fadeHidden(f)), ans = f.fadeAns || {}, shown = !!f.fadeShown, more = f.fadeLvl < 2 && fadeHidden({ ...f, fadeLvl: 2 }).length > hid.size;
+    const rows = L1.map((line, i) => !hid.has(i) ? `<p class="kl-pre kg-fade-given">${esc(line)}</p>`
+      : shown ? `<div class="kg-fade-step"><b>Step ${i}</b><p>You: ${esc(ans[i] || '(blank)')}</p><p class="kl-small">Example: ${esc(line)}</p></div>`
+      : `<label class="kg-fade-step">Step ${i} <input data-fade="${i}" maxlength="400" value="${esc(ans[i] || '')}" placeholder="The missing step, and why it's allowed"></label>`).join('');
+    return `<div class="learning-session-support"><p class="kl-eyebrow">WORKED EXAMPLE · FILL THE GAPS · ${esc(f.topic)}</p><h2>${shown ? 'Compare your steps with the example' : `Fill in the ${hid.size} hidden step${hid.size === 1 ? '' : 's'}`}</h2>
+      <p class="kl-small">${shown ? 'Where yours differ, is it a different valid route or a missing idea? Note the step you couldn\'t explain.' : 'From memory, not by scrolling back. Say why each step is allowed, not just what it is.'}</p>
+      <div class="kg-fade">${rows}</div>
+      <div class="kl-row">${shown ? `<button class="kl-primary" data-a="flowhideexample">Now a similar problem, on my own</button>${more ? '<button data-a="flowfade" data-v="2">Hide more steps</button>' : ''}` : '<button class="kl-primary" data-a="flowfadeshow">Show the example\'s steps</button>'}<button class="kl-ghost" data-a="flowfade" data-v="0">Full example again</button></div></div>`;
+  }
   function exampleStep(f) {
+    if (f.fadeLvl > 0 && exLines(f).length >= 3) return fadeStep(f);
     return `<div class="learning-session-support"><p class="kl-eyebrow">WORKED EXAMPLE · ${esc(f.topic)}</p><h2>Understand the steps before doing them alone</h2>
       <p>Use a solved example from your textbook or teacher. Explain why each step is allowed. Then hide it and solve a nearby problem. This session records supported learning; a later fresh problem can test independence.</p>
       <label>Worked example <textarea data-flow="example" rows="9" maxlength="5000" placeholder="Paste the problem and solution, or write the book and page you are reading.">${esc(f.example || '')}</textarea></label>
       <label>Why these steps? <textarea data-flow="exampleWhy" rows="4" maxlength="2000" placeholder="Name the principle, assumptions and one step you could not explain at first.">${esc(f.exampleWhy || '')}</textarea></label>
-      <div class="kl-row"><button class="kl-primary" data-a="flowhideexample">Hide example and try a similar problem</button></div></div>`;
+      <div class="kl-row"><button class="kl-primary" data-a="flowfade" data-v="1">Hide some steps and fill them in</button><button class="kl-ghost" data-a="flowhideexample">Skip to a similar problem</button></div>
+      <p class="kl-small">Put each step on its own line. The last steps are hidden first; once you can fill them in, more go, then you solve a similar problem alone. Skip ahead if this is already familiar.</p></div>`;
   }
   function recapStep(f) {
     return `<p class="kl-eyebrow">RECAP · NOTES CLOSED</p><h2>In your own words, before any summary</h2>
@@ -9442,7 +9458,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       const skillId = window.StudyPlan.creditTarget(L.skills || [], {sk:f.skillId,lec:f.lec});
       const result = skillId && ev !== 'ungraded' ? M.recordSkill?.(skillId, ev === 'indep' ? 'ok' : ev === 'help' ? 'hint' : 'miss', 'flow', {sourceEvent:f.id,verified:f.verified,verificationSource:f.verificationSource,transfer:f.transfer}) : null;
       if (x || (skillId && ((L.skills || []).find(s => s.id === skillId)?.made || d) < d)) M.chargeReview?.('flow', f.id);
-      L.flowLog.push({ method: hasMethod(f) ? { p: String(f.mPrin).trim().slice(0, 160), w: String(f.mWhy || '').trim().slice(0, 240), a: String(f.mAlt || '').trim().slice(0, 240) } : null, skillId, lec:f.lec || '', requireVerification:true, verified:!!f.verified, verificationSource:f.verificationSource || '', supported:!!(f.supported || f.peeked), delayed:!!result?.delayed, transfer:ev === 'indep' && f.transfer === true, id: f.id, d, act: f.act, subj: f.subj, topic: f.topic, goal: f.goal, gap: gap ? f.gap.slice(0, 300) : '', errType: gap ? f.errType || '' : '', fixed: f.fixed, ev, disputed: f.disputed || '', miss: f.miss || '', by: f.checker?.provider || '', model: f.checker?.model || '', met: v.met || '', warm: !!f.warm.trim(), recap: !!(f.rc1 || f.rc2 || f.rc3), card: !!f.cardId, mins: f.started ? Math.min(180, Math.round((Date.now() - f.started - (f.away || 0)) / 60000)) : 0 }); // time away after "Leave for now" doesn't count
+      L.flowLog.push({ fade: f.act === 'worked' ? f.fadeMax || 0 : undefined, method: hasMethod(f) ? { p: String(f.mPrin).trim().slice(0, 160), w: String(f.mWhy || '').trim().slice(0, 240), a: String(f.mAlt || '').trim().slice(0, 240) } : null, skillId, lec:f.lec || '', requireVerification:true, verified:!!f.verified, verificationSource:f.verificationSource || '', supported:!!(f.supported || f.peeked), delayed:!!result?.delayed, transfer:ev === 'indep' && f.transfer === true, id: f.id, d, act: f.act, subj: f.subj, topic: f.topic, goal: f.goal, gap: gap ? f.gap.slice(0, 300) : '', errType: gap ? f.errType || '' : '', fixed: f.fixed, ev, disputed: f.disputed || '', miss: f.miss || '', by: f.checker?.provider || '', model: f.checker?.model || '', met: v.met || '', warm: !!f.warm.trim(), recap: !!(f.rc1 || f.rc2 || f.rc3), card: !!f.cardId, mins: f.started ? Math.min(180, Math.round((Date.now() - f.started - (f.away || 0)) / 60000)) : 0 }); // time away after "Leave for now" doesn't count
       if (L.flowLog.length > 300) L.flowLog = L.flowLog.slice(-300);
       L.flow = null; save();
       closeDesk(f, v.mood);
@@ -9455,6 +9471,10 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     flowcheck: check, flowlisten: listen, flowrepair: checkRepair, flowdispute: dispute, flowrecap: checkRecap, flowcard: addCard,
     flowpark: () => { const f = L.flow; if (!f) return; f.parking = !f.parking; save(); M.render(); setTimeout(() => document.querySelector('.kg-park input')?.focus(), 50); },
     flowwarmskip: () => { const f = L.flow; if (!f) return; f.warm = ''; f.step = f.act === 'worked' ? 'example' : 'attempt'; save(); M.render(); },
+    flowfade: b => { const f = L.flow; if (!f || f.busy) return; const lvl = Number(b.dataset.v) || 0;
+      if (lvl && exLines(f).length < 3) return M.I('Put the problem and at least two solution steps on separate lines, then I can hide some.', { face: 'study' });
+      f.fadeLvl = lvl; f.fadeShown = false; f.fadeAns = {}; if (lvl) { f.supported = true; f.fadeMax = Math.max(f.fadeMax || 0, lvl); } save(); M.render(); setTimeout(() => document.querySelector('[data-fade]')?.focus(), 60); },
+    flowfadeshow: () => { const f = L.flow; if (!f) return; f.fadeShown = true; save(); M.render(); },
     flowhideexample: () => { const f = L.flow; if (!f || f.busy) return; if (!(f.example || '').trim()) return M.I('Add the example or its book and page first.', { face: 'study' }); f.supported = true; f.step = 'attempt'; save(); M.render(); },
     flowpick: b => { const f = L.flow; if (!f?.alt) return; const second = b.dataset.v === 'second'; if (second) Object.assign(f, { right: f.alt.right, gap: f.alt.gap, fix: f.alt.fix, errType: f.alt.errType || '', checker: f.alt.by || f.checker }); f.disputed = second ? 'second' : 'first'; f.dispute = second ? 'The two checks disagreed; you chose the second.' : 'The two checks disagreed; you kept the first.'; f.alt = null; save(); M.render(); },
     flowto: b => { const f = L.flow; if (!f || f.busy) return; f.step = b.dataset.v; save(); M.render(); },
@@ -9466,6 +9486,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     const lec = t.value, opts = [...s.options].filter(o => o.value); for (const o of opts) o.hidden = !!lec && !o.dataset.lec.split(' ').includes(lec);
     const vis = opts.filter(o => !o.hidden); if (s.selectedOptions[0]?.hidden) s.value = ''; if (lec && vis.length === 1) s.value = vis[0].value; s.options[0].textContent = lec && vis.length > 1 ? 'Pick one so it gets credit' : 'None'; });
   document.addEventListener('toggle', e => { if (e.target.matches?.('[data-method]') && L.flow) { L.flow.mOpen = e.target.open; save(); } }, true);
+  document.addEventListener('input', e => { const i = e.target.dataset?.fade; if (i == null || !L.flow) return; (L.flow.fadeAns = L.flow.fadeAns || {})[i] = e.target.value.slice(0, 400); clearTimeout(tSave); tSave = setTimeout(save, 400); });
   // drafts: every keystroke is kept
   let tSave = 0;
   document.addEventListener('input', e => {
@@ -10795,6 +10816,7 @@ body.kg-calm .kv-lens.in,body.kg-calm .kv-hud.in>*,body.kg-calm .kv-ecg path{ani
   body.kg-docked.kg-dock-open .kv-dock{left:20px;right:20px;flex-wrap:wrap;gap:8px}
 }
 .kg-method{margin:8px 0 10px;padding:10px 14px;border:1px solid rgba(196,182,255,.22);border-radius:12px;background:rgba(127,227,255,.04)}.kg-method summary{cursor:pointer}.kg-method label{display:block;margin-top:8px}.kg-method input{width:100%;box-sizing:border-box}
+.kg-fade{margin:10px 0;display:grid;gap:6px}.kg-fade-given{margin:0;opacity:.85}.kg-fade-step{display:block;padding:8px 12px;border-left:3px solid #7fe3ff;background:rgba(127,227,255,.06);border-radius:0 10px 10px 0}.kg-fade-step input{width:100%;box-sizing:border-box;margin-top:4px}.kg-fade-step p{margin:4px 0}
 /* the floating room nav never covers the last card */
 body.kv-on #kg-main{padding-bottom:104px}
 /* focus mode on a running timer: its card shows on every page, so Study or Company never turns into an empty visor */
