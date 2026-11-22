@@ -201,3 +201,49 @@ test('the night-meds reminder appears on template days at the set time', () => {
   const rows = plan(iso(MON, 720), seeded({ sched: { wake: { [MON]: 720 } }, medsAt: 840 })).fallback(1);
   assert.strictEqual(rows.find(r => r.id === 'meds').start, 840);
 });
+
+// ---- review fixes (22 Nov 2026) ----
+test('German is exactly the chosen minutes in every template, and the total never changes', () => {
+  const plans = { normal: 720, early: 600, late: 780, later: 840, verylate: 900, sunday: 720 };
+  for (const [p, W] of Object.entries(plans)) {
+    const base = P0.skeleton(W, p, { german: 30, from: W + 30 }).filter(x => x.kind === 'study').reduce((n, x) => n + x.e - x.s, 0);
+    for (const g of [15, 30, 45, 60, 75, 90]) {
+      const s = P0.skeleton(W, p, { german: g, from: W + 30 }).filter(x => x.kind === 'study');
+      assert.strictEqual(s.filter(x => x.role === 'G').reduce((n, x) => n + x.e - x.s, 0), g, `${p} German ${g}`);
+      assert.strictEqual(s.reduce((n, x) => n + x.e - x.s, 0), base, `${p} total with German ${g}`);
+    }
+  }
+  for (const g of [60, 90]) {
+    const s = P0.skeleton(720, 'normal', { german: g, extend: true, from: 750 }).filter(x => x.kind === 'study');
+    assert.ok(!s.some(x => x.role === 'G' && x.ext), 'German never moves into the optional extension');
+    assert.strictEqual(s.reduce((n, x) => n + x.e - x.s, 0), 470);
+  }
+  const r = P0.skeleton(720, 'reduced', { german: 60, from: 900 }).filter(x => x.kind === 'study');
+  assert.strictEqual(r.filter(x => x.role === 'G').reduce((n, x) => n + x.e - x.s, 0), 60, 'a lighter day keeps the chosen German');
+});
+
+test('a subject\'s next lecture waits for its unfinished revision and essential homework', () => {
+  const syl = P0.seedSyllabus();
+  syl.revs.push({ id: 'r1', subj: 'maths', title: 'Basic Mathematics · lecture 20', done: false });
+  syl.hw.push({ id: 'h1', subj: 'maths', title: 'Ex 3', mins: 45, essential: true, status: 'open' });
+  const rows = study(day({ syl, sched: { wake: { [MON]: 720 }, focus: { [MON]: 'maths' } } }, 720).rows).filter(r => r.subj === 'maths');
+  const first = type => rows.findIndex(r => r.task?.type === type && (type !== 'lecture' || !r.task.cont));
+  assert.ok(first('revision') >= 0 && first('homework') > first('revision'), 'revision, then homework');
+  assert.ok(first('lecture') > first('homework'), 'the next lecture comes after both');
+  const syl2 = P0.seedSyllabus(); syl2.pos.maths = { course: 'm11', ci: 0, chapter: 'Basic Mathematics', lec: 21, active: true, spent: 30 };
+  syl2.revs.push({ id: 'r2', subj: 'maths', title: 'Basic Mathematics · lecture 20', done: false });
+  const r2 = study(day({ syl: syl2, sched: { wake: { [MON]: 720 }, focus: { [MON]: 'maths' } } }, 720).rows).filter(r => r.subj === 'maths');
+  assert.ok(r2[0].task.type === 'lecture' && r2[0].task.cont, 'an interrupted lecture is finished first');
+});
+
+test('progress wording is shared, and zero minutes never "counts" on a study day', () => {
+  for (const plan of ['normal', 'stop', 'gentle']) {
+    const P = plan === 'normal' ? plan_(720) : plan_(1000, { plan: { [MON]: plan }, switches: plan === 'stop' ? { [MON]: [{ at: 1000, from: 'auto', plan: 'stop' }] } : {} });
+    const p0 = P.dayProgress(0), p15 = P.dayProgress(15);
+    assert.strictEqual(p0.counts, false, plan); assert.ok(p0.need >= 15, plan); assert.match(p0.text, /min until today counts/);
+    if (plan !== 'normal') assert.strictEqual(p15.counts, true, plan + ': 15 real minutes count');
+  }
+  const off = plan(iso(MON, 720), seeded({ dayTypes: { [MON]: { t: 'rest' } } })).dayProgress(0);
+  assert.ok(off.rest && !off.counts);
+  function plan_(now, sched = {}) { return plan(iso(MON, now), seeded({ sched: Object.assign({ wake: { [MON]: 720 } }, sched), planLog: { [MON]: sched.plan ? 0 : 6 } })); }
+});
