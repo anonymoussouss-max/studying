@@ -952,7 +952,7 @@ body.habit-shh #hb-session-card {text-align:center;}
   const PLAN_NAME={normal:'Normal day',early:'Early day',late:'Late day',later:'Later day',verylate:'Very late day',sunday:'Sunday · light exploration',gentle:'Difficult day · 15 minutes of Physics',reduced:'Reduced day',stop:'Stopped for today'};
   const PLAN_WAKE={normal:720,early:600,late:780,later:840,verylate:900};
   function schedOf(L){const s=Object.assign({wake:{},plan:{},extend:{},piano:{},pianoLen:45,food:{},switches:{},edits:{},german:30,germanExam:'light',diploma:{week:120,heavy:{}},exams:[],split:{maths:45,physics:30,chem:25},focus:{}},(L&&L.sched)||{});
-    for(const k of ['wake','plan','extend','piano','food','switches','edits','focus'])if(!s[k]||typeof s[k]!=='object')s[k]={};
+    for(const k of ['wake','plan','extend','piano','food','switches','edits','focus','weekSize'])if(!s[k]||typeof s[k]!=='object')s[k]={};
     if(!s.diploma||typeof s.diploma!=='object')s.diploma={week:120,heavy:{}};if(!s.diploma.heavy)s.diploma.heavy={};if(!Array.isArray(s.exams))s.exams=[];
     s.german=Math.max(15,Math.min(90,Math.round((+s.german||30)/5)*5));return s;}
   // which template a wake time picks when the plan is Auto
@@ -989,7 +989,7 @@ body.habit-shh #hb-session-card {text-align:center;}
       return finish(seg,study,o,W);
     }
     // before lunch: 90 + 60 minutes of lecture (an early day also fits revision and homework), 20-minute breaks between
-    const early=W<=630,preCap=early?270:150,sizes=[[90,'L'],[60,'L'],[90,'R'],[40,'H']];let t=start,used=0,carry=null,i=0;
+    const early=W<=630,budget0=Math.max(60,Math.min(360,+o.budget||360)),preCap=Math.min(early?270:150,budget0),sizes=[[90,'L'],[60,'L'],[90,'R'],[40,'H']];let t=start,used=0,carry=null,i=0;
     if(start<T_LUNCH[0]){
       while(i<sizes.length&&used<preCap){const room=T_LUNCH[0]-t;if(room<15)break;const [sz,role]=sizes[i];const m=Math.min(sz,room,preCap-used);
         put(t,t+m,role);if(m<sz)carry={role,m:sz-m};used+=m;t+=m;i++;
@@ -997,7 +997,7 @@ body.habit-shh #hb-session-card {text-align:center;}
       if(t<T_LUNCH[0])add(t,T_LUNCH[0],'rest','buffer-'+t,'Buffer · unscheduled');
     }
     // after lunch: fixed slots, filled until the day's study budget (6 hours) is used
-    const budget=360;let left=budget-used,gDone=G===0,reached3=false;
+    const budget=budget0;let left=budget-used,gDone=G===0,reached3=false;
     const slots=[[1020,1110,sizes.slice(0,i).some(x=>x[1]==='R')?'P':'R'],[1130,1170,'H'],[1185,1215,'G'],[1260,1310,'P']].filter(x=>x[1]>start);
     for(const [s0,e0,role] of slots){const s=Math.max(s0,start);if(left<5)break;
       if(s0===1260){reached3=true;if(ext)break;}
@@ -1066,7 +1066,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const syl=L.syl||{},pos=syl.pos||{},out=[];
     for(const s of SUB3){const a=pos[s];if(a&&a.active){out.push({type:'lecture',subj:s,cont:true,rem:Math.max(15,lecMin(syl,s)-(+a.spent||0)),title:`Finish ${a.chapter||SNAME[s]} · lecture ${a.lec||''}${a.at?' from '+a.at:''}`,ref:a});}}
     for(const r of syl.revs||[])if(r&&!r.done&&SUB3.includes(r.subj))out.push({type:'revision',subj:r.subj,rem:REVMIN[r.subj],title:`Revise ${r.title} · the whole lecture`,ref:r,ready:true});
-    for(const h of syl.hw||[])if(h&&h.status==='open'&&h.essential!==false&&SUB3.includes(h.subj))out.push({type:'homework',subj:h.subj,rem:Math.max(10,+h.mins||HWMIN[h.subj]),title:`Homework · ${h.title}`,ref:h});
+    for(const h of syl.hw||[])if(h&&h.status==='open'&&h.essential!==false&&SUB3.includes(h.subj))out.push({type:'homework',subj:h.subj,rem:Math.max(10,+h.mins||HWMIN[h.subj]),title:`Homework · ${h.title}${h.next&&!/^parked/.test(h.next)?' · next: '+h.next:''}`,ref:h});
     if(!opts.noNewLectures)for(const s of SUB3){if(out.some(x=>x.type==='lecture'&&x.subj===s))continue;const n=nextLecture(syl,s);if(n&&!n.missing)out.push({type:'lecture',subj:s,cont:false,rem:lecMin(syl,s),title:`Watch ${n.chapter} · lecture ${n.lec} of ${n.of}`,ref:n});}
     return out;
   }
@@ -1074,9 +1074,23 @@ body.habit-shh #hb-session-card {text-align:center;}
   function dayFocus(L,day,actual14){const f=(schedOf(L).focus||{})[day];if(SUB3.includes(f))return f;const sp=schedOf(L).split,tot=SUB3.reduce((n,s)=>n+(actual14[s]||0),0)||1;
     return SUB3.map(s=>[s,(sp[s]||0)/100-(actual14[s]||0)/tot]).sort((a,b)=>b[1]-a[1]||SUB3.indexOf(a[0])-SUB3.indexOf(b[0]))[0][0];}
   const GERMAN=['German · listening and shadowing','German · pronunciation and speaking','German · basic reading','German · useful vocabulary from memory'];
+  // a beginner (A1) sequence: [topic, a small speaking task]; each lesson also retrieves the two before it
+  const GERMAN_SEQ=[['Alphabet and sounds (ä, ö, ü, ß, ch)','spell your name and city aloud'],['Greetings and introducing yourself','introduce yourself in four sentences'],['Numbers 0–100','say your age and a phone number'],['Personal pronouns and sein','describe three people with ist / sind'],['haben and family','talk about your family for one minute'],
+    ['Regular verbs in the present','say five things you do every day'],['der, die, das and plurals','name ten things on your desk with their articles'],['Questions: W-Fragen and yes/no','ask and answer six questions'],['Telling the time and daily routine','describe your day with times'],['Days, months and dates','say your birthday and this week\'s plan'],
+    ['Food, drink and möchten','order a meal and a drink'],['The accusative','say what you have, need and want to buy'],['nicht and kein','say three things you don\'t have or like'],['Separable verbs','describe your afternoon with aufstehen, anfangen, aufhören'],['Modal verbs: können, müssen, wollen','say what you can, must and want to do'],
+    ['Places in town and directions','give directions from your home to a shop'],['The dative with mit, bei, zu','say where and with whom you study'],['Possessive articles: mein, dein, sein','describe your things and someone else\'s'],['Weather and seasons','describe today\'s weather and your favourite season'],['Hobbies and gern','talk about piano and your free time'],
+    ['Perfekt with haben','say what you did yesterday'],['Perfekt with sein','describe a trip you made'],['Shopping and prices','buy something and ask the price'],['School and study words','explain what you study and why']];
+  const germanTitle=u=>{const n=Math.max(0,+u||0),k=n%GERMAN_SEQ.length,[t,s]=GERMAN_SEQ[k],rec=[k-1,k-2].filter(x=>x>=0).map(x=>'Unit '+(x+1)).join(' and ');
+    return `German · Unit ${k+1}: ${t} · speak: ${s}${rec?' · recall '+rec+' from memory':''}`;};
+  // the lecture after a given one, across chapters and courses (for the week preview)
+  function nextAfter(syl,ref){const order=((syl||{}).order||{})[ref.subj]||[];let started=false;
+    for(const id of order){const c=(syl.courses||{})[id];if(!c||!Array.isArray(c.chapters))continue;if(!started&&id!==ref.course)continue;
+      for(let k=started?0:ref.ci;k<c.chapters.length;k++){const [name,n]=c.chapters[k];if(n==null)return null;const lec=(!started&&k===ref.ci)?ref.lec+1:((c.done||[])[k]||0)+1;
+        if(lec<=n)return {course:id,ci:k,chapter:name,lec,of:n,subj:ref.subj};}started=true;}
+    return null;}
   // fill study segments in time order. A lecture finished in an earlier block makes its revision eligible later the same day.
   function assign(segs,tasks,focus,o={}){
-    const pool=tasks.map(t=>Object.assign({},t)),deficitOrder=[focus,...SUB3.filter(s=>s!==focus)],rows=[];let n=0;
+    const pool=o.pool||tasks.map(t=>Object.assign({},t)),deficitOrder=[focus,...SUB3.filter(s=>s!==focus)],rows=[];let n=0;
     const pick=role=>{const open=pool.filter(t=>t.rem>=5&&t.ready!==false),owed=s=>open.some(x=>x.subj===s&&(x.type==='revision'||x.type==='homework'||(x.type==='lecture'&&x.cont)));
       const live=open.filter(t=>!(t.type==='lecture'&&!t.cont&&owed(t.subj))),f=t=>t.subj===focus?0:1,by=(fn)=>live.filter(fn).sort((a,b)=>f(a)-f(b))[0];
       if(role==='L')return by(t=>t.type==='lecture'&&t.cont&&t.subj===focus)||by(t=>t.subj===focus&&t.type==='revision')||by(t=>t.subj===focus&&t.type==='homework')||by(t=>t.type==='lecture'&&t.subj===focus)||by(t=>t.type==='lecture'&&t.cont)||pick('P');
@@ -1086,7 +1100,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     for(const g of segs){
       if(g.kind!=='study'){rows.push(g);continue;}
       if(o.now!=null&&g.e<=o.now){rows.push(Object.assign({},g,{title:'Earlier study block',past:true,subj:null}));continue;}
-      if(g.role==='G'){rows.push(Object.assign({},g,{subj:'german',title:GERMAN[(o.dayNo||0)%4]+(g.e-g.s>30?' (and more of the same)':''),task:{type:'german'}}));continue;}
+      if(g.role==='G'){rows.push(Object.assign({},g,{subj:'german',title:o.germanUnit!=null?germanTitle(o.germanUnit):GERMAN[(o.dayNo||0)%4],task:{type:'german'}}));continue;}
       if(g.role==='X'){rows.push(Object.assign({},g,{subj:'explore',title:'Exploration · a puzzle, a derivation, a simulation or a question you like (stop whenever)',task:{type:'explore'}}));continue;}
       if(g.role==='D'){rows.push(Object.assign({},g,{subj:'diploma',title:o.examPrep?'Diploma exam preparation':'Diploma work · assignments and submissions',task:{type:'diploma'}}));continue;}
       if(g.role==='Gphys'){rows.push(Object.assign({},g,{subj:'physics',title:'Physics · 15 minutes, then decide. Stopping after this is a complete day.',task:{type:'gentle'}}));continue;}
@@ -1098,6 +1112,7 @@ body.habit-shh #hb-session-card {text-align:center;}
         k.rem-=m;t=last;
         if(k.rem<5&&k.type==='lecture'){ // its whole-lecture revision becomes possible after this, never before
           pool.push({type:'revision',subj:k.subj,rem:REVMIN[k.subj],title:`Revise ${k.ref?.chapter||SNAME[k.subj]} · lecture ${k.ref?.lec||''} · the whole lecture (once it is finished)`,ref:k.ref,sim:true});
+          if(o.week&&k.ref&&k.ref.course!=null){const nx=nextAfter(o.syl,Object.assign({subj:k.subj},k.ref));if(nx)pool.push({type:'lecture',subj:k.subj,cont:false,rem:lecMin(o.syl,k.subj),title:`Watch ${nx.chapter} · lecture ${nx.lec} of ${nx.of}`,ref:nx});}
           if(!k.cont&&k.subj==='maths'&&!o.noSimHomework)pool.push({type:'homework',subj:'maths',rem:HWMIN.maths,title:`Homework from ${k.ref?.chapter||'Maths'} · lecture ${k.ref?.lec||''} (if set)`,sim:true});}
       }
     }
@@ -1114,7 +1129,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const examDays=[],prep=S.exams.find(x=>x&&x.from&&x.end&&x.from<=dayIso&&dayIso<=x.end);
     for(const x of S.exams)for(const d of (x&&x.days)||[])if(d&&d.d===dayIso){const at=+d.at,len=Math.max(180,+d.len||180),tr=Math.max(0,+d.travel||45);if(at>0)examDays.push({s:at-tr,e:at+len+tr,id:'exam-'+at,title:`${x.name||'Diploma exam'} · travel, exam and breaks`});}
     const food=((S.food||{})[dayIso]||[]).filter(f=>f&&+f.at>0).map((f,i)=>({s:+f.at,e:+f.at+Math.max(10,Math.min(45,+f.len||20)),id:'food-'+i,title:'Food break'}));
-    const opt=p=>({extend:!!(S.extend||{})[dayIso]&&!['sunday','gentle','reduced','stop'].includes(p),german:prep?(S.germanExam==='pause'?0:S.germanExam==='light'?15:S.german):S.german,pianoAt:(S.piano||{})[dayIso],pianoLen:S.pianoLen,blockers:examDays.concat(food),edits:((S.edits||{})[dayIso]||[])});
+    const opt=p=>({extend:!!(S.extend||{})[dayIso]&&!['sunday','gentle','reduced','stop'].includes(p),german:prep?(S.germanExam==='pause'?0:S.germanExam==='light'?15:S.german):S.german,pianoAt:(S.piano||{})[dayIso],pianoLen:S.pianoLen,budget:WEEK_BUDGET[(S.weekSize||{})[mondayOf(dayIso)]]||undefined,blockers:examDays.concat(food),edits:((S.edits||{})[dayIso]||[])});
     // switching plan mid-day keeps everything before the switch as it was and re-plans only what is left
     const sw=((S.switches||{})[dayIso]||[]).filter(x=>x&&x.at>W).sort((a,b)=>a.at-b.at);let segs;
     if(!sw.length){segs=skeleton(W,plan,Object.assign(opt(plan),{from:nowClock}));}
@@ -1129,12 +1144,26 @@ body.habit-shh #hb-session-card {text-align:center;}
     for(const role of ['P','H'])for(const g of segs.slice().reverse()){if(dip<5)break;if(g.kind!=='study'||g.role!==role||g.ext||(nowClock!=null&&g.e<=nowClock))continue;const len=g.e-g.s;
       if(len<=dip||len-dip<15){g.role='D';dip-=len;}else{const k=segs.indexOf(g);segs.splice(k+1,0,Object.assign({},g,{s:g.s+dip,role:g.role}));g.e=g.s+dip;g.role='D';dip=0;}}
 
-    const tasks=buildTasks(L,dayIso,{noNewLectures:!!prep});
+    const tasks=ctx.pool?[]:buildTasks(L,dayIso,{noNewLectures:!!prep});
     const focus=dayFocus(L,dayIso,ctx.actual14||{});
-    const {rows,deferred}=assign(segs,tasks,focus,{now:nowClock,dayNo:Math.floor(Date.parse(dayIso+'T12:00:00')/864e5),firstOfDay:!ctx.loggedAny,examPrep:!!prep});
+    const {rows,deferred}=assign(segs,tasks,focus,{now:nowClock,dayNo:Math.floor(Date.parse(dayIso+'T12:00:00')/864e5),firstOfDay:!ctx.loggedAny,examPrep:!!prep,pool:ctx.pool,week:!!ctx.pool,syl:L.syl||{},germanUnit:+S.germanUnit||0});
     const cut=(segs.cuts||[]).reduce((a,c)=>a+c.m,0);
     return {rows,deferred,cutMinutes:cut,plan,chosen,wake:W,focus,extend:!!opt(plan).extend,examPrep:prep?prep.name||'Diploma exams':'',examDays:examDays.length,switched:sw.length};
   }
+  const WEEK_BUDGET={lighter:270,minimal:150};
+  const mondayOf=d=>{const w=new Date(d+'T12:00:00').getDay();return add8(d,w===0?-6:1-w);};
+  // the next 7 days with one shared queue: what is expected to fit, with German and diploma reserved
+  function weekPreview(L,start,now,ctx0={}){
+    const S=schedOf(L),pool=buildTasks(L,start).map(t=>Object.assign({},t)),out=[],a14=Object.assign({},ctx0.actual14||{});
+    for(let k=0;k<7;k++){const d=add8(start,k),dow=new Date(d+'T12:00:00').getDay(),off=((L.dayTypes||{})[d]||{}).t==='rest';
+      if(off){out.push({d,dow,off:true,total:0,items:[]});continue;}
+      const mon=mondayOf(d),wk=+((S.diploma.heavy||{})[mon])||+S.diploma.week||0,dip=k===0?(+ctx0.diplomaToday||0):(dow===0?0:Math.ceil(wk/6/5)*5);
+      const t=templateDay(L,d,dow,k===0?now:null,Object.assign({},ctx0,{actual14:a14,pool,loggedAny:k===0?!!ctx0.loggedAny:true,diplomaToday:dip}));
+      const st=t.rows.filter(r=>r.kind==='study'&&!r.past),items=[];
+      for(const r of st){const key=r.title,last=items[items.length-1];if(last&&last.title===key)last.min+=r.e-r.s;else items.push({title:key,subj:r.subj,type:r.task&&r.task.type,min:r.e-r.s});}
+      for(const i of items)if(SUB3.includes(i.subj))a14[i.subj]=(a14[i.subj]||0)+i.min;
+      out.push({d,dow,plan:t.plan,focus:t.focus,total:st.reduce((n,r)=>n+r.e-r.s,0),items,size:(S.weekSize||{})[mon]||'full'});}
+    return out;}
   // rows for the desk: [id,title,kind,minutes,bucket,meta], starting at the wake time
   function templateRows(L,dayIso,dow,nowClock,ctx){
     const d=templateDay(L,dayIso,dow,nowClock,ctx),rows=[];const used={};
@@ -1190,7 +1219,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const daysLeft=w===0?0:7-w,loggedAny=ss.some(s=>s&&s.date===day&&s.subject!=='Other'&&(+s.minutes||0)>0)||Object.values(((desk.state||desk).days||{})[day]?.completed||{}).some(x=>+x>0)||!!(habit.active&&habit.active.date===day);
     return {actual14:a14,loggedAny,diplomaToday:daysLeft?Math.max(0,Math.ceil((target-dipDone)/daysLeft/5)*5):0,diplomaTarget:target,diplomaDone:dipDone,monday:mon};}
   const nowClock=()=>{const n=new Date();let m=n.getHours()*60+n.getMinutes();if(m<240)m+=1440;return m;};
-  const api={templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,forecast:(L,hist)=>forecast(L||labData(),hist||{}),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,forecast:(L,hist)=>forecast(L||labData(),hist||{}),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -8159,27 +8188,151 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     const sy = syl(), p = sy.pos[subj], n = SP().nextLecture(sy, subj), cur = p && p.course ? p : (n && !n.missing ? n : null); if (!cur) return null;
     const c = sy.courses[cur.course]; if (!c) return null; c.done = c.done || []; c.done[cur.ci] = Math.min(c.chapters[cur.ci][1] || 999, (c.done[cur.ci] || 0) + 1);
     const spent = (+((p && p.spent) || 0)) + (spentNow || 0); if (spent >= 30) { (sy.watch[subj] = sy.watch[subj] || []).push(Math.round(spent)); sy.watch[subj] = sy.watch[subj].slice(-30); }
-    const title = `${cur.chapter} · lecture ${cur.lec}`; sy.revs.push({ id: 'rv' + Date.now().toString(36), subj, title, done: false, made: today() }); delete sy.pos[subj];
+    const title = `${cur.chapter} · lecture ${cur.lec}`; sy.revs.push({ id: 'rv' + Date.now().toString(36), subj, title, done: false, made: today() }); delete sy.pos[subj]; S().flow = { d: today(), kind: 'revise', subj, title };
     audit('lecture finished', SN[subj] + ' · ' + title); return title;
   }
-  // minutes of the current block already behind you (for "spent so far" on an interrupted lecture)
-  const blockElapsed = v => v.cur && v.cur.kind === 'study' ? Math.max(0, Math.min(v.cur.minutes, v.now - v.cur.start)) : 0;
-  // ---- the card ----
-  function statusHTML(v) {
-    const c = v.cur, cs = c ? `<b>${esc(c.title)}</b> · ${hm(c.start)}–${hm(c.end)} · ${dur(c.end - v.now)} left on the planner` : 'No block right now';
-    const nb = v.nextBreak ? `${esc(v.nextBreak.title)} · ${hm(v.nextBreak.start)}–${hm(v.nextBreak.end)}` : 'none left today';
-    const sess = v.a ? `<p class="kl-small">⏱ Your session timer: <b>${v.sess} min</b>${v.a.running ? '' : ' (paused)'} on ${esc(v.a.subject || '')}. This is your actual study clock; the planner block above is wall-clock time.</p>` : '';
-    return `<div class="kg-day-stats"><p><span class="kl-small">Planned study</span><b>${dur(v.planned)}</b><small>German included · meals, breaks and piano excluded</small></p><p><span class="kl-small">Actually done</span><b>${dur(v.done)}</b><small>from your timer, pauses excluded</small></p></div>
-      <p class="kl-small">Now: ${cs}</p><p class="kl-small">Next protected break: <b>${nb}</b></p>${sess}`;
+  // lecture time comes only from the paused-aware session timer; a ledger (syl.timerSeen) remembers what each session already gave,
+  // so saving a timestamp and then finishing never counts the same minutes twice
+  const SUBKEY = { maths: 'math', physics: 'phys', chemistry: 'chem' };
+  function timerTake(subj, a) {
+    a = a === undefined ? window.__kgSession?.() : a; if (!a || !a.id) return 0;
+    const s = String(a.subject || '').toLowerCase(); if (!s.startsWith(SUBKEY[subj] || subj)) return 0;
+    if (/revis|homework/i.test(String(a.task || '') + ' ' + String(a.kind || ''))) return 0;
+    const min = Math.round(Math.min(+a.targetMs || Infinity, (+a.accruedMs || 0) + (a.running ? Date.now() - (+a.lastStart || Date.now()) : 0)) / 60000);
+    const sy = syl(), seen = sy.timerSeen = sy.timerSeen && typeof sy.timerSeen === 'object' ? sy.timerSeen : {};
+    const add = Math.max(0, min - (+seen[a.id] || 0)); seen[a.id] = Math.max(+seen[a.id] || 0, min);
+    const ks = Object.keys(seen); if (ks.length > 20) for (const k of ks.slice(0, ks.length - 20)) delete seen[k];
+    return add;
   }
-  function actionsHTML(v) {
-    const c = v.cur && v.cur.kind === 'study' ? v.cur : null, next = c || v.ahead[0];
-    const lt = curLectureTask(v), subj = lt?.task?.subj, pos = subj ? syl().pos[subj] : null;
+  window.__kgTimerTake = timerTake;
+  // ---- the card: three things up front (do this now, next protected break, change today); the rest folds away ----
+  // folded sections remember being open across re-renders
+  const keep = new Set((() => { try { return JSON.parse(sessionStorage.getItem('kg-day-open') || '[]'); } catch (_) { return []; } })());
+  document.addEventListener('toggle', e => { const d = e.target; if (!d || !d.dataset || !d.dataset.keep) return; d.open ? keep.add(d.dataset.keep) : keep.delete(d.dataset.keep); try { sessionStorage.setItem('kg-day-open', JSON.stringify([...keep])); } catch (_) {} }, true);
+  const ko = k => ` data-keep="${k}"${keep.has(k) ? ' open' : ''}`;
+  const DN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const NAME = s => SN[s] || (s === 'german' ? 'German' : s === 'diploma' ? 'Diploma' : s === 'explore' ? 'Exploration' : String(s || ''));
+  const dayIso = (d, k) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + k); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+  const short = t => String(t || '').replace(/^Watch (.+?) · lecture (\d+).*$/, '$1 L$2').replace(/^(?:Finish|Continue) (.+?) · lecture (\d+).*$/, 'finish $1 L$2').replace(/^Revise (.+?) · lecture (\d+).*$/, 'revise $1 L$2')
+    .replace(/^Homework from (.+?) · lecture (\d+).*$/, 'homework $1 L$2').replace(/^Homework · (.+?)(?: · next.*)?$/, 'homework: $1').replace(/^German · Unit (\d+).*$/, 'German unit $1').replace(/^Diploma work.*$/, 'diploma').replace(/^Exploration.*$/, 'exploration');
+  // the next 7 days, cached for two minutes (a preview, not a promise)
+  let wkCache = null;
+  function week() {
+    const key = today() + '|' + Math.floor(Date.now() / 120000) + '|' + JSON.stringify(S()).length + '|' + JSON.stringify(syl()).length;
+    if (!wkCache || wkCache.key !== key) { let data = []; try { data = SP().weekPreview(L, today()); } catch (_) {} wkCache = { key, data }; }
+    return wkCache.data;
+  }
+  // the lecture's own notes page (by lecture number when possible), for Open / Attach PDF
+  function lecNotes(subj, n) {
+    const k = SUBKEY[subj] || subj, all = (L.lectures || []).filter(e => String(e.subj || '').toLowerCase().startsWith(k)); if (!all.length) return null;
+    const re = n ? new RegExp('\\b(?:lec(?:ture)?\\.?\\s*|l)' + n + '\\b', 'i') : null, hit = re && all.slice().reverse().find(e => re.test(`${e.ch || ''} ${e.topic || ''} ${e.details || ''}`));
+    return hit ? { e: hit, exact: true } : { e: all[all.length - 1], exact: false };
+  }
+  function verbOf(r, first) {
+    const t = r.task || {}, title = String(r.title || '');
+    if (t.type === 'lecture') return (t.cont ? 'finish ' : 'watch ') + short(title).replace(/^finish /, '');
+    if (t.type === 'revision') return first ? short(title) : 'revise it';
+    if (t.type === 'homework') return `attempt the ${t.ref && t.ref.essential === false ? 'additional' : 'essential'} homework`;
+    return short(title);
+  }
+  // why this subject today, and when the other two come next
+  function reasonHTML(v) {
+    const f = v.info.focus; if (!f || !SN[f] || v.kind === 'rest' || ['sunday', 'gentle', 'stop'].includes(v.info.plan)) return '';
+    const seq = [], seen = new Set();
+    for (const r of v.ahead) { if (r.subj !== f || !r.task) continue; const k = r.task.type + '|' + r.title; if (seen.has(k)) continue; seen.add(k); seq.push(verbOf(r, !seq.length)); if (seq.length === 3) break; }
+    const said = seq.length ? (seq.length === 1 ? seq[0] : seq.slice(0, -1).join(', ') + ', then ' + seq[seq.length - 1]) : 'nothing more of it fits today';
+    const why = S().focus[v.d] && S().focus[v.d] !== 'auto' ? 'you picked it' : 'it is furthest below its share of your last two weeks';
+    const others = SUB.filter(s => s !== f).map(s => {
+      const r = v.ahead.find(x => x.subj === s); if (r) return `${SN[s]} today at ${hm(r.start)}: ${esc(short(r.title))}`;
+      const w = week().slice(1).find(x => x.items.some(i => i.subj === s)); if (!w) return `${SN[s]}: not in the next 7 days`;
+      return `${SN[s]} next on ${DN[w.dow]}: ${esc(short(w.items.find(i => i.subj === s).title))}`;
+    });
+    return `<p class="kl-small"><b>${esc(SN[f])}-heavy</b> (${why}): ${esc(said.charAt(0).toUpperCase() + said.slice(1))}.</p><p class="kl-small">${others.join(' · ')}</p>`;
+  }
+  const hwLine = h => [h.done ? 'done ' + h.done : '', h.next && !/^parked/.test(h.next) ? 'next ' + h.next : '', h.stuck ? 'stuck on ' + h.stuck + ' (in Doubts)' : ''].filter(Boolean).join(' · ');
+  function hwProgForm(h) {
+    return `<form data-f="kghwprog" class="kl-row" style="flex-wrap:wrap"><input type="hidden" name="id" value="${esc(h.id)}"><label class="kl-small">Done <input name="done" value="${esc(h.done || '')}" maxlength="40" placeholder="Q1–8" style="width:6em"></label><label class="kl-small">Next <input name="next" value="${esc(/^parked/.test(h.next || '') ? '' : h.next || '')}" maxlength="60" placeholder="Q9" style="width:6em"></label><label class="kl-small">Stuck on <input name="stuck" value="${esc(h.stuck || '')}" maxlength="60" placeholder="Q6" style="width:6em"></label><label class="kl-small">min left <input name="mins" type="number" min="10" max="300" value="${esc(h.mins || '')}" style="width:5em"></label><button>Save progress</button><button type="button" class="kl-ghost" data-a="kghwdone" data-v="${esc(h.id)}">All done</button></form>`;
+  }
+  function germanTools() {
+    const u = +S().germanUnit || 0, N = SP().GERMAN_SEQ.length;
+    return `<p class="kl-small">${esc(SP().germanTitle(u))}. Unit ${u % N + 1} of ${N}; it stays the same until you mark it done.</p><div class="kl-row"><button type="button" data-a="kgdgerman1" data-v="1">✓ Unit done, next one</button>${u ? '<button type="button" class="kl-ghost" data-a="kgdgerman1" data-v="-1">Back one</button>' : ''}</div>`;
+  }
+  function doNowHTML(v) {
+    const c = v.cur && v.cur.kind === 'study' ? v.cur : null, next = c || v.ahead[0], t = (next && next.task) || {}, subj = t.subj || (next && next.subj);
+    const fl = S().flow && S().flow.d === v.d ? S().flow : null;
+    const head = v.kind === 'rest' ? '<p><b>Day off.</b> Nothing is owed today.</p>' : !next ? `<p><b>Today's planned study is over.</b>${v.done ? ` Your timer recorded ${dur(v.done)}.` : ''} Nothing carries into the night.</p>`
+      : `<p class="kg-now-t"><b>${esc(next.title)}</b></p><p class="kl-small">${c ? `${hm(c.start)}–${hm(c.end)} · ${dur(c.end - v.now)} left on the planner` : `planned at ${hm(next.start)}`}</p>`;
+    const start = v.a ? `<button type="button" class="kl-primary" data-a="kgdgo" data-v="resume">⏱ Your timer · ${v.sess} min${v.a.running ? '' : ' (paused)'}</button>` : next && v.kind !== 'rest' ? `<button type="button" class="kl-primary" data-a="kgdgo" data-v="${esc(next.id)}">▶ ${c ? 'Start the timer' : 'Start early'}</button>` : '';
+    let tools = '';
+    if (next && t.type === 'lecture' && SN[subj]) {
+      const pos = syl().pos[subj], n = (pos && pos.lec) || (t.ref && t.ref.lec), ln = lecNotes(subj, n);
+      const pdf = !ln ? '<span class="kl-small">No notes page for this lecture yet (add one in Lectures).</span>' : ln.e.files && ln.e.files.length ? `<button type="button" data-a="kgnotesopen" data-v="${esc(ln.e.id)}">📄 ${ln.exact ? 'Open its notes / PDF' : 'Open latest notes: ' + esc(String(ln.e.topic || ln.e.ch || '').slice(0, 30))}</button>` : `<button type="button" data-a="kgnotesattach" data-v="${esc(ln.e.id)}">📎 Attach PDF${ln.exact ? '' : ' to latest notes'}</button>`;
+      tools = `<form data-f="kgdts" class="kl-row" style="flex-wrap:wrap"><input type="hidden" name="subj" value="${esc(subj)}"><label class="kl-small">Timestamp <input name="at" placeholder="1:02:30" value="${esc((pos && pos.at) || '')}" maxlength="12" style="width:7em"></label><button>Save timestamp</button><button type="button" data-a="kgdlecdone" data-v="${esc(subj)}">✓ Lecture finished</button>${pdf}</form><p class="kl-small">${pos && pos.spent ? `About ${Math.round(pos.spent)} min of timer time on this lecture so far. ` : ''}Lecture time comes only from your session timer, each minute counted once.</p>`;
+    } else if (next && t.type === 'homework' && t.ref && t.ref.id) tools = (hwLine(t.ref) ? `<p class="kl-small">${esc(hwLine(t.ref))}</p>` : '') + hwProgForm(t.ref);
+    else if (next && t.type === 'german') tools = germanTools();
+    let flow = '';
+    if (fl && fl.kind === 'revise') { const rv = v.ahead.find(r => r.task && r.task.type === 'revision' && r.subj === fl.subj);
+      flow = `<div class="kg-day-note"><p class="kl-small"><b>${esc(fl.title)} is finished.</b> Its whole-lecture revision is next${rv ? ` (on the plan at ${hm(rv.start)})` : ', first in line next study day'}.</p><div class="kl-row">${rv && !v.a ? `<button type="button" class="kl-primary" data-a="kgdgo" data-v="${esc(rv.id)}">▶ Start revision now</button>` : ''}<button type="button" class="kl-ghost" data-a="kgdflow">Later</button></div></div>`; }
+    if (fl && fl.kind === 'homework') { const open = syl().hw.find(h => h.status === 'open' && h.subj === fl.subj), hr = v.ahead.find(x => x.task && x.task.type === 'homework' && x.subj === fl.subj);
+      flow = `<div class="kg-day-note"><p class="kl-small"><b>Revision of ${esc(fl.title)} done.</b> ${open ? `Homework is next: ${esc(open.title)}.` : 'Was homework set for this lecture?'}</p>${open ? `<div class="kl-row">${hr && !v.a ? `<button type="button" class="kl-primary" data-a="kgdgo" data-v="${esc(hr.id)}">▶ Start homework</button>` : ''}<button type="button" class="kl-ghost" data-a="kgdflow">Later</button></div>`
+        : `<form data-f="kghwadd" class="kl-row" style="flex-wrap:wrap"><input type="hidden" name="subj" value="${esc(fl.subj)}"><input name="title" required maxlength="140" value="${esc(fl.title)} homework"><label class="kl-small">min <input name="mins" type="number" min="10" max="300" style="width:5em"></label><label class="kl-small"><input type="checkbox" name="extra"> additional</label><button>Add homework</button><button type="button" class="kl-ghost" data-a="kgdflow">No homework</button></form>`}</div>`; }
     const gentleEnded = v.info.plan === 'gentle' && v.rows.some(r => r.task?.type === 'gentle' && r.end <= v.now), gentleDone = gentleEnded && v.done >= 15;
-    const start = v.a ? `<button type="button" class="kl-primary" data-a="kgdgo" data-v="resume">⏱ Go to your running timer</button>` : next && next.kind === 'study' ? `<button type="button" class="kl-primary" data-a="kgdgo" data-v="${esc(next.id)}">▶ ${c ? 'Start this block' : 'Start next block early'}</button>` : '';
-    const lec = lt ? `<form data-f="kgdts" class="kl-row" style="flex-wrap:wrap"><input type="hidden" name="subj" value="${esc(subj)}"><label class="kl-small">${esc(SN[subj])} lecture timestamp <input name="at" placeholder="1:02:30" value="${esc(pos?.at || '')}" maxlength="12" style="width:7em"></label><button>Save timestamp</button><button type="button" data-a="kgdlecdone" data-v="${esc(subj)}">✓ Lecture finished</button>${pos?.at ? `<span class="kl-small">Saved at ${esc(pos.at)}${pos.spent ? ' · about ' + Math.round(pos.spent) + ' min watched so far' : ''}</span>` : ''}</form>` : '';
     const g = gentleEnded ? `<div class="kg-day-note"><p class="kl-small">${gentleDone ? '<b>Fifteen minutes done.</b> Your timer recorded it, and it counts as real study. Stopping now is a complete day.' : `<b>Your planned window has ended.</b> Your timer shows ${v.done} min today. Stopping is fine; or start the 15 minutes now if you'd like.`}</p><div class="kl-row"><button type="button" class="kl-primary" data-a="kgdplan" data-v="stop">Stop here for today</button><button type="button" data-a="kgdplan" data-v="reduced">One more block, then decide</button></div></div>` : '';
-    return `<div class="kl-row" style="flex-wrap:wrap">${start}<button type="button" data-a="kgdtalk">💬 Talk to Iroha about today</button><button type="button" class="kl-ghost" data-a="kgdplan" data-v="stop" title="Ends today's plan now. No permission needed.">Stop for today</button><button type="button" class="kl-ghost" data-a="kgdfood">🍽 Food break now</button></div>${g}${lec}`;
+    const nb = v.nextBreak;
+    return `<div class="kg-now3"><div class="kg-now kg-now-main"><p class="kl-eyebrow">DO THIS NOW</p>${head}${reasonHTML(v)}<div class="kl-row" style="flex-wrap:wrap">${start}</div>${tools}${flow}${g}</div>
+      <div class="kg-now"><p class="kl-eyebrow">NEXT PROTECTED BREAK</p><p><b>${nb ? esc(nb.title) : 'None left today'}</b></p>${nb ? `<p class="kl-small">${hm(nb.start)}–${hm(nb.end)} · in ${dur(nb.start - v.now)}</p>` : ''}<p class="kl-small">Done today: <b>${dur(v.done)}</b> on your timer · planned ${dur(v.planned)}</p></div>
+      <div class="kg-now"><p class="kl-eyebrow">CHANGE TODAY</p><div class="kl-row" style="flex-wrap:wrap"><button type="button" data-a="kgdtalk">💬 Talk to Iroha</button><button type="button" class="kl-ghost" data-a="kgdfood">🍽 Food break now</button><button type="button" class="kl-ghost" data-a="kgdplan" data-v="stop" title="Ends today's plan now. No permission needed.">Stop for today</button></div><details${ko('plan')}><summary class="kl-small">Plan, wake time, heavy subject</summary>${pickerHTML(v)}</details></div></div>`;
+  }
+  // ---- weekly check: estimated vs actual, one bottleneck, one change you apply (never more hours) ----
+  function weeklyCheck(v) {
+    const mon = SP().mondayOf(v.d), sc = S(); if ((sc.weekNote || {})[mon]) return { done: sc.weekNote[mon] };
+    const days = [1, 2, 3, 4, 5, 6, 7].map(k => dayIso(v.d, -k)), studyDays = days.filter(d => dowOf(d) !== 0 && (L.dayTypes || {})[d]?.t !== 'rest');
+    const act = d => Math.round(window.HabitDesk?.minutes?.(d) || 0), plan = d => Math.round((+L.planLog[d] || 0) * 60);
+    const withData = studyDays.filter(d => act(d) > 0), P0 = studyDays.reduce((n, d) => n + plan(d), 0), A0 = studyDays.reduce((n, d) => n + act(d), 0);
+    const nextDay = dayIso(v.d, dowOf(v.d) === 6 ? 2 : 1), nextMon = dayIso(mon, 7);
+    if (withData.length < 3) return { none: `Not enough timer history yet (${withData.length} of the last 6 study days). The check starts once 3 days are recorded.` };
+    let byS = {}; try { const h = JSON.parse(localStorage.getItem('ame-habit-v1') || '{}'); for (const s of (h.sessions || [])) { if (!days.includes(s.date)) continue; const k = SUB.find(x => String(s.subject || '').toLowerCase().startsWith(SUBKEY[x] || x)); if (k) byS[k] = (byS[k] || 0) + (+s.minutes || 0); } } catch (_) {}
+    const pcm = SUB.reduce((n, s) => n + (byS[s] || 0), 0), TARGET = { maths: .45, physics: .30, chem: .25 };
+    const est = `Planned about ${dur(P0)} across the last 6 study days; your timer recorded ${dur(A0)}.`;
+    if (P0 && A0 < P0 * 0.6) { const cur = (sc.weekSize || {})[nextMon] || 'full', to = cur === 'full' ? 'lighter' : cur === 'lighter' ? 'minimal' : null;
+      if (to) return { found: est + ' The plan asked for more than real days held.', text: `plan next week as a ${to} week (about ${to === 'lighter' ? '4 h 30' : '2 h 30'} a day)`, op: { k: 'week', mon: nextMon, size: to } }; }
+    const back = SUB.map(s => [s, syl().revs.filter(r => !r.done && r.subj === s).length]).sort((a, b) => b[1] - a[1])[0];
+    if (back[1] >= 3) return { found: `${est} ${back[1]} ${SN[back[0]]} revisions are waiting, which holds back its next lectures.`, text: `make ${DN[dowOf(nextDay)]} ${SN[back[0]]}-heavy, so its revisions come first`, op: { k: 'focus', d: nextDay, s: back[0] } };
+    if (pcm >= 300) { const low = SUB.map(s => [s, (byS[s] || 0) / pcm / TARGET[s]]).sort((a, b) => a[1] - b[1])[0];
+      if (low[1] < 0.5) return { found: `${est} ${SN[low[0]]} got ${Math.round((byS[low[0]] || 0) / pcm * 100)}% of your PCM time against a provisional ${Math.round(TARGET[low[0]] * 100)}%.`, text: `make ${DN[dowOf(nextDay)]} ${SN[low[0]]}-heavy`, op: { k: 'focus', d: nextDay, s: low[0] } }; }
+    const hwq = SUB.map(s => [s, syl().hw.filter(h => h.status === 'open' && h.essential !== false && h.subj === s).length]).sort((a, b) => b[1] - a[1])[0];
+    if (hwq[1] >= 4) return { found: `${est} ${hwq[1]} essential ${SN[hwq[0]]} homework sets are open.`, text: `make ${DN[dowOf(nextDay)]} ${SN[hwq[0]]}-heavy, so its homework comes before new lectures`, op: { k: 'focus', d: nextDay, s: hwq[0] } };
+    return { none: est + ' No bottleneck stands out, so no change is suggested.' };
+  }
+  function weekHTML(v) {
+    const w = week(), mon = SP().mondayOf(v.d), size = (S().weekSize || {})[mon] || 'full', adj = weeklyCheck(v);
+    const days = w.map(x => { const m = new Map(); for (const i of x.items) { const k = short(i.title); m.set(k, (m.get(k) || 0) + i.min); }
+      return `<li><span class="kg-tl-t">${DN[x.dow]} ${+x.d.slice(8)}</span> ${x.off ? 'day off' : `<b>${dur(x.total)}</b>`}${m.size ? ': ' + [...m].map(([k, n]) => `${esc(k)} <small>(${dur(n)})</small>`).join(', ') : ''}</li>`; }).join('');
+    const byS = {}; for (const x of w) for (const i of x.items) byS[i.subj] = (byS[i.subj] || 0) + i.min;
+    const sizes = [['full', 'Full', 'the normal plan'], ['lighter', 'Lighter', 'about 4 h 30 a day'], ['minimal', 'Minimal', 'about 2 h 30 a day']].map(([k, l, s]) => `<button type="button" data-a="kgdweek" data-v="${k}" aria-pressed="${size === k}"><b>${l}</b><small>${s}</small></button>`).join('');
+    const a = adj.done ? `<p class="kl-small"><b>Weekly check:</b> ${esc(adj.done)}</p>` : adj.none ? `<p class="kl-small"><b>Weekly check:</b> ${esc(adj.none)}</p>`
+      : `<div class="kg-day-note"><p class="kl-small"><b>Weekly check:</b> ${esc(adj.found)}</p><p class="kl-small">Suggestion: ${esc(adj.text)}. Nothing changes until you tap Apply, and it never adds hours.</p><div class="kl-row"><button type="button" class="kl-primary" data-a="kgdadj" data-v="apply">Apply</button><button type="button" class="kl-ghost" data-a="kgdadj" data-v="no">Not this week</button></div></div>`;
+    return `<details${ko('week')}><summary class="kl-small">This week · ${dur(w.reduce((n, x) => n + x.total, 0))} expected to fit${size !== 'full' ? ' · ' + size + ' week' : ''}${adj.op ? ' · 1 suggestion' : ''}</summary>
+      <p class="kl-small">What realistically fits in the next 7 days, in queue order, with German and diploma time held back. It's a preview from today's settings; real days will change it.</p><ul class="kl-list kg-tl">${days}</ul>
+      <p class="kl-small">By subject: ${Object.entries(byS).map(([s, m]) => esc(NAME(s)) + ' ' + dur(m)).join(' · ') || 'nothing planned'}</p>
+      <p class="kl-small">Size of this week (Mon–Sun). One tap changes every day of it; nothing to rebuild by hand.</p><div class="kg-plan-row" role="group" aria-label="Week size">${sizes}</div>${a}</details>`;
+  }
+  // ---- chapter readiness: lectures completed and "can solve on my own" stay separate ----
+  function finishedChapters() {
+    const sy = syl(), out = [];
+    for (const s of SUB) for (const id of ((sy.order || {})[s] || [])) { const c = (sy.courses || {})[id]; if (!c || !Array.isArray(c.chapters)) continue;
+      c.chapters.forEach(([name, n], k) => { if (n && ((c.done || [])[k] || 0) >= n) out.push({ s, key: id + ':' + k, name }); }); }
+    return out;
+  }
+  function readyHTML() {
+    const sy = syl(), R = sy.ready && typeof sy.ready === 'object' ? sy.ready : {}, Q = sy.readyQ && typeof sy.readyQ === 'object' ? sy.readyQ : {}, out = finishedChapters();
+    if (!out.length) return `<details${ko('ready')}><summary class="kl-small">Chapter readiness · no chapter finished yet</summary><p class="kl-small">When every lecture of a chapter is done, a short check appears here: one understanding question, one application problem and one method-choice problem, each from a named source. "Lectures completed" and "can solve on my own" are tracked separately.</p></details>`;
+    const L3 = ['understanding', 'application', 'method choice'];
+    const rows = out.slice(-8).reverse().map(x => { const r = R[x.key], q = Q[x.key];
+      const st = r ? `checked ${esc(r.d)}: solved on your own ${r.n}/3${r.n < 3 ? ' · recheck ' + esc(L3.filter((_, i) => !r.ok[i]).join(', ')) : ''}` : 'lectures complete · not checked yet';
+      return `<li><b>${esc(SN[x.s])} · ${esc(x.name)}</b> <small>${st}</small><div class="kl-row" style="flex-wrap:wrap"><button type="button" class="kl-ghost" data-a="kgdready" data-v="${esc(x.key)}" data-s="${esc(x.s)}" data-n="${esc(x.name)}">${q ? 'Ask for 3 new problems' : 'Ask Iroha for the 3 check problems'}</button></div>${q ? `<div class="kl-small" style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(q.text)}</div>` : ''}<form data-f="kgdreadyset" class="kl-row" style="flex-wrap:wrap"><input type="hidden" name="key" value="${esc(x.key)}"><span class="kl-small">Solved on my own, no hints:</span>${L3.map((l, i) => `<label class="kl-small"><input type="checkbox" name="c${i}"> ${l}</label>`).join('')}<button>Save result</button></form></li>`; }).join('');
+    const nReady = out.filter(x => (R[x.key] || {}).n === 3).length;
+    return `<details${ko('ready')}><summary class="kl-small">Chapter readiness · ${out.length} chapter${out.length === 1 ? '' : 's'} with lectures complete · ${nReady} solved independently</summary><p class="kl-small">Lectures completed is coverage. Solving all three on your own, with no hints, is readiness. They're kept separate.</p><ul class="kl-list">${rows}</ul></details>`;
   }
   function deferredHTML(v) {
     const list = v.info.deferred || [], cut = v.info.cutMinutes || 0;
@@ -8191,7 +8344,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
       const pastCls = r.end <= v.now ? ' style="opacity:.55"' : r.start <= v.now ? ' style="font-weight:700"' : '';
       return `<li${pastCls}><span class="kg-tl-t">${hm(r.start)}–${hm(r.end)}</span> ${r.kind === 'study' ? '📘 ' : r.kind === 'life' ? '🫖 ' : ''}${esc(r.title)}${r.kind === 'study' ? ` <small>(${r.minutes} min${r.optional ? ', optional' : ''})</small>` : ''}${r.entry ? ' <small>· starts with an easy entry</small>' : ''}</li>`;
     }).join('');
-    return `<details${v.ahead.length ? ' open' : ''}><summary class="kl-small">Today's plan, block by block · bedtime 1:30 AM</summary><ul class="kl-list kg-tl">${li}</ul></details>`;
+    return `<details${ko('tl')}><summary class="kl-small">Today's plan, block by block · bedtime 1:30 AM</summary><ul class="kl-list kg-tl">${li}</ul></details>`;
   }
   function pickerHTML(v) {
     const sc = S(), chosen = sc.plan[v.d] || 'auto', woke = sc.wake[v.d];
@@ -8206,11 +8359,11 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   function workHTML() {
     const sy = syl(), revs = sy.revs.filter(r => !r.done), hw = sy.hw.filter(h => h.status === 'open');
     const rv = revs.map(r => `<li>${esc(SN[r.subj])} · ${esc(r.title)} <button type="button" class="kl-ghost" data-a="kgdrev" data-v="${esc(r.id)}">Revision done</button></li>`).join('');
-    const hl = hw.map(h => `<li>${esc(SN[h.subj])} · ${esc(h.title)} <small>${h.essential === false ? 'additional' : 'essential'} · about ${h.mins || SP().HWMIN[h.subj]} min${h.next ? ' · next: ' + esc(h.next) : ''}</small> <button type="button" class="kl-ghost" data-a="kghwdone" data-v="${esc(h.id)}">Done</button><button type="button" class="kl-ghost" data-a="kghwess" data-v="${esc(h.id)}">${h.essential === false ? 'Make essential' : 'Make additional'}</button><button type="button" class="kl-ghost" data-a="kghwpark" data-v="${esc(h.id)}" title="Puts a stuck question in Doubts">Park a doubt</button></li>`).join('');
+    const hl = hw.map(h => `<li>${esc(SN[h.subj])} · ${esc(h.title)} <small>${h.essential === false ? 'additional' : 'essential'} · about ${h.mins || SP().HWMIN[h.subj]} min${hwLine(h) ? ' · ' + esc(hwLine(h)) : ''}</small> <button type="button" class="kl-ghost" data-a="kghwdone" data-v="${esc(h.id)}">Done</button><button type="button" class="kl-ghost" data-a="kghwess" data-v="${esc(h.id)}">${h.essential === false ? 'Make essential' : 'Make additional'}</button><button type="button" class="kl-ghost" data-a="kghwpark" data-v="${esc(h.id)}" title="Puts a stuck question in Doubts">Park a doubt</button><details><summary class="kl-small">Progress</summary>${hwProgForm(h)}</details></li>`).join('');
     const opts = SUB.map(s => `<option value="${s}">${SN[s]}</option>`).join('');
-    return `<details><summary class="kl-small">Revision and homework · ${revs.length} revision${revs.length === 1 ? '' : 's'} waiting · ${hw.length} homework open</summary>
+    return `<details${ko('work')}><summary class="kl-small">Revision, homework and German · ${revs.length} revision${revs.length === 1 ? '' : 's'} waiting · ${hw.length} homework open</summary>
       <p class="kl-small">A lecture's whole revision appears here only once the lecture is marked finished. Homework carries over to the next study day with its next step; it never pushes bedtime.</p>
-      ${rv ? `<ul class="kl-list">${rv}</ul>` : ''}${hl ? `<ul class="kl-list">${hl}</ul>` : ''}
+      ${rv ? `<ul class="kl-list">${rv}</ul>` : ''}${hl ? `<ul class="kl-list">${hl}</ul>` : ''}<p class="kl-small"><b>German</b></p>${germanTools()}
       <form data-f="kghwadd" class="kl-row" style="flex-wrap:wrap"><select name="subj">${opts}</select><input name="title" required maxlength="140" placeholder="e.g. Basic Maths L21 exercise 1-12"><label class="kl-small">min <input name="mins" type="number" min="10" max="300" style="width:5em"></label><label class="kl-small"><input type="checkbox" name="extra"> additional (not essential)</label><input name="next" maxlength="100" placeholder="next step (optional)"><button>Add homework</button></form></details>`;
   }
   function settingsHTML(v) {
@@ -8268,9 +8421,11 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     if (!SP()?.templateDay) return '';
     const v = view();
     return `<section class="kl-card kg-plan kg-day"><p class="kl-eyebrow">YOUR STUDY DAY · ${esc(planLabel(v))}${v.info.examPrep ? ' · exam period: ' + esc(v.info.examPrep) : ''}</p>
-      ${statusHTML(v)}${actionsHTML(v)}${deferredHTML(v)}${changesHTML()}${timelineHTML(v)}${pickerHTML(v)}
+      ${doNowHTML(v)}${deferredHTML(v)}${changesHTML()}
+      <details class="kg-more"${ko('more')}><summary>More: today's blocks, this week, homework and German, readiness, settings</summary>
+      ${timelineHTML(v)}${weekHTML(v)}${workHTML()}${readyHTML()}
       <p class="kl-small">Six hours is a complete normal day. Late days are shorter by design, not failed. Meals, your commitment, breaks and bedtime come before any task; unfinished work moves on, it is never squeezed in.</p>
-      ${workHTML()}${settingsHTML(v)}${forecastHTML()}</section>`;
+      ${settingsHTML(v)}${forecastHTML()}</details></section>`;
   };
   // ---- actions ----
   const toast = t => M.K?.(t);
@@ -8284,8 +8439,21 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     kgdfood: () => { const d = today(), at = Math.ceil(nowC() / 5) * 5; (S().food[d] = S().food[d] || []).push({ at, len: 20 }); window.HabitDesk?.pauseActive?.(); audit('food break', clk(at)); redo('food break now. the plan makes room; nothing gets squeezed later 🌙'); },
     kgdgo: b => { if (b.dataset.v === 'resume') { M.go('today'); document.getElementById('hb-session-card')?.scrollIntoView({ behavior: 'smooth' }); return; }
       if (!window.HabitDesk?.startBlock) return toast('open the desk below to start a timer 🌙'); window.HabitDesk.startBlock(b.dataset.v); },
-    kgdlecdone: b => { const s = b.dataset.v, v = view(), lt = curLectureTask(v), extra = lt && v.cur === lt ? blockElapsed(v) : 0; const t = finishLecture(s, extra); if (!t) return toast('no lecture to finish for ' + SN[s]); redo(`${t} finished. its whole-lecture revision is next in line 🌙`); },
-    kgdrev: b => { const r = syl().revs.find(x => x.id === b.dataset.v); if (!r) return; r.done = true; r.doneD = today(); audit('revision done', SN[r.subj] + ' · ' + r.title); redo('revision marked done 🌙'); },
+    kgdlecdone: b => { const s = b.dataset.v; const t = finishLecture(s, timerTake(s)); if (!t) return toast('no lecture to finish for ' + SN[s]); redo(`${t} finished. its whole-lecture revision is next in line 🌙`); },
+    kgdrev: b => { const r = syl().revs.find(x => x.id === b.dataset.v); if (!r) return; r.done = true; r.doneD = today(); S().flow = { d: today(), kind: 'homework', subj: r.subj, title: r.title }; audit('revision done', SN[r.subj] + ' · ' + r.title); redo('revision marked done 🌙'); },
+    kgdflow: () => { delete S().flow; redo(); },
+    kgdgerman1: b => { const u = Math.max(0, (+S().germanUnit || 0) + (+b.dataset.v || 0)); S().germanUnit = u; audit('German unit', SP().germanTitle(u)); redo(+b.dataset.v > 0 ? 'next German unit is ready for your next German block 🌙' : ''); },
+    kgdweek: b => { const k = b.dataset.v, mon = SP().mondayOf(today()), ws = S().weekSize = S().weekSize || {}; if (!['full', 'lighter', 'minimal'].includes(k)) return; if (k === 'full') delete ws[mon]; else ws[mon] = k; audit('week size', k + ' from ' + mon); redo(k === 'full' ? 'back to the normal week 🌙' : `a ${k} week: every day of it is smaller, nothing to catch up later 🌙`); },
+    kgdadj: b => { const v = view(), adj = weeklyCheck(v), mon = SP().mondayOf(v.d), sc = S(); sc.weekNote = sc.weekNote || {}; if (!adj.op) return;
+      if (b.dataset.v !== 'apply') { sc.weekNote[mon] = 'you chose no change this week.'; audit('weekly check', 'no change'); return redo(); }
+      if (adj.op.k === 'week') (sc.weekSize = sc.weekSize || {})[adj.op.mon] = adj.op.size; else if (adj.op.k === 'focus' && SUB.includes(adj.op.s)) sc.focus[adj.op.d] = adj.op.s;
+      sc.weekNote[mon] = 'applied: ' + adj.text + '.'; audit('weekly check applied', adj.text); redo('applied. you can change it back any time 🌙'); },
+    kgdready: async b => { const key = b.dataset.v, s = b.dataset.s, name = b.dataset.n, sy = syl(); if (!window.__kgAsk) return toast('Iroha is unavailable right now. Three questions from your notes or NCERT exercises work too 🌙');
+      const msg = `Readiness check for ${SN[s]} · ${name}. I've finished every lecture of this chapter. Give me exactly 3 problems: (1) understanding: explain or predict, little calculation; (2) application: a standard JEE Main-level problem; (3) method choice: a problem where I must decide which approach to use and say why before solving. Take each from a real source and name it (an NCERT exercise or example number, or a JEE previous-year question with its year); if you can't name a real source, say so rather than inventing one. No hints or answers yet: I'll attempt them first, then ask you to check.`;
+      b.disabled = true; b.textContent = 'asking Iroha…'; let text = '';
+      try { const r = await window.__kgAsk('iroha', msg); text = r && typeof r.reply === 'string' ? r.reply.trim() : ''; } catch (_) {}
+      if (!text) { b.disabled = false; b.textContent = 'Ask Iroha for the 3 check problems'; return toast('Iroha could not answer just now 🌙'); }
+      (sy.readyQ = sy.readyQ && typeof sy.readyQ === 'object' ? sy.readyQ : {})[key] = { d: today(), text: text.slice(0, 3000) }; audit('readiness problems', SN[s] + ' · ' + name); redo(); },
     kghwdone: b => { const h = syl().hw.find(x => x.id === b.dataset.v); if (!h) return; h.status = 'done'; h.doneD = today(); audit('homework done', h.title); redo(); },
     kghwess: b => { const h = syl().hw.find(x => x.id === b.dataset.v); if (!h) return; h.essential = h.essential === false; redo(); },
     kghwpark: b => { const h = syl().hw.find(x => x.id === b.dataset.v); if (!h) return; const q = prompt('Which question are you stuck on? It goes to Doubts with this homework.', ''); if (!q) return; (L.doubts = L.doubts || []).push({ id: Date.now().toString(36), ch: '', t: `${SN[h.subj]} · ${h.title}: ${q}`.slice(0, 400), d: today(), done: false }); h.next = 'parked: ' + q.slice(0, 60); redo('parked in Doubts. the rest of the homework can go on 🌙'); },
@@ -8296,9 +8464,13 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   });
   Object.assign(M.FORMS, {
     kgdwake: v => { const c = readClock(v.at); if (c == null) return toast('pick the time you woke up 🌙'); if (c > 1290) return toast('after 9:30 PM there is no study to plan. rest; tomorrow starts fresh 🌙'); const d = today(); S().wake[d] = Math.round(c / 5) * 5; delete S().switches[d]; if (WAKE[S().plan[d]]) S().plan[d] = 'auto'; audit('wake time', clk(c)); redo(); },
-    kgdts: v => { const s = v.subj; if (!SUB.includes(s)) return; const at = String(v.at || '').trim(); if (at && !/^\d{1,2}(:\d{2}){1,2}$/.test(at)) return toast('type it like 42:10 or 1:02:30 🌙'); const vw = view(), lt = curLectureTask(vw); const add = lt && vw.cur === lt ? blockElapsed(vw) : 0;
-      const p = syl().pos[s]; const already = p && p.lastBlock === (vw.cur && vw.cur.id) ? (p.lastAdd || 0) : 0; if (!saveTimestamp(s, at, Math.max(0, add - already))) return toast('no lecture in progress for ' + SN[s]); syl().pos[s].lastBlock = vw.cur && vw.cur.id; syl().pos[s].lastAdd = add; audit('lecture timestamp', SN[s] + ' ' + at); redo('timestamp saved. it picks up from there next time 🌙'); },
-    kghwadd: v => { const t = String(v.title || '').trim(); if (!t || !SUB.includes(v.subj)) return; syl().hw.push({ id: 'hw' + Date.now().toString(36), subj: v.subj, title: t.slice(0, 140), essential: !v.extra, mins: Math.max(10, Math.min(300, +v.mins || SP().HWMIN[v.subj])), next: String(v.next || '').slice(0, 100), status: 'open', made: today() }); audit('homework added', t); redo(); },
+    kgdts: v => { const s = v.subj; if (!SUB.includes(s)) return; const at = String(v.at || '').trim(); if (at && !/^\d{1,2}(:\d{2}){1,2}$/.test(at)) return toast('type it like 42:10 or 1:02:30 🌙'); const seen0 = JSON.stringify(syl().timerSeen || {}); const add = timerTake(s);
+      if (!saveTimestamp(s, at, add)) { syl().timerSeen = JSON.parse(seen0); return toast('no lecture in progress for ' + SN[s]); } delete syl().pos[s].lastBlock; delete syl().pos[s].lastAdd; audit('lecture timestamp', SN[s] + ' ' + at); redo('timestamp saved. it picks up from there next time 🌙'); },
+    kghwadd: v => { const t = String(v.title || '').trim(); if (!t || !SUB.includes(v.subj)) return; if (S().flow && S().flow.kind === 'homework') delete S().flow; syl().hw.push({ id: 'hw' + Date.now().toString(36), subj: v.subj, title: t.slice(0, 140), essential: !v.extra, mins: Math.max(10, Math.min(300, +v.mins || SP().HWMIN[v.subj])), next: String(v.next || '').slice(0, 100), status: 'open', made: today() }); audit('homework added', t); redo(); },
+    kghwprog: v => { const h = syl().hw.find(x => x.id === v.id); if (!h) return; h.done = String(v.done || '').trim().slice(0, 40); h.next = String(v.next || '').trim().slice(0, 60); const st = String(v.stuck || '').trim().slice(0, 60), fresh = st && st !== h.stuck;
+      if (fresh) (L.doubts = L.doubts || []).push({ id: Date.now().toString(36), ch: '', t: `${SN[h.subj]} · ${h.title}: stuck on ${st}`.slice(0, 400), d: today(), done: false });
+      h.stuck = st; if (+v.mins) h.mins = Math.max(10, Math.min(300, Math.round(+v.mins))); audit('homework progress', h.title + (hwLine(h) ? ' · ' + hwLine(h) : '')); redo(fresh ? 'saved. the stuck question is in Doubts, so the rest can go on 🌙' : 'progress saved. it carries over with what is left 🌙'); },
+    kgdreadyset: v => { const k = String(v.key || ''); if (!finishedChapters().some(x => x.key === k)) return; const ok = [!!v.c0, !!v.c1, !!v.c2], sy = syl(); (sy.ready = sy.ready && typeof sy.ready === 'object' ? sy.ready : {})[k] = { d: today(), ok, n: ok.filter(Boolean).length }; audit('readiness result', k + ' ' + ok.filter(Boolean).length + '/3'); redo(ok.every(Boolean) ? 'all three on your own: that chapter is ready 🌙' : 'saved. the ones to recheck are listed with the chapter 🌙'); },
     kgdgerman: v => { const m = +v.min; if (![15, 30, 45, 60, 75, 90].includes(m)) return; S().german = m; audit('German minutes', m); redo(`German ${m} min a day, inside the same study total 🌙`); },
     kgdpiano: v => { const d = today(), c = v.at ? readClock(v.at) : null; if (c == null) delete S().piano[d]; else S().piano[d] = c; S().pianoLen = +v.len === 30 ? 30 : 45; redo(); },
     kgmeds: v => { const s = String(v.at || '').trim(); if (!s) { delete L.medsAt; return redo(); } const c = readClock(s); if (c == null || c < 1080 || c > 1525) return toast('pick a time between 6 PM and 1:25 AM 🌙'); L.medsAt = c - 630; redo(`reminder at ${clk(c)} 🌙`); },
@@ -8329,7 +8501,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     kghome: () => { const n = new Date(), m = n.getHours() * 60 + n.getMinutes(); (L.homeAt = L.homeAt || {})[today()] = (m < 240 ? m + 1440 : m) - 630; redo(); }
   });
   const css = document.createElement('style');
-  css.textContent = '.kg-day-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}.kg-day-stats p{margin:0;padding:8px 10px;border-radius:12px;background:rgba(127,227,255,.08);display:flex;flex-direction:column}.kg-day-stats b{font-size:20px}.kg-day-stats small{opacity:.75;font-size:11px}.kg-tl{max-height:320px;overflow:auto}.kg-tl li{padding:2px 0}.kg-tl-t{display:inline-block;min-width:9.5em;opacity:.8;font-variant-numeric:tabular-nums}.kg-day-note{border-left:3px solid #7fe3ff;padding:6px 10px;margin:8px 0;border-radius:0 10px 10px 0;background:rgba(127,227,255,.06)}@media(max-width:480px){.kg-day-stats{grid-template-columns:1fr}.kg-tl-t{min-width:8.5em}}';
+  css.textContent = '.kg-now3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin:8px 0}.kg-now{padding:10px 12px;border-radius:14px;background:rgba(127,227,255,.07);min-width:0}.kg-now p{margin:0 0 6px}.kg-now .kl-eyebrow{margin-bottom:4px}.kg-now-main{background:rgba(127,227,255,.13)}.kg-now-t{font-size:17px}.kg-more>summary{cursor:pointer;font-weight:700;margin:6px 0}@media (max-width:900px){.kg-now3{grid-template-columns:1fr}}.kg-day-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}.kg-day-stats p{margin:0;padding:8px 10px;border-radius:12px;background:rgba(127,227,255,.08);display:flex;flex-direction:column}.kg-day-stats b{font-size:20px}.kg-day-stats small{opacity:.75;font-size:11px}.kg-tl{max-height:320px;overflow:auto}.kg-tl li{padding:2px 0}.kg-tl-t{display:inline-block;min-width:9.5em;opacity:.8;font-variant-numeric:tabular-nums}.kg-day-note{border-left:3px solid #7fe3ff;padding:6px 10px;margin:8px 0;border-radius:0 10px 10px 0;background:rgba(127,227,255,.06)}@media(max-width:480px){.kg-day-stats{grid-template-columns:1fr}.kg-tl-t{min-width:8.5em}}';
   document.head.appendChild(css);
   const todayPanel = M.PANELS.today;
   M.PANELS.today = () => card() + todayPanel();
