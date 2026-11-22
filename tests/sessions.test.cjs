@@ -46,5 +46,34 @@ test("the chain was reset to 3 on 21 Nov 2026 and grows from there", () => {
   const h = studied(["2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20", "2026-11-21"]);
   assert.strictEqual(C.history(h, {}, "2026-11-21").chain, 3);
   h.sessions.push({ date: "2026-11-23", minutes: 500, subject: "Maths" });
-  assert.strictEqual(C.history(h, {}, "2026-11-23").chain, 4);
+  // Mon 23 Nov has an 8 h plan; Sun 22 Nov is a rest day in between and adds nothing
+  assert.strictEqual(withPlan({ "2026-11-22": 0, "2026-11-23": 8 }).history(h, {}, "2026-11-23").chain, 4);
 });
+
+test("a planned rest day (0 study minutes planned) keeps the chain without adding a day", () => {
+  const store = { "kg-lab-v1": JSON.stringify({ planLog: { "2026-11-11": 0 } }) };
+  const c2 = { Date, Math, JSON, Number, String, Object, Array, Set, Map, console, localStorage: { getItem: k => store[k] ?? null, setItem() {} } };
+  c2.globalThis = c2;
+  vm.runInNewContext(scripts.find(x => x.includes("root.StudyPlan=api")), c2);
+  vm.runInNewContext(scripts.find(x => x.includes("root.HabitCore=api")), c2);
+  const hist = studied(["2026-11-10", "2026-11-12"]);
+  assert.strictEqual(c2.HabitCore.history(hist, {}, "2026-11-12").chain, 2);
+  assert.strictEqual(c2.HabitCore.history(hist, {}, "2026-11-12").statuses["2026-11-11"], "rest");
+});
+test("a rest day right after the 21 Nov reset leaves the chain at 3", () => {
+  const store = { "kg-lab-v1": JSON.stringify({ planLog: { "2026-11-22": 0 } }) };
+  const c2 = { Date, Math, JSON, Number, String, Object, Array, Set, Map, console, localStorage: { getItem: k => store[k] ?? null, setItem() {} } };
+  c2.globalThis = c2;
+  vm.runInNewContext(scripts.find(x => x.includes("root.StudyPlan=api")), c2);
+  vm.runInNewContext(scripts.find(x => x.includes("root.HabitCore=api")), c2);
+  const hist = studied(["2026-11-20", "2026-11-21"]);
+  assert.strictEqual(c2.HabitCore.history(hist, {}, "2026-11-22").chain, 3);
+});
+function withPlan(planLog) {
+  const store = { "kg-lab-v1": JSON.stringify({ planLog }) };
+  const c2 = { Date, Math, JSON, Number, String, Object, Array, Set, Map, console, localStorage: { getItem: k => store[k] ?? null, setItem(k, v) { store[k] = v; } } };
+  c2.globalThis = c2;
+  vm.runInNewContext(scripts.find(x => x.includes("root.StudyPlan=api")), c2);
+  vm.runInNewContext(scripts.find(x => x.includes("root.HabitCore=api")), c2);
+  return c2.HabitCore;
+}
