@@ -9074,6 +9074,47 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
 })();
 
 </script>
+<script>
+/* ===== FlowKit: the guided session's pure rules (worked-example fading, what a check covers, fresh-problem records).
+   No page access here, so tests/flow.test.cjs can check them directly. ===== */
+(function (root) {
+  'use strict';
+  const S = x => String(x == null ? '' : x).trim();
+  // a worked example: its own Problem box when filled (kept whole, however many lines); otherwise the first line is the problem.
+  // Solution steps are the remaining non-empty lines.
+  const exSplit = (problem, solution) => {
+    const lines = String(solution || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean), p = S(problem);
+    return p ? { problem: p, steps: lines.slice(0, 60) } : { problem: lines[0] || '', steps: lines.slice(1, 61) };
+  };
+  // backward fading over n steps (0-based): level 1 hides the last third, level 2 two thirds. Needs at least 2 steps.
+  const fadeHide = (n, lvl) => {
+    if (!(n >= 2) || !(lvl > 0)) return [];
+    const k = Math.min(n, lvl >= 2 ? Math.max(2, Math.round(n * 2 / 3)) : Math.max(1, Math.round(n / 3)));
+    return Array.from({ length: k }, (_, i) => n - k + i);
+  };
+  // everything a check reads: a reply only counts if this is unchanged when it arrives
+  const checkKey = f => JSON.stringify([f.id, f.act, f.attempt, f.ka, f.ref, f.exProb, f.example, f.exampleWhy, f.topic, f.mPrin, f.mWhy, f.mAlt]);
+  // Method first, as Iroha sees it: what I chose before calculating, and what to judge
+  const methodNote = f => !S(f.mPrin) ? { given: '', ask: '' } : {
+    given: '\n\nMy method choice, written before I calculated:\nPrinciple: ' + S(f.mPrin) + '\nWhy it applies: ' + (S(f.mWhy) || '(not given)') + '\nTempting alternative and why not: ' + (S(f.mAlt) || '(not given)'),
+    ask: ' Also judge my method choice: under "Right:" say whether the principle fits and name the cue in the problem that signals it. If the principle, my reason for it, or my rejection of the alternative is wrong, that is the Gap, and Type is "Principle".'
+  };
+  // the fresh problem kept in full on the session record: question, my answer, Iroha's feedback, and whether it was checked
+  const freshRecord = f => !S(f.freshQ) ? null : { q: S(f.freshQ).slice(0, 1500), a: S(f.freshA).slice(0, 3000), fb: S(f.freshFb).slice(0, 1200), checked: !!S(f.freshFb), ok: !!f.freshOk };
+  // a failed fresh problem becomes the mistake to revisit: its own question and my failed working, linked to the skill and the repair
+  const freshMistake = (f, d, ch, due) => !(S(f.freshQ) && S(f.freshFb) && !f.freshOk) ? null : {
+    d, ok: false, src: 'fresh', parent: f.id || '', sk: f.skillId || '', ch: ch || '',
+    q: ('Fresh problem on ' + S(f.topic) + ': ' + S(f.freshQ)).slice(0, 600), mine: S(f.freshA).slice(0, 1200), why: S(f.freshFb).slice(0, 600),
+    cause: f.errType === 'slip' ? 'careless slip' : 'knowledge gap', fix: S(f.fix).slice(0, 200), due, st: 0
+  };
+  // storage stays small: the newest records keep their fresh work in full, older ones keep a short question and the result
+  const trimLog = (log, keep = 30) => (log || []).map((r, i, a) => i >= a.length - keep || !r || !r.fresh ? r : { ...r, fresh: { q: S(r.fresh.q).slice(0, 300), checked: !!r.fresh.checked, ok: !!r.fresh.ok } });
+  // a draft brought back after a reload: no check is still running, and old drafts get the fields newer steps expect
+  const restore = f => !f ? f : { ...f, busy: '', fadeAns: f.fadeAns && typeof f.fadeAns === 'object' ? f.fadeAns : {}, fadeLvl: Number(f.fadeLvl) || 0, requireVerification: true };
+  const api = { exSplit, fadeHide, checkKey, methodNote, freshRecord, freshMistake, trimLog, restore };
+  root.FlowKit = api;
+})(globalThis);
+</script>
 <script id="kg-session-script">
 /* ===== Guided session: goal → attempt → feedback → repair → save, in a quiet workspace (Study · Session).
    Six activities. In Explain (Feynman mode) Kaguya listens and asks the curious question, then Iroha checks.
@@ -9100,7 +9141,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   const stepsOf = f => ['goal', ...(f.opener ? ['warmup'] : []), ...(f.act === 'worked' ? ['example'] : []), 'attempt', 'feedback', 'repair', 'recap', 'save'];
   const SUBJS = ['Maths', 'Physics', 'Chemistry', 'Mixed'];
   L.flowLog = L.flowLog || [];
-  if (L.flow) L.flow.busy = '';
+  if (L.flow) L.flow = window.FlowKit.restore(L.flow); // a reload mid-check: usable again, work kept
   const blank = o => Object.assign({ id: M.uid(), act: '', subj: 'Maths', topic: '', goal: '', lec: '', miss: '', dispute: '', disputed: '', stretch: '', opener: '', warm: '', rc1: '', rc2: '', rc3: '', rcfb: '', since: '', rq: '', ra: '', cardId: '', energy: 'ordinary', ref: '', cmp: null, src: '', parking: false, mins: 25, step: 'goal', attempt: '', kq: '', ka: '', fb: '', right: '', gap: '', fix: '', repair: '', rfb: '', fixed: false, made: today(), started: 0, desk: false, busy: '', requireVerification: true, verified: false, verificationSource: '', supported: false, transfer: false, example: '', exampleWhy: '' }, o || {});
   const lecture = id => (L.lectures || []).find(e => e.id === id);
   const lecLabel = e => [e.subj, e.ch ? M.chName(e.ch) : '', e.topic].filter(Boolean).join(' · ');
@@ -9150,9 +9191,9 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   const ENERGY = { demanding: ' I have energy today, so make the repair task a harder application or an independent derivation.', lighter: " I'm low on energy today, so keep the repair task very small and kind.", ordinary: '' };
   const BLURT = ' This is a blurt: before Right, Gap and Repair, add four lines comparing it with the reference (or with what the topic needs if there is none), each starting with its label: "Recalled:" what I got right, "Missing:" what I left out, "Incorrect:" what I got wrong, "Unclear:" anything unreadable or uncertain in the source, or "None." for any of them. Accept diagrams in words and derivations, not only lists of facts.';
   const kagNote = f => f.kq ? `\n\nKaguya, listening, asked: "${f.kq}"\nMy answer: ${f.ka.trim() || '(I skipped it)'}` : '';
-  const checkPrompt = (f, A, kag, extra = '') => `[guided session, not typed by me. Activity: ${A.name}: ${A.what} Subject: ${f.subj}. Topic: ${f.topic}.${f.goal ? ` My goal: ${f.goal}.` : ''}${notes(f)}]${hasMethod(f) ? `\n\nMy method choice, written before I calculated:\nPrinciple: ${String(f.mPrin).trim()}\nWhy it applies: ${String(f.mWhy || '').trim() || '(not given)'}\nTempting alternative and why not: ${String(f.mAlt || '').trim() || '(not given)'}` : ''}\n\nMy attempt:\n${f.attempt.trim()}${kag}\n\n[How to check it: ${A.check}${extra}${hasMethod(f) ? ' Also judge my method choice: under "Right:" say whether the principle fits and name the cue in the problem that signals it. If the principle, my reason for it, or my rejection of the alternative is wrong, that is the Gap, and Type is "Principle".' : ''} Reply in plain text in exactly four short parts, each on its own line and starting with its label. "Right:" what is correct (say "Correct." plainly if all of it is). "Gap:" the single most important thing that is missing or wrong, and why it matters, or "None." "Repair:" one small task I can do in under five minutes that fixes that gap, or "None." "Type:" "Slip" if the idea and method were right but the execution went wrong (algebra, arithmetic, sign, units, copying, misreading), "Principle" if a law, definition, assumption or choice of method was wrong, or "None." if there is no gap. Nothing else.]`;
+  const checkPrompt = (f, A, kag, extra = '') => `[guided session, not typed by me. Activity: ${A.name}: ${A.what} Subject: ${f.subj}. Topic: ${f.topic}.${f.goal ? ` My goal: ${f.goal}.` : ''}${notes(f)}]${window.FlowKit.methodNote(f).given}\n\nMy attempt:\n${f.attempt.trim()}${kag}\n\n[How to check it: ${A.check}${extra}${window.FlowKit.methodNote(f).ask} Reply in plain text in exactly four short parts, each on its own line and starting with its label. "Right:" what is correct (say "Correct." plainly if all of it is). "Gap:" the single most important thing that is missing or wrong, and why it matters, or "None." "Repair:" one small task I can do in under five minutes that fixes that gap, or "None." "Type:" "Slip" if the idea and method were right but the execution went wrong (algebra, arithmetic, sign, units, copying, misreading), "Principle" if a law, definition, assumption or choice of method was wrong, or "None." if there is no gap. Nothing else.]`;
   // what a check was asked about; a reply only counts if this is unchanged when it arrives
-  const sentKey = f => JSON.stringify([f.id, f.act, f.attempt, f.ka, f.ref, f.example, f.exampleWhy, f.topic, f.mPrin, f.mWhy, f.mAlt]);
+  const sentKey = f => window.FlowKit.checkKey(f);
   async function check() {
     const f = L.flow, A = ACTS[f.act]; if (!f || f.busy) return;
     if (!f.attempt.trim()) return M.I('Write your attempt first. One line or one equation is enough if that is the answer.', { face: 'study' });
@@ -9259,6 +9300,10 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   const chLabel = ch => (typeof M.chName === 'function' ? M.chName(ch) : '') || ch;
   const skillPick = f => (L.skills || []).length ? `<label>Skill that gets credit <select name="sk" data-flowsk>${skillOpts(f, true)}</select></label><p class="kl-small kg-flow-hint">When a lecture has several skills, pick the one you're practising. Without a pick, only a lecture with a single skill gets credit.</p>` : '';
   const creditName = f => { const id = window.StudyPlan.creditTarget(L.skills || [], { sk: f.skillId, lec: f.lec }); return id ? (L.skills || []).find(s => s.id === id)?.name || '' : ''; };
+  // a past session, reopened: its method choice and fresh problem, with your answer and Iroha's feedback
+  const recDetail = x => { const p = []; if (x.method?.p) p.push(`<p><b>Method:</b> ${esc(x.method.p)}${x.method.w ? ' · ' + esc(x.method.w) : ''}${x.method.a ? '<br><span class="kl-small">Not: ' + esc(x.method.a) + '</span>' : ''}</p>`);
+    if (x.fresh?.q) p.push(`<p><b>Fresh problem (${x.fresh.checked ? (x.fresh.ok ? 'solved' : 'not yet') : 'not checked'}):</b></p><p class="kl-pre">${esc(x.fresh.q)}</p>${x.fresh.a ? `<p class="kl-small"><b>Your answer:</b></p><p class="kl-pre">${esc(x.fresh.a)}</p>` : ''}${x.fresh.fb ? `<p class="kl-small"><b>Iroha:</b> ${esc(x.fresh.fb)}</p>` : ''}`);
+    return p.length ? `<details class="kg-rec-detail"><summary class="kl-small">Open</summary>${p.join('')}</details>` : ''; };
   function goalStep(f) {
     const lecs = (L.lectures || []).filter(e => e.topic).sort((a, b) => (a.due && a.due <= today() ? 0 : 1) - (b.due && b.due <= today() ? 0 : 1) || (b.made || '').localeCompare(a.made || '')).slice(0, 20);
     return `<form data-f="flowgoal" class="kl-stack"><p class="kl-eyebrow">GUIDED SESSION</p><h2>What will you work on?</h2>
@@ -9290,8 +9335,9 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   }
   // Faded worked example: full solution -> the later steps hidden for you to fill in -> more hidden -> a similar problem on your own.
   // Steps are the example's lines; the first line (the problem) always stays visible. Backward fading: the last steps go first.
-  const exLines = f => String(f.example || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 30);
-  const fadeHidden = f => { const n = exLines(f).length - 1; if (n < 2) return []; const k = Math.min(n, f.fadeLvl >= 2 ? Math.max(2, Math.round(n * 2 / 3)) : Math.max(1, Math.round(n / 3))); return Array.from({ length: k }, (_, i) => n - k + 1 + i); };
+  const exLines = f => { const x = window.FlowKit.exSplit(f.exProb, f.example); return [x.problem, ...x.steps]; };
+  const fadeHidden = f => window.FlowKit.fadeHide(exLines(f).length - 1, f.fadeLvl || 1).map(i => i + 1);
+  const fadePreview = f => { const L1 = exLines(f), n = L1.length - 1; if (n < 2) return 'Put at least two solution steps on separate lines to practise filling them in.'; const hid = fadeHidden({ ...f, fadeLvl: 1 }); return `${n} steps. Hidden first: step ${hid.length > 1 ? hid[0] + '–' + hid[hid.length - 1] : hid[0]} (“${L1[hid[0]].slice(0, 50)}${L1[hid[0]].length > 50 ? '…' : ''}”), then about two thirds.`; };
   function fadeStep(f) {
     const L1 = exLines(f), hid = new Set(fadeHidden(f)), ans = f.fadeAns || {}, shown = !!f.fadeShown, more = f.fadeLvl < 2 && fadeHidden({ ...f, fadeLvl: 2 }).length > hid.size;
     const rows = L1.map((line, i) => !hid.has(i) ? `<p class="kl-pre kg-fade-given">${esc(line)}</p>`
@@ -9306,7 +9352,9 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     if (f.fadeLvl > 0 && exLines(f).length >= 3) return fadeStep(f);
     return `<div class="learning-session-support"><p class="kl-eyebrow">WORKED EXAMPLE · ${esc(f.topic)}</p><h2>Understand the steps before doing them alone</h2>
       <p>Use a solved example from your textbook or teacher. Explain why each step is allowed. Then hide it and solve a nearby problem. This session records supported learning; a later fresh problem can test independence.</p>
-      <label>Worked example <textarea data-flow="example" rows="9" maxlength="5000" placeholder="Paste the problem and solution, or write the book and page you are reading.">${esc(f.example || '')}</textarea></label>
+      <label>Problem <textarea data-flow="exProb" rows="3" maxlength="2000" placeholder="The question, as many lines as it needs. Or the book and page.">${esc(f.exProb || '')}</textarea></label>
+      <label>Solution steps, one per line <textarea data-flow="example" rows="8" maxlength="5000" placeholder="ux = 20 cos 30 = 17.3 m/s&#10;uy = 20 sin 30 = 10 m/s&#10;T = 2uy / g = 2.04 s">${esc(f.example || '')}</textarea></label>
+      <p class="kl-small" data-fadepreview>${esc(fadePreview(f))}</p>
       <label>Why these steps? <textarea data-flow="exampleWhy" rows="4" maxlength="2000" placeholder="Name the principle, assumptions and one step you could not explain at first.">${esc(f.exampleWhy || '')}</textarea></label>
       <div class="kl-row"><button class="kl-primary" data-a="flowfade" data-v="1">Hide some steps and fill them in</button><button class="kl-ghost" data-a="flowhideexample">Skip to a similar problem</button></div>
       <p class="kl-small">Put each step on its own line. The last steps are hidden first; once you can fill them in, more go, then you solve a similar problem alone. Skip ahead if this is already familiar.</p></div>`;
@@ -9434,7 +9482,8 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       ${(L.skills || []).length ? `<label class="kg-flow-credit">Skill credit <select data-flow="skillId">${skillOpts(f, false)}</select></label><p class="kl-small" data-credit-note>${creditName(f) ? (ev === 'ungraded' ? `${esc(creditName(f))} is picked, but nothing is credited until the result is graded and checked.` : `This result counts for ${esc(creditName(f))}.`) : 'No skill gets credit for this session. Pick one above if it practised a skill.'}</p>` : ''}
       <ul class="kl-list">${f.goal ? `<li><b>Goal:</b> ${esc(f.goal)}</li>` : ''}<li><b>Gap:</b> ${gap ? esc(f.gap) : noGap(f) ? 'none found' : 'not graded'}</li>${gap ? `<li><b>Repair:</b> ${f.fixed ? 'done, and Iroha agrees' : f.repair.trim() ? 'done, not confirmed' : 'not done yet'}</li>` : ''}${f.dispute ? `<li><b>Recheck:</b> ${esc(f.dispute)}</li>` : ''}${x ? `<li><b>Mistake notebook:</b> ${esc(missNext)}</li>` : ''}${f.warm.trim() ? '<li><b>Recall first:</b> done</li>' : ''}${hasMethod(f) ? '<li><b>Method first:</b> ' + esc(String(f.mPrin).trim()) + '</li>' : ''}${f.freshQ ? '<li><b>Fresh problem:</b> ' + (!f.freshFb ? 'not checked' : f.freshOk ? 'solved, so the fix carried over today. A fresh problem on a later day shows whether it stays.' : 'not yet. Worth adding to your misses for another day.') + '</li>' : ''}<li><b>Recap:</b> ${f.rc1 || f.rc2 || f.rc3 ? (f.rcfb ? 'written and checked' : 'written') : 'skipped'}${f.cardId ? ', one review item added' : ''}</li></ul>
       <form data-f="flowsave" class="kl-stack">
-      ${gap && (!f.fixed || (f.freshFb && !f.freshOk)) && !x ? '<label class="kl-check"><input type="checkbox" name="miss"' + (f.freshFb && !f.freshOk ? ' checked' : '') + '> Add this important gap to my misses for later practice</label>' : ''}
+      ${f.freshFb && !f.freshOk ? '<label class="kl-check"><input type="checkbox" name="freshmiss" checked> Save this fresh problem as a mistake, with your working and Iroha\'s feedback, to revisit another day</label>' : ''}
+      ${gap && !f.fixed && !x ? '<label class="kl-check"><input type="checkbox" name="miss"> Add this important gap to my misses for later practice</label>' : ''}
       ${f.goal ? `<fieldset class="kg-flow-rev"><legend>Core goal: ${esc(f.goal)}</legend><label class="kl-check"><input type="radio" name="met" value="yes"> Done</label><label class="kl-check"><input type="radio" name="met" value="partly"> Partly</label><label class="kl-check"><input type="radio" name="met" value="no"> Not yet</label></fieldset>` : ''}
       ${parkedNow(f) ? `<div class="kg-flow-k"><b>You parked ${parkedNow(f)} thought${parkedNow(f) === 1 ? '' : 's'}</b>${(L.parked || []).filter(p => !p.done && p.at >= f.started).map(p => `<p>${esc(p.t)}</p>`).join('')}<p class="kl-small">They're waiting on Today under Parked thoughts.</p></div>` : ''}
       <label>How did it feel? <select name="mood"><option value="calm">Calm</option><option value="proud">Proud</option><option value="tired">Tired</option><option value="stuck">Stuck</option></select></label>
@@ -9448,7 +9497,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     const body = cur.step === 'goal' || !A ? goalStep(cur) : cur.step === 'warmup' ? warmupStep(cur, A) : cur.step === 'example' ? exampleStep(cur) : cur.step === 'recap' ? recapStep(cur) : cur.step === 'attempt' ? attemptStep(cur, A) : cur.step === 'feedback' ? feedbackStep(cur, A) : cur.step === 'repair' ? repairStep(cur) : saveStep(cur, A);
     const recent = L.flowLog.slice(-5).reverse();
     return `<section class="kl-card kg-flow">${head(cur)}${parkForm(cur)}${body}</section>`
-      + (cur.step === 'goal' && recent.length ? `<section class="kl-card kl-mini"><p class="kl-eyebrow">RECENT SESSIONS</p>${recent.map(x => `<div class="kl-li"><span>${esc(ACTS[x.act]?.name || '')}: ${esc(x.topic)}<small>${esc(x.d)} · ${x.gap ? (x.fixed ? 'gap repaired' : 'gap: ' + esc(x.gap.slice(0, 90))) : 'no gaps'}</small></span></div>`).join('')}</section>` : '');
+      + (cur.step === 'goal' && recent.length ? `<section class="kl-card kl-mini"><p class="kl-eyebrow">RECENT SESSIONS</p>${recent.map(x => `<div class="kl-li"><span>${esc(ACTS[x.act]?.name || '')}: ${esc(x.topic)}<small>${esc(x.d)} · ${x.gap ? (x.fixed ? 'gap repaired' : 'gap: ' + esc(x.gap.slice(0, 90))) : 'no gaps'}</small></span>${recDetail(x)}</div>`).join('')}</section>` : '');
   };
 
   /* ---------- forms and buttons ---------- */
@@ -9484,8 +9533,11 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       const skillId = window.StudyPlan.creditTarget(L.skills || [], {sk:f.skillId,lec:f.lec});
       const result = skillId && ev !== 'ungraded' ? M.recordSkill?.(skillId, ev === 'indep' ? 'ok' : ev === 'help' ? 'hint' : 'miss', 'flow', {sourceEvent:f.id,verified:f.verified,verificationSource:f.verificationSource,transfer:f.transfer}) : null;
       if (x || (skillId && ((L.skills || []).find(s => s.id === skillId)?.made || d) < d)) M.chargeReview?.('flow', f.id);
-      L.flowLog.push({ fresh: f.freshQ ? { q: String(f.freshQ).slice(0, 300), checked: !!f.freshFb, ok: !!f.freshOk } : null, fade: f.act === 'worked' ? f.fadeMax || 0 : undefined, method: hasMethod(f) ? { p: String(f.mPrin).trim().slice(0, 160), w: String(f.mWhy || '').trim().slice(0, 240), a: String(f.mAlt || '').trim().slice(0, 240) } : null, skillId, lec:f.lec || '', requireVerification:true, verified:!!f.verified, verificationSource:f.verificationSource || '', supported:!!(f.supported || f.peeked), delayed:!!result?.delayed, transfer:ev === 'indep' && f.transfer === true, id: f.id, d, act: f.act, subj: f.subj, topic: f.topic, goal: f.goal, gap: gap ? f.gap.slice(0, 300) : '', errType: gap ? f.errType || '' : '', fixed: f.fixed, ev, disputed: f.disputed || '', miss: f.miss || '', by: f.checker?.provider || '', model: f.checker?.model || '', met: v.met || '', warm: !!f.warm.trim(), recap: !!(f.rc1 || f.rc2 || f.rc3), card: !!f.cardId, mins: f.started ? Math.min(180, Math.round((Date.now() - f.started - (f.away || 0)) / 60000)) : 0 }); // time away after "Leave for now" doesn't count
+      L.flowLog.push({ fresh: window.FlowKit.freshRecord(f), fade: f.act === 'worked' ? f.fadeMax || 0 : undefined, method: hasMethod(f) ? { p: String(f.mPrin).trim().slice(0, 160), w: String(f.mWhy || '').trim().slice(0, 240), a: String(f.mAlt || '').trim().slice(0, 240) } : null, skillId, lec:f.lec || '', requireVerification:true, verified:!!f.verified, verificationSource:f.verificationSource || '', supported:!!(f.supported || f.peeked), delayed:!!result?.delayed, transfer:ev === 'indep' && f.transfer === true, id: f.id, d, act: f.act, subj: f.subj, topic: f.topic, goal: f.goal, gap: gap ? f.gap.slice(0, 300) : '', errType: gap ? f.errType || '' : '', fixed: f.fixed, ev, disputed: f.disputed || '', miss: f.miss || '', by: f.checker?.provider || '', model: f.checker?.model || '', met: v.met || '', warm: !!f.warm.trim(), recap: !!(f.rc1 || f.rc2 || f.rc3), card: !!f.cardId, mins: f.started ? Math.min(180, Math.round((Date.now() - f.started - (f.away || 0)) / 60000)) : 0 }); // time away after "Leave for now" doesn't count
       if (L.flowLog.length > 300) L.flowLog = L.flowLog.slice(-300);
+      L.flowLog = window.FlowKit.trimLog(L.flowLog);
+      // a failed fresh problem is the mistake worth revisiting: its own question and working, linked to the skill and the repair
+      if (v.freshmiss) { const fm = window.FlowKit.freshMistake(f, d, f.lec ? lecture(f.lec)?.ch || '' : '', window.LearningDesk?.roomy?.(M.add(d, 1)) || M.add(d, 1)); if (fm) L.attempts.push({ id: M.uid(), ts: Date.now(), ...fm }); }
       L.flow = null; save();
       closeDesk(f, v.mood);
       if (v.met === 'yes' && f.stretch) setTimeout(() => M.I(`Core goal done. The stretch goal is there if you want it: ${f.stretch}. Stopping here is just as fine.`, { face: 'study' }), 2600);
@@ -9499,10 +9551,10 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     flowwarmskip: () => { const f = L.flow; if (!f) return; f.warm = ''; f.step = f.act === 'worked' ? 'example' : 'attempt'; save(); M.render(); },
     flowfreshask: freshAsk, flowfreshcheck: freshCheck,
     flowfade: b => { const f = L.flow; if (!f || f.busy) return; const lvl = Number(b.dataset.v) || 0;
-      if (lvl && exLines(f).length < 3) return M.I('Put the problem and at least two solution steps on separate lines, then I can hide some.', { face: 'study' });
+      if (lvl && exLines(f).length < 3) return M.I('Put at least two solution steps on separate lines, then I can hide some.', { face: 'study' });
       f.fadeLvl = lvl; f.fadeShown = false; f.fadeAns = {}; if (lvl) { f.supported = true; f.fadeMax = Math.max(f.fadeMax || 0, lvl); } save(); M.render(); setTimeout(() => document.querySelector('[data-fade]')?.focus(), 60); },
     flowfadeshow: () => { const f = L.flow; if (!f) return; f.fadeShown = true; save(); M.render(); },
-    flowhideexample: () => { const f = L.flow; if (!f || f.busy) return; if (!(f.example || '').trim()) return M.I('Add the example or its book and page first.', { face: 'study' }); f.supported = true; f.step = 'attempt'; save(); M.render(); },
+    flowhideexample: () => { const f = L.flow; if (!f || f.busy) return; if (!(f.example || f.exProb || '').trim()) return M.I('Add the example or its book and page first.', { face: 'study' }); f.supported = true; f.step = 'attempt'; save(); M.render(); },
     flowpick: b => { const f = L.flow; if (!f?.alt) return; const second = b.dataset.v === 'second'; if (second) Object.assign(f, { right: f.alt.right, gap: f.alt.gap, fix: f.alt.fix, errType: f.alt.errType || '', checker: f.alt.by || f.checker }); f.disputed = second ? 'second' : 'first'; f.dispute = second ? 'The two checks disagreed; you chose the second.' : 'The two checks disagreed; you kept the first.'; f.alt = null; save(); M.render(); },
     flowto: b => { const f = L.flow; if (!f || f.busy) return; f.step = b.dataset.v; save(); M.render(); },
     flowleave: () => { if (L.flow) L.flow.leftAt = Date.now(); save(); M.go('today'); },
@@ -9514,12 +9566,13 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     const vis = opts.filter(o => !o.hidden); if (s.selectedOptions[0]?.hidden) s.value = ''; if (lec && vis.length === 1) s.value = vis[0].value; s.options[0].textContent = lec && vis.length > 1 ? 'Pick one so it gets credit' : 'None'; });
   document.addEventListener('toggle', e => { if (e.target.matches?.('[data-method]') && L.flow) { L.flow.mOpen = e.target.open; save(); } }, true);
   document.addEventListener('input', e => { const i = e.target.dataset?.fade; if (i == null || !L.flow) return; (L.flow.fadeAns = L.flow.fadeAns || {})[i] = e.target.value.slice(0, 400); clearTimeout(tSave); tSave = setTimeout(save, 400); });
+  document.addEventListener('input', e => { const k = e.target.dataset?.flow; if ((k !== 'example' && k !== 'exProb') || !L.flow) return; const p = document.querySelector('[data-fadepreview]'); if (p) p.textContent = fadePreview({ ...L.flow, [k]: e.target.value }); });
   // drafts: every keystroke is kept
   let tSave = 0;
   document.addEventListener('input', e => {
     const k = e.target.dataset?.flow; if (!k || !L.flow) return;
     L.flow[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    if (['attempt', 'ka', 'ref', 'example', 'exampleWhy', 'mPrin', 'mWhy', 'mAlt'].includes(k)) { L.flow.verified = false; L.flow.graded = false; L.flow.fixed = false; }
+    if (['attempt', 'ka', 'ref', 'exProb', 'example', 'exampleWhy', 'mPrin', 'mWhy', 'mAlt'].includes(k)) { L.flow.verified = false; L.flow.graded = false; L.flow.fixed = false; }
     if (k === 'repair') { L.flow.verified = false; L.flow.fixed = false; }
     if (k === 'verificationSource') L.flow.verified = false;
     if (k === 'freshA') { L.flow.freshOk = false; L.flow.freshFb = ''; }
@@ -10845,6 +10898,7 @@ body.kg-calm .kv-lens.in,body.kg-calm .kv-hud.in>*,body.kg-calm .kv-ecg path{ani
 }
 .kg-method{margin:8px 0 10px;padding:10px 14px;border:1px solid rgba(196,182,255,.22);border-radius:12px;background:rgba(127,227,255,.04)}.kg-method summary{cursor:pointer}.kg-method label{display:block;margin-top:8px}.kg-method input{width:100%;box-sizing:border-box}
 .kg-fade{margin:10px 0;display:grid;gap:6px}.kg-fade-given{margin:0;opacity:.85}.kg-fade-step{display:block;padding:8px 12px;border-left:3px solid #7fe3ff;background:rgba(127,227,255,.06);border-radius:0 10px 10px 0}.kg-fade-step input{width:100%;box-sizing:border-box;margin-top:4px}.kg-fade-step p{margin:4px 0}
+.kg-rec-detail{margin-top:4px}.kg-rec-detail p{margin:4px 0}
 /* the floating room nav never covers the last card */
 body.kv-on #kg-main{padding-bottom:104px}
 /* focus mode on a running timer: its card shows on every page, so Study or Company never turns into an empty visor */
