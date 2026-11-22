@@ -899,7 +899,7 @@ body.habit-shh #hb-session-card {text-align:center;}
   const gapD=(a,b)=>Math.round((Date.parse(a+'T12:00:00')-Date.parse(b+'T12:00:00'))/864e5);
   // one skill per lecture that no skill links to yet; running it again adds nothing
   const skillsFromLectures=(lectures,skills)=>{const out=(skills||[]).slice(),linked=new Set(out.flatMap(s=>s.lectures||[]));
-    for(const e of lectures||[]){if(!e||!e.id||e.noSkill||linked.has(e.id))continue;linked.add(e.id);
+    for(const e of lectures||[]){if(!e||!e.id||e.noSkill||e.astro||linked.has(e.id))continue;linked.add(e.id);
       out.push({id:'sk-'+e.id,name:String(e.topic||'Lecture').slice(0,120),subj:e.subj||'',ch:e.ch||'',lectures:[e.id],made:e.made||'',lastTested:e.lastGraded||null,last:null,strength:(e.stage||0)>=2?'solid':'shaky'});}
     return out;};
   // older skills to mix into practice: shaky first, then new, then solid by longest untested; never one shown unaided in the last 7 days or made today
@@ -1137,7 +1137,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const examDays=[],prep=S.exams.find(x=>x&&x.from&&x.end&&x.from<=dayIso&&dayIso<=x.end);
     for(const x of S.exams)for(const d of (x&&x.days)||[])if(d&&d.d===dayIso){const at=+d.at,len=Math.max(180,+d.len||180),tr=Math.max(0,+d.travel||45);if(at>0)examDays.push({s:at-tr,e:at+len+tr,id:'exam-'+at,title:`${x.name||'Diploma exam'} · travel, exam and breaks`});}
     const food=((S.food||{})[dayIso]||[]).filter(f=>f&&+f.at>0).map((f,i)=>({s:+f.at,e:+f.at+Math.max(10,Math.min(45,+f.len||20)),id:'food-'+i,title:'Food break'}));
-    const opt=p=>({astro:astroMinutes(S,dayIso),extend:!!(S.extend||{})[dayIso]&&!['sunday','gentle','reduced','stop'].includes(p),german:prep?(S.germanExam==='pause'?0:S.germanExam==='light'?15:S.german):S.german,pianoAt:(S.piano||{})[dayIso],pianoLen:S.pianoLen,budget:WEEK_BUDGET[(S.weekSize||{})[mondayOf(dayIso)]]||undefined,blockers:examDays.concat(food),edits:((S.edits||{})[dayIso]||[])});
+    const hrs=dayHours(S,dayIso),opt=p=>({astro:astroMinutes(S,dayIso),extend:(hrs?hrs>=7:!!(S.extend||{})[dayIso])&&!['sunday','gentle','reduced','stop'].includes(p),german:prep?(S.germanExam==='pause'?0:S.germanExam==='light'?15:S.german):S.german,pianoAt:(S.piano||{})[dayIso],pianoLen:S.pianoLen,budget:hrs?(hrs<6?hrs*60:undefined):WEEK_BUDGET[(S.weekSize||{})[mondayOf(dayIso)]]||undefined,blockers:examDays.concat(food),edits:((S.edits||{})[dayIso]||[])});
     // switching plan mid-day keeps everything before the switch as it was and re-plans only what is left
     const sw=((S.switches||{})[dayIso]||[]).filter(x=>x&&x.at>W).sort((a,b)=>a.at-b.at);let segs;
     if(!sw.length){segs=skeleton(W,plan,Object.assign(opt(plan),{from:nowClock}));}
@@ -1146,6 +1146,11 @@ body.habit-shh #hb-session-card {text-align:center;}
         if(k&&Wp>W)sk.unshift({s:W,e:Wp,kind:'rest',id:'free-sw'+k,title:'Free time · nothing owed'});
         for(const x0 of sk){const x=k&&x0.id==='tea'?Object.assign({},x0,{kind:'rest',id:'free-tea'+k,title:'Free time · nothing owed'}):x0;const s=Math.max(x.s,prevAt),e=Math.min(x.e,until);if(e-s>=1)parts.push(Object.assign({},x,{s,e}));}prevAt=until;}
       segs=parts.sort((a,b)=>a.s-b.s).reduce((o,x)=>{const p=o[o.length-1];if(p&&p.id===x.id&&p.kind===x.kind&&p.kind!=='study'&&p.e===x.s)p.e=x.e;else o.push(x);return o;},[]);segs.cuts=[];}
+    // an hours target of 7 h or more: the extended evening is trimmed from its end so the day's study is at most the target (never past bedtime)
+    if(hrs>=7){const cap=hrs*60;let tot=segs.filter(x=>x.kind==='study').reduce((n,x)=>n+x.e-x.s,0);
+      for(let i=segs.length-1;i>=0&&tot>cap;i--){const x=segs[i];if(x.kind!=='study'||!x.ext)continue;const len=x.e-x.s,keep=len-Math.min(tot-cap,len);
+        if(keep>=15){segs.splice(i+1,0,{s:x.s+keep,e:x.e,kind:'rest',id:'free-cap'+i,title:'Free time · nothing owed'});x.e=x.s+keep;tot-=len-keep;}
+        else{segs[i]={s:x.s,e:x.e,kind:'rest',id:'free-cap'+i,title:'Free time · nothing owed'};tot-=len;}}}
     // diploma: the week's hours replace part of the PCM priority time (latest priority block first); exam preparation takes the lecture and priority blocks
     let dip=Math.max(0,Math.round((+ctx.diplomaToday||0)/5)*5);if(dip>0&&dip<15)dip=15;
     for(const g of segs)if(g.kind==='study'&&prep&&(examDays.length?['L','P','R','H'].includes(g.role):(g.role==='L'||g.role==='P')))g.role='D';
@@ -1156,9 +1161,10 @@ body.habit-shh #hb-session-card {text-align:center;}
     const focus=dayFocus(L,dayIso,ctx.actual14||{});
     const {rows,deferred}=assign(segs,tasks,focus,{now:nowClock,dayNo:Math.floor(Date.parse(dayIso+'T12:00:00')/864e5),firstOfDay:!ctx.loggedAny,examPrep:!!prep,astroTitle:astroNext(L.astro,dayIso).text,pool:ctx.pool,week:!!ctx.pool,syl:L.syl||{},germanUnit:+S.germanUnit||0});
     const cut=(segs.cuts||[]).reduce((a,c)=>a+c.m,0);
-    return {rows,deferred,cutMinutes:cut,plan,chosen,wake:W,focus,extend:!!opt(plan).extend,examPrep:prep?prep.name||'Diploma exams':'',examDays:examDays.length,switched:sw.length};
+    return {rows,deferred,cutMinutes:cut,plan,chosen,wake:W,focus,hours:hrs||0,extend:!!opt(plan).extend,examPrep:prep?prep.name||'Diploma exams':'',examDays:examDays.length,switched:sw.length};
   }
-  const WEEK_BUDGET={lighter:270,minimal:150};
+  const WEEK_BUDGET={lighter:270,minimal:150},DAY_HOURS=[4,5,6,7,8];
+  const dayHours=(S,d)=>{const h=+((S&&S.hours)||{})[d];return DAY_HOURS.includes(h)?h:0;};
   // ---- Astrophysics course ----
   // daily course minutes: your chosen amount, or a deadline adjustment you applied (only until its date)
   function astroMinutes(S,d){const a=(S&&S.astro)||{},b=a.boost;return Math.max(0,Math.min(120,+(b&&b.until&&d<=b.until?b.min:a.min)||0));}
@@ -1251,7 +1257,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const daysLeft=w===0?0:7-w,loggedAny=ss.some(s=>s&&s.date===day&&s.subject!=='Other'&&(+s.minutes||0)>0)||Object.values(((desk.state||desk).days||{})[day]?.completed||{}).some(x=>+x>0)||!!(habit.active&&habit.active.date===day);
     return {actual14:a14,loggedAny,diplomaToday:daysLeft?Math.max(0,Math.ceil((target-dipDone)/daysLeft/5)*5):0,diplomaTarget:target,diplomaDone:dipDone,monday:mon};}
   const nowClock=()=>{const n=new Date();let m=n.getHours()*60+n.getMinutes();if(m<240)m+=1440;return m;};
-  const api={astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,forecast:(L,hist)=>forecast(L||labData(),hist||{}),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={DAY_HOURS,dayHours,astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,forecast:(L,hist)=>forecast(L||labData(),hist||{}),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -9015,7 +9021,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
 
   /* ---------- Study · Notes: every lecture you've logged ---------- */
   M.PANELS.notes = () => {
-    const list = L.lectures.slice().sort((a, b) => b.made.localeCompare(a.made));
+    const list = L.lectures.filter(e => !e.astro).sort((a, b) => b.made.localeCompare(a.made));
     const P = window.StudyPlan?.lens8?.() || { len: {}, rev: {} }, ids = { Maths: 'maths', Physics: 'physics', Chemistry: 'chem' };
     const lensCard = `<section class="kl-card kg-lens"><p class="kl-eyebrow">LECTURE LENGTHS</p><h3>Your recorded lecture lengths</h3>
       <p class="kl-small">Both Normal 8-hour free-day schedules use fixed study blocks: Maths lecture 120 min + revision 60 min; Physics lecture 90 min + spaced revision 60 min; Chemistry lecture 90 min + revision 60 min. Logged lecture lengths are kept for personalised estimates and other planner features, but do not change these fixed normal blocks.</p>
@@ -9291,7 +9297,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   M.lecPicker = () => {
     document.getElementById('kg-lecpick')?.remove();
     const box = document.createElement('div'); box.id = 'kg-lecpick'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Lectures');
-    const rows = q => L.lectures.filter(e => !q || label(e).toLowerCase().includes(q)).sort((a, b) => b.made.localeCompare(a.made)).slice(0, 60)
+    const rows = q => L.lectures.filter(e => !e.astro && (!q || label(e).toLowerCase().includes(q))).sort((a, b) => b.made.localeCompare(a.made)).slice(0, 60)
       .map(e => `<li><span><b>${esc(label(e))}</b><small>${e.astro ? 'Astrophysics course notes' : e.due ? (e.due <= today() ? 'due today' : 'next ' + esc(e.due)) : 'all revisions done'} · ${e.files?.length || 0} file${e.files?.length === 1 ? '' : 's'}</small></span><span class="kg-lp-btns"><button data-lp="open" data-v="${esc(e.id)}">Notes</button><button data-lp="rev" data-v="${esc(e.id)}">Revise</button></span></li>`).join('') || '<li><small>No lectures match.</small></li>';
     box.innerHTML = `<div class="kg-lp-head"><b>Your lectures</b><button data-lp="close" aria-label="Close">×</button></div><input type="search" placeholder="Search by subject, chapter or topic" aria-label="Search lectures"><ul>${rows('')}</ul>`;
     document.body.appendChild(box);
@@ -9933,7 +9939,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     p.push(`<button type="button" class="kl-ghost" data-a="flowpin" data-v="${esc(x.id)}">${x.pinned ? 'Unpin' : 'Pin: keep in full'}</button>`);
     return `<details class="kg-rec-detail"><summary class="kl-small">Open${x.pinned ? ' · pinned' : ''}</summary>${p.join('')}</details>`; };
   function goalStep(f) {
-    const lecs = (L.lectures || []).filter(e => e.topic).sort((a, b) => (a.due && a.due <= today() ? 0 : 1) - (b.due && b.due <= today() ? 0 : 1) || (b.made || '').localeCompare(a.made || '')).slice(0, 20);
+    const lecs = (L.lectures || []).filter(e => e.topic && !e.astro).sort((a, b) => (a.due && a.due <= today() ? 0 : 1) - (b.due && b.due <= today() ? 0 : 1) || (b.made || '').localeCompare(a.made || '')).slice(0, 20);
     return `<form data-f="flowgoal" class="kl-stack"><p class="kl-eyebrow">GUIDED SESSION</p><h2>What will you work on?</h2>
       <fieldset class="kg-acts"><legend class="kl-small">Pick how you'll practise</legend>${Object.entries(ACTS).map(([k, a]) => `<label class="kg-act"><input type="radio" name="act" value="${k}" ${f.act === k ? 'checked' : ''} required><b>${a.icon} ${a.name}</b><span>${esc(a.what)}</span><small>Good for ${esc(a.best)}</small></label>`).join('')}</fieldset>
       <div class="kg-flow-grid"><label>Subject <select name="subj">${SUBJS.map(s => `<option ${s === f.subj ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
@@ -10155,12 +10161,12 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       <label>Source and page / problem <input data-flow="verificationSource" maxlength="200" value="${esc(f.verificationSource || '')}" placeholder="e.g. textbook, exercise 4.2, problem 6"></label>
       <label class="kl-check"><input type="checkbox" data-flow="verified" ${f.verified ? 'checked' : ''}> I checked the reasoning and result against this source</label>
       <label class="kl-check"><input type="checkbox" data-flow="transfer" ${f.transfer ? 'checked' : ''}> This used the idea in an unfamiliar setting (my assessment)</label></div>
-      ${(L.skills || []).length ? `<label class="kg-flow-credit">Skill credit <select data-flow="skillId">${skillOpts(f, false)}</select></label><p class="kl-small" data-credit-note>${creditName(f) ? (ev === 'ungraded' ? `${esc(creditName(f))} is picked, but nothing is credited until the result is graded and checked.` : `This result counts for ${esc(creditName(f))}.`) : 'No skill gets credit for this session. Pick one above if it practised a skill.'}</p>` : ''}
+      ${(L.skills || []).length && f.subj !== 'Astrophysics' ? `<label class="kg-flow-credit">Skill credit <select data-flow="skillId">${skillOpts(f, false)}</select></label><p class="kl-small" data-credit-note>${creditName(f) ? (ev === 'ungraded' ? `${esc(creditName(f))} is picked, but nothing is credited until the result is graded and checked.` : `This result counts for ${esc(creditName(f))}.`) : 'No skill gets credit for this session. Pick one above if it practised a skill.'}</p>` : ''}
       <ul class="kl-list">${f.goal ? `<li><b>Goal:</b> ${esc(f.goal)}</li>` : ''}<li><b>Gap:</b> ${gap ? esc(f.gap) : noGap(f) ? 'none found' : 'not graded'}</li>${gap ? `<li><b>Repair:</b> ${f.fixed ? 'done, and Iroha agrees' : f.repair.trim() ? 'done, not confirmed' : 'not done yet'}</li>` : ''}${f.dispute ? `<li><b>Recheck:</b> ${esc(f.dispute)}</li>` : ''}${x ? `<li><b>Mistake notebook:</b> ${esc(missNext)}</li>` : ''}${f.warm.trim() ? '<li><b>Recall first:</b> done</li>' : ''}${hasMethod(f) ? '<li><b>Method first:</b> ' + esc(String(f.mPrin).trim()) + '</li>' : ''}${f.freshQ ? '<li><b>Fresh problem:</b> ' + (!f.freshFb ? 'not checked' : f.freshOk ? 'solved, so the fix carried over today. A fresh problem on a later day shows whether it stays.' : 'not yet. Worth adding to your misses for another day.') + '</li>' : ''}<li><b>Recap:</b> ${f.rc1 || f.rc2 || f.rc3 ? (f.rcfb ? 'written and checked' : 'written') : 'skipped'}${f.cardId ? ', one review item added' : ''}</li></ul>
       <form data-f="flowsave" class="kl-stack">
-      ${gap && f.fixed && !x && !(f.freshFb && !f.freshOk) ? `<label class="kl-check"><input type="checkbox" name="stick" ${f.errType === 'slip' ? '' : 'checked'}> Did the fix stick? Bring a different problem on this gap back in 3 days (inside your daily review allowance)</label>` : ''}
-      ${f.freshFb && !f.freshOk ? '<label class="kl-check"><input type="checkbox" name="freshmiss" checked> Save this fresh problem as a mistake, with your working and Iroha\'s feedback, to revisit another day</label>' : ''}
-      ${gap && !f.fixed && !x ? '<label class="kl-check"><input type="checkbox" name="miss"> Add this important gap to my misses for later practice</label>' : ''}
+      ${f.subj !== 'Astrophysics' && gap && f.fixed && !x && !(f.freshFb && !f.freshOk) ? `<label class="kl-check"><input type="checkbox" name="stick" ${f.errType === 'slip' ? '' : 'checked'}> Did the fix stick? Bring a different problem on this gap back in 3 days (inside your daily review allowance)</label>` : ''}
+      ${f.subj !== 'Astrophysics' && f.freshFb && !f.freshOk ? '<label class="kl-check"><input type="checkbox" name="freshmiss" checked> Save this fresh problem as a mistake, with your working and Iroha\'s feedback, to revisit another day</label>' : ''}
+      ${f.subj === 'Astrophysics' ? (gap ? '<p class="kl-small">This gap is saved as a doubt on the course lecture. It stays out of your PCM misses and reviews.</p>' : '') : gap && !f.fixed && !x ? '<label class="kl-check"><input type="checkbox" name="miss"> Add this important gap to my misses for later practice</label>' : ''}
       ${f.goal ? `<fieldset class="kg-flow-rev"><legend>Core goal: ${esc(f.goal)}</legend><label class="kl-check"><input type="radio" name="met" value="yes"> Done</label><label class="kl-check"><input type="radio" name="met" value="partly"> Partly</label><label class="kl-check"><input type="radio" name="met" value="no"> Not yet</label></fieldset>` : ''}
       ${parkedNow(f) ? `<div class="kg-flow-k"><b>You parked ${parkedNow(f)} thought${parkedNow(f) === 1 ? '' : 's'}</b>${(L.parked || []).filter(p => !p.done && p.at >= f.started).map(p => `<p>${esc(p.t)}</p>`).join('')}<p class="kl-small">They're waiting on Today under Parked thoughts.</p></div>` : ''}
       <label>How did it feel? <select name="mood"><option value="calm">Calm</option><option value="proud">Proud</option><option value="tired">Tired</option><option value="stuck">Stuck</option></select></label>
@@ -10172,7 +10178,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     if (M.onBreak?.() && (!f || f.step === 'goal')) return `<section class="kl-card kl-breakcard"><p class="kl-eyebrow">🌙 RESTING</p><h3>Guided sessions are here when you're back.</h3><p>Nothing is waiting, and nothing is piling up.</p></section>`;
     const cur = f || blank(), A = ACTS[cur.act];
     const body = cur.step === 'goal' || !A ? goalStep(cur) : cur.step === 'warmup' ? warmupStep(cur, A) : cur.step === 'example' ? exampleStep(cur) : cur.step === 'recap' ? recapStep(cur) : cur.step === 'attempt' ? attemptStep(cur, A) : cur.step === 'feedback' ? feedbackStep(cur, A) : cur.step === 'repair' ? repairStep(cur) : saveStep(cur, A);
-    const recent = L.flowLog.slice(-8).reverse(), sureWrong = window.FlowKit.confWrong(L.flowLog, today());
+    const pcmLog = L.flowLog.filter(x => x.subj !== 'Astrophysics'), recent = pcmLog.slice(-8).reverse(), sureWrong = window.FlowKit.confWrong(pcmLog, today());
     return `<section class="kl-card kg-flow">${head(cur)}${parkForm(cur)}${body}</section>`
       + (cur.step === 'goal' && recent.length ? `<section class="kl-card kl-mini"><p class="kl-eyebrow">RECENT SESSIONS</p><p class="kl-small">The newest 30 sessions keep their full working; older ones keep a summary unless pinned. <button type="button" class="kl-ghost" data-a="flowexport">Download full history</button></p>${sureWrong.length ? `<p class="kl-small">Sure, but there was a gap (last 14 days): ${sureWrong.slice(-4).map(r => esc(r.topic)).join('; ')}. Worth another look.</p>` : ''}${recent.map(x => `<div class="kl-li"><span>${esc(ACTS[x.act]?.name || '')}: ${esc(x.topic)}${x.conf === 'sure' && x.gap ? ' <b class="kl-small">· sure, but a gap</b>' : ''}<small>${esc(x.d)} · ${x.gap ? (x.fixed ? 'gap repaired' : 'gap: ' + esc(x.gap.slice(0, 90))) : 'no gaps'}</small></span>${recDetail(x)}</div>`).join('')}</section>` : '');
   };
@@ -10196,7 +10202,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     flowsave: v => {
       const f = L.flow; if (!f) return;
       const d = today(), A = ACTS[f.act], gap = hasGap(f);
-      const [ev] = evidence(f), x = missOf(f);
+      const [ev] = evidence(f), x = missOf(f), astro = f.subj === 'Astrophysics';
       // a mistake repaired here follows the notebook's own schedule: independent moves it on, help or no repair brings it back tomorrow
       if (x && ev !== 'ungraded') {
         x.reviews = (x.reviews || 0) + 1;
@@ -10206,16 +10212,17 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
         if (ev !== 'ungraded') (L.revLog = L.revLog || []).push({ d, src: 'miss', ok: ev === 'indep', help: ev === 'help', gap: (x.lastSeen || x.d) ? M.gap?.(d, x.lastSeen || x.d) ?? null : null });
         x.lastSeen = d;
       }
-      if (v.miss && gap && !x) L.attempts.push({ id: M.uid(), d, ts: Date.now(), ok: false, src: 'flow', ch: f.lec ? lecture(f.lec)?.ch || '' : '', q: `${f.topic}: ${f.gap}`.slice(0, 240), cause: f.errType === 'slip' ? 'careless slip' : f.errType === 'principle' ? 'knowledge gap' : /\b(sign|arithmetic|calculation|copied|copy|typo|units?|careless|slip|misread|rounding)\b/i.test(f.gap || '') ? 'careless slip' : /\b(concept|understand|definition|why|formula|idea|meaning)\b/i.test(f.gap || '') ? 'knowledge gap' : f.act === 'diagnose' ? 'careless slip' : 'knowledge gap', fix: (f.fix || '').slice(0, 200), due: window.LearningDesk?.roomy?.(M.add(d, 1)) || M.add(d, 1), st: 0 }); { const last = L.attempts[L.attempts.length - 1]; if (last?.src === 'flow' && last.due !== M.add(d, 1)) last.held = true; }
-      const skillId = window.StudyPlan.creditTarget(L.skills || [], {sk:f.skillId,lec:f.lec});
+      if (!astro && v.miss && gap && !x) L.attempts.push({ id: M.uid(), d, ts: Date.now(), ok: false, src: 'flow', ch: f.lec ? lecture(f.lec)?.ch || '' : '', q: `${f.topic}: ${f.gap}`.slice(0, 240), cause: f.errType === 'slip' ? 'careless slip' : f.errType === 'principle' ? 'knowledge gap' : /\b(sign|arithmetic|calculation|copied|copy|typo|units?|careless|slip|misread|rounding)\b/i.test(f.gap || '') ? 'careless slip' : /\b(concept|understand|definition|why|formula|idea|meaning)\b/i.test(f.gap || '') ? 'knowledge gap' : f.act === 'diagnose' ? 'careless slip' : 'knowledge gap', fix: (f.fix || '').slice(0, 200), due: window.LearningDesk?.roomy?.(M.add(d, 1)) || M.add(d, 1), st: 0 }); { const last = L.attempts[L.attempts.length - 1]; if (last?.src === 'flow' && last.due !== M.add(d, 1)) last.held = true; }
+      const skillId = astro ? null : window.StudyPlan.creditTarget(L.skills || [], {sk:f.skillId,lec:f.lec});
       const result = skillId && ev !== 'ungraded' ? M.recordSkill?.(skillId, ev === 'indep' ? 'ok' : ev === 'help' ? 'hint' : 'miss', 'flow', {sourceEvent:f.id,verified:f.verified,verificationSource:f.verificationSource,transfer:f.transfer}) : null;
       if (x || (skillId && ((L.skills || []).find(s => s.id === skillId)?.made || d) < d)) M.chargeReview?.('flow', f.id);
       L.flowLog.push({ stick: !!f.stick, prob: f.probQ ? String(f.probQ).slice(0, 1500) : '', probBank: f.probBank || '', synth: f.synth || null, hint: f.hintMax || 0, next: String(f.nextStep || '').trim().slice(0, 200), contract: f.contract || 'stop', work: window.FlowKit.workRecord(f), conf: ['sure', 'unsure', 'guess'].includes(f.conf) ? f.conf : '', bank: f.freshBank || '', fresh: window.FlowKit.freshRecord(f), fade: f.act === 'worked' ? f.fadeMax || 0 : undefined, method: hasMethod(f) ? { p: String(f.mPrin).trim().slice(0, 160), w: String(f.mWhy || '').trim().slice(0, 240), a: String(f.mAlt || '').trim().slice(0, 240) } : null, skillId, lec:f.lec || '', requireVerification:true, verified:!!f.verified, verificationSource:f.verificationSource || '', supported:!!(f.supported || f.peeked), delayed:!!result?.delayed, transfer:ev === 'indep' && f.transfer === true, id: f.id, d, act: f.act, srcKind: f.src || '', subj: f.subj, topic: f.topic, goal: f.goal, gap: gap ? f.gap.slice(0, 300) : '', errType: gap ? f.errType || '' : '', fixed: f.fixed, ev, disputed: f.disputed || '', miss: f.miss || '', by: f.checker?.provider || '', model: f.checker?.model || '', met: v.met || '', warm: !!f.warm.trim(), recap: !!(f.rc1 || f.rc2 || f.rc3), card: !!f.cardId, mins: f.started ? Math.min(180, Math.round((Date.now() - f.started - (f.away || 0)) / 60000)) : 0 }); // time away after "Leave for now" doesn't count
       if (L.flowLog.length > 300) L.flowLog = L.flowLog.slice(-300);
       L.flowLog = window.FlowKit.trimLog(L.flowLog);
       // a failed fresh problem is the mistake worth revisiting: its own question and working, linked to the skill and the repair
-      if (v.freshmiss) { const fm = window.FlowKit.freshMistake(f, d, f.lec ? lecture(f.lec)?.ch || '' : '', window.LearningDesk?.roomy?.(M.add(d, 1)) || M.add(d, 1)); if (fm) L.attempts.push({ id: M.uid(), ts: Date.now(), ...fm }); }
-      if (v.stick && !x && !v.freshmiss) { const si = window.FlowKit.stickItem(f, d, f.lec ? lecture(f.lec)?.ch || '' : '', window.LearningDesk?.roomy?.(M.add(d, 3)) || M.add(d, 3)); if (si) L.attempts.push({ id: M.uid(), ts: Date.now(), ...si }); }
+      if (!astro && v.freshmiss) { const fm = window.FlowKit.freshMistake(f, d, f.lec ? lecture(f.lec)?.ch || '' : '', window.LearningDesk?.roomy?.(M.add(d, 1)) || M.add(d, 1)); if (fm) L.attempts.push({ id: M.uid(), ts: Date.now(), ...fm }); }
+      if (!astro && v.stick && !x && !v.freshmiss) { const si = window.FlowKit.stickItem(f, d, f.lec ? lecture(f.lec)?.ch || '' : '', window.LearningDesk?.roomy?.(M.add(d, 3)) || M.add(d, 3)); if (si) L.attempts.push({ id: M.uid(), ts: Date.now(), ...si }); }
+      if (astro && gap) window.__kgAstroGap?.(f);
       L.flow = null; save();
       closeDesk(f, v.mood);
       if (v.met === 'yes' && f.stretch) setTimeout(() => M.I(`Core goal done. The stretch goal is there if you want it: ${f.stretch}. Stopping here is just as fine.`, { face: 'study' }), 2600);
@@ -10338,7 +10345,7 @@ html body.kg-flow-on #kg-main>#moon-lab{display:block!important}html body.kg-flo
   function measure(dim, from, to) {
     const inWin = d => d >= from && d <= to;
     if (dim.retention) { const r = (L.revLog || []).filter(x => inWin(x.d)), gaps = r.map(x => x.gap).filter(g => Number.isFinite(g) && g > 0); return { n: r.length, ok: r.filter(x => x.ok).length, help: r.filter(x => x.help).length, gap: gaps.length ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : 0, unit: 'review' }; }
-    const s = (L.flowLog || []).filter(x => dim.acts.includes(x.act) && inWin(x.d) && x.ev !== 'ungraded');
+    const s = (L.flowLog || []).filter(x => x.subj !== 'Astrophysics' && dim.acts.includes(x.act) && inWin(x.d) && x.ev !== 'ungraded');
     return { n: s.length, ok: s.filter(indep).length, help: s.filter(x => x.ev === 'help').length, unit: 'session' };
   }
   const questions = (from, to) => { const q = (L.attempts || []).filter(a => a.d >= from && a.d <= to && typeof a.ok === 'boolean' && !['flow', 'import', 'block'].includes(a.src)); return { n: q.length, ok: q.filter(a => a.ok).length }; };
@@ -10501,7 +10508,7 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
   L.rpath = L.rpath || { solid: {} };
   const solid = i => !!L.rpath.solid[i];
   const current = () => { const i = STAGES.findIndex((_, k) => !solid(k)); return i < 0 ? STAGES.length : i; };
-  const evidence = s => (L.flowLog || []).filter(x => s.key.test(x.topic || '')).reduce((o, x) => { o.n++; if (x.ev ? x.ev === 'indep' : !x.gap) o.ok++; return o; }, { n: 0, ok: 0 });
+  const evidence = s => (L.flowLog || []).filter(x => x.subj !== 'Astrophysics' && s.key.test(x.topic || '')).reduce((o, x) => { o.n++; if (x.ev ? x.ev === 'indep' : !x.gap) o.ok++; return o; }, { n: 0, ok: 0 });
 
   M.SECTIONS.study.splice(Math.max(0, M.SECTIONS.study.findIndex(t => t[0] === 'project')), 0, ['rocket', '🚀 Rocket path']);
   M.PANELS.rocket = () => {
@@ -10785,9 +10792,9 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
   };
   let weekBusy = false;
   const weekFacts = () => {
-    const w = week(today()), inW = d => d >= w && d <= today(), fl = (L.flowLog || []).filter(x => inW(x.d));
+    const w = week(today()), inW = d => d >= w && d <= today(), fl = (L.flowLog || []).filter(x => inW(x.d) && x.subj !== 'Astrophysics');
     const acts = fl.reduce((o, x) => (o[x.act] = (o[x.act] || 0) + 1, o), {});
-    return `guided sessions this week: ${fl.length}${fl.length ? ` (${Object.entries(acts).map(([k, n]) => `${k} ${n}`).join(', ')}), ${fl.filter(x => x.ev === 'indep').length} on my own, ${fl.filter(x => x.gap).length} with a gap` : ''}; lectures logged this week: ${(L.lectures || []).filter(e => inW(e.made || '')).length}; spaced reviews due now: ${(L.lectures || []).filter(e => e.due && e.due <= today()).length}; mood check-ins this week: ${Object.keys(L.mood || {}).filter(inW).length}`;
+    return `guided sessions this week: ${fl.length}${fl.length ? ` (${Object.entries(acts).map(([k, n]) => `${k} ${n}`).join(', ')}), ${fl.filter(x => x.ev === 'indep').length} on my own, ${fl.filter(x => x.gap).length} with a gap` : ''}; lectures logged this week: ${(L.lectures || []).filter(e => !e.astro && inW(e.made || '')).length}; spaced reviews due now: ${(L.lectures || []).filter(e => e.due && e.due <= today()).length}; mood check-ins this week: ${Object.keys(L.mood || {}).filter(inW).length}`;
   };
   Object.assign(M.FORMS, {
     weekly: v => { const w = week(today()); (L.weekly = L.weekly || {})[w] = Object.assign(L.weekly[w] || {}, { easier: v.easier.trim(), inway: v.inway.trim(), change: v.change.trim() }); save(); M.render(); M.I('Saved. One change at a time, so we can tell what worked.', { face: 'study' }); }
@@ -13164,7 +13171,7 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
     return '<section class="kl-card learning-evidence"><p class="kl-eyebrow">REVIEW WORKLOAD · NEXT 7 DAYS</p><h2>Checks coming up</h2><ol class="lf-days">' + bars + '</ol><p class="kl-small">' + note + '</p></section>';
   }
   function twoWeekCard() {
-    const t = M.today(), a = M.add(t, -13), b = M.add(t, -27), log = L.flowLog || [], win = (x, y) => log.filter(r => r.d >= x && r.d <= y);
+    const t = M.today(), a = M.add(t, -13), b = M.add(t, -27), log = (L.flowLog || []).filter(x => x.subj !== 'Astrophysics'), win = (x, y) => log.filter(r => r.d >= x && r.d <= y);
     const sum = xs => ({ n: xs.length, mins: xs.reduce((s, r) => s + (r.mins || 0), 0), indep: xs.filter(r => r.ev === 'indep').length, later: xs.filter(r => r.delayed || r.transfer).length, slip: xs.filter(r => r.errType === 'slip').length, principle: xs.filter(r => r.errType === 'principle').length });
     const N = sum(win(a, t)), P = sum(win(b, M.add(a, -1))), first = log.reduce((m, r) => r.d && r.d < m ? r.d : m, t), ready = (dayMs(t) - dayMs(first)) / 864e5 >= 13;
     const say = N.n < 3 ? 'Too few guided sessions in these two weeks to judge. It fills in as you use Study.' : N.mins > P.mins * 1.2 && N.later <= P.later ? 'More time went in, but wins after a delay or in a new setting did not rise. Swap some repeat practice for changed problems.' : N.principle > N.slip ? 'Most gaps were principle errors. Start more sessions from a worked example before solving alone.' : N.slip > N.principle ? 'Most gaps were slips. Add a one-minute units and sign check before you finish.' : N.later > P.later ? 'Wins after a delay or in a new setting are up. Keep the routine as it is.' : 'Steady. Keep the routine and look again in two weeks.';
@@ -13173,7 +13180,7 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
   }
   const oldSkills = M.PANELS.skills;
   if (oldSkills) M.PANELS.skills = () => {
-    const s = C.evidence(L.flowLog);
+    const s = C.evidence((L.flowLog || []).filter(x => x.subj !== 'Astrophysics'));
     return `<section class="kl-card learning-evidence"><p class="kl-eyebrow">EVIDENCE, NOT A MASTERY SCORE</p><h2>What your checked work shows</h2><div class="learning-summary"><div><strong>${s.independent}</strong><span>Independent checked attempts</span></div><div><strong>${s.delayed}</strong><span>After an earlier dated skill check</span></div><div><strong>${s.transfer}</strong><span>Unfamiliar settings · your assessment</span></div></div><p class="kl-small">${s.supported} supported attempts. ${s.unverified} saved records without source verification, including older records. Counts overlap; no percentage predicts mastery. Covers the latest ${Math.min(300, (L.flowLog || []).length)} saved guided sessions.</p><p class="kl-small">Source verification is your report, not an external certification. Delayed results require an exact linked skill and a prior check on a different day; transfer is never inferred from the activity name.</p></section>${twoWeekCard()}${forecastCard()}${oldSkills()}`;
   };
   M.softRender?.();
@@ -13401,8 +13408,8 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
 <script id="kg-astro-script">
 /* ===== Astrophysics course (Study · Astrophysics course), first version, 22 Nov 2026.
    Reuses what the desk already has: lecture notes storage (files in the browser, included in the full backup), guided sessions
-   (Recall / Explain / Solve / Diagnose, with the desk timer and exact-skill credit), the review allowance (each lecture gets one skill
-   in the existing pool, no new queue) and the planner (course time replaces PCM time). Unknown course facts stay "Not confirmed". ===== */
+   (Recall / Explain / Solve / Diagnose, with the desk timer and exact-skill credit), kept apart from PCM (no PCM skills, misses, reviews or stats; study minutes still count in the day total;
+   course work stays on the course page) and the planner (course time replaces PCM time). Unknown course facts stay "Not confirmed". ===== */
 (function () {
   'use strict';
   const M = window.MoonLab; if (!M || !window.StudyPlan || !M.SECTIONS?.study) return;
@@ -13417,6 +13424,13 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
   }
   const C = () => L.astro;
   { const c = C(); for (const k of ['lectures', 'tasks', 'checklist']) if (!Array.isArray(c[k])) c[k] = []; if (!c.details || typeof c.details !== 'object') c.details = {}; }
+  // separate from PCM: skills made for course lectures by the first version move out of the PCM pool into the course (kept, never deleted)
+  { const ids = new Set((L.lectures || []).filter(e => e && e.astro).map(e => e.id)), sk = L.skills || [];
+    const out = sk.filter(s => s && (s.lectures || []).length && s.lectures.every(id => ids.has(id)));
+    if (out.length) { const c = C(); c.skills = (Array.isArray(c.skills) ? c.skills : []).concat(out); L.skills = sk.filter(s => !out.includes(s)); save(); } }
+  // a gap found in course practice becomes a doubt on that lecture, not a PCM mistake
+  window.__kgAstroGap = f => { const l = f && C().lectures.find(x => x.notesId && x.notesId === f.lec); if (!l || !String(f.gap || '').trim()) return;
+    (l.doubts = l.doubts || []).push({ id: uid('aq'), q: ('From practice: ' + String(f.gap).trim()).slice(0, 400), d: today(), done: false, src: 'practice' }); };
   const S = () => { const s = L.sched = L.sched || {}; if (!s.astro || typeof s.astro !== 'object') s.astro = { min: 0 }; return s; };
   const audit = (a, d) => window.__kgDeskAudit?.(a, d);
   const lecOf = id => C().lectures.find(l => l.id === id);
@@ -13610,6 +13624,49 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
   };
   const css = document.createElement('style');
   css.textContent = '.kg-astro-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:8px 0}@media (max-width:760px){.kg-astro-grid{grid-template-columns:1fr}}.kg-astro-form{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}.kg-astro-form label{display:flex;flex-direction:column;gap:4px}.kg-astro-form textarea,.kg-astro-form input{width:100%}.kl-btnlink{display:inline-flex;align-items:center;padding:6px 12px;border-radius:10px;border:1px solid currentColor;text-decoration:none}';
+  document.head.appendChild(css);
+})();
+</script>
+<script id="kg-tomorrow-plan">
+/* Tomorrow's plan (Planner, 22 Nov 2026): a small preview of tomorrow's day and an hours target (4-8 h) for it.
+   Each button shows the real total the planner can fit for tomorrow's wake time; bedtime (1:30 AM) and meals never move. */
+(function () {
+  'use strict';
+  const M = window.MoonLab, SP = () => window.StudyPlan; if (!M || !M.PANELS || !M.PANELS.countdown || !window.StudyPlan?.dayHours) return;
+  const { L, save, esc } = M;
+  const day = () => M.add(SP().studyDate ? SP().studyDate() : M.today(), 1);
+  const dowOf = d => new Date(d + 'T12:00:00').getDay();
+  const S = () => (L.sched = L.sched || {});
+  const hmLen = m => Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0');
+  const studyOf = t => t.rows.filter(r => r.kind === 'study');
+  const total = t => studyOf(t).reduce((n, r) => n + r.e - r.s, 0);
+  // the day as it would be with a given target (0 = no target); the saved value is put back straight after
+  function preview(d, h) {
+    const s = S(), had = Object.prototype.hasOwnProperty.call(s.hours || {}, d), old = had ? s.hours[d] : undefined;
+    if (h != null) { s.hours = s.hours || {}; if (h) s.hours[d] = h; else delete s.hours[d]; }
+    try { return SP().templateDay(L, d, dowOf(d), -1); }
+    finally { if (h != null) { if (had) s.hours[d] = old; else if (s.hours) delete s.hours[d]; } }
+  }
+  function card() {
+    const d = day(), sp = SP(), cur = sp.dayHours(S(), d), t = preview(d), light = ['sunday', 'gentle', 'reduced', 'stop'].includes(t.plan);
+    const date = new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    const opts = light ? '' : `<div class="kl-row kg-tmrw-h" role="group" aria-label="Study hours for tomorrow">${[0].concat(sp.DAY_HOURS).map(h => {
+      const m = total(preview(d, h)), short = h && m < h * 60;
+      return `<button type="button" data-a="tmrwhrs" data-v="${h}" aria-pressed="${h === cur}" title="${short ? 'The most that fits before bedtime with this wake time' : ''}"><b>${h ? h + 'h' : 'Plan default'}</b><small>${hmLen(m)}${short ? ' max' : ''}</small></button>`; }).join('')}</div>`;
+    const rows = studyOf(t).map(r => `<li><span>${sp.clk(r.s)}–${sp.clk(r.e)}</span> ${esc(r.title || '')}${r.optional ? ' <i>(optional)</i>' : ''}</li>`).join('');
+    return `<section class="kl-card kg-tmrw"><p class="kl-eyebrow">TOMORROW'S PLAN · ${esc(date)}</p>
+      <p class="kl-small">${esc(sp.PLAN_NAME[t.plan] || 'Your day')} · wake ${sp.clk(t.wake)} · <b>${hmLen(total(t))}</b> of study${t.extend ? ' (extended evening)' : ''} · bed by 1:30 AM</p>
+      ${light ? '<p class="kl-small">This is a light day, so it has no hours target.</p>' : opts}
+      <details class="kg-tmrw-list"><summary>Show tomorrow's blocks</summary><ol>${rows || '<li>No study blocks.</li>'}</ol></details>
+      <p class="kl-small">The real day still follows when you wake. 8h is the most that fits before bedtime, so it may show less.</p></section>`;
+  }
+  const base = M.PANELS.countdown;
+  M.PANELS.countdown = () => { let c = ''; try { c = card(); } catch (e) { c = ''; } return c + base(); };
+  M.ACTIONS.tmrwhrs = b => { const d = day(), h = +b.dataset.v, s = S(); s.hours = s.hours || {};
+    if (h) s.hours[d] = h; else delete s.hours[d];
+    save(); M.render(); };
+  const css = document.createElement('style');
+  css.textContent = '.kg-tmrw-h{gap:6px;flex-wrap:wrap}.kg-tmrw-h button{display:flex;flex-direction:column;align-items:center;min-width:64px;padding:6px 10px}.kg-tmrw-h button small{opacity:.75;font-size:.78em}.kg-tmrw-h button[aria-pressed="true"]{outline:2px solid currentColor}.kg-tmrw-list ol{margin:6px 0 0;padding-left:18px}.kg-tmrw-list li span{font-variant-numeric:tabular-nums;opacity:.8;margin-right:6px}';
   document.head.appendChild(css);
 })();
 </script>
