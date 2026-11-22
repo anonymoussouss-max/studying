@@ -988,7 +988,10 @@ body.habit-shh #hb-session-card {text-align:center;}
       const wk = monday(cursor), min = total(cursor);
       const rested = restSet.has(cursor) || !!days[cursor]?.rested;
       const before = run;
-      if (min>=P.need(!!days[cursor]?.shortDay,cursor)) { chain++; run++; statuses[cursor]='study'; }
+      // a rest day plans 0 study minutes, so its bar is 0 and it used to count as a study day: now it only keeps the chain
+      const nd = P.need(!!days[cursor]?.shortDay,cursor);
+      if (nd>0 && min>=nd) { chain++; run++; statuses[cursor]='study'; }
+      else if (!(nd>0)) statuses[cursor]='rest';
       else if (breaks.some(b=>cursor>=b.from&&cursor<b.until)) statuses[cursor]='rest';
       else if (date(cursor).getDay()===0 && cursor!==today) statuses[cursor]='rest'; // Sunday is the plan's rest day: it never breaks the chain
       else if (rested && !rests[wk]) { rests[wk]=1; statuses[cursor]='rest'; } // a rest day keeps the chain but doesn't add a day
@@ -996,7 +999,7 @@ body.habit-shh #hb-session-card {text-align:center;}
       else if (chain>0 && bank>0) { bank--; freezes[wk]=(freezes[wk]||0)+1; statuses[cursor]='freeze'; } // a freeze protects the chain; it doesn't add a day
       else { chain=0; run=0; statuses[cursor]='miss'; }
       if (run > before && run % 7 === 0) bank = Math.min(3, bank + 1);
-      if (cursor === '2026-11-21' && chain > 3) { chain = 3; run = Math.min(run, 3); } // one-time reset Ayan asked for: rest days had been counted as +1
+      if (cursor === '2026-11-21') { chain = 3; run = 3; } // one-time reset Ayan asked for: rest days had been counted as +1
     }
     const wk = monday(today), weekDays = Object.keys(statuses).filter(d=>d>=wk && statuses[d]==='study').length;
     return { chain, statuses, freezes, weekDays, freezeLeft:bank };
