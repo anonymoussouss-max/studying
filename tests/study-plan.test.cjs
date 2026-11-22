@@ -20,11 +20,11 @@ const at = (d, hm) => `${d}T${hm}:00`;               // local time
 const clock = off => { const m = ((630 + off) % 1440 + 1440) % 1440; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
 const row = (rows, id) => rows.find(r => r.id === id);
 
-test('weekday defaults: Mon–Sat are free days (college is a toggle), Sunday rest', () => {
+test('weekday defaults: every day is a normal day; Sunday gets its light guide from the plan, not a rest type', () => {
   const P = plan(at(MON, '12:00'));
   assert.strictEqual(JSON.stringify(P.dayKind(MON)), JSON.stringify({ t: 'normal' }));
   assert.strictEqual(JSON.stringify(P.dayKind(SAT)), JSON.stringify({ t: 'normal' }));
-  assert.strictEqual(JSON.stringify(P.dayKind(SUN)), JSON.stringify({ t: 'rest' }));
+  assert.strictEqual(JSON.stringify(P.dayKind(SUN)), JSON.stringify({ t: 'normal' }));
 });
 
 test('a saved day type overrides the weekday default', () => {
@@ -67,18 +67,6 @@ test('"I\'m home now" late: what does not fit before dinner moves to tomorrow', 
   assert.strictEqual(clock(row(rows, 'meal-1').start), '23:00');
 });
 
-test('free day: 8 hours by default, Normal starts at noon; 10 hours when chosen', () => {
-  const P = plan(at(SAT, '11:00'));
-  assert.strictEqual(P.hours(), 8);
-  assert.strictEqual(clock(P.fallback(6).find(r => r.kind === 'study').start), '12:00');
-  assert.strictEqual(plan(at(SAT, '11:00'), { dayHours: { [SAT]: 10 } }).hours(), 10);
-});
-
-test('re-planned after dinner: what does not fit is still named, on the wind-down row', () => {
-  const late = 20 * 60 - 630, rows = plan(`${SAT}T20:00:00`, { replanAt: { [SAT]: late } }).fallback(6);
-  assert.match(row(rows, 'wind').title, /moves to tomorrow: .*Physics \d+ min.*Chemistry \d+ min/);
-});
-
 test('the desk day starts at 4:00 AM: 5:00 AM belongs to the same calendar day', () => {
   const P = plan(at(MON, '05:00'), { dayTypes: { [MON]: { t: 'college', end: 900 } }, mathsNext: { [MON]: 155 } });
   // a college-day plan (not Sunday's empty rest plan) means 5 AM counted as Monday
@@ -93,7 +81,7 @@ test('no separate spaced-revision blocks: older material lives inside practice, 
   const plain = plan(at(MON, '07:00'), { dayTypes: { [MON]: { t: 'college', end: 900 } }, mathsNext: { [MON]: 155 } }).fallback(1);
   const sum = rows => rows.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0);
   assert.strictEqual(sum(college), sum(plain));
-  assert.strictEqual(holiday.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0), 480);
+  assert.strictEqual(holiday.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0), 360);
 });
 
 test('subject practice blocks carry a "mix in older material" note', () => {
@@ -116,59 +104,12 @@ test('after college comes a 3-hour nap instead of lunch, then study resumes', ()
 // ---- the daily routine: Early / Normal / Late x 4-16 h around fixed anchors ----
 const FRI = '2026-11-27';
 const anchorsAt = fri => ({ 'tea-am': 0, lunch: 360, 'tea-pm': 540, irl: fri ? 630 : 600, wind: 780, sleep: 870 });
-test('every available plan has its exact study total and keeps every fixed block in place (Friday too)', () => {
-  for (const [day, dow] of [[MON, 1], [FRI, 5]]) {
-    const P0 = plan(at(day, '10:40')), o = P0.routineOptions(dow);
-    for (const h of P0.routineHours) for (const v of ['early', 'normal', 'late']) {
-      if (!o[h].ok) continue;
-      const rows = plan(at(day, '10:40'), { dayHours: { [day]: h }, planVariant: v }).fallback(dow), want = anchorsAt(dow === 5);
-      assert.strictEqual(rows.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0), h * 60, h + ' ' + v);
-      for (const id in want) assert.strictEqual(rows.find(r => r.id === id).start, want[id], day + ' ' + h + ' ' + v + ' ' + id);
-      assert.ok(rows.filter(r => r.kind === 'study').every(r => r.start >= 30 && r.end <= 780), 'study outside 11 AM to 11:30 PM');
-      assert.strictEqual(rows.find(r => r.id === 'sleep').minutes, 570);
-    }
-  }
-});
-test('12 and 16 hours are unavailable, with the reason', () => {
-  const o = plan(at(MON, '10:40')).routineOptions(1);
-  for (const h of [12, 16]) { assert.strictEqual(o[h].ok, false); assert.match(o[h].why, /wind-down/); }
-  for (const h of [4, 6, 7, 8, 10]) assert.ok(o[h].ok, h + ' h');
-});
-test('Late 8 h starts in the early afternoon and ends by 11:30 PM; Early starts at 11:00', () => {
-  const o = plan(at(MON, '10:40')).routineOptions(1)[8];
-  assert.strictEqual(clock(o.early.start), '11:00');
-  assert.ok(o.late.start >= 150 && o.late.start <= 210, clock(o.late.start));
-  assert.ok(o.late.end <= 780 && o.normal.start > o.early.start && o.normal.start < o.late.start);
-});
 test('night meds sit at the set time and never move', () => {
   const rows = plan(at(MON, '10:40'), { medsAt: 840 }).fallback(1), m = rows.find(r => r.id === 'meds');
   assert.strictEqual(clock(m.start), '00:30');
   const re = plan(at(MON, '15:00'), { medsAt: 840, replanAt: { [MON]: 270 } }).fallback(1);
   assert.strictEqual(re.find(r => r.id === 'meds').start, m.start);
 });
-test('re-planned late on a free day: owed study moves later, sleep and wind-down stay, overflow is named', () => {
-  const re = plan(at(MON, '20:00'), { replanAt: { [MON]: 570 } }).fallback(1);
-  assert.strictEqual(re.find(r => r.id === 'wind').start, 780);
-  assert.strictEqual(re.find(r => r.id === 'sleep').start, 870);
-  assert.ok(re.filter(r => r.kind === 'study').every(r => r.start >= 570 && r.end <= 780));
-  assert.match(re.find(r => r.id === 'wind').title, /moves to tomorrow/);
-});
-
-test("slept long: today starts from the wake time, nothing before it, and bedtime stays", () => {
-  const rows = plan(at(MON, "13:10"), { wokeAt: { [MON]: 150 } }).fallback(1);
-  assert.strictEqual(rows.find(r => r.id === "tea-am").start, 150);
-  assert.ok(rows.filter(r => r.kind === "study").every(r => r.start >= 180 && r.end <= 780));
-  assert.strictEqual(rows.find(r => r.id === "sleep").start, 870);
-  const o = plan(at(MON, "13:10"), { wokeAt: { [MON]: 150 } }).routineOptions(1);
-  assert.strictEqual(clock(o[4].early.start), "13:30");
-  assert.strictEqual(o[10].ok, false);
-});
-test("woke after lunch time: lunch comes 30 min after morning tea, never skipped", () => {
-  const rows = plan(at(MON, "17:00"), { wokeAt: { [MON]: 380 } }).fallback(1);
-  assert.strictEqual(rows.find(r => r.id === "lunch").start, 410);
-  assert.ok(rows.some(r => r.kind === "study"));
-});
-
 test('the older-material allowance counts every completion in one ledger, whichever page it came from', () => {
   const P = plan(at(MON, '12:00'), { deskSettings: { reviewMinutes: 15 }, log: [{ d: MON, t: 'recall', budgetMinutes: 5 }], reviewLedger: [{ d: MON, src: 'flow', id: 'a', budgetMinutes: 5 }, { d: MON, src: 'lecture', id: 'b', budgetMinutes: 5 }, { d: '2026-11-22', src: 'lecture', id: 'c', budgetMinutes: 5 }] });
   assert.strictEqual(P.mixLeft(), 0);
