@@ -617,7 +617,8 @@ body.habit-shh #hb-session-card {text-align:center;}
   const shortHours=()=>{const h=hours();return h<12?h:8;};
   // 80% of the day's study plan makes it count. A past short day keeps the size it had that day.
   const needLog=()=>{try{return JSON.parse(root.localStorage.getItem('kg-need-log')||'{}');}catch(e){return {};}};
-  const need=(short,iso)=>{const d=iso||studyDate(),v=needRaw(short,iso);return d<studyDate()||dayKind(d).t==='rest'?v:Math.max(15,v);}; // past days keep their size (0 planned = a rest day for the chain)
+  let gCache={t:0,S:null};const gentleDay=d=>{const n=Date.now();if(n-gCache.t>1000)gCache={t:n,S:schedOf(labData())};const g=gCache.S&&gCache.S.gentle;return !!gentleOf(gCache.S,d)||!!(g&&Array.isArray(g.past)&&g.past.some(p=>p&&d>=p[0]&&d<=p[1]));}; // earlier gentle periods stay rest-like for the chain
+  const need=(short,iso)=>{const d=iso||studyDate();if(gentleDay(d))return 0;const v=needRaw(short,iso);return d<studyDate()||dayKind(d).t==='rest'?v:Math.max(15,v);}; // past days keep their size (0 planned = a rest day for the chain)
   // one wording for every progress display: header, desk card and companions
   const dayProgress=(got,iso)=>{const d=iso||studyDate();if(dayKind(d).t==='rest')return {need:0,counts:false,rest:true,text:'day off, the chain is safe'};
     const n=need(true,d),g=Math.round(+got||0),c=g>=n;return {need:n,got:g,counts:c,rest:false,text:c?'today counts':`${Math.max(1,Math.ceil(n-g))} min until today counts`};};
@@ -1137,7 +1138,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const examDays=[],prep=S.exams.find(x=>x&&x.from&&x.end&&x.from<=dayIso&&dayIso<=x.end);
     for(const x of S.exams)for(const d of (x&&x.days)||[])if(d&&d.d===dayIso){const at=+d.at,len=Math.max(180,+d.len||180),tr=Math.max(0,+d.travel||45);if(at>0)examDays.push({s:at-tr,e:at+len+tr,id:'exam-'+at,title:`${x.name||'Diploma exam'} · travel, exam and breaks`});}
     const food=((S.food||{})[dayIso]||[]).filter(f=>f&&+f.at>0).map((f,i)=>({s:+f.at,e:+f.at+Math.max(10,Math.min(45,+f.len||20)),id:'food-'+i,title:'Food break'}));
-    const hrs=dayHours(S,dayIso),opt=p=>({astro:astroMinutes(S,dayIso),extend:(hrs?hrs>=7:!!(S.extend||{})[dayIso])&&!['sunday','gentle','reduced','stop'].includes(p),german:prep?(S.germanExam==='pause'?0:S.germanExam==='light'?15:S.german):S.german,pianoAt:(S.piano||{})[dayIso],pianoLen:S.pianoLen,budget:hrs?(hrs<6?hrs*60:undefined):WEEK_BUDGET[(S.weekSize||{})[mondayOf(dayIso)]]||undefined,blockers:examDays.concat(food),edits:((S.edits||{})[dayIso]||[])});
+    const GR=gentleOf(S,dayIso),hrs=GR?0:dayHours(S,dayIso),opt=p=>({astro:astroMinutes(S,dayIso),extend:(GR?true:hrs?hrs>=7:!!(S.extend||{})[dayIso])&&!['sunday','gentle','reduced','stop'].includes(p),german:GR&&!(GR.cap&&GR.picks.includes('german'))?0:prep?(S.germanExam==='pause'?0:S.germanExam==='light'?15:S.german):S.german,pianoAt:(S.piano||{})[dayIso],pianoLen:S.pianoLen,budget:hrs?(hrs<6?hrs*60:undefined):WEEK_BUDGET[(S.weekSize||{})[mondayOf(dayIso)]]||undefined,blockers:examDays.concat(food),edits:((S.edits||{})[dayIso]||[])});
     // switching plan mid-day keeps everything before the switch as it was and re-plans only what is left
     const sw=((S.switches||{})[dayIso]||[]).filter(x=>x&&x.at>W).sort((a,b)=>a.at-b.at);let segs;
     if(!sw.length){segs=skeleton(W,plan,Object.assign(opt(plan),{from:nowClock}));}
@@ -1151,6 +1152,20 @@ body.habit-shh #hb-session-card {text-align:center;}
       for(let i=segs.length-1;i>=0&&tot>cap;i--){const x=segs[i];if(x.kind!=='study'||!x.ext)continue;const len=x.e-x.s,keep=len-Math.min(tot-cap,len);
         if(keep>=15){segs.splice(i+1,0,{s:x.s+keep,e:x.e,kind:'rest',id:'free-cap'+i,title:'Free time · nothing owed'});x.e=x.s+keep;tot-=len-keep;}
         else{segs[i]={s:x.s,e:x.e,kind:'rest',id:'free-cap'+i,title:'Free time · nothing owed'};tot-=len;}}}
+    // gentle return: at most the shared maximum minus the study already timed today, evening and night first; no maximum (or 0)
+    // means no automatic study at all, only what Ayan picks; 'Done for today' clears the rest. Unkept blocks are free time, not debt.
+    if(GR){const nowC=nowClock==null?-1:nowClock,used=dayIso===studyDate()?(ctx.gentleUsed!=null?+ctx.gentleUsed:gentleUsed(dayIso)):0;
+      const free=x=>({s:x.s,e:x.e,kind:'rest',id:'free-g'+x.s,title:'Free time · nothing owed'});
+      let left=GR.stopped||!GR.cap?0:Math.max(0,GR.cap-used);const fut=segs.map((x,i)=>({x,i})).filter(o=>o.x.kind==='study'&&o.x.e>nowC);
+      const order=fut.filter(o=>o.x.role==='G').concat(fut.filter(o=>o.x.role!=='G'&&o.x.s>=T_PERSONAL[1]).sort((a,b)=>a.x.s-b.x.s),fut.filter(o=>o.x.role!=='G'&&o.x.s<T_PERSONAL[1]).sort((a,b)=>b.x.s-a.x.s));
+      const keep=new Map();for(const o of order){const len=o.x.e-Math.max(o.x.s,nowC),k=Math.min(len,left);if(k<15&&k<len)continue;if(k<=0)break;keep.set(o.i,k);left-=k;}
+      segs=segs.map((x,i)=>{if(x.kind!=='study')return x;if(!keep.has(i))return free(x);const k=keep.get(i),from=Math.max(x.s,nowC);if(k>=x.e-from)return x;
+        return x.s>=T_PERSONAL[1]?Object.assign({},x,{s:from,e:from+k}):Object.assign({},x,{s:x.e-k});});
+      if(!GR.stopped&&!GR.cap){const busy=segs.filter(x=>!(x.kind==='rest'&&/^free/.test(x.id))).sort((a,b)=>a.s-b.s);
+        for(const p of GR.picks){const len=p==='german'?30:15;let t=Math.max(nowC,W+30),at=null;for(const b of busy){if(b.e<=t)continue;if(b.s-t>=len){at=t;break;}t=Math.max(t,b.e);}if(at==null&&T_READY-t>=len)at=t;
+          if(at==null)continue;const r={s:at,e:at+len,kind:'study',role:p==='german'?'G':'Gphys',gentle:p!=='german',picked:true};busy.push(r);busy.sort((a,b)=>a.s-b.s);
+          segs=segs.flatMap(x=>x.kind==='rest'&&/^free/.test(x.id)&&x.s<r.e&&r.s<x.e?[x.s<r.s?Object.assign({},x,{e:r.s}):null,x.e>r.e?Object.assign({},x,{s:r.e,id:x.id+'b'}):null].filter(Boolean):[x]).concat([r]).sort((a,b)=>a.s-b.s);}}
+      segs.cuts=[];}
     // diploma: the week's hours replace part of the PCM priority time (latest priority block first); exam preparation takes the lecture and priority blocks
     let dip=Math.max(0,Math.round((+ctx.diplomaToday||0)/5)*5);if(dip>0&&dip<15)dip=15;
     for(const g of segs)if(g.kind==='study'&&prep&&(examDays.length?['L','P','R','H'].includes(g.role):(g.role==='L'||g.role==='P')))g.role='D';
@@ -1161,9 +1176,20 @@ body.habit-shh #hb-session-card {text-align:center;}
     const focus=dayFocus(L,dayIso,ctx.actual14||{});
     const {rows,deferred}=assign(segs,tasks,focus,{now:nowClock,dayNo:Math.floor(Date.parse(dayIso+'T12:00:00')/864e5),firstOfDay:!ctx.loggedAny,examPrep:!!prep,astroTitle:astroNext(L.astro,dayIso).text,pool:ctx.pool,week:!!ctx.pool,syl:L.syl||{},germanUnit:+S.germanUnit||0});
     const cut=(segs.cuts||[]).reduce((a,c)=>a+c.m,0);
-    return {rows,deferred,cutMinutes:cut,plan,chosen,wake:W,focus,hours:hrs||0,extend:!!opt(plan).extend,examPrep:prep?prep.name||'Diploma exams':'',examDays:examDays.length,switched:sw.length};
+    if(GR)deferred.length=0; // gentle return: nothing is pushed onto another day; unfinished work waits in the parked list
+    return {rows,deferred,cutMinutes:cut,plan,chosen,wake:W,focus,hours:hrs||0,gentle:GR,extend:!!opt(plan).extend,examPrep:prep?prep.name||'Diploma exams':'',examDays:examDays.length,switched:sw.length};
   }
   const WEEK_BUDGET={lighter:270,minimal:150},DAY_HOURS=[4,5,6,7,8];
+  // Gentle return (Ayan's choice, 23 Nov 2026): a reversible mode with one shared maximum for all study, set only by Ayan.
+  // S.gentle={on,max (minutes or null = not set),from,offAfter,day:{[date]:{max,stopped,picks,over}}}. Records are never touched.
+  const gentleOf=(S,d)=>{const g=S&&S.gentle;if(!g||!g.on||(g.from&&d<g.from)||(g.offAfter&&d>g.offAfter))return null;
+    const num=v=>v==null||v===''||!Number.isFinite(+v)?null:Math.max(0,Math.min(720,Math.round(+v))),max=num(g.next&&g.next.from&&d>=g.next.from?g.next.max:g.max),o=((g.day||{})[d])||{},dm=num(o.max);
+    return {max,cap:dm==null?max:max==null?dm:Math.min(dm,max),stopped:!!o.stopped,over:!!o.over,picks:Array.isArray(o.picks)?o.picks:[]};};
+  function gentleUsed(day){let habit={},desk={};try{habit=JSON.parse(root.localStorage.getItem('ame-habit-v1')||'{}')||{};desk=JSON.parse(root.localStorage.getItem('desk-needy-v1')||'{}')||{};}catch(_){}
+    let ses=0;for(const s of Array.isArray(habit.sessions)?habit.sessions:[])if(s&&s.date===day&&s.subject!=='Other')ses+=+s.minutes||0;
+    const a=habit.active;if(a&&a.date===day&&a.subject!=='Other'){const ms=Math.min(+a.targetMs||Infinity,(+a.accruedMs||0)+(a.running?Math.max(0,Date.now()-(+a.lastStart||Date.now())):0));ses+=Math.floor(ms/60000);}
+    let blk=0;for(const [id,m] of Object.entries(((desk.state||desk).days||{})[day]?.completed||{}))if(/^(maths|physics|chem|german|astro|diploma|explore|study)/.test(id)&&Number.isFinite(+m))blk+=+m;
+    return Math.max(ses,blk);}
   const dayHours=(S,d)=>{const h=+((S&&S.hours)||{})[d];return DAY_HOURS.includes(h)?h:0;};
   // ---- Astrophysics course ----
   // daily course minutes: your chosen amount, or a deadline adjustment you applied (only until its date)
@@ -1185,8 +1211,8 @@ body.habit-shh #hb-session-card {text-align:center;}
   // deadline conflicts: confirmed due dates whose remaining work does not fit the course time before them
   // (course days are Monday-Saturday; days off are not counted). Proposes a temporary daily amount, never above 120 min, always replacing PCM.
   function astroConflicts(L,d){const C=L.astro||{},S=schedOf(L),out=[];let need=0;
-    const due=(C.tasks||[]).filter(t=>t&&!t.done&&t.due&&t.dueOk&&t.due>=d).sort((a,b)=>a.due.localeCompare(b.due));
-    for(const t of due){need+=Math.max(10,+t.mins||60);let avail=0,days=0;for(let x=d;x<t.due;x=addDays(x,1)){const dow=new Date(x+'T12:00:00').getDay();if(dow===0||((L.dayTypes||{})[x]||{}).t==='rest')continue;days++;avail+=astroMinutes(S,x);}
+    const due=(C.tasks||[]).filter(t=>t&&!t.done&&t.due&&t.dueOk&&t.due>=d&&+t.mins>0).sort((a,b)=>a.due.localeCompare(b.due)); // only tasks with your own time estimate
+    for(const t of due){need+=Math.max(10,+t.mins);let avail=0,days=0;for(let x=d;x<t.due;x=addDays(x,1)){const dow=new Date(x+'T12:00:00').getDay();if(dow===0||((L.dayTypes||{})[x]||{}).t==='rest')continue;days++;avail+=astroMinutes(S,x);}
       if(need>avail){const per=days?Math.min(120,Math.ceil(need/days/15)*15):null;out.push({id:t.id,title:t.title,due:t.due,need,avail,days,per,fits:!!per&&per*days>=need});}}
     return out;}
   const mondayOf=d=>{const w=new Date(d+'T12:00:00').getDay();return add8(d,w===0?-6:1-w);};
@@ -1257,7 +1283,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const daysLeft=w===0?0:7-w,loggedAny=ss.some(s=>s&&s.date===day&&s.subject!=='Other'&&(+s.minutes||0)>0)||Object.values(((desk.state||desk).days||{})[day]?.completed||{}).some(x=>+x>0)||!!(habit.active&&habit.active.date===day);
     return {actual14:a14,loggedAny,diplomaToday:daysLeft?Math.max(0,Math.ceil((target-dipDone)/daysLeft/5)*5):0,diplomaTarget:target,diplomaDone:dipDone,monday:mon};}
   const nowClock=()=>{const n=new Date();let m=n.getHours()*60+n.getMinutes();if(m<240)m+=1440;return m;};
-  const api={DAY_HOURS,dayHours,astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,forecast:(L,hist)=>forecast(L||labData(),hist||{}),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={DAY_HOURS,dayHours,gentleOf,gentleUsed,astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,forecast:(L,hist)=>forecast(L||labData(),hist||{}),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -2588,7 +2614,7 @@ window.__KG_BUILTIN = {
     if (iOpen) iAdd("ame", text); else iBubble(text);
     face(talkFace(text, o.face), 4500);
   }
-  window.__irohaSay = (t, o = {}) => setTimeout(() => { if (!document.hidden) irohaSay(t, Object.assign({ habit: true }, o)); }, o.delay ?? 2400);
+  window.__irohaSay = (t, o = {}) => setTimeout(() => { if (!document.hidden && !window.__kgQuiet?.(t, o)) irohaSay(t, Object.assign({ habit: true }, o)); }, o.delay ?? 2400);
 
   function iOpenChat() {
     iOpen = true; iw.classList.remove("unread"); ichat.classList.add("open"); ibubble.classList.remove("show"); face("talking");
@@ -3012,7 +3038,7 @@ window.__KG_BUILTIN = {
   // Hooks for the Moon Lab module, which lives outside this scope.
   window.__kgScript = script => runBanter(script);
   window.__kgAddBanter = (kind, script) => (BANTER[kind] || BANTER.any).push(script);
-  window.__kaguyaSay = (text, o = {}) => say(text, Object.assign({ mood: "happy" }, o));
+  window.__kaguyaSay = (text, o = {}) => window.__kgQuiet?.(text, o) ? undefined : say(text, Object.assign({ mood: "happy" }, o));
   window.__irohaAsk = text => iSend(text);
   window.__kgClearChat = who => {
     if (who === "k") { conversation.length = 0; saveConversation(); messagesEl.textContent = ""; }
@@ -3852,7 +3878,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     const blocks=window.StudySchedule?.(short,dow) || (short?window.StudyPlan.fallback(dow):[]),study=blocks.filter(b=>b.kind==='study');
     const target=study.reduce((n,b)=>n+b.minutes,0),logged=C.minutes(h,days(),today()),pct=target?Math.min(100,Math.round(logged*100/target)):0;
     const time=offset=>{const m=(630+offset)%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');};
-    return `<article class="hb-day-map hb-card" id="hb-day-map"><div class="hb-section-heading"><div><p class="hb-eyebrow">${esc(C.date(today()).toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'}))} · YOUR DAY</p><h2>${focus?esc(focus)+' is today’s focus.':'Sunday belongs to you.'}</h2><p>${focus?`${(h=>h%1?'about '+Math.round(h):h)(window.StudyPlan.shortHours())+'-hour plan'} · ${window.StudyPlan.need(true)} min today keeps the chain · bedtime 01:30`:'A full rest day. You do not owe the desk a session.'}</p></div>${focus?(window.StudyPlan.hours()<12?'':button(short?'8h fallback on · switch to 12h':'Switch to 8h fallback','fallback','aria-pressed="'+short+'"')):button('Mark today rested','rest')}</div>
+    return `<article class="hb-day-map hb-card" id="hb-day-map"><div class="hb-section-heading"><div><p class="hb-eyebrow">${esc(C.date(today()).toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'}))} · YOUR DAY</p><h2>${focus?esc(focus)+' is today’s focus.':'Sunday belongs to you.'}</h2><p>${focus&&window.StudyPlan.need(true)===0?'Gentle return · nothing is owed today · bedtime 01:30':focus?`${(h=>h%1?'about '+Math.round(h):h)(window.StudyPlan.shortHours())+'-hour plan'} · ${window.StudyPlan.need(true)} min today keeps the chain · bedtime 01:30`:'A full rest day. You do not owe the desk a session.'}</p></div>${focus?(window.StudyPlan.hours()<12?'':button(short?'8h fallback on · switch to 12h':'Switch to 8h fallback','fallback','aria-pressed="'+short+'"')):button('Mark today rested','rest')}</div>
     ${focus?`<div class="hb-day-progress"><strong>${Math.round(logged)} / ${target} min logged</strong><span>${(p=>p.counts?'Today counts 🌙':p.text.charAt(0).toUpperCase()+p.text.slice(1))(window.StudyPlan.dayProgress(logged))}</span></div><progress max="100" value="${pct}" aria-label="Today’s study progress">${pct}%</progress><details><summary>See the ${short?window.StudyPlan.shortHours():'12'}-hour schedule · ${study.length} study blocks</summary><ol class="hb-timeline">${blocks.map(b=>`<li class="hb-block-${b.kind}"><time>${time(b.start)}–${time(b.end)}</time><span><strong>${esc(b.title)}</strong><small>${b.minutes}m · ${esc(b.kind==='study' && b.id==='focus'?'today’s priority':b.kind)}</small></span>${b.kind==='study'?button('Start timer','block-task','data-block="'+esc(b.id)+'" aria-label="Choose '+esc(b.title)+'"'):''}</li>`).join('')}</ol><p class="hb-caption">A plan is a guide. Only saved work counts. Switching keeps your logs; each plan caps its own blocks.</p></details>`:'<p>Walk, eat, see someone, do something with no score attached. ♡</p>'}</article>`;
   }
   function restartView() {return `<details class="hb-card hb-extra"><summary>Make this feel like something I chose</summary><form id="hb-reason" class="hb-stack"><label>What do I want studying to make possible?<textarea name="reason" rows="2" maxlength="300" placeholder="Something that matters to you, beyond a score.">${esc(settings().reason || '')}</textarea></label><button type="submit">Keep my reason</button></form><p>Try one small question before deciding how the whole day will go.</p></details>`;}
@@ -4089,7 +4115,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     if((!desk().sound || window.__kgOnBreak) && melodyTimer)stopAudio();
   },1000);
   // Keep the original schedule, floating companion and dashboard on the same rule.
-  window.HabitDesk={startBlock(id){actions['block-task']({dataset:{block:id}});return !!h.active;},pauseActive(){if(!h.active||!h.active.running)return true;pause();return !h.active.running;},shiftMistakes(n){if(!n)return;for(const m of h.mistakes)if(m&&m.stage<4&&m.due)m.due=C.add(m.due,n);save();},setTheme(t){h.settings.theme=t;save();render();},refresh(){if(!document.activeElement?.closest('#habit-desk form'))render();},
+  window.HabitDesk={startBlock(id){actions['block-task']({dataset:{block:id}});return !!h.active;},pauseActive(){if(!h.active||!h.active.running)return true;pause();return !h.active.running;},resumeActive(){if(!h.active||h.active.running||h.active.phase==='closeout')return false;pause();return !!h.active.running;},shiftMistakes(n){if(!n)return;for(const m of h.mistakes)if(m&&m.stage<4&&m.due)m.due=C.add(m.due,n);save();},setTheme(t){h.settings.theme=t;save();render();},refresh(){if(!document.activeElement?.closest('#habit-desk form'))render();},
     minutes:iso=>C.minutes(h,days(),iso),
     history:(d,iso)=>C.history(h,d,iso),
     counted:(iso,d)=>{const status=C.history(h,{...days(),[iso]:d || days()[iso]},iso).statuses[iso];return status==='study'||status==='rest';},
@@ -6338,7 +6364,7 @@ window.KG_RECALL = {
     q.reminded = true; L.askNagAt = now; save(); I("Welcome back. That question's still open, whenever you're ready: " + q.text, { face: 'stern' });
   });
   render();
-  setTimeout(() => { tick(); const b = block(); if (!L.mood[today()] && b && b.kind !== 'sleep' && !document.body.classList.contains('habit-shh') && !isNight() && !window.__kgOnBreak) openMood(); }, 4000);
+  setTimeout(() => { tick(); const b = block(); if (!L.mood[today()] && b && b.kind !== 'sleep' && !document.body.classList.contains('habit-shh') && !isNight() && !window.__kgOnBreak && !window.StudyPlan?.gentleOf?.(L.sched, today())) openMood(); }, 4000);
   setInterval(tick, 60000);
   window.addEventListener('habit:change', () => { histCache = null; checkStickers(); });
 })();
@@ -8352,7 +8378,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     const gentleEnded = v.info.plan === 'gentle' && v.rows.some(r => r.task?.type === 'gentle' && r.end <= v.now), gentleDone = gentleEnded && v.done >= 15;
     const g = gentleEnded ? `<div class="kg-day-note"><p class="kl-small">${gentleDone ? '<b>Fifteen minutes done.</b> Your timer recorded it, and it counts as real study. Stopping now is a complete day.' : `<b>Your planned window has ended.</b> Your timer shows ${v.done} min today. Stopping is fine; or start the 15 minutes now if you'd like.`}</p><div class="kl-row"><button type="button" class="kl-primary" data-a="kgdplan" data-v="stop">Stop here for today</button><button type="button" data-a="kgdplan" data-v="reduced">One more block, then decide</button></div></div>` : '';
     const nb = v.nextBreak;
-    return `<div class="kg-now3"><div class="kg-now kg-now-main"><p class="kl-eyebrow">DO THIS NOW</p>${head}${reasonHTML(v)}<div class="kl-row" style="flex-wrap:wrap">${start}</div>${tools}${flow}${g}</div>
+    return `<div class="kg-now3"><div class="kg-now kg-now-main"><p class="kl-eyebrow">DO THIS NOW</p>${head}${v.info && v.info.gentle ? '' : reasonHTML(v)}<div class="kl-row" style="flex-wrap:wrap">${start}</div>${tools}${flow}${g}</div>
       <div class="kg-now"><p class="kl-eyebrow">NEXT PROTECTED BREAK</p><p><b>${nb ? esc(nb.title) : 'None left today'}</b></p>${nb ? `<p class="kl-small">${hm(nb.start)}–${hm(nb.end)} · in ${dur(nb.start - v.now)}</p>` : ''}<p class="kl-small">Done today: <b>${dur(v.done)}</b> on your timer · planned ${dur(v.planned)}</p></div>
       <div class="kg-now"><p class="kl-eyebrow">CHANGE TODAY</p><div class="kl-row" style="flex-wrap:wrap"><button type="button" data-a="kgdtalk">💬 Talk to Iroha</button><button type="button" class="kl-ghost" data-a="kgdfood">🍽 Food break now</button><button type="button" class="kl-ghost" data-a="kgdplan" data-v="stop" title="Ends today's plan now. No permission needed.">Stop for today</button></div><details${ko('plan')}><summary class="kl-small">Plan, wake time, heavy subject</summary>${pickerHTML(v)}</details></div></div>`;
   }
@@ -9392,14 +9418,15 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   }
   function srPause() {
     const d = today();
-    if (M.onBreak?.()) {
+    const gentle = !M.onBreak?.() && !!window.StudyPlan?.gentleOf?.(L.sched, d);
+    if (M.onBreak?.() || gentle) {
       // the first break day counts too, so a review due on day 1 of the break is still due a day after you're back
-      if (!L.srPause) { const b = (L.breaks || []).slice(-1)[0]; L.srPause = { day: add(b && b.from <= d ? b.from : d, -1) }; }
+      if (!L.srPause) { const b = gentle ? null : (L.breaks || []).slice(-1)[0]; L.srPause = { day: add(b && b.from <= d ? b.from : d, -1) }; if (gentle) L.srPause.kind = 'gentle'; }
       const n = M.gap(d, L.srPause.day);
       if (n > 0) { shiftSR(n); L.srPause.day = d; save(); M.softRender?.(); }
     } else if (L.srPause) {
       // catch up any break days the site wasn't opened on; ending the break early takes back today's shift
-      if (L.breakUntil) shiftSR(M.gap(add(L.breakUntil, -1), L.srPause.day));
+      if (L.breakUntil && L.srPause.kind !== 'gentle') shiftSR(M.gap(add(L.breakUntil, -1), L.srPause.day));
       delete L.srPause; spreadSR(); save(); M.render();
     }
   }
@@ -10924,6 +10951,7 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
     const m = new Date().getHours() * 60 + new Date().getMinutes(), t = (m < 240 ? m + 1440 : m) - 630, left = b ? Math.max(0, b.end - t) : 0;
     const el = $('kg-status');
     if (el && window.__kgOnBreak) { el.textContent = `${me} Resting until ${window.__kgBreakUntil} · doctor's orders · chain safe`; return; }
+    { const gr = window.StudyPlan?.gentleOf?.(M.L.sched, M.today()); if (el && gr) { el.textContent = `${me} Gentle return · ${gr.stopped ? 'done for today' : 'your pace'}`; return; } }
     if (el) el.textContent = `${me} ${M.hist().chain}-day chain · ${(p => p ? (p.counts ? 'today counts ✓' : p.text) : got >= need ? 'today counts ✓' : `${Math.max(0, need - got)} min until today counts`)(window.StudyPlan?.dayProgress?.(got))}${b && !M.isNight() ? ` · ${b.title}, ${Math.floor(left / 60) ? Math.floor(left / 60) + 'h ' : ''}${left % 60}m left` : ''}`;
     const dot = bar.querySelector('[data-sec="study"] .kg-dot'); if (dot) dot.hidden = !M.L.ask.q;
   }
@@ -11057,6 +11085,8 @@ body.kg-plain #kg-main :is(h2,h3){letter-spacing:0}`;
     if (window.__kgOnBreak) return [of(["the moon's out and you're off duty, No.1. best combo.", 'my official orders: be extremely comfy.', 'nothing to do today except be looked after.']), of(["Your doctor's plan is a good one. I'm glad you're keeping to it.", 'Nothing is due and nothing is waiting. Rest is the whole job.', 'Resting counts. I checked the numbers.'])];
     if (M.isNight()) return ["the moon's my shift now. go to sleep, No.1. i'll keep watch.", 'Past wind-down. The work will still be there tomorrow.'];
     if (window.__kgGentle) return ['gentle day. tiny steps still get the clip.', 'A lighter day is still a real day.'];
+    { const gr = window.StudyPlan?.gentleOf?.(M.L.sched, M.today()); // gentle return: company, no push
+      if (gr) return gr.stopped ? ["done for today. it's just us and the moon now.", 'Done for today. That counts as following the plan.'] : [of(["no rush today, No.1. i'm here either way.", "whatever you pick today, i'll keep you company."]), of(['Your call today. One small thing, or nothing.', "I'm around if you want help with anything."])]; }
     if (day === 0) return ['sunday! i declare a royal holiday.', "It's Sunday. Rest properly; the week can wait."];
     return [of(["we're live, No.1! let's make today a good episode.", "your happy ending needs today's page. no pressure. some pressure.", "i believe in you so loudly that iroha asked me to stop."]), of(['You came. Good. Pick the first block and open the page.', "How's your head today? Tell me honestly and I'll size the work to it.", 'Desk is clear. One problem first; the rest follows.', "Kaguya has been narrating your arrival for a while. Ignore her. Let's begin.", "Same as always: attempt first, then we look at the first wrong line."])];
   }
@@ -13480,7 +13510,7 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
     return `<section class="kl-card kg-astro"><p class="kl-eyebrow">ASTROPHYSICS COURSE · ${nc(c.details.provider)}</p>
       <h3>Next: ${esc(n.text)}</h3><div class="kl-row" style="flex-wrap:wrap">${btns}${timer}</div>
       <p class="kl-small">Course time today: <b>${t.planned} min planned</b> on your day plan · <b>${t.done} min</b> on your timer. ${S().astro.min ? `${S().astro.min} min a day replaces part of your PCM time; the day's total stays the same.` : 'No daily course time is set, so the plan has no course block (set it below).'}</p>
-      ${conf.map(x => `<div class="kg-day-note"><p class="kl-small"><b>Deadline conflict:</b> ${esc(x.title)} is due ${esc(x.due)} and needs about ${x.need} min of course work by then, but your plan has ${x.avail} min of course time on the ${x.days} study day${x.days === 1 ? '' : 's'} before it.${x.per ? ` Suggestion: ${x.per} min a day of course time until ${esc(x.due)}, taken from PCM time (no extra hours)${x.fits ? '' : '; even that may not be enough, so consider asking for an extension'}.` : ' There are no study days left before it.'}</p>${x.per && !(S().astro.boost && +S().astro.boost.min >= x.per && S().astro.boost.until >= x.due) ? `<div class="kl-row"><button type="button" class="kl-primary" data-a="astroboost" data-v="${x.per}:${esc(x.due)}">Apply</button></div>` : x.per ? '<p class="kl-small">That suggestion is already applied.</p>' : ''}</div>`).join('')}
+      ${conf.map(x => `<div class="kg-day-note"><p class="kl-small"><b>Deadline conflict:</b> ${esc(x.title)} is due ${esc(x.due)} and needs about ${x.need} min of course work by then (your own estimate), but your plan has ${x.avail} min of course time on the ${x.days} study day${x.days === 1 ? '' : 's'} before it.${SP().gentleOf(S(), today()) ? ' Gentle return is on, so nothing is added to your days. You could do part of it, ask about an extension, or change your maximum yourself in Settings.' : x.per ? ` Suggestion: ${x.per} min a day of course time until ${esc(x.due)}, taken from PCM time (no extra hours)${x.fits ? '' : '; even that may not be enough, so consider asking for an extension'}.` : ' There are no study days left before it.'}</p>${x.per && !SP().gentleOf(S(), today()) && !(S().astro.boost && +S().astro.boost.min >= x.per && S().astro.boost.until >= x.due) ? `<div class="kl-row"><button type="button" class="kl-primary" data-a="astroboost" data-v="${x.per}:${esc(x.due)}">Apply</button></div>` : x.per ? '<p class="kl-small">That suggestion is already applied.</p>' : ''}</div>`).join('')}
       <div class="kg-astro-grid"><div><p class="kl-small"><b>Waiting for you</b></p>${waiting.length ? `<ul class="kl-list">${waiting.map(w => `<li>${w}</li>`).join('')}</ul>` : '<p class="kl-small">Nothing waiting.</p>'}</div>
       <div><p class="kl-small"><b>Confirmed deadlines</b></p>${dl.length ? `<ul class="kl-list">${dl.map(x => `<li>${esc(x.due)} · ${esc(x.title)}</li>`).join('')}</ul>` : '<p class="kl-small">None confirmed yet.</p>'}<p class="kl-small">Assessment: ${nc(c.details.assessDate)}${c.details.assessFormat ? ' · ' + esc(c.details.assessFormat) : ''}</p></div>
       <div><p class="kl-small"><b>Progress</b> (from what you've actually done)</p><p class="kl-small">${counts.map(([s, k]) => `${s} ${k}`).join(' · ')} · assignments ${c.tasks.filter(x => x.done).length}/${c.tasks.length} done</p><p class="kl-small">Watched isn't mastered: a lecture counts as checked only when you solve its practice on your own and check it against a named source.</p></div></div>
@@ -13648,7 +13678,7 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
     finally { if (h != null) { if (had) s.hours[d] = old; else if (s.hours) delete s.hours[d]; } }
   }
   function card() {
-    const d = day(), sp = SP(), cur = sp.dayHours(S(), d), t = preview(d), light = ['sunday', 'gentle', 'reduced', 'stop'].includes(t.plan);
+    const d = day(), sp = SP(), cur = sp.dayHours(S(), d), t = preview(d), gr = t.gentle, light = !!gr || ['sunday', 'gentle', 'reduced', 'stop'].includes(t.plan);
     const date = new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
     const opts = light ? '' : `<div class="kl-row kg-tmrw-h" role="group" aria-label="Study hours for tomorrow">${[0].concat(sp.DAY_HOURS).map(h => {
       const m = total(preview(d, h)), short = h && m < h * 60;
@@ -13656,7 +13686,7 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
     const rows = studyOf(t).map(r => `<li><span>${sp.clk(r.s)}–${sp.clk(r.e)}</span> ${esc(r.title || '')}${r.optional ? ' <i>(optional)</i>' : ''}</li>`).join('');
     return `<section class="kl-card kg-tmrw"><p class="kl-eyebrow">TOMORROW'S PLAN · ${esc(date)}</p>
       <p class="kl-small">${esc(sp.PLAN_NAME[t.plan] || 'Your day')} · wake ${sp.clk(t.wake)} · <b>${hmLen(total(t))}</b> of study${t.extend ? ' (extended evening)' : ''} · bed by 1:30 AM</p>
-      ${light ? '<p class="kl-small">This is a light day, so it has no hours target.</p>' : opts}
+      ${gr ? `<p class="kl-small">Gentle return is on: ${gr.cap == null ? 'no maximum is set, so nothing is planned automatically' : gr.cap ? `up to ${hmLen(gr.cap)} of study in all, evening first` : 'your maximum is 0, so nothing is planned'}. Change it in Settings.</p>` : light ? '<p class="kl-small">This is a light day, so it has no hours target.</p>' : opts}
       <details class="kg-tmrw-list"><summary>Show tomorrow's blocks</summary><ol>${rows || '<li>No study blocks.</li>'}</ol></details>
       <p class="kl-small">The real day still follows when you wake. 8h is the most that fits before bedtime, so it may show less.</p></section>`;
   }
@@ -13668,6 +13698,164 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
   const css = document.createElement('style');
   css.textContent = '.kg-tmrw-h{gap:6px;flex-wrap:wrap}.kg-tmrw-h button{display:flex;flex-direction:column;align-items:center;min-width:64px;padding:6px 10px}.kg-tmrw-h button small{opacity:.75;font-size:.78em}.kg-tmrw-h button[aria-pressed="true"]{outline:2px solid currentColor}.kg-tmrw-list ol{margin:6px 0 0;padding-left:18px}.kg-tmrw-list li span{font-variant-numeric:tabular-nums;opacity:.8;margin-right:6px}';
   document.head.appendChild(css);
+})();
+</script>
+<script id="kg-gentle-script">
+/* ===== Gentle return (Ayan's choice, 23 Nov 2026). A reversible mode, not a diagnosis.
+   One shared maximum for all study (PCM, German, diploma, Astrophysics), set only by Ayan and possibly left unset.
+   Lowering it, a smaller day, "Done for today" and rest work at once; raising it needs a confirmation and starts tomorrow.
+   Unfinished work waits in an unscheduled list (real deadlines stay visible). Spaced reviews and mistakes wait while it is on
+   and come back a few a day afterwards. Switching it off shows a preview and starts tomorrow, so today is never refilled.
+   Study records, notes and evidence are never changed. ===== */
+(function () {
+  'use strict';
+  const M = window.MoonLab, SP = () => window.StudyPlan; if (!M || !M.PANELS || !window.StudyPlan?.gentleOf) return;
+  const { L, save, esc } = M;
+  const S = () => (L.sched = L.sched || {});
+  const day = () => SP().studyDate ? SP().studyDate() : M.today();
+  const tomorrow = () => M.add(day(), 1);
+  const G = () => S().gentle;
+  const st = (d = day()) => SP().gentleOf(S(), d);
+  const dayRec = (d = day()) => { const g = G(); g.day = g.day || {}; return (g.day[d] = g.day[d] || {}); };
+  const used = () => SP().gentleUsed(day());
+  const hm = m => m >= 60 ? Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + String(m % 60).padStart(2, '0') : '') : m + ' min';
+  const audit = (a, d) => window.__kgDeskAudit?.(a, d);
+  const redo = () => { save(); M.srPause?.(); M.render(); };
+  // an increase chosen earlier becomes the standing maximum on its day
+  { const g = G(); if (g && g.next && g.next.from && day() >= g.next.from) { g.max = g.next.max; delete g.next; save(); }
+    if (g && g.on && g.offAfter && day() > g.offAfter) { (g.past = Array.isArray(g.past) ? g.past : []).push([g.from || g.offAfter, g.offAfter]); g.on = false; delete g.offAfter; save(); } } // switched off on an earlier day; the maximum is kept for next time
+
+  // ---- the unscheduled list: nothing here has an overdue count or is added to a day by itself ----
+  const SUBJ = { maths: 'Maths', physics: 'Physics', chem: 'Chemistry', Maths: 'Maths', Physics: 'Physics', Chemistry: 'Chemistry' };
+  function parkedHTML() {
+    const sy = L.syl || {}, items = [];
+    for (const [k, p] of Object.entries(sy.pos || {})) if (p && p.active && p.lec) items.push(`${esc(SUBJ[k] || k)} · lecture ${esc(String(p.lec))}${p.chapter ? ' (' + esc(String(p.chapter)) + ')' : ''}${p.at ? ' · stopped at ' + esc(p.at) : ''}`);
+    for (const h of sy.hw || []) if (h && h.status === 'open') items.push(`Homework · ${esc(SUBJ[h.subj] || h.subj || '')}: ${esc(h.title)}${h.next ? ' · next: ' + esc(h.next) : ''}`);
+    for (const x of L.doubts || []) if (x && !x.done) items.push(`Doubt: ${esc(String(x.t || '').slice(0, 120))}`);
+    const c = L.astro || {};
+    for (const l of c.lectures || []) { if (l.watch === 'progress') items.push(`Astrophysics · ${esc(SP().astroDay(l))}${l.resume ? ' · resume at ' + esc(l.resume) : ''}`); for (const q of l.doubts || []) if (!q.done) items.push(`Astrophysics doubt: ${esc(String(q.q).slice(0, 120))}`); }
+    for (const t of c.tasks || []) if (t && !t.done) items.push(`Astrophysics · ${esc(t.title)}${t.due ? ` · due ${esc(t.due)}${t.dueOk ? '' : ' (date not confirmed)'}` : ''}${+t.mins > 0 ? ` · your estimate ${+t.mins} min` : ''}`);
+    return `<details class="kg-parked"><summary>Waiting, unscheduled (${items.length})</summary>${items.length ? `<ul class="kl-list">${items.map(x => `<li>${x}</li>`).join('')}</ul>` : '<p class="kl-small">Nothing waiting.</p>'}<p class="kl-small">Nothing here is added to a day by itself and nothing here is overdue. Real submission dates stay as they are.</p></details>`;
+  }
+
+  // ---- the Today card ----
+  function card() {
+    const g = st(); if (!g) return '';
+    const u = used(), left = g.cap == null ? null : Math.max(0, g.cap - u), rec = (G().day || {})[day()] || {};
+    const maxLine = g.cap == null ? 'No maximum is set, so nothing is planned automatically.' : g.cap === 0 ? 'Your maximum today is 0, so nothing is planned.' : `Up to <b>${hm(g.cap)}</b> of study today, all subjects together${g.max != null && g.cap < g.max ? ` (smaller than your usual ${hm(g.max)})` : ''}.`;
+    const usage = `<p class="kl-small">Timer today: <b>${hm(u)}</b>${left != null && g.cap ? ` · left: <b>${hm(left)}</b>` : ''}${g.over ? ' · you chose to continue beyond your maximum today' : ''}. Breaks don't count.</p>`;
+    const res = '<div class="kl-row" style="flex-wrap:wrap"><button type="button" data-a="kggopen" data-v="library">Notes</button><button type="button" data-a="kggopen" data-v="astro">Astrophysics course</button></div>';
+    if (g.stopped) return `<section class="kl-card kg-gentle"><p class="kl-eyebrow">GENTLE RETURN · DONE FOR TODAY</p><p><b>Done for today. That's following the plan.</b></p>${usage}<p class="kl-small">Nothing more is planned today and nothing moves to tomorrow. Notes and the course stay open if you want them.</p>${res}<div class="kl-row"><button type="button" class="kl-ghost" data-a="kggundo">Undo (tapped by mistake)</button></div>${parkedHTML()}</section>`;
+    const picks = g.picks || [], noAuto = !g.cap;
+    const opt = noAuto ? `<p class="kl-small"><b>Optional, only if you want to:</b></p><div class="kl-row" style="flex-wrap:wrap">
+        <button type="button" data-a="kggpick" data-v="physics" aria-pressed="${picks.includes('physics')}">15 min Physics, a gentle start</button>
+        <button type="button" data-a="kggpick" data-v="german" aria-pressed="${picks.includes('german')}">German · 30 min</button></div>`
+      : `<div class="kl-row" style="flex-wrap:wrap"><button type="button" data-a="kggpick" data-v="german" aria-pressed="${picks.includes('german')}">${picks.includes('german') ? 'German is in today (inside your maximum)' : 'Add German today (inside your maximum)'}</button></div>`;
+    return `<section class="kl-card kg-gentle"><p class="kl-eyebrow">GENTLE RETURN</p><p>${maxLine}</p>${usage}${opt}
+      <div class="kl-row" style="flex-wrap:wrap"><button type="button" class="kl-primary" data-a="kggstop">Done for today</button><button type="button" data-a="kgday" data-v="rest">Rest day</button></div>
+      ${g.cap ? `<form data-f="kggsmaller" class="kl-row" style="flex-wrap:wrap"><label class="kl-small">Smaller today, in minutes <input name="m" type="number" min="0" max="${g.cap}" step="5" style="width:6em" required></label><button>Use for today</button></form>` : ''}
+      ${parkedHTML()}<p class="kl-small">Stopping at your maximum, or earlier, counts as following the plan. Other cards are under "More for today".</p></section>`;
+  }
+  // everything else on Today folds into the existing "More for today"
+  const KEEP = '.kg-gentle, .kg-plan, .kg-more';
+  const prev = M.PANELS.today;
+  M.PANELS.today = () => {
+    const h = prev(), g = st(); document.body.classList.toggle('kg-gentle-on', !!g); if (!g || M.onBreak?.()) return h;
+    const tpl = document.createElement('template'); tpl.innerHTML = h;
+    let more = [...tpl.content.children].find(el => el.matches('details.kg-more'));
+    if (!more) { more = document.createElement('details'); more.className = 'kl-card kg-more'; more.innerHTML = '<summary>More for today <small>optional</small></summary>'; tpl.content.append(more); }
+    const noTask = g.stopped || (!g.cap && !(g.picks || []).length);
+    for (const el of [...tpl.content.children]) if (el !== more && (!el.matches(KEEP) || (noTask && el.matches('.kg-plan')))) more.append(el);
+    return card() + tpl.innerHTML;
+  };
+
+  // ---- reaching the maximum: pause the timer once and ask; no repeated warnings ----
+  let asked = '';
+  function limitBox() {
+    if (document.getElementById('kg-gentle-limit')) return;
+    const g = st(), box = document.createElement('div'); box.id = 'kg-gentle-limit'; box.className = 'kg-gl'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Maximum reached');
+    box.innerHTML = `<div class="kl-card"><p class="kl-eyebrow">YOUR MAXIMUM FOR TODAY</p><p>You've reached the ${hm(g.cap)} you set. Your timer is paused. Notes stay open.</p>
+      <div class="kl-row" style="flex-wrap:wrap"><button type="button" class="kl-primary" data-gl="stop">Done for today</button><button type="button" data-gl="ask">Continue beyond my limit</button></div>
+      <div data-gl-confirm hidden><p class="kl-small">Continue beyond your maximum for today? You won't be asked again today.</p><div class="kl-row"><button type="button" data-gl="yes">Yes, continue</button><button type="button" class="kl-ghost" data-gl="back">Back</button></div></div></div>`;
+    document.body.append(box);
+    box.addEventListener('click', e => { const b = e.target.closest('[data-gl]'); if (!b) return; const k = b.dataset.gl;
+      if (k === 'ask') { box.querySelector('[data-gl-confirm]').hidden = false; return; }
+      if (k === 'back') { box.querySelector('[data-gl-confirm]').hidden = true; return; }
+      if (k === 'stop') stop();
+      if (k === 'yes') { dayRec().over = true; audit('gentle return: continued beyond the maximum', ''); save(); window.HabitDesk?.resumeActive?.(); M.render(); }
+      box.remove(); });
+  }
+  function check() {
+    const g = st(); if (!g || g.over || g.stopped || g.cap == null) { document.getElementById('kg-gentle-limit')?.remove(); return; }
+    let a = null; try { a = (JSON.parse(localStorage.getItem('ame-habit-v1') || '{}') || {}).active; } catch (e) {}
+    if (!a || !a.running || used() < g.cap) return;
+    if (window.HabitDesk?.pauseActive?.()) { if (asked !== day()) { asked = day(); audit('gentle return: maximum reached, timer paused', hm(g.cap)); } M.render(); limitBox(); }
+  }
+  setInterval(check, 15000); setTimeout(check, 3000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(check, 800); });
+
+  // ---- actions ----
+  function stop() { dayRec().stopped = true; window.HabitDesk?.pauseActive?.(); audit('gentle return: done for today', ''); redo(); }
+  Object.assign(M.ACTIONS, {
+    kggstop: stop,
+    kggundo: () => { delete dayRec().stopped; redo(); },
+    kggpick: b => { const r = dayRec(), p = b.dataset.v; r.picks = (r.picks || []).includes(p) ? r.picks.filter(x => x !== p) : (r.picks || []).concat(p); redo(); },
+    kggopen: b => b.dataset.v === 'astro' ? M.go?.('study', 'astro') : M.go?.('library'),
+    kgg: b => { const g = G(), v = b.dataset.v;
+      if (v === 'on') { S().gentle = Object.assign(g || {}, { on: true, from: (g && g.on && !g.offAfter && g.from) || day() }); delete S().gentle.offAfter; delete S().gentle.offPreview; audit('gentle return on', ''); return redo(); }
+      if (v === 'offask') { g.offPreview = true; return redo(); }
+      if (v === 'offcancel') { delete g.offPreview; return redo(); }
+      if (v === 'off') { delete g.offPreview; g.offAfter = day(); audit('gentle return off from tomorrow', ''); return redo(); }
+      if (v === 'keep') { delete g.offAfter; return redo(); }
+      if (v === 'nextcancel') { delete g.next; delete g.ask; return redo(); }
+      if (v === 'raiseno') { delete g.ask; return redo(); }
+      if (v === 'raiseyes' && g.ask) { g.next = { max: g.ask.max, from: tomorrow() }; delete g.ask; audit('gentle return: maximum raised from tomorrow', String(g.next.max)); return redo(); } }
+  });
+  Object.assign(M.FORMS, {
+    kggsmaller: v => { const g = st(), m = Math.max(0, Math.round(+v.m || 0)); if (!g || !g.cap) return; dayRec().max = Math.min(m, g.cap); redo(); },
+    // lowering (or clearing) is immediate; raising needs a confirmation and starts tomorrow
+    kggmax: v => { const g = G(); const raw = String(v.m ?? '').trim(), m = raw === '' ? null : Math.max(0, Math.min(720, Math.round(+raw))); if (raw !== '' && !Number.isFinite(m)) return;
+      const cur = st()?.max ?? (g.max == null ? null : +g.max), higher = m != null && (cur == null || m > cur);
+      if (higher) { g.ask = { max: m }; return redo(); }
+      g.max = m; delete g.next; delete g.ask; audit('gentle return: maximum lowered', String(m)); redo(); }
+  });
+
+  // ---- Settings ----
+  M.SECTIONS.settings.push(['gentle', '🌱 Gentle return']);
+  M.PANELS.gentle = () => {
+    const g = G() || {}, on = !!g.on, t = st(), next = st(tomorrow());
+    if (!on) return `<section class="kl-card"><p class="kl-eyebrow">GENTLE RETURN</p><p>Off. The normal planner is in use.</p><p class="kl-small">When it's on: one shared maximum for all study (you set it, or leave it unset), one main task on Today, "Done for today", and an unscheduled list instead of carry-over. Spaced reviews wait and come back a few a day afterwards. It doesn't change your records.</p><div class="kl-row"><button type="button" class="kl-primary" data-a="kgg" data-v="on">Turn on</button></div></section>`;
+    const cur = t ? t.max : null;
+    let off = '';
+    if (g.offAfter) off = `<p class="kl-small"><b>Switching off after today.</b> From ${esc(tomorrow())} the normal planner returns. Today stays as it is.</p><div class="kl-row"><button type="button" data-a="kgg" data-v="keep">Keep gentle return on</button></div>`;
+    else if (g.offPreview) {
+      const s = G(), had = s.offAfter; s.offAfter = day(); let p; try { p = SP().templateDay(L, tomorrow(), new Date(tomorrow() + 'T12:00:00').getDay(), -1); } finally { if (had == null) delete s.offAfter; else s.offAfter = had; }
+      const rows = p.rows.filter(r => r.kind === 'study'), tot = rows.reduce((n, r) => n + r.e - r.s, 0);
+      off = `<div class="kg-day-note"><p><b>Preview: switching off</b></p><p class="kl-small">Today stays exactly as it is: ${hm(used())} on your timer, nothing added. From tomorrow (${esc(tomorrow())}) the normal planner returns: about <b>${hm(tot)}</b> of study (${esc(SP().PLAN_NAME[p.plan] || p.plan)}${p.hours ? ', your ' + p.hours + ' h target' : ''}).</p>
+        <p class="kl-small">Paused reviews come back a few at a time: at most two lectures a subject (four in all), ten cards and five mistakes a day. Your waiting list stays as it is.</p>
+        <div class="kl-row"><button type="button" class="kl-primary" data-a="kgg" data-v="off">Apply</button><button type="button" class="kl-ghost" data-a="kgg" data-v="offcancel">Cancel</button></div></div>`;
+    } else off = '<div class="kl-row"><button type="button" class="kl-ghost" data-a="kgg" data-v="offask">Switch off…</button></div>';
+    const ask = g.ask ? `<div class="kg-day-note"><p class="kl-small">Raise your maximum from ${cur == null ? 'not set' : hm(cur)} to <b>${hm(g.ask.max)}</b>? It starts tomorrow (${esc(tomorrow())}), not today.</p><div class="kl-row"><button type="button" class="kl-primary" data-a="kgg" data-v="raiseyes">Yes, raise it from tomorrow</button><button type="button" class="kl-ghost" data-a="kgg" data-v="raiseno">Cancel</button></div></div>` : '';
+    const pend = g.next ? `<p class="kl-small">From ${esc(g.next.from)}: ${hm(g.next.max)}. <button type="button" class="kl-ghost" data-a="kgg" data-v="nextcancel">Cancel that increase</button></p>` : '';
+    return `<section class="kl-card"><p class="kl-eyebrow">GENTLE RETURN · ON</p>
+      <p>Your maximum: <b>${cur == null ? 'not set' : hm(cur)}</b>${cur == null ? ' (nothing is planned automatically)' : ', all study together'}.</p>${pend}
+      <form data-f="kggmax" class="kl-row" style="flex-wrap:wrap"><label class="kl-small">Maximum in minutes (leave empty for not set) <input name="m" type="number" min="0" max="720" step="5" style="width:7em" value="${cur == null ? '' : cur}"></label><button>Save</button></form>
+      <p class="kl-small">Lowering it works at once. Raising it asks you first and starts tomorrow. It's a maximum you can always go under, not a target, and not a medical limit.</p>${ask}
+      <p class="kl-small">Tomorrow: ${next ? (next.cap == null ? 'no maximum set' : 'up to ' + hm(next.cap)) : 'normal planner'}.</p>${off}</section>`;
+  };
+
+  // ---- companions: what they know, and how to behave ----
+  { const base = window.__kgScheduleNote; window.__kgScheduleNote = () => { let out = ''; try { out = base ? base() || '' : ''; } catch (e) {}
+      const g = st(); if (!g) return out; const u = used();
+      return out + `\n\n[not typed by me: I'm using gentle return mode, my own choice and not a diagnosis. Today's maximum: ${g.cap == null ? 'not set' : g.cap + ' min'}; timer so far ${u} min${g.cap != null ? `; left ${Math.max(0, g.cap - u)} min` : ''}; done for today: ${g.stopped ? 'yes' : 'no'}${g.over ? '; I chose to continue beyond my maximum today' : ''}. Respect my choices: no shaming, no bargaining, don't use JEE, Germany or my goals to push me, don't nudge me back to study, and accept stopping or resting without asking why. If I want to keep going past my maximum, say plainly that it's above what I set and that the choice is mine, once. Don't diagnose me and don't present any plan as medical advice.]`; }; }
+  // after "Done for today", companions don't bring study up on their own (replies to my own messages still work)
+  window.__kgQuiet = (t, o = {}) => { const g = st(); return !!(g && g.stopped && !o.force && /\b(study|studying|lecture|block|session|timer|revise|revision|homework|minutes?|books?|desk|plan)\b/i.test(String(t))); };
+
+  const css = document.createElement('style');
+  css.textContent = 'body.kg-sec-today #kg-main .kg-gentle{order:1}body.kg-gentle-on.kg-sec-today #kg-main .kg-plan{order:1}.kg-gentle .kl-row{gap:8px;margin:6px 0}.kg-gentle [aria-pressed="true"]{outline:2px solid currentColor}.kg-parked{margin-top:8px}.kg-parked>summary{cursor:pointer;font-weight:600}'
+    + '.kg-gl{position:fixed!important;inset:0;display:grid;place-items:center;background:rgba(5,4,15,.6)!important;z-index:2147483000;padding:16px}.kg-gl>.kl-card{max-width:440px;width:100%;background:#1c1838;border:1px solid #3b3470;border-radius:16px;padding:16px 18px;color:#f2eeff}.kg-gl .kl-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.kg-gl button{border:1px solid #3b3470;border-radius:999px;padding:8px 14px;background:rgba(127,227,255,.08);color:inherit;cursor:pointer}.kg-gl button.kl-primary{background:#7fe3ff;color:#0f0d24;border-color:#7fe3ff}';
+  document.head.appendChild(css);
+  M.srPause?.();
 })();
 </script>
 </body></html>
