@@ -9113,18 +9113,19 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     cause: f.errType === 'slip' ? 'careless slip' : 'knowledge gap', fix: S(f.fix).slice(0, 200), due, st: 0
   };
   // storage stays small: the newest records keep their fresh work in full, older ones keep a short question and the result
-  const trimLog = (log, keep = 30) => (log || []).map((r, i, a) => { if (i >= a.length - keep || !r || !(r.fresh || r.work)) return r; const o = { ...r }; delete o.work; if (r.fresh) o.fresh = { q: S(r.fresh.q).slice(0, 300), checked: !!r.fresh.checked, ok: !!r.fresh.ok }; return o; });
+  const trimLog = (log, keep = 30) => (log || []).map((r, i, a) => { if (i >= a.length - keep || !r || r.pinned || !(r.fresh || r.work)) return r; const o = { ...r }; delete o.work; if (r.fresh) o.fresh = { q: S(r.fresh.q).slice(0, 300), checked: !!r.fresh.checked, ok: !!r.fresh.ok }; return o; });
   // a whole session, so it can be reopened: the problem, my working, Iroha's feedback, the repair and its check
   const workRecord = f => { const w = { prob: S(f.exProb).slice(0, 1000), attempt: S(f.attempt).slice(0, 3000), fb: S(f.fb).slice(0, 1500), repair: S(f.repair).slice(0, 1500), rfb: S(f.rfb).slice(0, 600) }; return Object.values(w).some(Boolean) ? w : null; };
   // "did the fix stick?": a repaired gap comes back on a later day as a different problem, inside the daily review allowance
   const stickItem = (f, d, ch, due) => !(S(f.gap) && f.fixed) ? null : { d, ok: false, src: 'stick', parent: f.id || '', sk: f.skillId || '', ch: ch || '',
-    q: ('Did the fix stick? A different problem on ' + S(f.topic) + ': ' + S(f.gap)).slice(0, 600), fix: S(f.fix).slice(0, 200), cause: f.errType === 'slip' ? 'careless slip' : 'knowledge gap', due, st: 0 };
+    topic: S(f.topic).slice(0, 120), gap: S(f.gap).slice(0, 300), q: ('Did the fix stick? A different problem on ' + S(f.topic) + ': ' + S(f.gap)).slice(0, 600), fix: S(f.fix).slice(0, 200), cause: f.errType === 'slip' ? 'careless slip' : 'knowledge gap', due, st: 0 };
   // trusted problem bank: a saved textbook problem for this skill (else this subject and topic), not used in the last 7 days, least recently used first
-  const bankPick = (bank, { sk, subj, topic } = {}, today = '', avoid = []) => {
+  // exact: a misconception follow-up only takes a problem tagged with that exact skill, never a topic-word guess
+  const bankPick = (bank, { sk, subj, topic, exact } = {}, today = '', avoid = []) => {
     const gapD = (a, b) => (new Date(a + 'T12:00:00') - new Date(b + 'T12:00:00')) / 864e5, words = S(topic).toLowerCase().split(/\W+/).filter(w => w.length > 3);
-    const ok = b => b && S(b.q) && !avoid.includes(b.id) && !(b.lastUsed && today && gapD(today, b.lastUsed) < 7);
+    const ok = b => b && S(b.q) && !b.quarantined && !avoid.includes(b.id) && !(b.lastUsed && today && gapD(today, b.lastUsed) < 7);
     const by = list => list.filter(ok).sort((a, b) => S(a.lastUsed).localeCompare(S(b.lastUsed)))[0] || null;
-    return (sk && by((bank || []).filter(b => b.sk === sk))) || by((bank || []).filter(b => (!subj || b.subj === subj) && words.some(w => S(b.q + ' ' + b.topic).toLowerCase().includes(w)))) || null;
+    return (sk && by((bank || []).filter(b => b.sk === sk))) || (exact ? null : by((bank || []).filter(b => (!subj || b.subj === subj) && words.some(w => S(b.q + ' ' + b.topic).toLowerCase().includes(w))))) || null;
   };
   // sure, and still a gap: the answers worth a second look. Confidence is never a score.
   const confWrong = (log, today, days = 14) => (log || []).filter(r => r && r.conf === 'sure' && S(r.gap) && (!today || (new Date(today + 'T12:00:00') - new Date(r.d + 'T12:00:00')) / 864e5 <= days));
@@ -9135,7 +9136,21 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     return skills.filter(s => s.id !== from).map(s => s.id === into ? kept : s); };
   // a draft brought back after a reload: no check is still running, and old drafts get the fields newer steps expect
   const restore = f => !f ? f : { ...f, busy: '', fadeAns: f.fadeAns && typeof f.fadeAns === 'object' ? f.fadeAns : {}, fadeLvl: Number(f.fadeLvl) || 0, requireVerification: true };
-  const api = { exSplit, fadeHide, checkKey, methodNote, freshRecord, freshMistake, trimLog, restore, workRecord, stickItem, bankPick, confWrong, mergeSkills };
+  // opening a "did the fix stick?" item: a session on that exact skill, with a different problem first (from the bank when one fits exactly)
+  const stickStart = (x, bank, today) => { const b = bankPick(bank, { sk: x.sk, exact: true }, today);
+    return { act: 'solve', stick: true, skillId: x.sk || '', topic: S(x.topic) || S(x.q).replace(/^Did the fix stick\? A different problem on /, '').slice(0, 120), stickGap: S(x.gap), probQ: b ? S(b.q) : '', probBank: b ? b.id : '' }; };
+  // a skill's evidence trail: every session, fresh problem and follow-up on it, in order, and whether the difficulty came back after a repair
+  const skillTrail = (ids, flowLog, attempts) => { const has = id => id && ids.includes(id), ev = [];
+    for (const r of flowLog || []) if (has(r.skillId)) { ev.push({ d: r.d, t: (r.act || 'session') + ': ' + (S(r.gap) ? (r.fixed ? 'gap repaired: ' : 'gap: ') + S(r.gap).slice(0, 90) : 'no gap'), ev: r.ev || '', gap: !!S(r.gap), fixed: !!r.fixed, stick: !!r.stick });
+      if (r.fresh && r.fresh.checked) ev.push({ d: r.d, t: 'fresh problem: ' + (r.fresh.ok ? 'solved' : 'not yet'), ev: r.fresh.ok ? 'help' : 'notyet' }); }
+    for (const a of attempts || []) if (has(a.sk) && (a.src === 'stick' || a.src === 'fresh')) ev.push({ d: a.d, t: (a.src === 'stick' ? 'follow-up booked for ' + (a.due || 'later') : 'fresh problem saved as a mistake') + (a.ok ? ' · done' : ''), ev: '' });
+    ev.sort((p, q) => S(p.d).localeCompare(S(q.d)));
+    const firstFix = ev.findIndex(e => e.fixed), recurred = firstFix < 0 ? 0 : ev.slice(firstFix + 1).filter(e => e.gap).length;
+    return { events: ev, recurred, repaired: firstFix >= 0 }; };
+  // synthesis: two different skills you've already shown on your own, least recently tested first, different chapters when possible
+  const synthPair = (skills, subj) => { const ok = (skills || []).filter(s => (s.last === 'ok' || s.strength === 'solid') && (!subj || subj === 'Mixed' || s.subj === subj)).sort((a, b) => S(a.lastTested).localeCompare(S(b.lastTested)));
+    if (ok.length < 2) return []; const a = ok[0], b = ok.slice(1).find(s => s.ch && s.ch !== a.ch) || ok[1]; return [a, b]; };
+  const api = { exSplit, fadeHide, checkKey, methodNote, freshRecord, freshMistake, trimLog, restore, workRecord, stickItem, bankPick, confWrong, mergeSkills, stickStart, skillTrail, synthPair };
   root.FlowKit = api;
 })(globalThis);
 </script>
@@ -9158,6 +9173,8 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     explain: { name: 'Explain', icon: '🗣', what: 'Feynman mode: explain it simply to Kaguya, then Iroha checks.', best: "things you can do but can't say why", ask: "Explain it to someone clever who has never seen it. Plain words, one example, and why it works.", check: 'Check the explanation for accuracy and find the spot where it turns vague or skips the why.', kind: 'recall', mins: 20 },
     solve: { name: 'Solve', icon: '✏️', what: 'One real problem, with all your working.', best: 'practice and homework-style questions', ask: 'Write the question first, then every step of your working, then your final answer.', check: 'Check the working fully. If the answer is right, say so first. If not, point at the first line that breaks and give a hint, not the full solution.', kind: 'recall', mins: 25 },
     compare: { name: 'Compare', icon: '⚖️', what: 'Two ideas side by side: alike, different, and when to use which.', best: 'topics you mix up', ask: 'Name the two things. How are they alike? How are they different? How do you tell which one a question needs?', check: 'Check that the comparison is accurate and that the "which one when" test would actually work on a real question.', kind: 'recall', mins: 15 },
+    represent: { name: 'Switch representation', icon: '🔁', what: 'Equation to graph, diagram to equations, graph to what is physically happening.', best: 'mechanics, orbits, rates and functions', ask: 'Do the switch: describe the graph (intercepts, slopes, asymptotes, shape), or write the governing equations, or explain the physical behaviour, and say how the two forms correspond.', check: 'Check that the new representation matches the original exactly (key features, signs, limits, units) and that I explained how they correspond.', kind: 'study', mins: 20 },
+    synth: { name: 'Synthesis', icon: '🧬', what: 'One problem that needs two skills you already have, like vectors + energy.', best: 'established skills, now and then instead of ordinary practice', ask: 'Solve it with full working, and say where each skill comes in.', check: 'Check the whole solution, and that each of the two skills was used correctly where it belongs.', kind: 'study', mins: 30 },
     diagnose: { name: 'Diagnose', icon: '🩺', what: 'Take a mistake apart: what went wrong, and the rule that stops it.', best: 'a wrong answer from homework, a mock or your misses', ask: "The question and your wrong step. Then: what went wrong, why it happened, and the rule you'll use next time.", check: 'Check whether the diagnosis finds the real cause (not just "a silly mistake") and whether the rule would really prevent it.', kind: 'mistakes', mins: 15 }
   };
   const NAMES = { goal: 'Goal', warmup: 'Recall / predict', example: 'Example', attempt: 'Attempt', feedback: 'Feedback', repair: 'Repair', recap: 'Recap', save: 'Save' };
@@ -9185,7 +9202,8 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     }
     if (!L.flow || L.flow.step === 'goal') {
       const e = o.lec && lecture(o.lec), x = o.miss && (L.attempts || []).find(a => a.id === o.miss);
-      L.flow = blank({ act: x ? 'diagnose' : o.act || '', subj: SUBJS.includes(o.subj) ? o.subj : e?.subj || 'Maths', topic: x ? String(x.q || '').slice(0, 120) : o.topic && !/lecture$/i.test(o.topic) ? o.topic : e?.topic || '', lec: o.lec || '', miss: x ? x.id : '' });
+      L.flow = blank({ act: x ? (x.src === 'stick' ? 'solve' : 'diagnose') : o.act || '', subj: SUBJS.includes(o.subj) ? o.subj : e?.subj || 'Maths', topic: x ? String(x.q || '').slice(0, 120) : o.topic && !/lecture$/i.test(o.topic) ? o.topic : e?.topic || '', lec: o.lec || '', miss: x ? x.id : '' });
+      if (x?.src === 'stick') { Object.assign(L.flow, window.FlowKit.stickStart(x, L.bank, today())); const b = (L.bank || []).find(p => p.id === L.flow.probBank); if (b) b.lastUsed = today(); }
       save();
     }
     M.go('study', 'session');
@@ -9215,7 +9233,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   const ENERGY = { demanding: ' I have energy today, so make the repair task a harder application or an independent derivation.', lighter: " I'm low on energy today, so keep the repair task very small and kind.", ordinary: '' };
   const BLURT = ' This is a blurt: before Right, Gap and Repair, add four lines comparing it with the reference (or with what the topic needs if there is none), each starting with its label: "Recalled:" what I got right, "Missing:" what I left out, "Incorrect:" what I got wrong, "Unclear:" anything unreadable or uncertain in the source, or "None." for any of them. Accept diagrams in words and derivations, not only lists of facts.';
   const kagNote = f => f.kq ? `\n\nKaguya, listening, asked: "${f.kq}"\nMy answer: ${f.ka.trim() || '(I skipped it)'}` : '';
-  const checkPrompt = (f, A, kag, extra = '') => `[guided session, not typed by me. Activity: ${A.name}: ${A.what} Subject: ${f.subj}. Topic: ${f.topic}.${f.goal ? ` My goal: ${f.goal}.` : ''}${notes(f)}]${window.FlowKit.methodNote(f).given}\n\nMy attempt:\n${f.attempt.trim()}${kag}\n\n[How to check it: ${A.check}${extra}${window.FlowKit.methodNote(f).ask} Reply in plain text in exactly four short parts, each on its own line and starting with its label. "Right:" what is correct (say "Correct." plainly if all of it is). "Gap:" the single most important thing that is missing or wrong, and why it matters, or "None." "Repair:" one small task I can do in under five minutes that fixes that gap, or "None." "Type:" "Slip" if the idea and method were right but the execution went wrong (algebra, arithmetic, sign, units, copying, misreading), "Principle" if a law, definition, assumption or choice of method was wrong, or "None." if there is no gap. Nothing else.]`;
+  const checkPrompt = (f, A, kag, extra = '') => `[guided session, not typed by me. Activity: ${A.name}: ${A.what} Subject: ${f.subj}. Topic: ${f.topic}.${f.goal ? ` My goal: ${f.goal}.` : ''}${notes(f)}]${f.probQ ? `\n\nThe problem I was set:\n${f.probQ}${(() => { const b = (L.bank || []).find(x => x.id === f.probBank); return b && b.ans ? `\n[Trusted answer from ${b.src || 'my source'}: ${b.ans}. Compare my answer with it.]` : ''; })()}` : ''}${window.FlowKit.methodNote(f).given}\n\nMy attempt:\n${f.attempt.trim()}${kag}\n\n[How to check it: ${A.check}${extra}${window.FlowKit.methodNote(f).ask} Reply in plain text in exactly four short parts, each on its own line and starting with its label. "Right:" what is correct (say "Correct." plainly if all of it is). "Gap:" the single most important thing that is missing or wrong, and why it matters, or "None." "Repair:" one small task I can do in under five minutes that fixes that gap, or "None." "Type:" "Slip" if the idea and method were right but the execution went wrong (algebra, arithmetic, sign, units, copying, misreading), "Principle" if a law, definition, assumption or choice of method was wrong, or "None." if there is no gap. Nothing else.]`;
   // what a check was asked about; a reply only counts if this is unchanged when it arrives
   const sentKey = f => window.FlowKit.checkKey(f);
   async function check() {
@@ -9307,7 +9325,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       [1, 2, 3].forEach(i => set('recall' + i, recall[i - 1] || f.topic));
       set('discovery', noGap(f) ? '' : f.gap);
       set('attempts', f.act === 'solve' ? 1 : 0); set('correct', f.act === 'solve' && ev === 'indep' ? 1 : 0);
-      set('next', !noGap(f) && !f.fixed && f.fix && !/^\W*none\s*(?:[.!,:;\-—]|$)/i.test(f.fix) ? f.fix : `Review ${f.topic}`);
+      set('next', String(f.nextStep || '').trim() ? f.nextStep : !noGap(f) && !f.fixed && f.fix && !/^\W*none\s*(?:[.!,:;\-—]|$)/i.test(f.fix) ? f.fix : `Review ${f.topic}`);
       c.requestSubmit();
     }, 120);
   }
@@ -9331,7 +9349,11 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     if (w.fb) p.push(`<p class="kl-small"><b>Iroha's check:</b></p><p class="kl-pre">${esc(w.fb)}</p>`);
     if (w.repair) p.push(`<p class="kl-small"><b>Your repair:</b></p><p class="kl-pre">${esc(w.repair)}</p>${w.rfb ? `<p class="kl-small">${esc(w.rfb)}</p>` : ''}`); if (x.method?.p) p.push(`<p><b>Method:</b> ${esc(x.method.p)}${x.method.w ? ' · ' + esc(x.method.w) : ''}${x.method.a ? '<br><span class="kl-small">Not: ' + esc(x.method.a) + '</span>' : ''}</p>`);
     if (x.fresh?.q) p.push(`<p><b>Fresh problem (${x.fresh.checked ? (x.fresh.ok ? 'solved' : 'not yet') : 'not checked'}):</b></p><p class="kl-pre">${esc(x.fresh.q)}</p>${x.fresh.a ? `<p class="kl-small"><b>Your answer:</b></p><p class="kl-pre">${esc(x.fresh.a)}</p>` : ''}${x.fresh.fb ? `<p class="kl-small"><b>Iroha:</b> ${esc(x.fresh.fb)}</p>` : ''}`);
-    return p.length ? `<details class="kg-rec-detail"><summary class="kl-small">Open</summary>${p.join('')}</details>` : ''; };
+    if (x.prob) p.unshift(`<p class="kl-small"><b>${x.stick ? 'Follow-up problem' : 'Problem set'}:</b></p><p class="kl-pre">${esc(x.prob)}</p>`);
+    if (x.hint) p.push(`<p class="kl-small">Strongest hint used: ${esc(['', 'a guiding question', 'the principle', 'a partial step', 'the worked solution'][x.hint] || '')}</p>`);
+    if (x.next) p.push(`<p class="kl-small"><b>Next step saved:</b> ${esc(x.next)}</p>`);
+    p.push(`<button type="button" class="kl-ghost" data-a="flowpin" data-v="${esc(x.id)}">${x.pinned ? 'Unpin' : 'Pin: keep in full'}</button>`);
+    return `<details class="kg-rec-detail"><summary class="kl-small">Open${x.pinned ? ' · pinned' : ''}</summary>${p.join('')}</details>`; };
   function goalStep(f) {
     const lecs = (L.lectures || []).filter(e => e.topic).sort((a, b) => (a.due && a.due <= today() ? 0 : 1) - (b.due && b.due <= today() ? 0 : 1) || (b.made || '').localeCompare(a.made || '')).slice(0, 20);
     return `<form data-f="flowgoal" class="kl-stack"><p class="kl-eyebrow">GUIDED SESSION</p><h2>What will you work on?</h2>
@@ -9347,6 +9369,9 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
         <label class="kl-check"><input type="radio" name="opener" value="recall" ${f.opener === 'recall' || (!f.started && f.opener !== 'predict') ? 'checked' : ''}> A few minutes of recall first: what do I already remember?</label>
         <label class="kl-check"><input type="radio" name="opener" value="predict" ${f.opener === 'predict' ? 'checked' : ''}> It's new to me: what might help, and what do I predict?</label>
         <label class="kl-check"><input type="radio" name="opener" value="" ${f.started && f.opener === '' ? 'checked' : ''}> Skip it this time</label></fieldset>
+      <fieldset class="kg-flow-open"><legend class="kl-small">When the minutes run out</legend>
+        <label class="kl-check"><input type="radio" name="contract" value="stop" ${f.contract !== 'finish' ? 'checked' : ''}> Stop on time and save the next step (recommended)</label>
+        <label class="kl-check"><input type="radio" name="contract" value="finish" ${f.contract === 'finish' ? 'checked' : ''}> Let me finish the step I'm on</label></fieldset>
       <label class="kg-flow-mins">Minutes on the desk timer <input name="mins" type="number" min="5" max="90" value="${f.mins || 25}"></label>
       <fieldset class="kg-flow-open"><legend class="kl-small">How much is in the tank today?</legend>
         <label class="kl-check"><input type="radio" name="energy" value="demanding" ${f.energy === 'demanding' ? 'checked' : ''}> Ready for something demanding: an unfamiliar problem or a derivation</label>
@@ -9413,7 +9438,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   document.addEventListener('toggle', e => { const d = e.target; if (!d.classList?.contains('kg-refpanel') || !L.flow) return; const first = d.open && !L.flow.peeked; L.flow.refOpen = d.open; if (first) { L.flow.peeked = true; L.flow.supported = true; } save(); if (first) M.render(); }, true);
   document.addEventListener('change', e => { const i = e.target; if (!i.matches?.('[data-refdoc]') || !L.flow || !i.files?.[0]) return; const file = i.files[0]; if (refDoc) URL.revokeObjectURL(refDoc.url); refDoc = { flow: L.flow.id, url: URL.createObjectURL(file), pdf: file.type === 'application/pdf', name: file.name }; M.render(); });
   // Method first: optional, for problems where choosing the approach is the hard part. Open by default on demanding days.
-  const METHOD_ACTS = ['solve', 'diagnose', 'worked'];
+  const METHOD_ACTS = ['solve', 'diagnose', 'worked', 'synth'];
   const hasMethod = f => !!String(f.mPrin || '').trim();
   const methodBox = f => !METHOD_ACTS.includes(f.act) ? '' : `<details class="kg-method" data-method ${f.mOpen ?? (f.energy === 'demanding' || hasMethod(f)) ? 'open' : ''}><summary><b>Method first</b> <span class="kl-small">before you calculate, when picking the approach is the hard part</span></summary>
       <label>Governing principle <input data-flow="mPrin" maxlength="160" value="${esc(f.mPrin || '')}" placeholder="e.g. conservation of energy"></label>
@@ -9428,19 +9453,53 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       <label>A limiting case <input data-flow="cLim" maxlength="240" value="${esc(f.cLim || '')}" placeholder="e.g. h → 0 gives v → 0, as it should"></label></details>`;
   const CONF = [['sure', 'Sure'], ['unsure', 'Unsure'], ['guess', 'Guessing']];
   const confPick = f => `<fieldset class="kg-conf"><legend class="kl-small">Before feedback: how sure are you? (optional, never a score)</legend>${CONF.map(([v, t]) => `<label class="kl-check"><input type="radio" name="kgconf" data-flow="conf" value="${v}" ${f.conf === v ? 'checked' : ''}> ${t}</label>`).join('')}</fieldset>`;
+  // a problem the session is about (a follow-up, a synthesis, a representation switch); shown before any old mistake
+  const PROB_ACTS = ['synth', 'represent'];
+  const probBox = f => { if (!(f.stick || f.probQ || PROB_ACTS.includes(f.act))) return '';
+    const b = (L.bank || []).find(x => x.id === f.probBank);
+    if (f.probQ) return `<div class="kg-flow-k kg-prob"><b>${f.stick ? 'A different problem on the gap you repaired' : f.act === 'synth' ? 'Synthesis: ' + esc((f.synth || []).join(' + ')) : f.act === 'represent' ? 'Switch the representation' : 'The problem'}</b>${b ? `<span class="kl-small"> · from your problem bank${b.src ? ', ' + esc(b.src) : ''}</span>` : ''}<p class="kl-pre">${esc(f.probQ)}</p>${b ? `<p class="kl-small">Problem with this problem? ${QFLAGS.map(([k, t]) => `<button type="button" class="kl-ghost" data-a="bank-flag" data-v="${esc(b.id)}" data-k="${k}">${t}</button>`).join('')}</p>` : ''}</div>`;
+    return `<div class="kg-flow-k kg-prob"><b>${f.stick ? 'Did the fix stick?' : f.act === 'synth' ? 'Synthesis challenge' : 'Representation switch'}</b><p class="kl-small">${f.stick ? 'No problem in your bank is tagged with this exact skill, so Iroha writes a different one. Your old mistake stays hidden until after the check.' : f.act === 'synth' ? 'One problem that needs two skills you have already shown on your own.' : 'An equation to sketch, a diagram to turn into equations, or a graph to explain.'}</p><button data-a="flowprob" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'iroha', 'Get the problem')}</button></div>`; };
+  const QFLAGS = [['ambiguous', 'Ambiguous'], ['missing', 'Missing information'], ['disputed', 'Answer disputed'], ['long', 'Too long']];
+  async function probAsk() {
+    const f = L.flow; if (!f || f.busy) return; let ask1 = '';
+    if (f.stick) ask1 = `Give me ONE problem that tests exactly this misconception, different from the one I got wrong: ${f.stickGap || f.topic}. Skill: ${(L.skills || []).find(s => s.id === f.skillId)?.name || f.topic}.`;
+    else if (f.act === 'synth') { const p = window.FlowKit.synthPair(L.skills, f.subj); if (p.length < 2) return M.I("Synthesis needs two skills you've already shown on your own. Pick another activity for now.", { face: 'study' }); f.synth = p.map(s => s.name); f.skillId = f.skillId || p[0].id; ask1 = `Give me ONE problem that genuinely needs both of these skills together: ${p[0].name} AND ${p[1].name}. Subject: ${f.subj}.`; }
+    else ask1 = `Give me ONE representation-switch task on ${f.topic} (${f.subj}): either an equation to sketch as a graph, a described diagram to turn into governing equations, or a described graph to explain physically. Pick whichever fits the topic best.`;
+    f.busy = 'iroha'; M.render();
+    const reply = await ask('iroha', `[guided session, not typed by me. Topic: ${f.topic}.] [${ask1} Solvable in about 15 minutes. Reply with only the task: no hints, no method, no answer.]`);
+    f.busy = ''; if (L.flow !== f) return;
+    if (reply) { f.probQ = String(reply).trim().slice(0, 1500); f.probBank = ''; f.graded = false; } else dropped('nothing is lost', 'the problem');
+    save(); M.render();
+  }
+  // the hint ladder: question -> principle -> partial step -> worked solution. The strongest hint used is recorded, and any hint means "with help".
+  const HINTS = ['A guiding question', 'The relevant principle', 'A partial step', 'The worked solution'];
+  const hintBox = f => { const n = f.hintMax || 0, hs = f.hints || [];
+    return `<div class="kg-hints">${hs.map((t, i) => `<div class="kg-flow-fb"><b>${HINTS[i]}</b><p class="kl-pre">${esc(t)}</p></div>`).join('')}${n < 4 ? `<button type="button" class="kl-ghost" data-a="flowhint" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'iroha', 'Need a hint? Next: ' + HINTS[n].toLowerCase())}</button>` : ''}${n ? `<span class="kl-small"> Strongest hint so far: ${HINTS[n - 1].toLowerCase()}. This attempt counts as with help.</span>` : ''}</div>`; };
+  async function hintAsk() {
+    const f = L.flow; if (!f || f.busy) return; const n = (f.hintMax || 0) + 1; if (n > 4) return;
+    const what = ['one guiding question that points me the right way, nothing more', 'the single principle or law that applies, and nothing about how to use it', 'the first step or two of the solution only', 'a complete worked solution with each step explained'][n - 1];
+    f.busy = 'iroha'; M.render();
+    const reply = await ask('iroha', `[guided session hint, not typed by me. Topic: ${f.topic}. ${f.probQ ? 'Problem: ' + f.probQ + ' ' : ''}${f.goal ? 'Goal: ' + f.goal + ' ' : ''}My working so far: ${(f.attempt || '').trim().slice(0, 1500) || '(nothing yet)'}] [Hint level ${n} of 4: give ${what}. Do not go beyond that level.]`);
+    f.busy = ''; if (L.flow !== f) return;
+    if (reply) { (f.hints = f.hints || [])[n - 1] = String(reply).trim().slice(0, 1500); f.hintMax = n; f.supported = true; f.graded = false; } else dropped('nothing is lost', 'the hint');
+    save(); M.render();
+  }
+  // the stopping contract: when the planned minutes are up, save the next step instead of stretching the session
+  const timeUp = f => f.contract !== 'finish' && f.started && !['goal', 'save'].includes(f.step) && (Date.now() - f.started - (f.away || 0)) > (f.mins || 25) * 60000;
+  const timeBanner = f => !timeUp(f) ? '' : `<div class="kg-flow-k kg-timeup"><b>Time's up</b><p class="kl-small">You chose to stop on time. Write the very next step, then save; it's waiting for you next session.</p><input data-flow="nextStep" maxlength="200" value="${esc(f.nextStep || '')}" placeholder="e.g. redo part (b) with the vertical height"><div class="kl-row"><button class="kl-primary" data-a="flowto" data-v="save">Save with this next step</button></div></div>`;
   function attemptStep(f, A) {
     return `<p class="kl-eyebrow">${A.icon} ${A.name.toUpperCase()} · ${esc(f.subj)} · ${esc(f.topic)}</p><h2>${esc(f.goal || A.what)}</h2>
       <p class="kl-small">${esc(A.ask)}${f.act === 'explain' ? ' Feynman mode: Kaguya listens first, then Iroha checks.' : ''} No notes; it saves as you type.</p>
       ${f.act === 'predict' ? `<div class="learning-session-support"><b>Your prediction</b><p class="kl-pre">${esc(f.warm || 'No prediction recorded.')}</p><p class="kl-small">Observe first, then explain. A simulation tests its model; it is not proof about every real situation.</p></div>` : ''}
       ${f.act === 'worked' ? '<p class="learning-status">The example is hidden. Try removing one more hint each time you practise.</p><button class="kl-ghost" data-a="flowto" data-v="example">Look at example again</button>' : ''}
-      ${missOf(f) ? `<div class="kg-flow-k kg-flow-miss"><b>The mistake</b><p>${esc(missOf(f).q)}</p>${missOf(f).cause || missOf(f).fix ? `<p class="kl-small">${missOf(f).cause ? 'Logged as ' + esc(missOf(f).cause) + '. ' : ''}${missOf(f).fix ? 'Your fix back then: ' + esc(missOf(f).fix) : ''}</p>` : ''}</div>` : ''}
-      ${methodBox(f)}
+      ${missOf(f) && !f.stick ? `<div class="kg-flow-k kg-flow-miss"><b>The mistake</b><p>${esc(missOf(f).q)}</p>${missOf(f).cause || missOf(f).fix ? `<p class="kl-small">${missOf(f).cause ? 'Logged as ' + esc(missOf(f).cause) + '. ' : ''}${missOf(f).fix ? 'Your fix back then: ' + esc(missOf(f).fix) : ''}</p>` : ''}</div>` : ''}
+      ${timeBanner(f)}${probBox(f)}${methodBox(f)}
       <div class="kg-workref"><textarea data-flow="attempt" rows="14" maxlength="6000" aria-label="Your attempt" placeholder="${esc(A.ask)}">${esc(f.attempt)}</textarea>${f.act === 'blurt' ? '' : refPanel(f)}</div>
       ${f.act === 'blurt' ? `<details class="kg-flow-refbox" ${f.ref ? 'open' : ''}><summary>Reveal a reference to compare with (after your blank page)</summary><p class="kl-small">Write your blank page first. Then paste the part of your notes you're checking against, or leave this empty to compare with your lecture's notes.</p><textarea data-flow="ref" rows="5" maxlength="4000" aria-label="Reference from your notes">${esc(f.ref)}</textarea></details>` : ''}
       <p class="kl-small kg-flow-src">${esc(srcGuess(f))}</p>${f.energy === 'lighter' ? '<p class="kl-small">Lighter today: small is the plan.</p>' : ''}
       ${f.act === 'explain' ? (f.kq ? `<div class="kg-flow-k"><b>Kaguya</b><p>${esc(f.kq)}</p></div><textarea data-flow="ka" rows="3" maxlength="1500" aria-label="Your answer to Kaguya" placeholder="Answer her, simply (optional)">${esc(f.ka)}</textarea>` : `<div class="kl-row"><button data-a="flowlisten" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'kaguya', '🗣 Tell Kaguya')}</button><span class="kl-small">She asks the question a curious friend would.</span></div>`) : ''}
-      <label class="kl-check"><input type="checkbox" data-flow="supported" ${f.supported || f.peeked ? 'checked' : ''} ${f.act === 'worked' || f.peeked ? 'disabled' : ''}> I used a hint, notes or a solution while answering${f.peeked ? ' <span class="kl-small">(the Reference was opened, so this stays on. To show it on your own, try a fresh problem without it.)</span>' : ''}</label>
-      ${ownChecks(f)}${confPick(f)}<div class="kl-row"><button class="kl-primary" data-a="flowcheck" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'iroha', 'Check it with Iroha')}</button><button class="kl-ghost" data-a="flowto" data-v="save">Save without an AI check</button></div>`;
+      <label class="kl-check"><input type="checkbox" data-flow="supported" ${f.supported || f.peeked || f.hintMax ? 'checked' : ''} ${f.act === 'worked' || f.peeked || f.hintMax ? 'disabled' : ''}> I used a hint, notes or a solution while answering${f.peeked ? ' <span class="kl-small">(the Reference was opened, so this stays on. To show it on your own, try a fresh problem without it.)</span>' : ''}</label>
+      ${hintBox(f)}${ownChecks(f)}${confPick(f)}<div class="kl-row"><button class="kl-primary" data-a="flowcheck" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'iroha', 'Check it with Iroha')}</button><button class="kl-ghost" data-a="flowto" data-v="save">Save without an AI check</button></div>`;
   }
   const backupModel = f => /gemini|groq/i.test(f.checker?.provider || '');
   const byLine = f => f.checker?.provider ? `<p class="kl-small kg-flow-by">Checked by ${esc(f.checker.model || 'an AI model')} via ${esc(f.checker.provider)}${backupModel(f) ? '. That is a backup model, so give this check a little less weight.' : '.'}</p>` : '';
@@ -9465,7 +9524,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   // Fresh problem after a repair (optional, about 5 min): a changed problem on the same gap, so copying the repair won't work.
   // It is its own attempt with its own check. Right after a repair it shows the fix carried over today; a later attempt tests whether it stays.
   const freshBox = f => !f.fixed ? '' : !f.freshQ
-    ? `<div class="kg-flow-k kg-fresh"><b>Optional: a fresh problem on this gap</b><p class="kl-small">About 5 minutes. A changed problem tests whether the fix carries over, not just whether you can repeat it.</p><button data-a="flowfreshask" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'iroha', window.FlowKit.bankPick(L.bank, { sk: f.skillId, subj: f.subj, topic: f.topic }, today()) ? 'Fresh problem from my bank' : 'Give me a fresh problem')}</button></div>`
+    ? `<div class="kg-flow-k kg-fresh"><b>Optional: a fresh problem on this gap</b><p class="kl-small">About 5 minutes. A changed problem tests whether the fix carries over, not just whether you can repeat it.</p><button data-a="flowfreshask" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'iroha', window.FlowKit.bankPick(L.bank, { sk: f.skillId, exact: true }, today()) ? 'Fresh problem from my bank' : 'Give me a fresh problem')}</button></div>`
     : `<div class="kg-flow-k kg-fresh"><b>Fresh problem</b>${(() => { const b = (L.bank || []).find(x => x.id === f.freshBank); return b ? `<span class="kl-small"> · from your problem bank${b.src ? ', ' + esc(b.src) : ''}</span>` : ''; })()}<p class="kl-pre">${esc(f.freshQ)}</p>
       <textarea data-flow="freshA" rows="6" maxlength="3000" aria-label="Your answer to the fresh problem" placeholder="Solve it without looking at your repair.">${esc(f.freshA || '')}</textarea>
       ${f.freshFb ? `<div class="kg-flow-fb ${f.freshOk ? 'ok' : ''}"><p class="kl-pre">${esc(f.freshFb)}</p></div>` : ''}
@@ -9473,7 +9532,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   async function freshAsk() {
     const f = L.flow; if (!f || f.busy || !f.fixed) return;
     // a trusted problem from your bank comes first: its answer is known, so the check doesn't rest on Iroha alone
-    const b = window.FlowKit.bankPick(L.bank, { sk: f.skillId, subj: f.subj, topic: f.topic }, today());
+    const b = window.FlowKit.bankPick(L.bank, { sk: f.skillId, exact: true }, today());
     if (b) { b.lastUsed = today(); Object.assign(f, { freshQ: b.q, freshBank: b.id, freshA: '', freshFb: '', freshOk: false }); save(); M.render(); return setTimeout(() => document.querySelector('[data-flow="freshA"]')?.focus(), 60); }
     f.busy = 'iroha'; M.render();
     const reply = await ask('iroha', `[guided session, not typed by me. Subject: ${f.subj}. Topic: ${f.topic}. The gap I just repaired: ${f.gap} The repair: ${f.fix}]\n\n[Give me ONE fresh problem that tests exactly this gap, with different numbers and a changed setting, so repeating my repair won't be enough. Solvable in about five minutes. Reply with only the problem: no hints, no method, no answer.]`);
@@ -9495,13 +9554,13 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     return `<p class="kl-eyebrow">REPAIR · ${esc(f.topic)}</p><h2>${f.act === 'explain' ? 'Explain it again, briefly, with the fix' : f.act === 'blurt' ? 'Rebuild just the weak part' : esc(f.fix && !/^\W*none\s*(?:[.!,:;\-—]|$)/i.test(f.fix) ? f.fix : 'Fix the gap')}</h2>${f.act === 'explain' || f.act === 'blurt' ? `<p class="kl-small"><b>The fix:</b> ${esc(f.fix)}</p>` : ''}<p class="kl-small"><b>The gap:</b> ${esc(f.gap)}${errTag(f)}</p>
       <textarea data-flow="repair" rows="9" maxlength="4000" aria-label="Your repair" placeholder="${f.act === 'explain' ? 'In plain words, as if to Kaguya again, now including the missing piece.' : f.act === 'blurt' ? 'From memory: only the missing or wrong part, rebuilt.' : 'Do the repair here, from memory first.'}">${esc(f.repair)}</textarea>
       ${f.rfb ? `<div class="kg-flow-fb ${f.fixed ? 'ok' : ''}"><p class="kl-pre">${esc(f.rfb)}</p></div>` : ''}
-      <div class="kl-row"><button class="${f.fixed ? '' : 'kl-primary'}" data-a="flowrepair" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'iroha', f.rfb ? 'Check it again' : 'Check my repair')}</button><button class="${f.fixed ? 'kl-primary' : ''}" data-a="flowto" data-v="recap">${f.fixed ? 'Close with a recap' : 'On to the recap without a check'}</button><button class="kl-ghost" data-a="flowto" data-v="save">Save now</button></div>${freshBox(f)}`;
+      <div class="kl-row"><button class="${f.fixed ? '' : 'kl-primary'}" data-a="flowrepair" ${f.busy ? 'disabled' : ''}>${busyBtn(f, 'iroha', f.rfb ? 'Check it again' : 'Check my repair')}</button><button class="${f.fixed ? 'kl-primary' : ''}" data-a="flowto" data-v="recap">${f.fixed ? 'Close with a recap' : 'On to the recap without a check'}</button><button class="kl-ghost" data-a="flowto" data-v="save">Save now</button></div>${timeBanner(f)}${freshBox(f)}`;
   }
   // the evidence behind any grade, in words: independent, with help, or not yet
   const evidence = f => {
     // every new result needs a checked source, including drafts saved before this rule existed
     if (!f.verified || !String(f.verificationSource || '').trim()) return ['ungraded', 'Saved without source verification. No independent credit.'];
-    if ((f.supported || f.peeked) && f.disputed !== 'unresolved' && graded(f) && (noGap(f) || f.fixed)) return ['help', 'Checked with support. Try a fresh problem another day.'];
+    if ((f.supported || f.peeked || f.hintMax > 0) && f.disputed !== 'unresolved' && graded(f) && (noGap(f) || f.fixed)) return ['help', 'Checked with support. Try a fresh problem another day.'];
     if (f.disputed === 'unresolved') return ['ungraded', "Unresolved: two checks disagreed and you haven't chosen, so nothing is counted."];
     if (!graded(f)) return ['ungraded', "Not graded: Iroha's check didn't come back in a form the desk can trust, so nothing is counted."];
     const how = f.disputed === 'agrees' ? ', confirmed by a fresh recheck' : /^(first|second)$/.test(f.disputed) ? ', after two checks disagreed and you chose' : '';
@@ -9521,7 +9580,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       ${(L.skills || []).length ? `<label class="kg-flow-credit">Skill credit <select data-flow="skillId">${skillOpts(f, false)}</select></label><p class="kl-small" data-credit-note>${creditName(f) ? (ev === 'ungraded' ? `${esc(creditName(f))} is picked, but nothing is credited until the result is graded and checked.` : `This result counts for ${esc(creditName(f))}.`) : 'No skill gets credit for this session. Pick one above if it practised a skill.'}</p>` : ''}
       <ul class="kl-list">${f.goal ? `<li><b>Goal:</b> ${esc(f.goal)}</li>` : ''}<li><b>Gap:</b> ${gap ? esc(f.gap) : noGap(f) ? 'none found' : 'not graded'}</li>${gap ? `<li><b>Repair:</b> ${f.fixed ? 'done, and Iroha agrees' : f.repair.trim() ? 'done, not confirmed' : 'not done yet'}</li>` : ''}${f.dispute ? `<li><b>Recheck:</b> ${esc(f.dispute)}</li>` : ''}${x ? `<li><b>Mistake notebook:</b> ${esc(missNext)}</li>` : ''}${f.warm.trim() ? '<li><b>Recall first:</b> done</li>' : ''}${hasMethod(f) ? '<li><b>Method first:</b> ' + esc(String(f.mPrin).trim()) + '</li>' : ''}${f.freshQ ? '<li><b>Fresh problem:</b> ' + (!f.freshFb ? 'not checked' : f.freshOk ? 'solved, so the fix carried over today. A fresh problem on a later day shows whether it stays.' : 'not yet. Worth adding to your misses for another day.') + '</li>' : ''}<li><b>Recap:</b> ${f.rc1 || f.rc2 || f.rc3 ? (f.rcfb ? 'written and checked' : 'written') : 'skipped'}${f.cardId ? ', one review item added' : ''}</li></ul>
       <form data-f="flowsave" class="kl-stack">
-      ${gap && f.fixed && !x && !(f.freshFb && !f.freshOk) ? `<label class="kl-check"><input type="checkbox" name="stick" checked> Did the fix stick? Bring a different problem on this gap back in 3 days (inside your daily review allowance)</label>` : ''}
+      ${gap && f.fixed && !x && !(f.freshFb && !f.freshOk) ? `<label class="kl-check"><input type="checkbox" name="stick" ${f.errType === 'slip' ? '' : 'checked'}> Did the fix stick? Bring a different problem on this gap back in 3 days (inside your daily review allowance)</label>` : ''}
       ${f.freshFb && !f.freshOk ? '<label class="kl-check"><input type="checkbox" name="freshmiss" checked> Save this fresh problem as a mistake, with your working and Iroha\'s feedback, to revisit another day</label>' : ''}
       ${gap && !f.fixed && !x ? '<label class="kl-check"><input type="checkbox" name="miss"> Add this important gap to my misses for later practice</label>' : ''}
       ${f.goal ? `<fieldset class="kg-flow-rev"><legend>Core goal: ${esc(f.goal)}</legend><label class="kl-check"><input type="radio" name="met" value="yes"> Done</label><label class="kl-check"><input type="radio" name="met" value="partly"> Partly</label><label class="kl-check"><input type="radio" name="met" value="no"> Not yet</label></fieldset>` : ''}
@@ -9537,7 +9596,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     const body = cur.step === 'goal' || !A ? goalStep(cur) : cur.step === 'warmup' ? warmupStep(cur, A) : cur.step === 'example' ? exampleStep(cur) : cur.step === 'recap' ? recapStep(cur) : cur.step === 'attempt' ? attemptStep(cur, A) : cur.step === 'feedback' ? feedbackStep(cur, A) : cur.step === 'repair' ? repairStep(cur) : saveStep(cur, A);
     const recent = L.flowLog.slice(-8).reverse(), sureWrong = window.FlowKit.confWrong(L.flowLog, today());
     return `<section class="kl-card kg-flow">${head(cur)}${parkForm(cur)}${body}</section>`
-      + (cur.step === 'goal' && recent.length ? `<section class="kl-card kl-mini"><p class="kl-eyebrow">RECENT SESSIONS</p>${sureWrong.length ? `<p class="kl-small">Sure, but there was a gap (last 14 days): ${sureWrong.slice(-4).map(r => esc(r.topic)).join('; ')}. Worth another look.</p>` : ''}${recent.map(x => `<div class="kl-li"><span>${esc(ACTS[x.act]?.name || '')}: ${esc(x.topic)}${x.conf === 'sure' && x.gap ? ' <b class="kl-small">· sure, but a gap</b>' : ''}<small>${esc(x.d)} · ${x.gap ? (x.fixed ? 'gap repaired' : 'gap: ' + esc(x.gap.slice(0, 90))) : 'no gaps'}</small></span>${recDetail(x)}</div>`).join('')}</section>` : '');
+      + (cur.step === 'goal' && recent.length ? `<section class="kl-card kl-mini"><p class="kl-eyebrow">RECENT SESSIONS</p><p class="kl-small">The newest 30 sessions keep their full working; older ones keep a summary unless pinned. <button type="button" class="kl-ghost" data-a="flowexport">Download full history</button></p>${sureWrong.length ? `<p class="kl-small">Sure, but there was a gap (last 14 days): ${sureWrong.slice(-4).map(r => esc(r.topic)).join('; ')}. Worth another look.</p>` : ''}${recent.map(x => `<div class="kl-li"><span>${esc(ACTS[x.act]?.name || '')}: ${esc(x.topic)}${x.conf === 'sure' && x.gap ? ' <b class="kl-small">· sure, but a gap</b>' : ''}<small>${esc(x.d)} · ${x.gap ? (x.fixed ? 'gap repaired' : 'gap: ' + esc(x.gap.slice(0, 90))) : 'no gaps'}</small></span>${recDetail(x)}</div>`).join('')}</section>` : '');
   };
 
   /* ---------- forms and buttons ---------- */
@@ -9548,7 +9607,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       const e = v.lec && lecture(v.lec), topic = String(v.topic || '').trim() || e?.topic || '';
       if (!topic) return M.I('Name the topic, even roughly. It tells me what to check against.', { face: 'study' });
       const sk = (L.skills || []).some(s => s.id === v.sk) ? v.sk : (window.StudyPlan.creditTarget(L.skills || [], { lec: v.lec || '' }) || '');
-      const f = L.flow = Object.assign(L.flow || blank(), { skillId: sk, act: v.act, subj: SUBJS.includes(v.subj) ? v.subj : 'Maths', topic, goal: String(v.goal || '').trim(), lec: v.lec || '', mins: Math.max(5, Math.min(90, parseInt(v.mins) || A.mins)), stretch: String(v.stretch || '').trim(), energy: ['demanding', 'lighter'].includes(v.energy) ? v.energy : 'ordinary', opener: ['recall', 'predict'].includes(v.opener) ? v.opener : '' });
+      const f = L.flow = Object.assign(L.flow || blank(), { skillId: sk, act: v.act, subj: SUBJS.includes(v.subj) ? v.subj : 'Maths', topic, goal: String(v.goal || '').trim(), lec: v.lec || '', mins: Math.max(5, Math.min(90, parseInt(v.mins) || A.mins)), stretch: String(v.stretch || '').trim(), energy: ['demanding', 'lighter'].includes(v.energy) ? v.energy : 'ordinary', opener: ['recall', 'predict'].includes(v.opener) ? v.opener : '', contract: v.contract === 'finish' ? 'finish' : 'stop' });
       if (f.energy === 'lighter') f.mins = Math.min(f.mins, 15);
       if (f.act === 'predict') f.opener = 'predict';
       if (f.act === 'worked') { f.opener = ''; f.supported = true; }
@@ -9573,7 +9632,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       const skillId = window.StudyPlan.creditTarget(L.skills || [], {sk:f.skillId,lec:f.lec});
       const result = skillId && ev !== 'ungraded' ? M.recordSkill?.(skillId, ev === 'indep' ? 'ok' : ev === 'help' ? 'hint' : 'miss', 'flow', {sourceEvent:f.id,verified:f.verified,verificationSource:f.verificationSource,transfer:f.transfer}) : null;
       if (x || (skillId && ((L.skills || []).find(s => s.id === skillId)?.made || d) < d)) M.chargeReview?.('flow', f.id);
-      L.flowLog.push({ work: window.FlowKit.workRecord(f), conf: ['sure', 'unsure', 'guess'].includes(f.conf) ? f.conf : '', bank: f.freshBank || '', fresh: window.FlowKit.freshRecord(f), fade: f.act === 'worked' ? f.fadeMax || 0 : undefined, method: hasMethod(f) ? { p: String(f.mPrin).trim().slice(0, 160), w: String(f.mWhy || '').trim().slice(0, 240), a: String(f.mAlt || '').trim().slice(0, 240) } : null, skillId, lec:f.lec || '', requireVerification:true, verified:!!f.verified, verificationSource:f.verificationSource || '', supported:!!(f.supported || f.peeked), delayed:!!result?.delayed, transfer:ev === 'indep' && f.transfer === true, id: f.id, d, act: f.act, subj: f.subj, topic: f.topic, goal: f.goal, gap: gap ? f.gap.slice(0, 300) : '', errType: gap ? f.errType || '' : '', fixed: f.fixed, ev, disputed: f.disputed || '', miss: f.miss || '', by: f.checker?.provider || '', model: f.checker?.model || '', met: v.met || '', warm: !!f.warm.trim(), recap: !!(f.rc1 || f.rc2 || f.rc3), card: !!f.cardId, mins: f.started ? Math.min(180, Math.round((Date.now() - f.started - (f.away || 0)) / 60000)) : 0 }); // time away after "Leave for now" doesn't count
+      L.flowLog.push({ stick: !!f.stick, prob: f.probQ ? String(f.probQ).slice(0, 1500) : '', probBank: f.probBank || '', synth: f.synth || null, hint: f.hintMax || 0, next: String(f.nextStep || '').trim().slice(0, 200), contract: f.contract || 'stop', work: window.FlowKit.workRecord(f), conf: ['sure', 'unsure', 'guess'].includes(f.conf) ? f.conf : '', bank: f.freshBank || '', fresh: window.FlowKit.freshRecord(f), fade: f.act === 'worked' ? f.fadeMax || 0 : undefined, method: hasMethod(f) ? { p: String(f.mPrin).trim().slice(0, 160), w: String(f.mWhy || '').trim().slice(0, 240), a: String(f.mAlt || '').trim().slice(0, 240) } : null, skillId, lec:f.lec || '', requireVerification:true, verified:!!f.verified, verificationSource:f.verificationSource || '', supported:!!(f.supported || f.peeked), delayed:!!result?.delayed, transfer:ev === 'indep' && f.transfer === true, id: f.id, d, act: f.act, subj: f.subj, topic: f.topic, goal: f.goal, gap: gap ? f.gap.slice(0, 300) : '', errType: gap ? f.errType || '' : '', fixed: f.fixed, ev, disputed: f.disputed || '', miss: f.miss || '', by: f.checker?.provider || '', model: f.checker?.model || '', met: v.met || '', warm: !!f.warm.trim(), recap: !!(f.rc1 || f.rc2 || f.rc3), card: !!f.cardId, mins: f.started ? Math.min(180, Math.round((Date.now() - f.started - (f.away || 0)) / 60000)) : 0 }); // time away after "Leave for now" doesn't count
       if (L.flowLog.length > 300) L.flowLog = L.flowLog.slice(-300);
       L.flowLog = window.FlowKit.trimLog(L.flowLog);
       // a failed fresh problem is the mistake worth revisiting: its own question and working, linked to the skill and the repair
@@ -9590,7 +9649,9 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     flowcheck: check, flowlisten: listen, flowrepair: checkRepair, flowdispute: dispute, flowrecap: checkRecap, flowcard: addCard,
     flowpark: () => { const f = L.flow; if (!f) return; f.parking = !f.parking; save(); M.render(); setTimeout(() => document.querySelector('.kg-park input')?.focus(), 50); },
     flowwarmskip: () => { const f = L.flow; if (!f) return; f.warm = ''; f.step = f.act === 'worked' ? 'example' : 'attempt'; save(); M.render(); },
-    flowfreshask: freshAsk, flowfreshcheck: freshCheck,
+    flowfreshask: freshAsk, flowfreshcheck: freshCheck, flowprob: probAsk, flowhint: hintAsk,
+    flowpin: b => { const r = (L.flowLog || []).find(x => x.id === b.dataset.v); if (!r) return; r.pinned = !r.pinned; save(); M.render(); },
+    flowexport: () => { try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ exported: new Date().toISOString(), sessions: L.flowLog || [] }, null, 1)], { type: 'application/json' })); a.download = 'kaguya-sessions-' + today() + '.json'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); } catch (e) { M.I('The download did not start. Try again.', { face: 'study' }); } },
     flowfade: b => { const f = L.flow; if (!f || f.busy) return; const lvl = Number(b.dataset.v) || 0;
       if (lvl && exLines(f).length < 3) return M.I('Put at least two solution steps on separate lines, then I can hide some.', { face: 'study' });
       f.fadeLvl = lvl; f.fadeShown = false; f.fadeAns = {}; if (lvl) { f.supported = true; f.fadeMax = Math.max(f.fadeMax || 0, lvl); } save(); M.render(); setTimeout(() => document.querySelector('[data-fade]')?.focus(), 60); },
@@ -9617,7 +9678,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     if (k === 'repair') { L.flow.verified = false; L.flow.fixed = false; }
     if (k === 'verificationSource') L.flow.verified = false;
     if (k === 'freshA') { L.flow.freshOk = false; L.flow.freshFb = ''; }
-    if (k === 'supported' && (L.flow.peeked || L.flow.act === 'worked')) { L.flow.supported = true; e.target.checked = true; }
+    if (k === 'supported' && (L.flow.peeked || L.flow.hintMax > 0 || L.flow.act === 'worked')) { L.flow.supported = true; e.target.checked = true; }
     if (k === 'skillId' && L.flow.step === 'save') { save(); M.render(); return; }
     clearTimeout(tSave); tSave = setTimeout(save, 400);
     if (e.target.type === 'checkbox' && L.flow.step === 'save') { save(); M.render(); }
@@ -10939,7 +11000,7 @@ body.kg-calm .kv-lens.in,body.kg-calm .kv-hud.in>*,body.kg-calm .kv-ecg path{ani
 }
 .kg-method{margin:8px 0 10px;padding:10px 14px;border:1px solid rgba(196,182,255,.22);border-radius:12px;background:rgba(127,227,255,.04)}.kg-method summary{cursor:pointer}.kg-method label{display:block;margin-top:8px}.kg-method input{width:100%;box-sizing:border-box}
 .kg-fade{margin:10px 0;display:grid;gap:6px}.kg-fade-given{margin:0;opacity:.85}.kg-fade-step{display:block;padding:8px 12px;border-left:3px solid #7fe3ff;background:rgba(127,227,255,.06);border-radius:0 10px 10px 0}.kg-fade-step input{width:100%;box-sizing:border-box;margin-top:4px}.kg-fade-step p{margin:4px 0}
-.kg-rec-detail{margin-top:4px}.kg-conf{display:flex;gap:12px;flex-wrap:wrap;border:0;padding:0;margin:8px 0}.kg-skill-row{padding:6px 0;border-bottom:1px solid rgba(196,182,255,.12)}.kg-rec-detail p{margin:4px 0}
+.kg-rec-detail{margin-top:4px}.kg-trail{margin:6px 0}.kg-timeup{border-left-color:#e8d29a}.kg-hints{margin:8px 0}.kg-prob{border-left-color:#7fe3ff}.kg-conf{display:flex;gap:12px;flex-wrap:wrap;border:0;padding:0;margin:8px 0}.kg-skill-row{padding:6px 0;border-bottom:1px solid rgba(196,182,255,.12)}.kg-rec-detail p{margin:4px 0}
 /* the floating room nav never covers the last card */
 body.kv-on #kg-main{padding-bottom:104px}
 /* focus mode on a running timer: its card shows on every page, so Study or Company never turns into an empty visor */
@@ -10956,11 +11017,12 @@ body.kg-shell.habit-shh:not(.kg-flow-on) #habit-desk{display:block!important}
   const { L, save, today, esc } = M;
   L.bank = Array.isArray(L.bank) ? L.bank : [];
   const SUBJS = ['Maths', 'Physics', 'Chemistry'];
+  const FLAGS = { ambiguous: 'Ambiguous', missing: 'Missing information', disputed: 'Answer disputed', long: 'Too long' };
   const skills = () => (L.skills || []).slice().sort((a, b) => String(a.subj).localeCompare(String(b.subj)) || String(a.name).localeCompare(String(b.name)));
   const skillSel = (name, cur, filter = () => true) => `<select name="${name}"><option value="">${name === 'into' ? "Don't merge" : 'No particular skill'}</option>${skills().filter(filter).slice(0, 120).map(s => `<option value="${esc(s.id)}" ${s.id === cur ? 'selected' : ''}>${esc(s.subj ? s.subj + ' · ' : '')}${esc(s.name)}</option>`).join('')}</select>`;
   function bankCard() {
     const rows = L.bank.slice().reverse().slice(0, 40).map(b => { const s = (L.skills || []).find(x => x.id === b.sk);
-      return `<li><p class="kl-pre">${esc(b.q)}</p><p class="kl-small">Answer: ${esc(b.ans)} · ${esc(b.src)}${s ? ' · ' + esc(s.name) : ''}${b.lastUsed ? ' · last used ' + esc(b.lastUsed) : ''} <button type="button" class="kl-ghost" data-a="bank-del" data-v="${esc(b.id)}" aria-label="Delete this problem">✕</button></p></li>`; }).join('');
+      return `<li><p class="kl-pre">${esc(b.q)}</p><p class="kl-small">Answer: ${esc(b.ans)} · ${esc(b.src)}${s ? ' · ' + esc(s.name) : ''}${b.lastUsed ? ' · last used ' + esc(b.lastUsed) : ''}${b.quarantined ? ` · <b>set aside: ${esc(FLAGS[b.flag] || b.flag || 'flagged')}</b> <button type="button" class="kl-ghost" data-a="bank-ok" data-v="${esc(b.id)}">Reviewed, use it again</button>` : ` · flag: ${Object.entries(FLAGS).map(([k, t]) => `<button type="button" class="kl-ghost" data-a="bank-flag" data-v="${esc(b.id)}" data-k="${k}">${t}</button>`).join('')}`} <button type="button" class="kl-ghost" data-a="bank-del" data-v="${esc(b.id)}" aria-label="Delete this problem">✕</button></p></li>`; }).join('');
     return `<section class="kl-card kl-stack"><p class="kl-eyebrow">📚 TRUSTED PROBLEM BANK · ${L.bank.length}</p><h3>Problems you can trust</h3>
       <p class="kl-small">Save textbook problems with their source and answer. When a repair asks for a fresh problem, one from here comes first, and Iroha checks your answer against the known one.</p>
       <form data-f="bankadd" class="kl-stack"><label>Problem <textarea name="q" required rows="3" maxlength="1500" placeholder="Copy the problem exactly"></textarea></label>
@@ -10968,10 +11030,13 @@ body.kg-shell.habit-shh:not(.kg-flow-on) #habit-desk{display:block!important}
       <label class="kl-small">Subject <select name="subj">${SUBJS.map(s => `<option>${s}</option>`).join('')}</select></label><label class="kl-small">Skill ${skillSel('sk', '')}</label><label class="kl-small">Topic <input name="topic" maxlength="120" placeholder="e.g. energy on ramps"></label></div>
       <button class="kl-primary">Save problem</button></form>${rows ? `<ul class="kl-list">${rows}</ul>` : ''}</section>`;
   }
+  // a skill's evidence trail: sessions, repairs, fresh problems and follow-ups together, and whether the difficulty came back
+  const trail = s => { const t = K.skillTrail([s.id, ...(s.aliases || [])], L.flowLog, L.attempts); if (!t.events.length) return '<p class="kl-small">No evidence yet. A guided session with this skill picked starts its trail.</p>';
+    return `<div class="kg-trail"><p class="kl-small"><b>Evidence trail</b> · ${t.repaired ? (t.recurred ? `the difficulty came back ${t.recurred} time${t.recurred === 1 ? '' : 's'} after the first repair` : 'no gap since the first repair') : 'no repair yet'}</p><ul class="kl-list">${t.events.slice(-12).map(e => `<li class="kl-small">${esc(e.d)} · ${esc(e.t)}</li>`).join('')}</ul></div>`; };
   function skillsCard() {
     const list = skills(); if (!list.length) return '';
     const rows = list.slice(0, 80).map(s => `<details class="kg-skill-row"><summary>${esc(s.name)} <span class="kl-small">${esc(s.subj || '')}${s.strength ? ' · ' + esc(s.strength) : ''}${s.example ? '' : ' · no example yet'}</span></summary>
-      <form data-f="skedit" class="kl-stack"><input type="hidden" name="id" value="${esc(s.id)}"><label>Name <input name="name" required minlength="3" maxlength="120" value="${esc(s.name)}"></label>
+      ${trail(s)}<form data-f="skedit" class="kl-stack"><input type="hidden" name="id" value="${esc(s.id)}"><label>Name <input name="name" required minlength="3" maxlength="120" value="${esc(s.name)}"></label>
       <label>What showing this skill looks like <input name="example" maxlength="240" value="${esc(s.example || '')}" placeholder="e.g. find the speed at the bottom of a smooth curved track"></label>
       <label>Merge into (a duplicate) ${skillSel('into', '', x => x.id !== s.id && (!s.subj || x.subj === s.subj))}</label><button>Save</button></form></details>`).join('');
     return `<section class="kl-card kl-stack"><p class="kl-eyebrow">🧩 SKILLS · ${list.length}</p><h3>Tidy your skills</h3><p class="kl-small">Rename vague ones, say what showing each skill looks like, and merge duplicates (from PDFs, say). Merging keeps both histories under the skill you keep.</p>${rows}</section>`;
@@ -10984,6 +11049,11 @@ body.kg-shell.habit-shh:not(.kg-flow-on) #habit-desk{display:block!important}
     L.bank.push({ id: 'pb' + Date.now().toString(36), q: q.slice(0, 1500), ans: ans.slice(0, 300), src: src.slice(0, 120), subj: SUBJS.includes(v.subj) ? v.subj : 'Maths', sk: (L.skills || []).some(s => s.id === v.sk) ? v.sk : '', topic: String(v.topic || '').trim().slice(0, 120), d: today(), lastUsed: '' });
     save(); M.render(); M.K?.(`saved. ${L.bank.length} trusted problem${L.bank.length === 1 ? '' : 's'} in the bank 🌙`);
   };
+  // a questionable problem is set aside (never picked) until you review it
+  M.ACTIONS['bank-flag'] = b => { const p = L.bank.find(x => x.id === b.dataset.v); if (!p) return; p.flag = b.dataset.k; p.quarantined = true;
+    const f = L.flow; if (f && f.freshBank === p.id) Object.assign(f, { freshQ: '', freshBank: '', freshA: '', freshFb: '', freshOk: false }); if (f && f.probBank === p.id) Object.assign(f, { probQ: '', probBank: '', graded: false });
+    save(); M.render(); M.K?.(`set aside as "${FLAGS[p.flag] || p.flag}". it won't be picked until you review it on Revision 🌙`); };
+  M.ACTIONS['bank-ok'] = b => { const p = L.bank.find(x => x.id === b.dataset.v); if (!p) return; delete p.quarantined; delete p.flag; save(); M.render(); };
   M.ACTIONS['bank-del'] = b => { const p = L.bank.find(x => x.id === b.dataset.v); if (!p || !confirm('Delete this problem from the bank?')) return; L.bank = L.bank.filter(x => x !== p); save(); M.render(); };
   M.FORMS.skedit = v => {
     const s = (L.skills || []).find(x => x.id === v.id); if (!s) return;

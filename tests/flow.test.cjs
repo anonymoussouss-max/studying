@@ -131,3 +131,44 @@ test('merging a duplicate skill keeps both histories under the kept one', () => 
   assert.deepStrictEqual([...m[0].aliases], ['a']);
   assert.strictEqual(K.mergeSkills(skills, 'a', 'a'), skills);
 });
+
+test('follow-ups only take a bank problem tagged with the exact skill; set-aside problems are never picked', () => {
+  const bank = [{ id: 'm', q: 'A ball rolls off a ramp: find the momentum', sk: 'momentum', subj: 'Physics' }, { id: 'e', q: 'Energy at the bottom of a ramp', sk: 'energy', subj: 'Physics', quarantined: true }];
+  assert.strictEqual(K.bankPick(bank, { sk: 'energy', subj: 'Physics', topic: 'energy on a ramp', exact: true }, '2026-11-23'), null, 'no topic-word guess across skills');
+  assert.strictEqual(K.bankPick(bank, { sk: 'energy', subj: 'Physics', topic: 'energy on a ramp' }, '2026-11-23').id, 'm', 'the loose pick still exists for non-follow-up use');
+  assert.strictEqual(K.bankPick([{ ...bank[1], quarantined: false }], { sk: 'energy', exact: true }, '2026-11-23').id, 'e');
+});
+
+test('end to end: save a repaired gap, open the follow-up 3 days later, get a different exact-skill problem, record the result', () => {
+  const f = { id: 's1', topic: 'Energy on ramps', gap: 'wrong energy sign', fixed: true, skillId: 'energy', fix: 'gain in KE = loss in PE', errType: 'principle' };
+  const item = { id: 'x1', ...K.stickItem(f, '2026-11-23', 'work-energy', '2026-11-26') };
+  assert.strictEqual(item.due, '2026-11-26'); assert.strictEqual(item.topic, 'Energy on ramps'); assert.strictEqual(item.gap, 'wrong energy sign');
+  const bank = [{ id: 'other', q: 'Momentum on a ramp', sk: 'momentum' }, { id: 'p1', q: 'A 2 kg block on a 3 m smooth ramp: speed at the bottom?', sk: 'energy', ans: '7.7 m/s', src: 'HCV 8.14' }];
+  const start = K.stickStart(item, bank, '2026-11-26');
+  assert.strictEqual(start.act, 'solve'); assert.strictEqual(start.stick, true); assert.strictEqual(start.skillId, 'energy');
+  assert.strictEqual(start.probBank, 'p1'); assert.match(start.probQ, /3 m smooth ramp/); assert.strictEqual(start.topic, 'Energy on ramps');
+  const none = K.stickStart(item, [bank[0]], '2026-11-26');
+  assert.strictEqual(none.probQ, ''); assert.strictEqual(none.probBank, '', 'no exact problem: Iroha writes one instead');
+  const rec = { id: 's2', d: '2026-11-26', skillId: 'energy', act: 'solve', stick: true, gap: '', ev: 'indep', work: K.workRecord({ attempt: 'v = 7.7 m/s' }) };
+  const t = K.skillTrail(['energy'], [{ id: 's1', d: '2026-11-23', skillId: 'energy', act: 'solve', gap: 'wrong energy sign', fixed: true }, rec], [item]);
+  assert.strictEqual(t.repaired, true); assert.strictEqual(t.recurred, 0);
+  assert.ok(t.events.some(e => /follow-up booked for 2026-11-26/.test(e.t)));
+});
+
+test('a skill trail counts the difficulty coming back after a repair', () => {
+  const log = [{ d: '2026-11-01', skillId: 'a', act: 'solve', gap: 'sign', fixed: true }, { d: '2026-11-05', skillId: 'a', act: 'solve', gap: 'sign again' }, { d: '2026-11-09', skillId: 'b', act: 'solve', gap: 'x' }, { d: '2026-11-10', skillId: 'old', act: 'solve', gap: 'via alias' }];
+  const t = K.skillTrail(['a', 'old'], log, []);
+  assert.strictEqual(t.recurred, 2); assert.strictEqual(t.events.length, 3);
+});
+
+test('pinned sessions keep their full working past the newest 30', () => {
+  const log = Array.from({ length: 33 }, (_, i) => ({ id: i, pinned: i === 0, work: { attempt: 'w' + i } }));
+  const t = K.trimLog(log);
+  assert.strictEqual(t[0].work.attempt, 'w0'); assert.strictEqual(t[1].work, undefined);
+});
+
+test('synthesis pairs two skills already shown, from different chapters when possible', () => {
+  const s = [{ id: 'v', name: 'vectors', subj: 'Physics', ch: 'kin', last: 'ok', lastTested: '2026-11-01' }, { id: 'k', name: 'kinematics', subj: 'Physics', ch: 'kin', strength: 'solid', lastTested: '2026-11-02' }, { id: 'e', name: 'energy', subj: 'Physics', ch: 'wep', last: 'ok', lastTested: '2026-11-05' }, { id: 'n', name: 'new', subj: 'Physics', strength: 'new' }];
+  assert.deepStrictEqual([...K.synthPair(s, 'Physics')].map(x => x.id), ['v', 'e']);
+  assert.strictEqual(K.synthPair([s[3]], 'Physics').length, 0);
+});
