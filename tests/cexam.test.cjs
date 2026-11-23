@@ -87,3 +87,12 @@ test("Today's schedule sits above the C card, and the Study tab has an independe
   assert.ok(html.includes('<form data-f="freesess"'), 'Study tab card');
   assert.ok(html.includes("begin({phone:true,free:true,"), 'starts the normal desk timer, so the minutes count');
 });
+
+test("every program in the answer bank has an explanation (the teacher asked for them), and programs show their output", () => {
+  const bank = /<template id="kg-cexam-bank">([\s\S]*?)<\/template>/.exec(html)[1];
+  for (const part of bank.split('<details class="q"').slice(1)) {
+    const id = /id="([^"]+)"/.exec(part)[1];
+    if (part.includes('<pre><code>')) assert.ok(part.includes('<div class="expl"><p class="expl-h">Explanation</p>'), id + ' has an explanation');
+    if (/class="qt">Program/.test(part)) assert.ok(part.includes('<p class="expl-h">Output</p>'), id + ' shows its output');
+  }
+});
