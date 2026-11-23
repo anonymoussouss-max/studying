@@ -74,3 +74,9 @@ test('the rest of the mode is wired up: limit question, review pause, companions
   assert.match(html, /!window\.StudyPlan\?\.gentleOf\?\.\(L\.sched, today\(\)\)\) openMood\(\)/, 'no automatic mood pop-up');
   assert.match(html, /window\.__kgQuiet\?\.\(t, o\)/, 'no study nudges after Done for today');
 });
+
+test('a confirmed increase can start today or tomorrow, as chosen; it is never automatic', () => {
+  assert.match(html, /data-v="raisetoday">Yes, from today<\/button><button type="button" data-a="kgg" data-v="raiseyes">Yes, from tomorrow/);
+  assert.match(html, /if \(v === 'raisetoday' && \(g\.ask \|\| g\.next\)\) \{ g\.max = \(g\.ask \|\| g\.next\)\.max;/);
+  assert.match(html, /if \(higher\) \{ g\.ask = \{ max: m \}; return redo\(\); \}/, 'an increase always waits for a confirmation');
+});
