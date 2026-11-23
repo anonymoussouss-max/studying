@@ -57,6 +57,16 @@ test("Iroha's test: model answers go only to Iroha, one question at a time; resu
   assert.match(html, /const x = SP\.cExam\(day\(\)\); if \(!x\) return '';/, 'the card still hides itself after Thursday');
 });
 
+test('a test on only the ticked answers, and Check my work sends one screenshot with hints, never the answer', () => {
+  const s = html.slice(html.indexOf('id="kg-cexam-script"'));
+  assert.match(s, /const ticked = mod => QS\.filter\(q => X\(\)\.learned\[q\.id\]/, 'ticked test draws only from learned answers');
+  assert.match(s, /ids = tk \? pickTicked\(tmod\) : pick\(\)/);
+  assert.match(s, /never paste it or reveal it in full/);
+  assert.match(s, /with a hint toward the fix, not the fixed code/);
+  assert.match(s, /Don't give a mark; I decide Got it or Review/);
+  assert.match(html, /!window\.__kgShortBreak && !window\.__kgCxTest\?\.\(\) && !waiting/, 'no random screen-watch questions during a C test');
+});
+
 test('the card knows when the core sittings are over (past rows keep their cx id)', () => {
   assert.ok(html.includes(String.raw`/^cx\d/.test(r.id || '')); doneC = x.mins > 0 && !!rows.length && rows.filter(r => !r.optional).every(r => r.past)`));
   assert.match(html, /'2026-11-26':\{what:'Exam at 10:00 AM\./, 'Thursday: no early blocks, sleep unchanged');
