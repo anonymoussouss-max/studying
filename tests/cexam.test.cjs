@@ -77,5 +77,5 @@ test('schedule blocks can be ticked done without the timer: one ordinary session
   assert.match(html, /if\(h\.sessions\.some\(s=>s\.date===today\(\)&&s\.block===b\.id\)\)\{toast\('This block is already marked done\.'\)/, 'one per block per day');
   assert.match(html, /h\.sessions\.push\(s\);save\(\);render\(\);toast\(`Logged \$\{m\} min/, 'saved as a session, so tracking counts it');
   assert.match(html, /b\.start<=nowOff\?button\('✓ Done','block-done'/, 'only blocks that have started');
-  assert.match(html, /\/\^diploma\|\(\^\|-\)cx\d\/\.test\(b\.id\)\?'Diploma'/, 'C exam blocks count as diploma study');
+  assert.ok(html.includes(String.raw`/^diploma|(^|-)cx\d/.test(b.id)?'Diploma'`), 'C exam blocks count as diploma study');
 });
