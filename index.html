@@ -1111,6 +1111,7 @@ body.habit-shh #hb-session-card {text-align:center;}
       if(g.role==='G'){rows.push(Object.assign({},g,{subj:'german',title:o.germanUnit!=null?germanTitle(o.germanUnit):GERMAN[(o.dayNo||0)%4],task:{type:'german'}}));continue;}
       if(g.role==='A'){rows.push(Object.assign({},g,{subj:'astro',title:'Astrophysics course · '+(o.astroTitle||'next step on the course page'),task:{type:'astro'}}));continue;}
       if(g.role==='X'){rows.push(Object.assign({},g,{subj:'explore',title:'Exploration · a puzzle, a derivation, a simulation or a question you like (stop whenever)',task:{type:'explore'}}));continue;}
+      if(g.role==='CX'){rows.push(Object.assign({},g,{subj:'diploma',title:'C exam (IT23102) · '+g.cx,task:{type:'diploma'}}));continue;}
       if(g.role==='D'){rows.push(Object.assign({},g,{subj:'diploma',title:o.examPrep?'Diploma exam preparation':'Diploma work · assignments and submissions',task:{type:'diploma'}}));continue;}
       if(g.role==='Gphys'){rows.push(Object.assign({},g,{subj:'physics',title:'Physics · 15 minutes, then decide. Stopping after this is a complete day.',task:{type:'gentle'}}));continue;}
       let t=g.s;
@@ -1166,6 +1167,10 @@ body.habit-shh #hb-session-card {text-align:center;}
           if(at==null)continue;const r={s:at,e:at+len,kind:'study',role:p==='german'?'G':'Gphys',gentle:p!=='german',picked:true};busy.push(r);busy.sort((a,b)=>a.s-b.s);
           segs=segs.flatMap(x=>x.kind==='rest'&&/^free/.test(x.id)&&x.s<r.e&&r.s<x.e?[x.s<r.s?Object.assign({},x,{e:r.s}):null,x.e>r.e?Object.assign({},x,{s:r.e,id:x.id+'b'}):null].filter(Boolean):[x]).concat([r]).sort((a,b)=>a.s-b.s);}}
       segs.cuts=[];}
+    // C exam plan: takes up to its minutes from the study time the day already has (inside the gentle maximum); adds no time
+    {const CX=ctx.noCExam?null:cExam(dayIso);if(CX&&CX.mins){let left=CX.mins;const nowC=nowClock==null?-1:nowClock,st=segs.filter(x=>x.kind==='study'&&!/^G/.test(x.role||'')&&x.e>nowC);
+      const ord=GR?st.filter(x=>x.s>=T_PERSONAL[1]).sort((a,b)=>a.s-b.s).concat(st.filter(x=>x.s<T_PERSONAL[1]).sort((a,b)=>b.s-a.s)):st.sort((a,b)=>a.s-b.s);
+      for(const g of ord){if(left<15)break;const from=Math.max(g.s,nowC),len=g.e-from;if(len-left>=15){segs.splice(segs.indexOf(g)+1,0,Object.assign({},g,{s:from+left,id:(g.id||'s')+'-cx'}));g.e=from+left;}g.role='CX';g.cx=CX.what;left-=Math.min(len,left);}}}
     // diploma: the week's hours replace part of the PCM priority time (latest priority block first); exam preparation takes the lecture and priority blocks
     let dip=Math.max(0,Math.round((+ctx.diplomaToday||0)/5)*5);if(dip>0&&dip<15)dip=15;
     for(const g of segs)if(g.kind==='study'&&prep&&(examDays.length?['L','P','R','H'].includes(g.role):(g.role==='L'||g.role==='P')))g.role='D';
@@ -1180,6 +1185,13 @@ body.habit-shh #hb-session-card {text-align:center;}
     return {rows,deferred,cutMinutes:cut,plan,chosen,wake:W,focus,hours:hrs||0,gentle:GR,extend:!!opt(plan).extend,examPrep:prep?prep.name||'Diploma exams':'',examDays:examDays.length,switched:sw.length};
   }
   const WEEK_BUDGET={lighter:270,minimal:150},DAY_HOURS=[4,5,6,7,8];
+  // C exam (IT23102, Thu 26 Nov 2026): a short dated plan, added 23 Nov. After its last day nothing of it shows; no record is touched.
+  const C_EXAM={name:'C exam (IT23102)',until:'2026-11-26',url:'https://claude.ai/artifact/TyQJXbjDxCREiMiG1XgQY9',days:{
+    '2026-11-23':{mins:90,what:'Top 10, then Pointers (Module 7)',note:'Optional today. Stopping earlier is fine.'},
+    '2026-11-24':{mins:180,what:'Arrays & strings (Module 4), then Control structures (Module 3)',note:'Take a real break between the two modules.'},
+    '2026-11-25':{mins:180,what:'Structures, unions & files (Module 6), Functions (Module 5), a quick pass of Modules 1 and 2, then a 20-min self-test of the Top 10'},
+    '2026-11-26':{mins:0,what:'Exam day: 15–20 min before the exam, read only the yellow lines and the program skeleton. Nothing new.'}}};
+  const cExam=d=>d<=C_EXAM.until&&C_EXAM.days[d]?Object.assign({name:C_EXAM.name,url:C_EXAM.url,until:C_EXAM.until},C_EXAM.days[d]):null;
   // Gentle return (Ayan's choice, 23 Nov 2026): a reversible mode with one shared maximum for all study, set only by Ayan.
   // S.gentle={on,max (minutes or null = not set),from,offAfter,day:{[date]:{max,stopped,picks,over}}}. Records are never touched.
   const gentleOf=(S,d)=>{const g=S&&S.gentle;if(!g||!g.on||(g.from&&d<g.from)||(g.offAfter&&d>g.offAfter))return null;
@@ -1283,7 +1295,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const daysLeft=w===0?0:7-w,loggedAny=ss.some(s=>s&&s.date===day&&s.subject!=='Other'&&(+s.minutes||0)>0)||Object.values(((desk.state||desk).days||{})[day]?.completed||{}).some(x=>+x>0)||!!(habit.active&&habit.active.date===day);
     return {actual14:a14,loggedAny,diplomaToday:daysLeft?Math.max(0,Math.ceil((target-dipDone)/daysLeft/5)*5):0,diplomaTarget:target,diplomaDone:dipDone,monday:mon};}
   const nowClock=()=>{const n=new Date();let m=n.getHours()*60+n.getMinutes();if(m<240)m+=1440;return m;};
-  const api={DAY_HOURS,dayHours,gentleOf,gentleUsed,astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,forecast:(L,hist)=>forecast(L||labData(),hist||{}),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={DAY_HOURS,dayHours,cExam,gentleOf,gentleUsed,astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,forecast:(L,hist)=>forecast(L||labData(),hist||{}),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -13858,6 +13870,29 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
     + '.kg-gl{position:fixed!important;inset:0;display:grid;place-items:center;background:rgba(5,4,15,.6)!important;z-index:2147483000;padding:16px}.kg-gl>.kl-card{max-width:440px;width:100%;background:#1c1838;border:1px solid #3b3470;border-radius:16px;padding:16px 18px;color:#f2eeff}.kg-gl .kl-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.kg-gl button{border:1px solid #3b3470;border-radius:999px;padding:8px 14px;background:rgba(127,227,255,.08);color:inherit;cursor:pointer}.kg-gl button.kl-primary{background:#7fe3ff;color:#0f0d24;border-color:#7fe3ff}';
   document.head.appendChild(css);
   M.srPause?.();
+})();
+</script>
+<script id="kg-cexam-script">
+/* C exam plan card (IT23102, Thu 26 Nov 2026). It shows only while StudyPlan.cExam has a step for the study day, so it is gone from Friday. */
+(function () {
+  const M = window.MoonLab, SP = window.StudyPlan; if (!M || !M.PANELS || !SP || !SP.cExam) return;
+  const day = () => SP.studyDate ? SP.studyDate() : M.today();
+  const WD = d => new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short' });
+  function card() {
+    const x = SP.cExam(day()); if (!x) return '';
+    const g = SP.gentleOf(M.L.sched, day()), rest = [];
+    for (let d = M.add(day(), 1); d <= x.until; d = M.add(d, 1)) { const y = SP.cExam(d); if (y) rest.push(`<li><b>${WD(d)}</b> · ${M.esc(y.what)}</li>`); }
+    const time = x.mins ? (g ? (g.cap ? `Up to ${x.mins} min, taken from your ${g.cap} min maximum (evening first). It adds no time.` : 'Not in the schedule, because no gentle-return maximum is set. Open the answer bank whenever you choose.') : `Up to ${x.mins} min of today's study time. It adds no time.`) : '';
+    return `<section class="kl-card kg-cexam"><p class="kl-eyebrow">${M.esc(x.name.toUpperCase())} · THURSDAY 26 NOV</p><p><b>Today:</b> ${M.esc(x.what)}</p>${x.note ? `<p class="kl-small">${M.esc(x.note)}</p>` : ''}${time ? `<p class="kl-small">${time}</p>` : ''}
+      <div class="kl-row"><a class="kl-primary" href="${x.url}" target="_blank" rel="noopener">Open the answer bank</a></div>
+      ${rest.length ? `<details><summary class="kl-small">Rest of the plan</summary><ul class="kl-list">${rest.join('')}</ul></details>` : ''}
+      <p class="kl-small">If a day gets shorter, keep the order and drop the last modules. This card and the plan go away by themselves after Thursday.</p></section>`;
+  }
+  const prev = M.PANELS.today;
+  M.PANELS.today = () => { const h = prev(); return M.onBreak?.() ? h : card() + h; };
+  const css = document.createElement('style');
+  css.textContent = 'body.kg-sec-today #kg-main .kg-cexam{order:1}.kg-cexam .kl-row{margin:8px 0}.kg-cexam a.kl-primary{display:inline-block;text-decoration:none}';
+  document.head.append(css);
 })();
 </script>
 </body></html>

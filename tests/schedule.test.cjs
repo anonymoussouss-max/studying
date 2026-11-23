@@ -13,7 +13,7 @@ function plan(isoNow, lab = {}, extra = {}) {
 }
 const MON = '2026-11-23', SUN = '2026-11-29';
 const iso = (d, c) => { const h = Math.floor(c / 60) % 24, m = c % 60, day = c >= 1440 ? '2026-11-24' : d; return `${day}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`; };
-const CTX = { actual14: {}, loggedAny: false, diplomaToday: 0 };
+const CTX = { actual14: {}, loggedAny: false, diplomaToday: 0, noCExam: true }; // the dated C exam plan (23–26 Nov) is tested in cexam.test.cjs
 const P0 = plan(iso(MON, 600));
 const seeded = (more = {}) => Object.assign({ syl: P0.seedSyllabus() }, more);
 const study = rows => rows.filter(r => r.kind === 'study');
