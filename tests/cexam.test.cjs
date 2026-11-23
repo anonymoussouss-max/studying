@@ -69,7 +69,8 @@ test('a test on only the ticked answers, and Check my work sends one screenshot 
 
 test('the card lists only the sittings the planner chose, and Done for today quiets it', () => {
   const s = html.slice(html.indexOf('id="kg-cexam-script"'));
-  assert.ok(s.includes(String.raw`rows = SP.templateDay().rows.filter(r => /^cx(\d|-break)/.test(r.id || ''))`), 'reads the real schedule');
+  assert.ok(s.includes(String.raw`sit = SP.fallback(new Date(day() + 'T12:00:00').getDay()).filter(b => b.kind === 'study' && /(^|-)cx\d/.test(b.id || ''))`), 'reads the same plan the timetable draws');
+  assert.ok(!/SP\.templateDay\(/.test(s), 'not a second, unadapted plan');
   assert.ok(!/doneC|Core: 1 h 50/.test(s), 'no clock-based "done" and no fixed 1 h 50');
   const c = s.slice(s.indexOf('function card()'), s.indexOf('function bankCard()')), stop = c.indexOf('if (g && g.stopped) return');
   assert.ok(stop > 0 && stop < c.indexOf('data-a="cxtest"'), 'Done returns before any test button');
