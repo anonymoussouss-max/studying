@@ -11,7 +11,7 @@ function plan(isoNow, lab = {}) {
   class FixedDate extends Date { constructor(...a) { a.length ? super(...a) : super(NOW); } static now() { return NOW; } }
   const store = { 'kg-lab-v1': JSON.stringify(lab) };
   const ctx = { Date: FixedDate, Math, JSON, Number, String, Object, Array, Set, Map, console, localStorage: { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = String(v); } } };
-  ctx.globalThis = ctx;
+  ctx.globalThis = ctx; ctx.__noCExam = true; /* the dated C exam timetable (23–26 Nov) is tested in cexam.test.cjs */
   vm.runInNewContext(src, ctx);
   return ctx.StudyPlan;
 }

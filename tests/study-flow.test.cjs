@@ -8,7 +8,7 @@ const src = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).f
 const NOW = new Date('2026-11-23T12:00:00').getTime();
 class FixedDate extends Date { constructor(...a) { a.length ? super(...a) : super(NOW); } static now() { return NOW; } }
 const ctx = { Date: FixedDate, Math, JSON, Number, String, Object, Array, Set, Map, console, localStorage: { getItem: () => null, setItem() {} } };
-ctx.globalThis = ctx; vm.runInNewContext(src, ctx); const SP = ctx.StudyPlan;
+ctx.globalThis = ctx; ctx.__noCExam = true; /* the dated C exam timetable (23–26 Nov) is tested in cexam.test.cjs */ vm.runInNewContext(src, ctx); const SP = ctx.StudyPlan;
 const MON = '2026-11-23', C0 = { actual14: {}, loggedAny: false, diplomaToday: 20 };
 const lab = (sched = {}, more = {}) => Object.assign({ syl: SP.seedSyllabus(), sched }, more);
 const week = (l, now = 720) => SP.weekPreview(l, MON, now, C0);
