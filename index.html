@@ -15085,12 +15085,17 @@ int main()
     return `<section class="kl-card kg-cexam"><p class="kl-eyebrow">${esc(x.name.toUpperCase())} · THURSDAY 26 NOV, 10 AM</p><p><b>Today:</b> ${esc(x.what)}</p>${x.note ? `<p class="kl-small">${esc(x.note)}</p>` : ''}${time}
       <p class="kl-small"><b><span data-cx-count>${n}</span> of ${QS.length}</b> answers ticked as learned${todayRes.length ? ` · Iroha's tests today: ${got} of ${todayRes.length} got it` : ''}.</p>
       ${C.test ? testHTML() : `${doneC ? '<p><b>Your C time for today is done.</b> Iroha can test you now, if you want.</p>' : ''}<div class="kl-row" style="flex-wrap:wrap"><button type="button" class="${doneC ? 'kl-primary' : ''}" data-a="cxtest">Test me with Iroha · 5 questions</button></div>`}
-      <details class="kg-cx-bank" data-cx-bank${bankOpen ? ' open' : ''}><summary><b>Answer bank</b> · every past-paper question, in priority order</summary><p class="kl-small">Read one, fold it, write it on paper from memory, then check. Tick it once you get it right. Iroha's tests start with the ones you haven't ticked.</p>${bankHTML()}</details>
+      <p class="kl-small">The answer bank is at the bottom of this page.</p>
       ${rest.length ? `<details><summary class="kl-small">Rest of the plan</summary><ul class="kl-list">${rest.join('')}</ul></details>` : ''}
       <p class="kl-small">For every program: write it without looking, trace it with an example, then check it. For theory, remember the definition and key points, not exact paragraphs. This card goes away by itself after Thursday; your ticks and test results stay saved.</p></section>`;
   }
+  // the answer bank is long, so it sits at the bottom of the Today page (CSS order), below everything else
+  function bankCard() {
+    if (!SP.cExam(day())) return '';
+    return `<section class="kl-card kg-cexam-bank"><details class="kg-cx-bank" data-cx-bank${bankOpen ? ' open' : ''}><summary><b>C answer bank</b> · every past-paper question, in priority order</summary><p class="kl-small">Read one, fold it, write it on paper from memory, then check. Tick it once you get it right. Iroha's tests start with the ones you haven't ticked.</p>${bankHTML()}</details></section>`;
+  }
   const prev = M.PANELS.today;
-  M.PANELS.today = () => { const h = prev(); return M.onBreak?.() ? h : card() + h; };
+  M.PANELS.today = () => { const h = prev(); return M.onBreak?.() ? h : card() + h + bankCard(); };
 
   // ---- actions ----
   const ask = text => window.__irohaAsk?.(text);
@@ -15122,7 +15127,7 @@ int main()
   document.addEventListener('click', e => { const a = e.target.closest?.('[data-cxgo]'); if (!a) return; const d = document.getElementById('kgcx-' + a.dataset.cxgo); if (d) { e.preventDefault(); d.open = true; d.scrollIntoView({ block: 'start', behavior: 'smooth' }); } });
 
   const css = document.createElement('style');
-  css.textContent = `body.kg-sec-today #kg-main .kg-cexam{order:1}.kg-cexam .kl-row{margin:8px 0}
+  css.textContent = `body.kg-sec-today #kg-main .kg-cexam{order:1}body.kg-sec-today #kg-main .kg-cexam-bank{order:99}.kg-cexam .kl-row{margin:8px 0}
 .kg-cx-test{border:1px solid rgba(127,227,255,.35);border-radius:12px;padding:10px 12px;margin:8px 0}
 .kg-cx-bank>summary{cursor:pointer;margin:6px 0}.kg-cx-bank .block{display:grid;gap:8px;margin:14px 0}
 .kg-cx-bank .mod-head{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;border-bottom:1px solid rgba(196,182,255,.35);padding-bottom:4px}.kg-cx-bank .mod-head h2{font-size:1.05rem;margin:0}
