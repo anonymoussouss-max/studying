@@ -6,7 +6,7 @@ const vm = require('vm');
 const html = fs.readFileSync(process.env.KG_INDEX || path.join(__dirname, '..', 'index.html'), 'utf8');
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 const ctx = { JSON, Math, Number, String, Object, Array };
-ctx.globalThis = ctx;
+ctx.globalThis = ctx; ctx.__noCExam = true; /* the dated C exam timetable (23–26 Nov) is tested in cexam.test.cjs */
 vm.runInNewContext(scripts.find(s => s.includes('root.FlowKit=api') || s.includes('root.FlowKit = api')), ctx);
 const K = ctx.FlowKit;
 

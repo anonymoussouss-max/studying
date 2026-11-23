@@ -5,7 +5,7 @@ const test = require('node:test'), assert = require('node:assert'), fs = require
 const html = fs.readFileSync(process.env.KG_INDEX || path.join(__dirname, '..', 'index.html'), 'utf8');
 const src = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).find(s => s.includes('root.StudyPlan=api'));
 const ctx = { Date, Math, JSON, Number, String, Object, Array, Set, Map, console, localStorage: { getItem: () => '{}', setItem() {} } };
-ctx.globalThis = ctx; vm.runInNewContext(src, ctx);
+ctx.globalThis = ctx; ctx.__noCExam = true; /* the dated C exam timetable (23–26 Nov) is tested in cexam.test.cjs */ vm.runInNewContext(src, ctx);
 const P = ctx.StudyPlan, J = x => JSON.parse(JSON.stringify(x));
 const TODAY = '2026-11-20';
 const sk = (o) => ({ id: o.id, name: o.id, subj: 'Maths', ch: '', lectures: [], made: '2026-11-01', lastTested: null, last: null, strength: 'solid', ...o });

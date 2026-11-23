@@ -9,7 +9,7 @@ function load(lab = {}, at = '2026-11-24T12:00:00') {
   class FixedDate extends Date { constructor(...a) { a.length ? super(...a) : super(NOW); } static now() { return NOW; } }
   const store = { 'kg-lab-v1': JSON.stringify(lab) };
   const ctx = { Date: FixedDate, Math, JSON, Number, String, Object, Array, Set, Map, console, localStorage: { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = String(v); } } };
-  ctx.globalThis = ctx; vm.runInNewContext(src, ctx); return ctx.StudyPlan;
+  ctx.globalThis = ctx; ctx.__noCExam = true; /* the dated C exam timetable (23–26 Nov) is tested in cexam.test.cjs */ vm.runInNewContext(src, ctx); return ctx.StudyPlan;
 }
 const SP = load(), D = '2026-11-24', C0 = { actual14: {}, loggedAny: false, diplomaToday: 0 };
 const day = (gentle, now = -1, ctx = {}, d = D) => SP.templateDay({ syl: SP.seedSyllabus(), sched: { wake: { [d]: 720 }, gentle } }, d, new Date(d + 'T12:00:00').getDay(), now, Object.assign({}, C0, ctx));

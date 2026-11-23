@@ -4,7 +4,7 @@ const test = require('node:test'), assert = require('node:assert'), fs = require
 const html = fs.readFileSync(process.env.KG_INDEX || path.join(__dirname, '..', 'index.html'), 'utf8');
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 const ctx = { Date, Math, JSON, Number, String, Object, Array, Set, Map, console, localStorage: { getItem: () => null, setItem() {} } };
-ctx.globalThis = ctx;
+ctx.globalThis = ctx; ctx.__noCExam = true; /* the dated C exam timetable (23–26 Nov) is tested in cexam.test.cjs */
 vm.runInNewContext(scripts.find(s => s.includes('root.StudyPlan=api')), ctx);
 vm.runInNewContext(scripts.find(s => s.includes('root.HabitCore=api')), ctx);
 const C = ctx.HabitCore, D = '2026-11-20';
