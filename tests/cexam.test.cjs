@@ -58,6 +58,6 @@ test("Iroha's test: model answers go only to Iroha, one question at a time; resu
 });
 
 test('the card knows when the core sittings are over (past rows keep their cx id)', () => {
-  assert.match(html, /\/\^cx\d\/\.test\(r\.id \|\| ''\)\); doneC = x\.mins > 0 && !!rows\.length && rows\.filter\(r => !r\.optional\)\.every\(r => r\.past\)/);
+  assert.ok(html.includes(String.raw`/^cx\d/.test(r.id || '')); doneC = x.mins > 0 && !!rows.length && rows.filter(r => !r.optional).every(r => r.past)`));
   assert.match(html, /'2026-11-26':\{what:'Exam at 10:00 AM\./, 'Thursday: no early blocks, sleep unchanged');
 });
