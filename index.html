@@ -13703,7 +13703,7 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
 <script id="kg-gentle-script">
 /* ===== Gentle return (Ayan's choice, 23 Nov 2026). A reversible mode, not a diagnosis.
    One shared maximum for all study (PCM, German, diploma, Astrophysics), set only by Ayan and possibly left unset.
-   Lowering it, a smaller day, "Done for today" and rest work at once; raising it needs a confirmation and starts tomorrow.
+   Lowering it, a smaller day, "Done for today" and rest work at once; raising it needs a confirmation (today or tomorrow, Ayan chooses).
    Unfinished work waits in an unscheduled list (real deadlines stay visible). Spaced reviews and mistakes wait while it is on
    and come back a few a day afterwards. Switching it off shows a preview and starts tomorrow, so today is never refilled.
    Study records, notes and evidence are never changed. ===== */
@@ -13809,11 +13809,13 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
       if (v === 'keep') { delete g.offAfter; return redo(); }
       if (v === 'nextcancel') { delete g.next; delete g.ask; return redo(); }
       if (v === 'raiseno') { delete g.ask; return redo(); }
-      if (v === 'raiseyes' && g.ask) { g.next = { max: g.ask.max, from: tomorrow() }; delete g.ask; audit('gentle return: maximum raised from tomorrow', String(g.next.max)); return redo(); } }
+      if (v === 'raiseyes' && g.ask) { g.next = { max: g.ask.max, from: tomorrow() }; delete g.ask; audit('gentle return: maximum raised from tomorrow', String(g.next.max)); return redo(); }
+      // a confirmed increase may start today if Ayan chooses that; it is never automatic
+      if (v === 'raisetoday' && (g.ask || g.next)) { g.max = (g.ask || g.next).max; delete g.ask; delete g.next; audit('gentle return: maximum raised from today', String(g.max)); return redo(); } }
   });
   Object.assign(M.FORMS, {
     kggsmaller: v => { const g = st(), m = Math.max(0, Math.round(+v.m || 0)); if (!g || !g.cap) return; dayRec().max = Math.min(m, g.cap); redo(); },
-    // lowering (or clearing) is immediate; raising needs a confirmation and starts tomorrow
+    // lowering (or clearing) is immediate; raising needs a confirmation; Ayan picks today or tomorrow
     kggmax: v => { const g = G(); const raw = String(v.m ?? '').trim(), m = raw === '' ? null : Math.max(0, Math.min(720, Math.round(+raw))); if (raw !== '' && !Number.isFinite(m)) return;
       const cur = st()?.max ?? (g.max == null ? null : +g.max), higher = m != null && (cur == null || m > cur);
       if (higher) { g.ask = { max: m }; return redo(); }
@@ -13835,12 +13837,12 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
         <p class="kl-small">Paused reviews come back a few at a time: at most two lectures a subject (four in all), ten cards and five mistakes a day. Your waiting list stays as it is.</p>
         <div class="kl-row"><button type="button" class="kl-primary" data-a="kgg" data-v="off">Apply</button><button type="button" class="kl-ghost" data-a="kgg" data-v="offcancel">Cancel</button></div></div>`;
     } else off = '<div class="kl-row"><button type="button" class="kl-ghost" data-a="kgg" data-v="offask">Switch off…</button></div>';
-    const ask = g.ask ? `<div class="kg-day-note"><p class="kl-small">Raise your maximum from ${cur == null ? 'not set' : hm(cur)} to <b>${hm(g.ask.max)}</b>? It starts tomorrow (${esc(tomorrow())}), not today.</p><div class="kl-row"><button type="button" class="kl-primary" data-a="kgg" data-v="raiseyes">Yes, raise it from tomorrow</button><button type="button" class="kl-ghost" data-a="kgg" data-v="raiseno">Cancel</button></div></div>` : '';
-    const pend = g.next ? `<p class="kl-small">From ${esc(g.next.from)}: ${hm(g.next.max)}. <button type="button" class="kl-ghost" data-a="kgg" data-v="nextcancel">Cancel that increase</button></p>` : '';
+    const ask = g.ask ? `<div class="kg-day-note"><p class="kl-small">Raise your maximum from ${cur == null ? 'not set' : hm(cur)} to <b>${hm(g.ask.max)}</b>? When should it start?</p><div class="kl-row" style="flex-wrap:wrap"><button type="button" class="kl-primary" data-a="kgg" data-v="raisetoday">Yes, from today</button><button type="button" data-a="kgg" data-v="raiseyes">Yes, from tomorrow</button><button type="button" class="kl-ghost" data-a="kgg" data-v="raiseno">Cancel</button></div></div>` : '';
+    const pend = g.next ? `<p class="kl-small">From ${esc(g.next.from)}: ${hm(g.next.max)}. <button type="button" data-a="kgg" data-v="raisetoday">Start it today instead</button> <button type="button" class="kl-ghost" data-a="kgg" data-v="nextcancel">Cancel that increase</button></p>` : '';
     return `<section class="kl-card"><p class="kl-eyebrow">GENTLE RETURN · ON</p>
       <p>Your maximum: <b>${cur == null ? 'not set' : hm(cur)}</b>${cur == null ? ' (nothing is planned automatically)' : ', all study together'}.</p>${pend}
       <form data-f="kggmax" class="kl-row" style="flex-wrap:wrap"><label class="kl-small">Maximum in minutes (leave empty for not set) <input name="m" type="number" min="0" max="720" step="5" style="width:7em" value="${cur == null ? '' : cur}"></label><button>Save</button></form>
-      <p class="kl-small">Lowering it works at once. Raising it asks you first and starts tomorrow. It's a maximum you can always go under, not a target, and not a medical limit.</p>${ask}
+      <p class="kl-small">Lowering it works at once. Raising it asks you first, and you choose whether it starts today or tomorrow. It's a maximum you can always go under, not a target, and not a medical limit.</p>${ask}
       <p class="kl-small">Tomorrow: ${next ? (next.cap == null ? 'no maximum set' : 'up to ' + hm(next.cap)) : 'normal planner'}.</p>${off}</section>`;
   };
 
