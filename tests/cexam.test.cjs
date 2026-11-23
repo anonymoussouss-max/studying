@@ -52,7 +52,7 @@ test('the answer bank is in the desk: every question has an answer and a memory 
 test("Iroha's test: model answers go only to Iroha, one question at a time; results are only ever added", () => {
   assert.match(html, /window\.__kgProofNote = \(\) => \{ let out = ''; try \{ out = base \? base\(\) \|\| '' : ''; \} catch \(e\) \{\} return out \+ testNote\(\); \}/);
   assert.match(html, /never show it before I have tried/);
-  assert.match(html, /C\.results\.push\(\{ d: day\(\), id, r, t: Date\.now\(\) \}\)/);
+  assert.match(html, /C\.results\.push\(Object\.assign\(\{ d: day\(\), id, r, t: Date\.now\(\) \}/);
   assert.ok(!/C\.results\s*=\s*\[|results\.(splice|pop|shift)\(/.test(html.slice(html.indexOf('id="kg-cexam-script"'))), 'no result is removed');
   assert.match(html, /const x = SP\.cExam\(day\(\)\); if \(!x\) return '';/, 'the card still hides itself after Thursday');
 });
@@ -60,15 +60,20 @@ test("Iroha's test: model answers go only to Iroha, one question at a time; resu
 test('a test on only the ticked answers, and Check my work sends one screenshot with hints, never the answer', () => {
   const s = html.slice(html.indexOf('id="kg-cexam-script"'));
   assert.match(s, /const ticked = mod => QS\.filter\(q => X\(\)\.learned\[q\.id\]/, 'ticked test draws only from learned answers');
-  assert.match(s, /ids = tk \? pickTicked\(tmod\) : pick\(\)/);
+  assert.match(s, /ids = tk \? pickTicked\(tmod\) : od \? pick\(4\)\.concat\('doubt:' \+ od\.id\) : pick\(\)/, 'a saved doubt replaces one ordinary question');
   assert.match(s, /never paste it or reveal it in full/);
   assert.match(s, /with a hint toward the fix, not the fixed code/);
-  assert.match(s, /Don't give a mark; I decide Got it or Review/);
+  assert.match(s, /Don't give a mark; I decide "I recalled it" or "Review"/);
   assert.match(html, /!window\.__kgShortBreak && !window\.__kgCxTest\?\.\(\) && !waiting/, 'no random screen-watch questions during a C test');
 });
 
-test('the card knows when the core sittings are over (past rows keep their cx id)', () => {
-  assert.ok(html.includes(String.raw`/^cx\d/.test(r.id || '')); doneC = x.mins > 0 && !!rows.length && rows.filter(r => !r.optional).every(r => r.past)`));
+test('the card lists only the sittings the planner chose, and Done for today quiets it', () => {
+  const s = html.slice(html.indexOf('id="kg-cexam-script"'));
+  assert.ok(s.includes(String.raw`rows = SP.templateDay().rows.filter(r => /^cx(\d|-break)/.test(r.id || ''))`), 'reads the real schedule');
+  assert.ok(!/doneC|Core: 1 h 50/.test(s), 'no clock-based "done" and no fixed 1 h 50');
+  const c = s.slice(s.indexOf('function card()'), s.indexOf('function bankCard()')), stop = c.indexOf('if (g && g.stopped) return');
+  assert.ok(stop > 0 && stop < c.indexOf('data-a="cxtest"'), 'Done returns before any test button');
+  assert.match(c, /if \(g && g\.stopped\) return `[^`]*Finished for today[^`]*data-cxbank/);
   assert.match(html, /'2026-11-26':\{what:'Exam at 10:00 AM\./, 'Thursday: no early blocks, sleep unchanged');
 });
 
