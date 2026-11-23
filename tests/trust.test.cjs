@@ -33,7 +33,7 @@ test('self-ratings are labelled as yours; feedback shows only when it arrived', 
   assert.match(cx, /Tests today: you marked \$\{got\} of \$\{todayRes\.length\} as recalled/);
   assert.ok(!/Iroha's tests today|got it\./.test(cx), 'old wording gone');
   assert.match(cx, />I recalled it<\/button>/);
-  assert.match(cx, /if \(X\(\)\.test === t\) \{ \(t\.fb = t\.fb \|\| \{\}\)\[q\.id\] = true;/, 'feedback flag only after a reply');
+  assert.match(cx, /if \(X\(\)\.test === t\) \{ if \(unread\) \(t\.unread = t\.unread \|\| \{\}\)\[q\.id\] = true; else \{ \(t\.fb = t\.fb \|\| \{\}\)\[q\.id\] = true;/, 'feedback flag only after a reply that read the attempt');
   assert.match(cx, /if \(!r\?\.reply\) \{ M\.render\(\); return/, 'a failed request marks nothing');
 });
 
