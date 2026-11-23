@@ -1422,6 +1422,8 @@ body.habit-shh #hb-session-card {text-align:center;}
     if (h.sessions.some(s=>s.id===a.id)) throw new Error('This session is already saved.');
     const recall=(values.recall||[]).map(x=>String(x||'').trim());
     // exam-day and "Other stuff" sessions skip the recall step
+    // an independent session (just a timer) needs no note, mood or recall
+    if (a.free) values={...values,win:String(values.win||'').trim()||'Independent session',mood:values.mood||'calm'};
     if (!values.win.trim() || !values.mood || (!a.noRecall && (recall.length!==3 || recall.some(r=>!r)))) throw new Error('Add a win, a mood, and three things you recall.');
     const attempts=Number(values.attempts),correct=Number(values.correct);
     if (!Number.isInteger(attempts)||!Number.isInteger(correct)||attempts<0||attempts>1000||correct<0||correct>attempts) throw new Error('Correct answers must be between zero and questions attempted.');
@@ -3925,10 +3927,13 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
   function activeView(a) {
     return `<p>${esc(a.subject)} · ${esc(a.topic)} · ${esc(a.task)}</p><div class="hb-timer" id="hb-clock" role="timer" aria-label="Session time remaining">${clock(a.open?C.elapsed(a):a.targetMs-C.elapsed(a))}</div><p id="hb-timer-caption" class="hb-caption">${a.running?'Focused minutes accumulate while this timer runs.':'Paused. Your work is saved.'}</p>
       ${a.phase!=='closeout'?`<details class="hb-parking"><summary>Something pulling your attention? Park it here.</summary><form id="hb-distraction"><label>Deal with it after this session<input name="thought" maxlength="240" required placeholder="e.g. Look up headphones later"></label><button type="submit">Park & return</button></form><ul>${(a.distractions || []).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`:''}
-      ${a.phase==='closeout'?closeoutForm(a):`<div class="hb-actions">${button(a.running?'Pause':'Resume','pause','class="hb-primary"')}${button('End & recall','end')}${button('5-minute break','break')}</div><p class="hb-caption">End ritual: a win, a mood, and three things remembered without peeking. A timed session never silently saves a full block.</p>`}`;
+      ${a.phase==='closeout'?closeoutForm(a):`<div class="hb-actions">${button(a.running?'Pause':'Resume','pause','class="hb-primary"')}${button(a.noRecall?'End session':'End & recall','end')}${button('5-minute break','break')}</div><p class="hb-caption">End ritual: a win, a mood, and three things remembered without peeking. A timed session never silently saves a full block.</p>`}`;
   }
   function closeoutForm(a) {
     const suggestion=C.nextTask(h,C.add(today(),1)), draft=a.draft || {};
+    if(a.free)return `<form id="hb-closeout" class="hb-stack"><h3>Session done. Save it?</h3><p class="hb-caption">Independent session: no recall or method steps. Your minutes count like any other session.</p>
+      ${field('A note for yourself (optional)','win','maxlength="240"',draft.win || '')}${select('How do you feel? (optional)','mood',[['','Skip'],['calm','Calm'],['proud','Proud'],['tired','Tired'],['stuck','Stuck']], draft.mood || '')}
+      <input type="hidden" name="attempts" value="0"><input type="hidden" name="correct" value="0"><button type="submit" class="hb-primary">Save session</button><p id="hb-form-error" role="alert"></p></form>`;
     return `<form id="hb-closeout" class="hb-stack"><h3>Close the books. What stayed with you?</h3><p class="hb-caption">Your time is safe. Finish this close-out now or when you return.</p>
       ${field('Something that surprised me (optional)','discovery','maxlength="500"',draft.discovery || '')}${field('One-line win','win','required maxlength="240"',draft.win || '')}${select('How do you feel?','mood',[['','Choose a mood'],['calm','Calm'],['proud','Proud'],['tired','Tired'],['stuck','Stuck']], draft.mood || '')}
       ${a.noRecall?'':[1,2,3].map(i=>`<label>Recall ${i} · no peeking<textarea name="recall${i}" required maxlength="1000" rows="2">${esc(draft['recall'+i] || '')}</textarea></label>`).join('')}
@@ -4022,7 +4027,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     if(store?.getState().pomo?.running)store.getState().pausePomo();
     window.DeskMusic?.stop();
     h.break=null;
-    h.active={id:uid(),date:today(),task:values.task.trim(),topic:values.topic.trim(),subject:values.subject,kind,hard,comeback,accruedMs:0,targetMs:minutes*60000,lastStart:Date.now(),running:true,phase:'study',checkpoints:[],open,noRecall:values.subject==='Other'||window.StudyPlan?.dayKind?.(today())?.t==='exam'};
+    h.active={id:uid(),date:today(),task:values.task.trim(),topic:values.topic.trim(),subject:values.subject,kind,hard,comeback,accruedMs:0,targetMs:minutes*60000,lastStart:Date.now(),running:true,phase:'study',checkpoints:[],open,free:!!values.free,noRecall:!!values.free||values.subject==='Other'||window.StudyPlan?.dayKind?.(today())?.t==='exam'};
     settings().energy=values.energy || settings().energy;
     h.shh=true;save();focus(true);view='start';render();startAudio();say('one task. phone away. i’ll sit right here with you 🌙');window.__irohaSay?.('Timer\'s going. Try to stay on this tab, and write the steps out. It helps.',{face:'stern'});
     $('hb-session-card').scrollIntoView({behavior:'smooth',block:'start'});
@@ -4084,7 +4089,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
         const s=C.complete(h,a,{...v,recall:[v.recall1,v.recall2,v.recall3]});
         h.sessions.push(s);h.active=null;h.shh=false;
         const nextSuggestion=C.nextTask(h,C.add(today(),1));
-        h.next={...nextSuggestion,task:v.next.trim(),date:C.add(today(),1),reason:'Chosen in your last close-out'};
+        h.next={...nextSuggestion,task:String(v.next||'').trim()||nextSuggestion.task,date:C.add(today(),1),reason:'Chosen in your last close-out'};
         const surprise=s.minutes>=5?drop():null;
         if(!save()){h.sessions.pop();h.active=a;throw new Error('Could not save. Download a backup to free storage.');}
         if(a.kind==='mock')try{patchDay(s.date,{mock:s.score,note:`Mock ${s.score}/${s.max}: ${s.win}\nRecall: ${s.recall.join('; ')}`});}catch(_){toast('Session saved; original score field could not sync yet.');}
@@ -4152,7 +4157,11 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     if((!desk().sound || window.__kgOnBreak) && melodyTimer)stopAudio();
   },1000);
   // Keep the original schedule, floating companion and dashboard on the same rule.
-  window.HabitDesk={startBlock(id){actions['block-task']({dataset:{block:id}});return !!h.active;},pauseActive(){if(!h.active||!h.active.running)return true;pause();return !h.active.running;},resumeActive(){if(!h.active||h.active.running||h.active.phase==='closeout')return false;pause();return !!h.active.running;},shiftMistakes(n){if(!n)return;for(const m of h.mistakes)if(m&&m.stage<4&&m.due)m.due=C.add(m.due,n);save();},setTheme(t){h.settings.theme=t;save();render();},refresh(){if(!document.activeElement?.closest('#habit-desk form'))render();},
+  window.HabitDesk={startBlock(id){actions['block-task']({dataset:{block:id}});return !!h.active;},
+    // independent session from the Study tab: just a timer, no method and no recall at the end
+    startFree(v){if(h.active)throw new Error('Finish your current session first.');const topic=String(v.topic||'').trim()||'Independent study';
+      window.MoonLab?.go('today');document.body.classList.add('kg-session');view='start';
+      begin({phone:true,free:true,subject:v.subject||'Mixed',task:topic,topic,kind:'study',minutes:v.minutes||'',energy:settings().energy});$('hb-session-card')?.scrollIntoView({behavior:'smooth',block:'start'});return !!h.active;},pauseActive(){if(!h.active||!h.active.running)return true;pause();return !h.active.running;},resumeActive(){if(!h.active||h.active.running||h.active.phase==='closeout')return false;pause();return !!h.active.running;},shiftMistakes(n){if(!n)return;for(const m of h.mistakes)if(m&&m.stage<4&&m.due)m.due=C.add(m.due,n);save();},setTheme(t){h.settings.theme=t;save();render();},refresh(){if(!document.activeElement?.closest('#habit-desk form'))render();},
     minutes:iso=>C.minutes(h,days(),iso),
     history:(d,iso)=>C.history(h,d,iso),
     counted:(iso,d)=>{const status=C.history(h,{...days(),[iso]:d || days()[iso]},iso).statuses[iso];return status==='study'||status==='rest';},
@@ -10243,12 +10252,22 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     const cur = f || blank(), A = ACTS[cur.act];
     const body = cur.step === 'goal' || !A ? goalStep(cur) : cur.step === 'warmup' ? warmupStep(cur, A) : cur.step === 'example' ? exampleStep(cur) : cur.step === 'recap' ? recapStep(cur) : cur.step === 'attempt' ? attemptStep(cur, A) : cur.step === 'feedback' ? feedbackStep(cur, A) : cur.step === 'repair' ? repairStep(cur) : saveStep(cur, A);
     const pcmLog = L.flowLog.filter(x => x.subj !== 'Astrophysics'), recent = pcmLog.slice(-8).reverse(), sureWrong = window.FlowKit.confWrong(pcmLog, today());
-    return `<section class="kl-card kg-flow">${head(cur)}${parkForm(cur)}${body}</section>`
+    // independent session: just the desk timer, no method and no recall (only offered before a guided session starts)
+    const free = cur.step === 'goal' ? `<section class="kl-card kg-freesess"><p class="kl-eyebrow">INDEPENDENT SESSION</p><h3>Just study, with the timer running</h3><p class="kl-small">No method, no recall steps. Your minutes count like any session.</p>
+      <form data-f="freesess" class="kl-stack"><div class="kl-row" style="flex-wrap:wrap"><select name="subject" aria-label="Subject">${['Maths', 'Physics', 'Chemistry', 'Diploma', 'Mixed', 'German'].map(s => `<option value="${s}">${s === 'Diploma' ? 'Diploma (C exam)' : s}</option>`).join('')}</select>
+      <input name="topic" maxlength="80" placeholder="Topic (optional)" aria-label="Topic"><input name="minutes" type="number" min="5" max="600" placeholder="Minutes (empty = until I stop)" aria-label="Minutes"></div>
+      <div class="kl-row"><button type="submit" class="kl-primary">Start independent session</button></div></form></section>` : '';
+    return free + `<section class="kl-card kg-flow">${head(cur)}${parkForm(cur)}${body}</section>`
       + (cur.step === 'goal' && recent.length ? `<section class="kl-card kl-mini"><p class="kl-eyebrow">RECENT SESSIONS</p><p class="kl-small">The newest 30 sessions keep their full working; older ones keep a summary unless pinned. <button type="button" class="kl-ghost" data-a="flowexport">Download full history</button></p>${sureWrong.length ? `<p class="kl-small">Sure, but there was a gap (last 14 days): ${sureWrong.slice(-4).map(r => esc(r.topic)).join('; ')}. Worth another look.</p>` : ''}${recent.map(x => `<div class="kl-li"><span>${esc(ACTS[x.act]?.name || '')}: ${esc(x.topic)}${x.conf === 'sure' && x.gap ? ' <b class="kl-small">· sure, but a gap</b>' : ''}<small>${esc(x.d)} · ${x.gap ? (x.fixed ? 'gap repaired' : 'gap: ' + esc(x.gap.slice(0, 90))) : 'no gaps'}</small></span>${recDetail(x)}</div>`).join('')}</section>` : '');
   };
 
   /* ---------- forms and buttons ---------- */
   Object.assign(M.FORMS, {
+    freesess: v => {
+      const m = String(v.minutes || '').trim(); if (m && !(+m >= 5 && +m <= 600)) return M.I('Choose between 5 and 600 minutes, or leave it empty.', { face: 'study' });
+      try { if (!window.HabitDesk?.startFree) return M.I("The session timer isn't ready yet. Reload and try again.", { face: 'stern' }); window.HabitDesk.startFree({ subject: v.subject, topic: v.topic, minutes: m }); }
+      catch (e) { M.I(e.message || 'Could not start the timer.', { face: 'stern' }); }
+    },
     park: v => { const t = String(v.t || '').trim(); if (!t) return; (L.parked = L.parked || []).push({ id: M.uid(), t: t.slice(0, 200), d: today(), at: Date.now(), done: false }); if (L.flow) L.flow.parking = false; save(); M.render(); },
     flowgoal: v => {
       const A = ACTS[v.act]; if (!A) return M.I('Pick an activity first.', { face: 'study' });
@@ -15178,7 +15197,7 @@ int main()
   document.addEventListener('click', e => { const a = e.target.closest?.('[data-cxgo]'); if (!a) return; const d = document.getElementById('kgcx-' + a.dataset.cxgo); if (d) { e.preventDefault(); d.open = true; d.scrollIntoView({ block: 'start', behavior: 'smooth' }); } });
 
   const css = document.createElement('style');
-  css.textContent = `body.kg-sec-today #kg-main .kg-cexam{order:1}body.kg-sec-today #kg-main .kg-cexam-bank{order:99}.kg-cexam .kl-row{margin:8px 0}
+  css.textContent = `body.kg-sec-today #kg-main .kg-cexam{order:2}body.kg-sec-today #kg-main .kg-cexam-bank{order:99}.kg-cexam .kl-row{margin:8px 0}
 .kg-cx-test{border:1px solid rgba(127,227,255,.35);border-radius:12px;padding:10px 12px;margin:8px 0}
 .kg-cx-bank>summary{cursor:pointer;margin:6px 0}.kg-cx-bank .block{display:grid;gap:8px;margin:14px 0}
 .kg-cx-bank .mod-head{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;border-bottom:1px solid rgba(196,182,255,.35);padding-bottom:4px}.kg-cx-bank .mod-head h2{font-size:1.05rem;margin:0}
