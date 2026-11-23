@@ -79,3 +79,11 @@ test('schedule blocks can be ticked done without the timer: one ordinary session
   assert.match(html, /b\.start<=nowOff\?button\('✓ Done','block-done'/, 'only blocks that have started');
   assert.ok(html.includes(String.raw`/^diploma|(^|-)cx\d/.test(b.id)?'Diploma'`), 'C exam blocks count as diploma study');
 });
+
+test("Today's schedule sits above the C card, and the Study tab has an independent session with no recall", () => {
+  assert.ok(html.includes('body.kg-sec-today #kg-main .kg-cexam{order:2}'), 'C card after the day map (order 1)');
+  assert.ok(html.includes("free:!!values.free,noRecall:!!values.free||"), 'independent sessions skip recall');
+  assert.ok(html.includes("if (a.free) values={...values,win:String(values.win||'').trim()||'Independent session',mood:values.mood||'calm'};"), 'no note or mood required');
+  assert.ok(html.includes('<form data-f="freesess"'), 'Study tab card');
+  assert.ok(html.includes("begin({phone:true,free:true,"), 'starts the normal desk timer, so the minutes count');
+});
