@@ -71,3 +71,11 @@ test('the card knows when the core sittings are over (past rows keep their cx id
   assert.ok(html.includes(String.raw`/^cx\d/.test(r.id || '')); doneC = x.mins > 0 && !!rows.length && rows.filter(r => !r.optional).every(r => r.past)`));
   assert.match(html, /'2026-11-26':\{what:'Exam at 10:00 AM\./, 'Thursday: no early blocks, sleep unchanged');
 });
+
+test('schedule blocks can be ticked done without the timer: one ordinary session per block, only ever added', () => {
+  assert.match(html, /'block-done':el=>/, 'the action exists');
+  assert.match(html, /if\(h\.sessions\.some\(s=>s\.date===today\(\)&&s\.block===b\.id\)\)\{toast\('This block is already marked done\.'\)/, 'one per block per day');
+  assert.match(html, /h\.sessions\.push\(s\);save\(\);render\(\);toast\(`Logged \$\{m\} min/, 'saved as a session, so tracking counts it');
+  assert.match(html, /b\.start<=nowOff\?button\('✓ Done','block-done'/, 'only blocks that have started');
+  assert.match(html, /\/\^diploma\|\(\^\|-\)cx\d\/\.test\(b\.id\)\?'Diploma'/, 'C exam blocks count as diploma study');
+});
