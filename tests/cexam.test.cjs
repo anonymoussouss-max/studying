@@ -36,3 +36,21 @@ test('exam day has no block, and from Friday the plan is gone', () => {
   assert.strictEqual(SP.cExam('2026-11-22'), null, 'and nothing before');
   assert.match(html, /const x = SP\.cExam\(day\(\)\); if \(!x\) return '';/, 'the card hides itself');
 });
+
+test('the answer bank is in the desk: every question has an answer and a memory line, with unique ids', () => {
+  const bank = /<template id="kg-cexam-bank">([\s\S]*?)<\/template>/.exec(html)[1];
+  const ids = [...bank.matchAll(/<details class="q" id="([^"]+)">/g)].map(m => m[1]);
+  assert.ok(ids.length >= 60, ids.length + ' questions');
+  assert.strictEqual(new Set(ids).size, ids.length, 'unique');
+  for (const part of bank.split('<details class="q"').slice(1)) assert.match(part, /class="hook"/);
+  assert.ok(!/class="mermaid"/.test(bank), 'flowcharts are plain text in the desk');
+  for (const m of [...bank.matchAll(/href="#(q[\d-]+)"/g)]) assert.ok(ids.includes(m[1]), 'Top 10 link ' + m[1]);
+});
+
+test("Iroha's test: model answers go only to Iroha, one question at a time; results are only ever added", () => {
+  assert.match(html, /window\.__kgProofNote = \(\) => \{ let out = ''; try \{ out = base \? base\(\) \|\| '' : ''; \} catch \(e\) \{\} return out \+ testNote\(\); \}/);
+  assert.match(html, /never show it before I have tried/);
+  assert.match(html, /C\.results\.push\(\{ d: day\(\), id, r, t: Date\.now\(\) \}\)/);
+  assert.ok(!/C\.results\s*=\s*\[|results\.(splice|pop|shift)\(/.test(html.slice(html.indexOf('id="kg-cexam-script"'))), 'no result is removed');
+  assert.match(html, /const x = SP\.cExam\(day\(\)\); if \(!x\) return '';/, 'the card still hides itself after Thursday');
+});
