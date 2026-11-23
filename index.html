@@ -15264,9 +15264,11 @@ You entered 25</pre></div>
     // "Done for today" is the same here as in the timetable: no sittings, no test button, just the date and the bank
     if (g && g.stopped) return `<section class="kl-card kg-cexam">${eyebrow}<p><b>Finished for today.</b> Nothing more is planned. Your ticks and test results are saved.</p><p class="kl-small"><a href="#" data-cxbank>Open the answer bank</a> if you want to look something up.</p></section>`;
     const ck = m => { const h = Math.floor(m / 60) % 24; return `${h % 12 || 12}:${String(m % 60).padStart(2, '0')}`; };
-    // the sittings the planner actually put in today's schedule (it applies the maximum, the clock and Done for today)
-    let rows = []; try { rows = SP.templateDay().rows.filter(r => /^cx(\d|-break)/.test(r.id || '')); } catch (e) {}
-    const sit = rows.filter(r => r.kind === 'study'), planned = sit.reduce((n, r) => n + r.e - r.s, 0), hm = m => m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ' ' + (m % 60) : ''}` : `${m} min`;
+    // the C sittings exactly as today's timetable shows them: SP.fallback is what the day map draws (maximum, clock,
+    // Done for today, "Re-plan from now", recovery and evening plans all applied). Block times are minutes after 10:30.
+    let sit = []; try { sit = SP.fallback(new Date(day() + 'T12:00:00').getDay()).filter(b => b.kind === 'study' && /(^|-)cx\d/.test(b.id || ''))
+      .map(b => ({ s: b.start + 630, e: b.end + 630, kind: 'study', optional: !!b.optional, cx: String(b.title || '').replace(/^C exam \([^)]*\) · /, '') })); } catch (e) {}
+    const planned = sit.reduce((n, r) => n + r.e - r.s, 0), hm = m => m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ' ' + (m % 60) : ''}` : `${m} min`;
     const fixed = sit.length ? [{ s: 1170, e: 1185, fix: 'Snack' }, { s: 1230, e: 1260, fix: 'Your fixed commitment' }].filter(f => f.s >= sit[0].s && f.e <= sit[sit.length - 1].e) : [];
     const list = sit.concat(fixed).sort((a, b) => a.s - b.s).map(r => `<li${r.kind !== 'study' ? ' class="kg-cx-brk"' : ''}><b>${ck(r.s)}–${ck(r.e)}</b> ${r.fix || (r.kind === 'study' ? esc(r.cx || 'C exam') + (r.optional ? ' <small>(optional)</small>' : '') : 'Break')}</li>`).join('');
     const time = !x.blocks ? '' : sit.length ? `<ul class="kl-list kg-cx-times">${list}</ul><p class="kl-small">Planned today: ${hm(planned)}${g && g.cap ? `, inside your ${g.cap} min maximum` : ''}. Optional sittings are only if you still feel okay. C replaces your other study until the exam. Stop earlier if the dread or exhaustion comes back; a missed sitting is not debt.</p>`
