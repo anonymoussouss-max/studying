@@ -1,0 +1,1415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="IT23102 Logic Development Using C: past-paper questions with model answers, explanations and outputs.">
+<title>IT23102 Answer Bank</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column like an exam answer book; questions fold so the page doubles as a self-test. */
+:root{
+  --bg:#f5f7fb; --paper:#ffffff; --fg:#172033; --muted:#5b6578; --line:#d9dfea;
+  --accent:#2f5bd3; --accent-soft:#e6edff; --hook:#fff1a8; --hook-fg:#3b3200; --ok:#1f8a5b; --code-bg:#f0f3f9;
+  --f-display:"Space Grotesk",system-ui,sans-serif; --f-body:"IBM Plex Sans",system-ui,sans-serif; --f-code:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10141d; --paper:#171c28; --fg:#e6e9f2; --muted:#9aa4b8; --line:#2a3242;
+  --accent:#86a6ff; --accent-soft:#1f2a47; --hook:#4a3f0c; --hook-fg:#fff3b8; --ok:#4cc38a; --code-bg:#0f131b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10141d; --paper:#171c28; --fg:#e6e9f2; --muted:#9aa4b8; --line:#2a3242;
+  --accent:#86a6ff; --accent-soft:#1f2a47; --hook:#4a3f0c; --hook-fg:#fff3b8; --ok:#4cc38a; --code-bg:#0f131b; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:16px/1.6 var(--f-body);padding-block:24px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:820px;margin:0 auto;display:grid;gap:28px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;line-height:1.2;margin:0}
+h1{font-size:2rem}h2{font-size:1.45rem}h3{font-size:1.1rem}
+p{margin:0}
+.eyebrow{font:600 .75rem/1 var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.lead{color:var(--muted);max-width:65ch}
+header{display:grid;gap:10px}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding-block:10px;border-bottom:1px solid var(--line)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button{font:500 .9rem var(--f-body);border:1px solid var(--line);background:var(--paper);color:var(--fg);border-radius:8px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:focus-visible,summary:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.progress{margin-left:auto;font:600 .9rem var(--f-body);font-variant-numeric:tabular-nums;color:var(--muted)}
+.jump{display:flex;flex-wrap:wrap;gap:6px}
+.jump a{font-size:.85rem;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--paper)}
+section.block{display:grid;gap:14px}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:grid;gap:10px}
+.plan{display:grid;gap:10px}
+.day{display:grid;grid-template-columns:7.5rem 1fr;gap:12px;align-items:start;border-top:1px solid var(--line);padding-top:10px}
+.day:first-child{border-top:0;padding-top:0}
+.day b{font-family:var(--f-display)}
+.day small{display:block;color:var(--muted)}
+ul,ol{margin:0;padding-left:1.3em}
+li+li{margin-top:3px}
+.top10{counter-reset:t;list-style:none;padding:0;display:grid;gap:6px}
+.top10 li{display:flex;gap:10px;align-items:baseline}
+.top10 li::before{counter-increment:t;content:counter(t);font:700 .8rem var(--f-code);color:var(--accent);min-width:1.6em}
+.top10 a{color:var(--fg)}
+.mod-head{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;border-bottom:2px solid var(--fg);padding-bottom:6px}
+.pri{font:600 .75rem var(--f-body);letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:2px 9px;background:var(--accent-soft);color:var(--accent)}
+details.q{background:var(--paper);border:1px solid var(--line);border-radius:10px}
+details.q[open]{border-color:var(--accent)}
+details.q>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto 1fr auto;gap:10px;padding:11px 14px;align-items:baseline}
+details.q>summary::-webkit-details-marker{display:none}
+.qno{font:600 .8rem var(--f-code);color:var(--muted)}
+.qt{font-weight:600}
+.freq{font:600 .75rem var(--f-code);color:var(--muted);white-space:nowrap}
+.freq.hot{color:var(--accent)}
+details.q.learned .qt::after{content:" ✓";color:var(--ok)}
+.ans{padding:2px 16px 16px;display:grid;gap:10px;min-width:0}
+.hook{background:var(--hook);color:var(--hook-fg);border-radius:8px;padding:8px 12px;font-size:.95rem}
+.expl{border-left:3px solid var(--accent,#7c6cf0);padding:2px 0 2px 12px;margin:10px 0}.expl-h{font-weight:700;margin:6px 0 4px;font-size:.95rem}.expl ul{margin:0 0 6px;padding-left:20px}.expl li{margin:3px 0}.expl pre.out{margin:4px 0 6px}
+.hook::before{content:"Remember: ";font-weight:700}
+pre{margin:0;overflow-x:auto;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:14px/1.5 var(--f-code)}
+code{font-family:var(--f-code);font-size:.92em;background:var(--code-bg);border-radius:4px;padding:0 4px}
+pre code{background:none;padding:0}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.93rem}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--accent-soft)}
+.learn{display:flex;gap:8px;align-items:center;font-size:.9rem;color:var(--muted)}
+.learn input{width:18px;height:18px;accent-color:var(--ok)}
+.note{font-size:.9rem;color:var(--muted)}
+.shapes{width:100%;max-width:560px;height:auto;color:var(--fg)}
+pre.mermaid{background:var(--paper)}
+@media (max-width:520px){.day{grid-template-columns:1fr;gap:4px}h1{font-size:1.6rem}}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+html{scroll-behavior:smooth}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+<header>
+  <p class="eyebrow">Logic Development Using C · IT23102 · exam Thursday 26 Nov</p>
+  <h1>IT23102 Answer Bank</h1>
+  <p class="lead">Every question from the four past papers (ODD/EVEN 2024-25 and 2025-26), answered short enough to memorise. Modules are in priority order. Each answer ends with a yellow line to remember; tick it once you can write it from memory.</p>
+</header>
+
+<div class="bar" role="toolbar" aria-label="Page controls">
+  <button type="button" id="btn-open">Show all answers</button>
+  <button type="button" id="btn-close">Hide all (self-test)</button>
+  <span class="progress" id="progress" aria-live="polite">0 learned</span>
+</div>
+
+<nav class="jump" aria-label="Jump to">
+  <a href="#plan">How to use</a><a href="#top10">Top 10</a><a href="#m7">Pointers</a><a href="#m4">Arrays &amp; strings</a><a href="#m3">Control</a><a href="#m6">Structures &amp; files</a><a href="#m5">Functions</a><a href="#m1">Algorithms</a><a href="#m2">Basics</a>
+</nav>
+
+<section class="block" id="plan">
+  <h2>How to use this</h2>
+  <div class="panel">
+    <h3>How to memorise each answer</h3>
+    <ol>
+      <li>Read the answer once, slowly.</li>
+      <li>Fold it (click the question), then write it on paper from memory.</li>
+      <li>Open it, check, and fix only what you missed. Tick it when you get it right.</li>
+      <li>For programs, learn the skeleton below once. After that you only memorise the middle part.</li>
+    </ol>
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    /* 1. declare variables   */
+    /* 2. input  (scanf)       */
+    /* 3. logic  (if / loop)   */
+    /* 4. output (printf)      */
+    return 0;
+}</code></pre>
+  </div>
+</section>
+
+<section class="block" id="top10">
+  <h2>Most repeated (learn these first)</h2>
+  <div class="panel">
+    <ol class="top10">
+      <li><a href="#q7-1">Define pointers</a> · 3 papers</li>
+      <li><a href="#q7-2">Meaning and use of * and &amp;</a> · 3 papers</li>
+      <li><a href="#q2-1">POP vs OOP</a> · 2 papers</li>
+      <li><a href="#q1-9">Swap two variables using a temporary variable</a> · 2 papers</li>
+      <li><a href="#q3-13">Pattern printing using loops</a> · 2 papers</li>
+      <li><a href="#q4-9">Array of strings</a> · 2 papers</li>
+      <li><a href="#q4-15">String input/output</a> · 2 papers</li>
+      <li><a href="#q6-10">CRUD operations on files</a> · 2 papers</li>
+      <li><a href="#q7-4">Pointer arithmetic</a> · 2 papers</li>
+      <li><a href="#q1-1">Define algorithm</a> · 2 papers</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ================= MODULE 7 ================= -->
+<section class="block" id="m7">
+  <div class="mod-head"><h2>Module 7 · Pointers</h2><span class="pri">High priority</span></div>
+
+  <details class="q" id="q7-1"><summary><span class="qno">7.1</span><span class="qt">Define pointers in C</span><span class="freq hot">×3</span></summary><div class="ans">
+    <p>A <b>pointer</b> is a variable that stores the <b>address</b> of another variable.</p>
+    <p>Syntax: <code>datatype *pointer_name;</code></p>
+<pre><code>int a = 10;
+int *p = &amp;a;    /* p holds the address of a */
+printf("%d", *p); /* prints 10 */</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>A pointer is just like another variable; the difference is that it stores the address of another variable, not a value.</li><li>The data type of the pointer and the variable must match: an int pointer can hold only the address of an int variable.</li><li>int *p = &amp;a; → &amp; gives the address of a, and that address is stored in p.</li><li>*p means "value at the address stored in p", so printf("%d", *p) prints the value of a, which is 10.</li></ul><p class="expl-h">Output</p><pre class="out">10</pre></div>
+    <p class="hook">Pointer = a variable that holds an address, not a value.</p>
+  </div></details>
+
+  <details class="q" id="q7-2"><summary><span class="qno">7.2</span><span class="qt">Meaning of * and &amp; operators in pointers</span><span class="freq hot">×3</span></summary><div class="ans">
+    <ul>
+      <li><b>&amp; (address-of operator)</b> gives the memory address of a variable. <code>&amp;a</code> = address of a.</li>
+      <li><b>* (indirection / dereference operator)</b> gives the value stored at an address. <code>*p</code> = value at the address in p. In a declaration, <code>int *p;</code> the * means "p is a pointer".</li>
+    </ul>
+<pre><code>int a = 5, *p;
+p = &amp;a;              /* &amp; : address of a  */
+printf("%d", *p);    /* * : value at p → 5 */
+*p = 20;             /* changes a to 20   */</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>&amp; is the "address of" operator. &amp;a gives the memory address where a is stored. It is also used in scanf to tell where to store the input.</li><li>* is the "value at address" (indirection) operator. *p gives the value stored at the address held in p.</li><li>p = &amp;a; makes p point to a. Now *p and a are the same memory location.</li><li>*p = 20; changes the value at that address, so a itself becomes 20.</li><li>Use %p in printf to print an address in hex format.</li></ul><p class="expl-h">Output</p><pre class="out">5</pre></div>
+    <p class="hook">&amp; = "address of"; * = "value at address".</p>
+  </div></details>
+
+  <details class="q" id="q7-3"><summary><span class="qno">7.3</span><span class="qt">How to declare and initialise pointers</span><span class="freq">×1</span></summary><div class="ans">
+    <ul>
+      <li><b>Declaration:</b> <code>int *p;</code> (p can hold the address of an int). Also <code>float *q; char *c;</code></li>
+      <li><b>Initialisation:</b> assign the address of a variable of the same type: <code>p = &amp;a;</code> or in one line <code>int *p = &amp;a;</code></li>
+      <li>If there is no address yet, use <code>int *p = NULL;</code></li>
+    </ul>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>Declaration tells the compiler that the variable is a pointer and which type of variable it will point to: int *p1; float *p2; char *p3;</li><li>Initialisation stores the address of a variable in the pointer using &amp;: p = &amp;a;</li><li>The data type of the pointer and the variable must be the same.</li><li>A pointer that does not point anywhere yet should be set to NULL, so it is not used by mistake.</li></ul></div>
+    <p class="hook">Declare with *, initialise with &amp;, and the types must match.</p>
+  </div></details>
+
+  <details class="q" id="q7-4"><summary><span class="qno">7.4</span><span class="qt">Pointer arithmetic (list operations, explain one)</span><span class="freq hot">×2</span></summary><div class="ans">
+    <p>Allowed operations on pointers:</p>
+    <ol>
+      <li>Increment: <code>p++</code></li>
+      <li>Decrement: <code>p--</code></li>
+      <li>Add an integer: <code>p + n</code></li>
+      <li>Subtract an integer: <code>p - n</code></li>
+      <li>Subtract two pointers of the same array: <code>q - p</code> (gives number of elements between)</li>
+      <li>Compare pointers: <code>p &lt; q</code>, <code>p == q</code></li>
+    </ol>
+    <p><b>Not allowed:</b> adding two pointers, multiplying or dividing pointers.</p>
+    <p><b>Explain increment:</b> <code>p++</code> moves the pointer to the next element, so the address increases by the size of the data type. If <code>int *p</code> holds 1000 and int is 4 bytes, after <code>p++</code> it holds 1004 (1002 with 2-byte int in Turbo C).</p>
+    <p class="hook">++, --, +n, -n, pointer minus pointer, compare. Never add, multiply or divide two pointers. Each step = size of the type.</p>
+  </div></details>
+
+  <details class="q" id="q7-6"><summary><span class="qno">7.6</span><span class="qt">Program: arithmetic operations on pointers</span><span class="freq">×1</span></summary><div class="ans">
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    int a[5] = {10, 20, 30, 40, 50};
+    int *p = a, *q = &amp;a[4];
+
+    printf("*p = %d\n", *p);        /* 10 */
+    p++;
+    printf("after p++   : %d\n", *p); /* 20 */
+    p = p + 2;
+    printf("after p + 2 : %d\n", *p); /* 40 */
+    p--;
+    printf("after p--   : %d\n", *p); /* 30 */
+    printf("q - p = %d\n", (int)(q - p)); /* 2 */
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>int *p = a; → the array name gives the address of the first element, so p points to a[0] (10).</li><li>q = &amp;a[4]; → q points to the last element (50).</li><li>p++ moves p to the next element, a[1], so *p is 20. The address increases by the size of one int.</li><li>p = p + 2 moves two elements forward, to a[3], so *p is 40.</li><li>p-- moves one element back, to a[2], so *p is 30.</li><li>q - p gives the number of elements between the two pointers: 4 − 2 = 2.</li></ul><p class="expl-h">Output</p><pre class="out">*p = 10
+after p++   : 20
+after p + 2 : 40
+after p--   : 30
+q - p = 2</pre></div>
+    <p class="hook">Array 10–50, then ++ → 20, +2 → 40, -- → 30, q - p → 2.</p>
+  </div></details>
+
+  <details class="q" id="q7-7"><summary><span class="qno">7.7</span><span class="qt">Applications of pointers</span><span class="freq">×1</span></summary><div class="ans">
+    <ol>
+      <li>Dynamic memory allocation (<code>malloc</code>, <code>calloc</code>, <code>free</code>).</li>
+      <li>Call by reference: a function can change the caller's variables.</li>
+      <li>Efficient handling of arrays and strings.</li>
+      <li>Building data structures: linked lists, stacks, queues, trees.</li>
+      <li>Returning more than one value from a function.</li>
+      <li>File handling with <code>FILE *fp</code>.</li>
+    </ol>
+    <p class="hook">D-C-A-D-R-F: Dynamic memory, Call by reference, Arrays/strings, Data structures, Return many values, Files.</p>
+  </div></details>
+
+  <details class="q" id="q7-8"><summary><span class="qno">7.8</span><span class="qt">How pointers are used in functions</span><span class="freq">×1</span></summary><div class="ans">
+    <p>We pass the <b>address</b> of a variable to a function (call by reference). The function receives it in a pointer and changes the original value through <code>*</code>.</p>
+<pre><code>#include &lt;stdio.h&gt;
+void swap(int *x, int *y)
+{
+    int t = *x;
+    *x = *y;
+    *y = t;
+}
+int main()
+{
+    int a = 10, b = 20;
+    swap(&amp;a, &amp;b);
+    printf("a = %d, b = %d", a, b); /* a = 20, b = 10 */
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>Execution starts from main(). a = 10 and b = 20.</li><li>swap(&amp;a, &amp;b) sends the addresses of a and b (call by address / reference).</li><li>In the function header, the formal parameters x and y are declared as pointers (int *x, int *y), so they receive these addresses.</li><li>t = *x stores the value of a (10). *x = *y puts 20 into a. *y = t puts 10 into b.</li><li>Because the function changed the values at the original addresses, the change is reflected back in main().</li></ul><p class="expl-h">Output</p><pre class="out">a = 20, b = 10</pre></div>
+    <p class="hook">Send &amp;a, receive int *x, change with *x, and the original changes.</p>
+  </div></details>
+
+  <details class="q" id="q7-9"><summary><span class="qno">7.9</span><span class="qt">Meaning of <code>int *p</code> and <code>p = &amp;num</code></span><span class="freq">×1</span></summary><div class="ans">
+    <ul>
+      <li><code>int *p;</code> declares p as a pointer to an integer (p can store the address of an int).</li>
+      <li><code>p = &amp;num;</code> stores the address of num in p. Now p "points to" num, and <code>*p</code> gives the value of num.</li>
+    </ul>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>In the declaration int *p; the * tells the compiler that p is a pointer, and int means it can hold the address of an integer variable only.</li><li>In p = &amp;num; the &amp; ("address of") operator gives the memory address of num, and that address is stored in p.</li><li>Now p points to num: printf("%p", p) prints the same address as printf("%p", &amp;num).</li><li>*p ("value at address") gives the value of num. If num = 10, printf("%d", *p) prints 10, and *p = 50; would change num to 50.</li></ul></div>
+    <p class="hook">int *p makes the box; p = &amp;num puts num's address in it.</p>
+  </div></details>
+</section>
+
+<!-- ================= MODULE 4 ================= -->
+<section class="block" id="m4">
+  <div class="mod-head"><h2>Module 4 · Arrays and Strings</h2><span class="pri">High priority</span></div>
+
+  <details class="q" id="q4-1"><summary><span class="qno">4.1</span><span class="qt">Define array with example</span><span class="freq">×1</span></summary><div class="ans">
+    <p>An <b>array</b> is a collection of elements of the <b>same data type</b> stored in <b>contiguous memory</b> locations, accessed by an index starting from 0.</p>
+<pre><code>int marks[5] = {70, 65, 80, 90, 75};
+/* marks[0] = 70 ... marks[4] = 75 */</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>An array is a sequential collection of similar data items. All the elements share a common name.</li><li>Each element is accessed by the array name and its subscript (index). If the size is n, the index runs from 0 to n − 1.</li><li>In memory, all the elements are stored in contiguous (side-by-side) memory locations.</li><li>int marks[5] reserves space for 5 integers: marks[0] = 70, marks[1] = 65, marks[2] = 80, marks[3] = 90, marks[4] = 75.</li></ul></div>
+    <p class="hook">Same type, side by side, index from 0.</p>
+  </div></details>
+
+  <details class="q" id="q4-2"><summary><span class="qno">4.2</span><span class="qt">Types of arrays</span><span class="freq">×1</span></summary><div class="ans">
+    <ol>
+      <li><b>One-dimensional</b>: one subscript, a list. <code>int a[5];</code></li>
+      <li><b>Two-dimensional</b>: two subscripts, rows × columns (matrix). <code>int m[3][3];</code></li>
+      <li><b>Multidimensional</b>: more than two subscripts. <code>int x[2][3][4];</code></li>
+    </ol>
+    <p class="hook">1-D list, 2-D table, multi-D cube.</p>
+  </div></details>
+
+  <details class="q" id="q4-3"><summary><span class="qno">4.3</span><span class="qt">Define multidimensional array</span><span class="freq">×1</span></summary><div class="ans">
+    <p>An array with <b>more than one subscript</b> is a multidimensional array. The most common is the 2-D array, which stores data in rows and columns.</p>
+<pre><code>int m[2][3] = { {1, 2, 3},
+                {4, 5, 6} };   /* 2 rows, 3 columns */</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>In a two-dimensional array the elements are arranged in rows and columns.</li><li>Two indices are used: i for the row number and j for the column number, e.g. m[1][2].</li><li>Syntax: data_type array_name[row_size][column_size];</li><li>int m[2][3] has 2 rows and 3 columns, so 6 elements. Each inner { } gives the values of one row: row 0 is 1 2 3, row 1 is 4 5 6.</li></ul></div>
+    <p class="hook">More than one [ ] = multidimensional; [rows][columns].</p>
+  </div></details>
+
+  <details class="q" id="q4-4"><summary><span class="qno">4.4</span><span class="qt">Array declaration and initialisation</span><span class="freq">×1</span></summary><div class="ans">
+    <p><b>Declaration:</b> <code>datatype array_name[size];</code> e.g. <code>int a[5];</code></p>
+    <p><b>Initialisation:</b></p>
+<pre><code>int a[5] = {1, 2, 3, 4, 5};   /* all values          */
+int b[]  = {10, 20, 30};      /* size taken as 3     */
+int c[5] = {1, 2};            /* rest become 0       */
+int m[2][2] = {{1, 2}, {3, 4}}; /* 2-D               */</code></pre>
+    <p>Values can also be read at run time with a loop and <code>scanf("%d", &amp;a[i]);</code></p>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>Declaration only allocates memory; the elements are not yet initialised. Values are stored by initialisation, by assigning values, or by reading them with scanf().</li><li>Complete initialisation: all elements are given, e.g. {1, 2, 3, 4, 5}.</li><li>Initialisation without size: int b[] = {10, 20, 30}; the compiler sets the size to 3.</li><li>Partial initialisation: int c[5] = {1, 2}; the elements are filled from index 0 and the remaining elements are set to 0 automatically (1 2 0 0 0).</li><li>2-D: each inner { } initialises one row.</li></ul></div>
+    <p class="hook">type name[size] = {values}; missing values become 0.</p>
+  </div></details>
+
+  <details class="q" id="q4-5"><summary><span class="qno">4.5</span><span class="qt">Operations on arrays</span><span class="freq">×1</span></summary><div class="ans">
+    <ol>
+      <li><b>Traversal</b>: visiting every element once (e.g. to print).</li>
+      <li><b>Insertion</b>: adding an element at a position.</li>
+      <li><b>Deletion</b>: removing an element from a position.</li>
+      <li><b>Searching</b>: finding an element (linear or binary search).</li>
+      <li><b>Sorting</b>: arranging in ascending or descending order.</li>
+      <li><b>Updating</b>: changing the value at an index.</li>
+      <li><b>Merging</b>: joining two arrays into one.</li>
+    </ol>
+    <p class="hook">TIDSSUM: Traverse, Insert, Delete, Search, Sort, Update, Merge.</p>
+  </div></details>
+
+  <details class="q" id="q4-6"><summary><span class="qno">4.6</span><span class="qt">Program: length of an array and print its values</span><span class="freq">×1</span></summary><div class="ans">
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    int a[] = {5, 10, 15, 20, 25};
+    int n, i;
+    n = sizeof(a) / sizeof(a[0]);
+    printf("Length = %d\n", n);
+    for (i = 0; i &lt; n; i++)
+        printf("%d ", a[i]);
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>int a[] = {5, 10, 15, 20, 25}; the size is not given, so the compiler sets it to 5 (initialisation without size).</li><li>sizeof(a) gives the size of the whole array in bytes (5 × 4 = 20 bytes when int is 4 bytes).</li><li>sizeof(a[0]) gives the size of one element (4 bytes), so n = 20 / 4 = 5 is the length.</li><li>The for loop runs from i = 0 to i = n − 1 and prints a[i] each time, so every element is displayed (traversal).</li></ul><p class="expl-h">Output</p><pre class="out">Length = 5
+5 10 15 20 25</pre></div>
+    <p class="hook">Length = sizeof(whole array) / sizeof(one element).</p>
+  </div></details>
+
+  <details class="q" id="q4-7"><summary><span class="qno">4.7</span><span class="qt">Program: addition of two 3×3 matrices</span><span class="freq">×1</span></summary><div class="ans">
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    int a[3][3], b[3][3], c[3][3], i, j;
+    printf("Enter matrix A:\n");
+    for (i = 0; i &lt; 3; i++)
+        for (j = 0; j &lt; 3; j++)
+            scanf("%d", &amp;a[i][j]);
+    printf("Enter matrix B:\n");
+    for (i = 0; i &lt; 3; i++)
+        for (j = 0; j &lt; 3; j++)
+            scanf("%d", &amp;b[i][j]);
+    for (i = 0; i &lt; 3; i++)
+        for (j = 0; j &lt; 3; j++)
+            c[i][j] = a[i][j] + b[i][j];
+    printf("Sum:\n");
+    for (i = 0; i &lt; 3; i++)
+    {
+        for (j = 0; j &lt; 3; j++)
+            printf("%d ", c[i][j]);
+        printf("\n");
+    }
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>a, b and c are 3 × 3 two-dimensional arrays; i is the row index and j is the column index.</li><li>The first nested loop reads matrix A element by element with scanf("%d", &amp;a[i][j]). The second reads matrix B the same way.</li><li>The third nested loop adds the elements in the same position: c[i][j] = a[i][j] + b[i][j].</li><li>The last nested loop prints c. printf("\n") after the inner loop moves to the next line, so each row prints on its own line.</li></ul><p class="expl-h">Output</p><pre class="out">Enter matrix A:
+1 2 3
+4 5 6
+7 8 9
+Enter matrix B:
+1 1 1
+1 1 1
+1 1 1
+Sum:
+2 3 4 
+5 6 7 
+8 9 10</pre></div>
+    <p class="hook">Four double loops: read A, read B, c = a + b, print c (with \n after each row).</p>
+  </div></details>
+
+  <details class="q" id="q4-8"><summary><span class="qno">4.8</span><span class="qt">Program: print numbers 1 to 10 using an array</span><span class="freq">×1</span></summary><div class="ans">
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    int a[10], i;
+    for (i = 0; i &lt; 10; i++)
+        a[i] = i + 1;          /* store 1..10 */
+    for (i = 0; i &lt; 10; i++)
+        printf("%d ", a[i]);   /* print 1..10 */
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>int a[10] reserves 10 locations, a[0] to a[9].</li><li>The first loop assigns values: when i = 0, a[0] = 1; when i = 1, a[1] = 2; and so on until a[9] = 10.</li><li>The second loop visits each element from a[0] to a[9] and prints it.</li></ul><p class="expl-h">Output</p><pre class="out">1 2 3 4 5 6 7 8 9 10</pre></div>
+    <p class="hook">Store a[i] = i + 1, then print a[i].</p>
+  </div></details>
+
+  <details class="q" id="q4-9"><summary><span class="qno">4.9 · 4.10</span><span class="qt">Define string; explain array of strings with example</span><span class="freq hot">×2</span></summary><div class="ans">
+    <p>A <b>string</b> is an array of characters ending with the null character <code>'\0'</code>. Example: <code>char name[10] = "Ravi";</code> is stored as R a v i \0.</p>
+    <p>An <b>array of strings</b> is a 2-D character array. The first size is the number of strings, the second is the maximum length of each string.</p>
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    char names[3][10] = {"Amit", "Ravi", "Sita"};
+    int i;
+    for (i = 0; i &lt; 3; i++)
+        printf("%s\n", names[i]);
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>A string is a sequence of characters within double quotes, and it always ends with the NULL character \0. That is why "Ravi" needs 5 locations: R a v i \0.</li><li>A group of strings is an array of strings. It needs a two-dimensional character array: char string_name[row][column];</li><li>In char names[3][10], 3 is the number of strings and 10 is the maximum length of each string (including \0).</li><li>names[i] refers to the i-th whole string, so printf("%s\n", names[i]) prints one name per line.</li></ul><p class="expl-h">Output</p><pre class="out">Amit
+Ravi
+Sita</pre></div>
+    <p class="hook">String = char array + '\0'. Array of strings = char a[how many][how long].</p>
+  </div></details>
+
+  <details class="q" id="q4-11"><summary><span class="qno">4.11 · 4.12 · 5.10</span><span class="qt">String handling functions (list any four)</span><span class="freq">×3 total</span></summary><div class="ans">
+    <p>All are in <code>&lt;string.h&gt;</code>:</p>
+    <div class="tbl"><table>
+      <tr><th>Function</th><th>Use</th><th>Example</th></tr>
+      <tr><td><code>strlen(s)</code></td><td>length of s (without '\0')</td><td><code>strlen("Hello")</code> → 5</td></tr>
+      <tr><td><code>strcpy(d, s)</code></td><td>copies s into d</td><td><code>strcpy(d, "Hi")</code></td></tr>
+      <tr><td><code>strcat(d, s)</code></td><td>joins s at the end of d</td><td>"Good" + "Day" → "GoodDay"</td></tr>
+      <tr><td><code>strcmp(a, b)</code></td><td>compares; 0 if equal, &lt;0 or &gt;0 otherwise</td><td><code>strcmp("abc","abc")</code> → 0</td></tr>
+      <tr><td><code>strrev(s)</code></td><td>reverses s (Turbo C)</td><td>"abc" → "cba"</td></tr>
+      <tr><td><code>strupr(s)</code> / <code>strlwr(s)</code></td><td>to upper / lower case (Turbo C)</td><td>"abc" → "ABC"</td></tr>
+    </table></div>
+    <p class="hook">Len, Copy, Cat, Compare (+ Rev, Upr, Lwr).</p>
+  </div></details>
+
+  <details class="q" id="q4-13"><summary><span class="qno">4.13</span><span class="qt">Program: compare two strings and find string length</span><span class="freq hot">×2</span></summary><div class="ans">
+<pre><code>#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+int main()
+{
+    char s1[50], s2[50];
+    printf("Enter first string: ");
+    scanf("%s", s1);
+    printf("Enter second string: ");
+    scanf("%s", s2);
+
+    printf("Length of first  = %d\n", (int)strlen(s1));
+    printf("Length of second = %d\n", (int)strlen(s2));
+
+    if (strcmp(s1, s2) == 0)
+        printf("Strings are equal");
+    else
+        printf("Strings are not equal");
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>#include &lt;string.h&gt; is needed for the string handling functions strlen() and strcmp().</li><li>scanf("%s", s1) reads a string; no &amp; is needed because the array name is already an address.</li><li>strlen(s1) counts all the characters until the NULL character is found, so it returns the length without \0.</li><li>strcmp(s1, s2) compares the strings character by character (by ASCII value). It returns 0 if they are equal, a positive value if s1 &gt; s2, and a negative value if s1 &lt; s2.</li><li>So if strcmp() == 0, the strings are equal; otherwise they are not.</li></ul><p class="expl-h">Output</p><pre class="out">Enter first string: HELLO
+Enter second string: HELLO
+Length of first  = 5
+Length of second = 5
+Strings are equal</pre></div>
+    <p class="hook">Include string.h; strlen for length; strcmp == 0 means equal. No &amp; with %s.</p>
+  </div></details>
+
+  <details class="q" id="q4-14"><summary><span class="qno">4.14</span><span class="qt">String operations in C</span><span class="freq">×1</span></summary><div class="ans">
+    <ol>
+      <li><b>Reading</b> a string: <code>scanf("%s", s)</code>, <code>gets(s)</code> / <code>fgets(s, n, stdin)</code></li>
+      <li><b>Displaying</b>: <code>printf("%s", s)</code>, <code>puts(s)</code></li>
+      <li><b>Finding length</b>: <code>strlen</code></li>
+      <li><b>Copying</b>: <code>strcpy</code></li>
+      <li><b>Concatenation</b> (joining): <code>strcat</code></li>
+      <li><b>Comparison</b>: <code>strcmp</code></li>
+      <li><b>Reversing</b>: <code>strrev</code></li>
+    </ol>
+    <p class="hook">Read, display, then the four functions: length, copy, join, compare (+ reverse).</p>
+  </div></details>
+
+  <details class="q" id="q4-15"><summary><span class="qno">4.15</span><span class="qt">String input/output with example</span><span class="freq hot">×2</span></summary><div class="ans">
+    <ul>
+      <li><b>Input:</b> <code>scanf("%s", s)</code> reads one word (stops at a space). <code>gets(s)</code> reads a whole line including spaces. Safer: <code>fgets(s, sizeof(s), stdin)</code>.</li>
+      <li><b>Output:</b> <code>printf("%s", s)</code> prints the string. <code>puts(s)</code> prints it and moves to a new line.</li>
+    </ul>
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    char name[30], city[30];
+    printf("Enter your name: ");
+    scanf("%s", name);            /* one word  */
+    getchar();                    /* clear the Enter key */
+    printf("Enter your city: ");
+    fgets(city, sizeof(city), stdin); /* whole line */
+    printf("Name: %s\n", name);
+    puts(city);
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>scanf("%s", name) is the formatted input function. It reads a string but stops at the first space.</li><li>getchar() removes the Enter key left behind by scanf, so the next input is read correctly.</li><li>gets()/fgets() are unformatted (line-oriented) input functions. They read a whole line including spaces. fgets() also limits the size, so it is safer.</li><li>printf("%s", name) prints the string; puts(city) prints the string and moves to a new line.</li></ul><p class="expl-h">Output</p><pre class="out">Enter your name: Ravi
+Enter your city: New Delhi
+Name: Ravi
+New Delhi</pre></div>
+    <p class="hook">scanf = one word, gets/fgets = whole line; printf("%s") or puts to print.</p>
+  </div></details>
+</section>
+
+<!-- ================= MODULE 3 ================= -->
+<section class="block" id="m3">
+  <div class="mod-head"><h2>Module 3 · Control Structures</h2><span class="pri">High priority</span></div>
+
+  <details class="q" id="q3-1"><summary><span class="qno">3.1</span><span class="qt">Define looping; syntax of while loop</span><span class="freq">×1</span></summary><div class="ans">
+    <p><b>Looping</b> means executing a set of statements <b>repeatedly</b> as long as a condition is true.</p>
+<pre><code>while (condition)
+{
+    statements;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>The while loop evaluates the test expression inside ( ).</li><li>If the test expression is true, the statements inside the body are executed, and then the test expression is evaluated again.</li><li>This goes on until the test expression becomes false; then the loop terminates.</li><li>It is an entry-controlled loop: the condition is checked before the body, so the body may run zero times.</li><li>Example: i = 1; while (i &lt;= 5) { printf("%d\n", i); i = i + 1; } prints 1 to 5.</li></ul></div>
+    <p class="hook">Loop = repeat while the condition is true. while checks first.</p>
+  </div></details>
+
+  <details class="q" id="q3-2"><summary><span class="qno">3.2 · 3.3</span><span class="qt">switch statement: syntax and explanation</span><span class="freq">×2 total</span></summary><div class="ans">
+<pre><code>switch (expression)
+{
+    case value1:
+        statements;
+        break;
+    case value2:
+        statements;
+        break;
+    default:
+        statements;
+}</code></pre>
+    <ul>
+      <li>The expression is matched with each <code>case</code> value; the matching case runs.</li>
+      <li><code>break</code> exits the switch; without it, control "falls through" to the next case.</li>
+      <li><code>default</code> runs when no case matches (optional).</li>
+      <li>Expression must be int or char; case values must be constants.</li>
+    </ul>
+<pre><code>int day = 2;
+switch (day)
+{
+    case 1: printf("Monday");  break;
+    case 2: printf("Tuesday"); break;
+    default: printf("Other day");
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>switch is a multiple-choice (multi-way) decision statement. It is generally used for menu-driven programs.</li><li>Each case label must be a constant and must end with a colon.</li><li>The expression after switch must be of integral type (int or char).</li><li>In the example, day is 2, so case 2 matches and "Tuesday" is printed; break then exits the switch.</li></ul><p class="expl-h">Output</p><pre class="out">Tuesday</pre></div>
+    <p class="hook">Match a case, break out, default if nothing matches.</p>
+  </div></details>
+
+  <details class="q" id="q3-4"><summary><span class="qno">3.4 · 3.5</span><span class="qt">Ternary operator and goto statement</span><span class="freq">×2 total</span></summary><div class="ans">
+    <p><b>Ternary (conditional) operator</b> <code>? :</code> is a short form of if-else.</p>
+    <p>Syntax: <code>condition ? expression1 : expression2;</code> If the condition is true, expression1 is the result, otherwise expression2.</p>
+<pre><code>int a = 10, b = 20, max;
+max = (a &gt; b) ? a : b;   /* max = 20 */</code></pre>
+    <p><b>goto</b> jumps control to a labelled statement in the same function.</p>
+<pre><code>int i = 1;
+start:
+    printf("%d ", i);
+    i++;
+    if (i &lt;= 5)
+        goto start;      /* prints 1 2 3 4 5 */</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>In max = (a &gt; b) ? a : b; the condition a &gt; b (10 &gt; 20) is false, so the value after the colon, b, is assigned. max = 20.</li><li>goto is an unconditional jump statement. The label (start:) is a user-defined identifier that marks the target statement.</li><li>Here the label is above the goto, so it is a backward jump. It prints i, increases i, and jumps back to start while i &lt;= 5.</li><li>If the label is below the goto, it is called a forward jump.</li></ul><p class="expl-h">Output</p><pre class="out">1 2 3 4 5   (from the goto part; max holds 20)</pre></div>
+    <p class="hook">Ternary: question ? yes : no. goto: jump to a label (avoid in big programs).</p>
+  </div></details>
+
+  <details class="q" id="q3-6"><summary><span class="qno">3.6</span><span class="qt">Explain while, do-while and for loops</span><span class="freq">×1</span></summary><div class="ans">
+<pre><code>/* while: entry-controlled, may run 0 times */
+while (condition) { statements; }
+
+/* do-while: exit-controlled, runs at least once */
+do { statements; } while (condition);
+
+/* for: initialisation; condition; update in one line */
+for (i = 1; i &lt;= 5; i++) { statements; }</code></pre>
+    <div class="tbl"><table>
+      <tr><th></th><th>while</th><th>do-while</th><th>for</th></tr>
+      <tr><td>Check</td><td>before body</td><td>after body</td><td>before body</td></tr>
+      <tr><td>Minimum runs</td><td>0</td><td>1</td><td>0</td></tr>
+      <tr><td>Best for</td><td>unknown count</td><td>menus, at least once</td><td>known count</td></tr>
+      <tr><td>Semicolon</td><td>no</td><td>after while( )</td><td>no</td></tr>
+    </table></div>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>while: the test expression is checked first. If it is true, the body runs and the expression is checked again; when it is false, the loop ends.</li><li>do-while: the body is executed once and only then is the test expression evaluated (exit-controlled loop). So the body always runs at least once.</li><li>for: used when the loop must run a fixed number of times. The initialisation runs only once, the condition is tested before every iteration, and the increment/decrement changes the counter after each iteration.</li></ul></div>
+    <p class="hook">while checks first, do-while checks last (runs once), for packs init; condition; update.</p>
+  </div></details>
+
+  <details class="q" id="q3-7"><summary><span class="qno">3.7 · 3.14</span><span class="qt">break and continue with a program</span><span class="freq">×2 total</span></summary><div class="ans">
+    <ul>
+      <li><b>break</b> ends the loop (or switch) immediately.</li>
+      <li><b>continue</b> skips the rest of the current iteration and goes to the next one.</li>
+    </ul>
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    int i;
+    for (i = 1; i &lt;= 10; i++)
+    {
+        if (i == 5)
+            continue;   /* skip 5 */
+        if (i == 8)
+            break;      /* stop at 8 */
+        printf("%d ", i);
+    }
+    return 0;           /* output: 1 2 3 4 6 7 */
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>break terminates the loop, and control goes to the first statement after the loop.</li><li>continue skips the statements after it and starts the next iteration of the loop.</li><li>When i = 5, continue runs, so 5 is not printed and the loop moves to i = 6.</li><li>When i = 8, break runs and the loop ends, so 8, 9 and 10 are never printed.</li></ul><p class="expl-h">Output</p><pre class="out">1 2 3 4 6 7</pre></div>
+    <p class="hook">break = leave the loop; continue = skip this turn. Output 1 2 3 4 6 7.</p>
+  </div></details>
+
+  <details class="q" id="q3-8"><summary><span class="qno">3.8 · 3.9</span><span class="qt">Print 1 to 10 and 10 to 1 using a loop</span><span class="freq">×2 total</span></summary><div class="ans">
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    int i;
+    for (i = 1; i &lt;= 10; i++)    /* 1 to 10 */
+        printf("%d ", i);
+    printf("\n");
+    for (i = 10; i &gt;= 1; i--)    /* 10 to 1 */
+        printf("%d ", i);
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>First loop: initial value i = 1, condition i &lt;= 10, increment i++. It prints 1, 2, … 10 and stops when i becomes 11.</li><li>printf("\n") moves to a new line between the two lists.</li><li>Second loop: initial value i = 10, condition i &gt;= 1, decrement i--. It prints 10, 9, … 1 and stops when i becomes 0.</li></ul><p class="expl-h">Output</p><pre class="out">1 2 3 4 5 6 7 8 9 10
+10 9 8 7 6 5 4 3 2 1</pre></div>
+    <p class="hook">Up: start 1, &lt;= 10, i++. Down: start 10, &gt;= 1, i--.</p>
+  </div></details>
+
+  <details class="q" id="q3-10"><summary><span class="qno">3.10</span><span class="qt">Program: even or odd</span><span class="freq">×1</span></summary><div class="ans">
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    int n;
+    printf("Enter a number: ");
+    scanf("%d", &amp;n);
+    if (n % 2 == 0)
+        printf("%d is even", n);
+    else
+        printf("%d is odd", n);
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>scanf reads the number into n.</li><li>n % 2 gives the remainder when n is divided by 2.</li><li>if-else is a bidirectional statement: if the remainder is 0 (condition true), the if block prints "even"; otherwise the else block prints "odd".</li></ul><p class="expl-h">Output</p><pre class="out">Enter a number: 121
+121 is odd</pre></div>
+    <p class="hook">n % 2 == 0 → even, else odd.</p>
+  </div></details>
+
+  <details class="q" id="q3-11"><summary><span class="qno">3.11</span><span class="qt">Greatest of three numbers using nested if</span><span class="freq">×1</span></summary><div class="ans">
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    int a, b, c;
+    printf("Enter three numbers: ");
+    scanf("%d %d %d", &amp;a, &amp;b, &amp;c);
+    if (a &gt; b)
+    {
+        if (a &gt; c)
+            printf("Greatest = %d", a);
+        else
+            printf("Greatest = %d", c);
+    }
+    else
+    {
+        if (b &gt; c)
+            printf("Greatest = %d", b);
+        else
+            printf("Greatest = %d", c);
+    }
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>Nested if means an if statement inside another if statement.</li><li>The outer if compares a and b. If a &gt; b, a is bigger, so the inner if compares a with c; the greater of the two is printed.</li><li>Otherwise (b ≥ a), the inner if in the else part compares b with c and prints the greater.</li><li>So only two comparisons are needed to find the greatest of three numbers.</li></ul><p class="expl-h">Output</p><pre class="out">Enter three numbers: 10 25 7
+Greatest = 25</pre></div>
+    <p class="hook">First a vs b; the winner vs c.</p>
+  </div></details>
+
+  <details class="q" id="q3-12"><summary><span class="qno">3.12</span><span class="qt">Smallest of two numbers (decision making)</span><span class="freq">×1</span></summary><div class="ans">
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    int a, b;
+    printf("Enter two numbers: ");
+    scanf("%d %d", &amp;a, &amp;b);
+    if (a &lt; b)
+        printf("Smallest = %d", a);
+    else
+        printf("Smallest = %d", b);
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>This is an if-else (two-way decision) statement.</li><li>If the condition a &lt; b is true, a is the smaller number and is printed.</li><li>Otherwise the else block prints b (when the numbers are equal, either one is the smallest).</li></ul><p class="expl-h">Output</p><pre class="out">Enter two numbers: 8 3
+Smallest = 3</pre></div>
+    <p class="hook">if (a &lt; b) a else b.</p>
+  </div></details>
+
+  <details class="q" id="q3-13"><summary><span class="qno">3.13</span><span class="qt">Pattern printing using loops</span><span class="freq hot">×2</span></summary><div class="ans">
+    <p class="note">The papers don't say which pattern in the list, so learn the method: <b>outer loop = rows, inner loop = what goes in each row, then <code>\n</code></b>. These two cover most patterns.</p>
+<pre><code>/* Pattern 1        Pattern 2
+   *                1
+   * *              1 2
+   * * *            1 2 3
+   * * * *          1 2 3 4   */
+#include &lt;stdio.h&gt;
+int main()
+{
+    int i, j, n = 4;
+    for (i = 1; i &lt;= n; i++)       /* rows */
+    {
+        for (j = 1; j &lt;= i; j++)   /* columns */
+            printf("* ");          /* use printf("%d ", j); for pattern 2 */
+        printf("\n");
+    }
+    return 0;
+}</code></pre>
+    <p>Inverted triangle (4 stars down to 1): change the outer loop to <code>for (i = n; i &gt;= 1; i--)</code>.</p>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>This is a nested for loop: a loop inside another loop. The outer loop controls the rows and the inner loop controls what is printed in each row.</li><li>For each value of i (row 1 to 4), the inner loop runs from j = 1 to j = i, so row i prints i stars.</li><li>After the inner loop, printf("\n") moves to the next row.</li><li>The number of iterations is the outer count multiplied by the inner count, and the inner loop restarts from 1 every time the outer loop moves on.</li></ul><p class="expl-h">Output</p><pre class="out">* 
+* * 
+* * * 
+* * * * </pre></div>
+    <p class="hook">Outer i = rows, inner j ≤ i, print, newline.</p>
+  </div></details>
+
+  <details class="q" id="q3-15"><summary><span class="qno">3.15</span><span class="qt">Program: factorial of a number</span><span class="freq">×1</span></summary><div class="ans">
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    int n, i;
+    long fact = 1;
+    printf("Enter a number: ");
+    scanf("%d", &amp;n);
+    for (i = 1; i &lt;= n; i++)
+        fact = fact * i;
+    printf("Factorial = %ld", fact);
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>Factorial n! = 1 × 2 × 3 × … × n. fact starts at 1 because multiplying by 1 does not change the product.</li><li>The for loop runs i from 1 to n and multiplies fact by i each time.</li><li>For n = 5: fact = 1 → 1 → 2 → 6 → 24 → 120.</li><li>long is used because factorials grow very fast; %ld prints a long.</li></ul><p class="expl-h">Output</p><pre class="out">Enter a number: 5
+Factorial = 120</pre></div>
+    <p class="hook">fact starts at 1, multiply by 1..n. 5! = 120.</p>
+  </div></details>
+</section>
+
+<!-- ================= MODULE 6 ================= -->
+<section class="block" id="m6">
+  <div class="mod-head"><h2>Module 6 · Structures, Unions and File Handling</h2><span class="pri">Important</span></div>
+
+  <details class="q" id="q6-1"><summary><span class="qno">6.1</span><span class="qt">Syntax to create a structure</span><span class="freq">×1</span></summary><div class="ans">
+    <p>A <b>structure</b> is a user-defined data type that groups variables of <b>different types</b> under one name.</p>
+<pre><code>struct structure_name
+{
+    datatype member1;
+    datatype member2;
+};
+
+struct student
+{
+    int roll;
+    char name[20];
+    float marks;
+};
+struct student s1;      /* structure variable */
+s1.roll = 1;            /* access with the dot operator */</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>struct is the keyword, and student is the structure name (tag).</li><li>The members (roll, name, marks) can have different data types and are written inside { }. The definition ends with a semicolon.</li><li>Defining the structure only creates a new data type; memory is allocated when a structure variable such as s1 is declared.</li><li>Members are accessed with the dot operator: s1.roll, s1.name, s1.marks.</li></ul></div>
+    <p class="hook">struct name { members }; — don't forget the semicolon; access with a dot.</p>
+  </div></details>
+
+  <details class="q" id="q6-2"><summary><span class="qno">6.2</span><span class="qt">Structure within structure (nested)</span><span class="freq">×1</span></summary><div class="ans">
+    <p>A structure can have another structure as a member. This is a <b>nested structure</b>.</p>
+<pre><code>#include &lt;stdio.h&gt;
+struct date
+{
+    int d, m, y;
+};
+struct employee
+{
+    int id;
+    char name[20];
+    struct date doj;        /* structure inside structure */
+};
+int main()
+{
+    struct employee e = {101, "Ravi", {15, 6, 2024}};
+    printf("%d %s %d/%d/%d", e.id, e.name, e.doj.d, e.doj.m, e.doj.y);
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>struct date is defined first, with members d, m and y.</li><li>struct employee has a member doj whose type is struct date, so one structure is inside another.</li><li>e is initialised with nested braces: {101, "Ravi", {15, 6, 2024}}; the inner braces fill doj.</li><li>To reach an inner member, use two dots: e.doj.d is the day of the date of joining.</li></ul><p class="expl-h">Output</p><pre class="out">101 Ravi 15/6/2024</pre></div>
+    <p class="hook">Outer.inner.member → e.doj.d (two dots).</p>
+  </div></details>
+
+  <details class="q" id="q6-3"><summary><span class="qno">6.3</span><span class="qt">Array of structures</span><span class="freq">×1</span></summary><div class="ans">
+    <p>An <b>array of structures</b> stores many records of the same structure type, e.g. details of 3 students.</p>
+<pre><code>#include &lt;stdio.h&gt;
+struct student
+{
+    int roll;
+    char name[20];
+};
+int main()
+{
+    struct student s[3];
+    int i;
+    for (i = 0; i &lt; 3; i++)
+    {
+        printf("Enter roll and name: ");
+        scanf("%d %s", &amp;s[i].roll, s[i].name);
+    }
+    for (i = 0; i &lt; 3; i++)
+        printf("%d %s\n", s[i].roll, s[i].name);
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>struct student s[3]; creates an array of 3 structure variables: s[0], s[1] and s[2].</li><li>The first loop reads the roll number and name of each student. &amp;s[i].roll needs &amp;, but s[i].name does not, because it is a character array.</li><li>The second loop prints every record using s[i].roll and s[i].name.</li></ul><p class="expl-h">Output</p><pre class="out">Enter roll and name: 1 Amit
+Enter roll and name: 2 Ravi
+Enter roll and name: 3 Sita
+1 Amit
+2 Ravi
+3 Sita</pre></div>
+    <p class="hook">struct student s[3]; then s[i].member inside a loop.</p>
+  </div></details>
+
+  <details class="q" id="q6-4"><summary><span class="qno">6.4</span><span class="qt">Program: structure to display employee information</span><span class="freq">×1</span></summary><div class="ans">
+<pre><code>#include &lt;stdio.h&gt;
+struct employee
+{
+    int id;
+    char name[20];
+    float salary;
+};
+int main()
+{
+    struct employee e;
+    printf("Enter id, name and salary: ");
+    scanf("%d %s %f", &amp;e.id, e.name, &amp;e.salary);
+    printf("ID: %d\nName: %s\nSalary: %.2f", e.id, e.name, e.salary);
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>struct employee groups the id (int), name (char array) and salary (float) of one employee under one name.</li><li>struct employee e; declares a structure variable e, and memory is allocated for all three members.</li><li>scanf reads the values into the members: &amp;e.id and &amp;e.salary need &amp;; e.name does not, because an array name is already an address.</li><li>printf displays each member with the dot operator; %.2f prints the salary with two decimal places.</li></ul><p class="expl-h">Output</p><pre class="out">Enter id, name and salary: 101 Ravi 25000
+ID: 101
+Name: Ravi
+Salary: 25000.00</pre></div>
+    <p class="hook">Define struct, read with &amp;e.id and e.name (no &amp; for strings), print with dots.</p>
+  </div></details>
+
+  <details class="q" id="q6-5"><summary><span class="qno">6.5</span><span class="qt">Structure for roll number, name and percentage of students</span><span class="freq">×1</span></summary><div class="ans">
+<pre><code>#include &lt;stdio.h&gt;
+struct student
+{
+    int roll;
+    char name[20];
+    float percent;
+};
+int main()
+{
+    struct student s;
+    printf("Enter roll number, name and percentage: ");
+    scanf("%d %s %f", &amp;s.roll, s.name, &amp;s.percent);
+    printf("Roll: %d\nName: %s\nPercentage: %.2f", s.roll, s.name, s.percent);
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>struct student has three members: roll (int), name (char[20]) and percent (float).</li><li>s is a structure variable of type struct student.</li><li>scanf reads all three values: &amp;s.roll and &amp;s.percent use &amp;, s.name does not (it is a string).</li><li>printf prints each member using the dot operator.</li></ul><p class="expl-h">Output</p><pre class="out">Enter roll number, name and percentage: 12 Sita 86.5
+Roll: 12
+Name: Sita
+Percentage: 86.50</pre></div>
+    <p class="hook">Same shape as the employee program: int, char[20], float.</p>
+  </div></details>
+
+  <details class="q" id="q6-6"><summary><span class="qno">6.6</span><span class="qt">Explain union with example</span><span class="freq">×1</span></summary><div class="ans">
+    <p>A <b>union</b> is a user-defined data type like a structure, but <b>all members share the same memory</b>. Its size is the size of its largest member, and only one member holds a valid value at a time.</p>
+<pre><code>#include &lt;stdio.h&gt;
+union data
+{
+    int i;
+    float f;
+    char c;
+};
+int main()
+{
+    union data d;
+    d.i = 10;
+    printf("i = %d\n", d.i);
+    d.f = 2.5;               /* overwrites i */
+    printf("f = %.1f\n", d.f);
+    printf("size = %d", (int)sizeof(d));   /* 4, the largest member */
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>All members of a union share the same memory location, so the union is only as big as its largest member (here int/float, 4 bytes).</li><li>d.i = 10 stores 10, and printing d.i gives 10.</li><li>d.f = 2.5 is written into the same memory, so it overwrites i. Now only d.f holds a valid value.</li><li>sizeof(d) shows 4 bytes, not 4 + 4 + 1, because the members do not get separate memory.</li></ul><p class="expl-h">Output</p><pre class="out">i = 10
+f = 2.5
+size = 4</pre></div>
+    <p class="hook">Union = members share one memory; size = biggest member.</p>
+  </div></details>
+
+  <details class="q" id="q6-7"><summary><span class="qno">6.7</span><span class="qt">Compare structure and union</span><span class="freq">×1</span></summary><div class="ans">
+    <div class="tbl"><table>
+      <tr><th>Point</th><th>Structure</th><th>Union</th></tr>
+      <tr><td>Keyword</td><td><code>struct</code></td><td><code>union</code></td></tr>
+      <tr><td>Memory</td><td>each member has its own memory</td><td>all members share one memory</td></tr>
+      <tr><td>Size</td><td>sum of all members (at least)</td><td>size of the largest member</td></tr>
+      <tr><td>Access</td><td>all members at the same time</td><td>one member at a time</td></tr>
+      <tr><td>Initialisation</td><td>all members can be initialised</td><td>only the first member</td></tr>
+      <tr><td>Use</td><td>when all values are needed</td><td>to save memory</td></tr>
+    </table></div>
+    <p class="hook">Structure = separate rooms; union = one shared room.</p>
+  </div></details>
+
+  <details class="q" id="q6-8"><summary><span class="qno">6.8 · 6.9</span><span class="qt">Creating a file in C (syntax and example)</span><span class="freq hot">×3 total</span></summary><div class="ans">
+    <p>Steps: declare a file pointer → open with <code>fopen()</code> → write → close with <code>fclose()</code>.</p>
+    <p>Syntax: <code>FILE *fp; fp = fopen("filename", "mode");</code></p>
+    <div class="tbl"><table>
+      <tr><th>Mode</th><th>Meaning</th></tr>
+      <tr><td><code>"r"</code></td><td>read (file must exist)</td></tr>
+      <tr><td><code>"w"</code></td><td>write; creates the file or erases old content</td></tr>
+      <tr><td><code>"a"</code></td><td>append; adds at the end, creates if missing</td></tr>
+      <tr><td><code>"r+" "w+" "a+"</code></td><td>read and write versions</td></tr>
+    </table></div>
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    FILE *fp;
+    fp = fopen("student.txt", "w");
+    if (fp == NULL)
+    {
+        printf("File cannot be created");
+        return 1;
+    }
+    fprintf(fp, "Roll: 1, Name: Ravi");
+    fclose(fp);
+    printf("File created");
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>FILE *fp; declares a file pointer, which is used to work with the file.</li><li>fopen("student.txt", "w") opens the file in write mode. If the file does not exist it is created; if it exists, its old contents are erased.</li><li>If fopen fails it returns NULL, so we check for NULL before writing.</li><li>fprintf(fp, …) writes formatted text into the file, just like printf writes to the screen.</li><li>fclose(fp) closes the file and saves the data.</li></ul><p class="expl-h">Output</p><pre class="out">File created
+(student.txt now contains: Roll: 1, Name: Ravi)</pre></div>
+    <p class="hook">FILE *fp → fopen(name, "w") → check NULL → fprintf → fclose.</p>
+  </div></details>
+
+  <details class="q" id="q6-10"><summary><span class="qno">6.10</span><span class="qt">CRUD operations on a file</span><span class="freq hot">×2</span></summary><div class="ans">
+    <div class="tbl"><table>
+      <tr><th>Operation</th><th>Meaning</th><th>How in C</th></tr>
+      <tr><td><b>C</b>reate</td><td>make a new file</td><td><code>fopen("a.txt", "w")</code></td></tr>
+      <tr><td><b>R</b>ead</td><td>read data from the file</td><td><code>fopen(.., "r")</code> + <code>fgetc</code>, <code>fgets</code>, <code>fscanf</code></td></tr>
+      <tr><td><b>U</b>pdate</td><td>add or change data</td><td><code>fopen(.., "a")</code> or <code>"r+"</code> + <code>fputc</code>, <code>fputs</code>, <code>fprintf</code></td></tr>
+      <tr><td><b>D</b>elete</td><td>remove the file</td><td><code>remove("a.txt")</code></td></tr>
+    </table></div>
+    <p class="hook">Create "w", Read "r", Update "a"/"r+", Delete remove().</p>
+  </div></details>
+
+  <details class="q" id="q6-11"><summary><span class="qno">6.11</span><span class="qt">Program: copy one file into another</span><span class="freq">×1</span></summary><div class="ans">
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    FILE *src, *dest;
+    int ch;
+    src = fopen("source.txt", "r");
+    dest = fopen("copy.txt", "w");
+    if (src == NULL || dest == NULL)
+    {
+        printf("Error opening file");
+        return 1;
+    }
+    while ((ch = fgetc(src)) != EOF)
+        fputc(ch, dest);
+    fclose(src);
+    fclose(dest);
+    printf("File copied");
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>Two file pointers are used: src for the source file and dest for the new file.</li><li>source.txt is opened in "r" (read) mode and copy.txt in "w" (write) mode. If either returns NULL, the program stops.</li><li>fgetc(src) reads one character at a time. The while loop continues until fgetc returns EOF (end of file).</li><li>fputc(ch, dest) writes each character into copy.txt, so the whole file is copied character by character.</li><li>Both files are closed with fclose().</li></ul><p class="expl-h">Output</p><pre class="out">File copied</pre></div>
+    <p class="hook">Open source "r" and copy "w"; fgetc until EOF, fputc each character; close both.</p>
+  </div></details>
+</section>
+
+<!-- ================= MODULE 5 ================= -->
+<section class="block" id="m5">
+  <div class="mod-head"><h2>Module 5 · Functions</h2><span class="pri">Also prepare</span></div>
+
+  <details class="q" id="q5-1"><summary><span class="qno">5.1</span><span class="qt">Predefined vs user-defined functions</span><span class="freq">×1</span></summary><div class="ans">
+    <div class="tbl"><table>
+      <tr><th>Predefined (library)</th><th>User-defined</th></tr>
+      <tr><td>already written in C libraries</td><td>written by the programmer</td></tr>
+      <tr><td>declared in header files (stdio.h, math.h)</td><td>need a prototype and a definition</td></tr>
+      <tr><td>we only call them</td><td>we define and then call them</td></tr>
+      <tr><td>cannot be changed</td><td>can be changed any time</td></tr>
+      <tr><td>e.g. <code>printf()</code>, <code>sqrt()</code>, <code>strlen()</code></td><td>e.g. <code>add()</code>, <code>fact()</code></td></tr>
+    </table></div>
+    <p class="hook">Library = ready-made, just call it. User-defined = you write it.</p>
+  </div></details>
+
+  <details class="q" id="q5-2"><summary><span class="qno">5.2 · 5.3 · 5.4</span><span class="qt">User-defined function: definition and example</span><span class="freq">×3 total</span></summary><div class="ans">
+    <p>A <b>user-defined function</b> is a block of code written by the programmer to do a specific task. It is written once and can be called many times.</p>
+    <p>Three parts:</p>
+    <ol>
+      <li><b>Declaration (prototype):</b> <code>int add(int, int);</code></li>
+      <li><b>Definition:</b> the body of the function.</li>
+      <li><b>Call:</b> <code>sum = add(a, b);</code></li>
+    </ol>
+<pre><code>#include &lt;stdio.h&gt;
+int add(int x, int y);          /* declaration */
+int main()
+{
+    int s = add(5, 3);          /* call */
+    printf("Sum = %d", s);      /* Sum = 8 */
+    return 0;
+}
+int add(int x, int y)           /* definition */
+{
+    return x + y;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>A user-defined function has three elements: the function declaration (prototype), the function definition and the function call.</li><li>The declaration int add(int x, int y); tells the compiler the return type, name and parameters before the function is used. It ends with a semicolon.</li><li>In the call add(5, 3), 5 and 3 are the actual parameters. They are copied into the formal parameters x and y in the function header.</li><li>The function body computes x + y, and return sends the result back to main(), where it is stored in s.</li></ul><p class="expl-h">Output</p><pre class="out">Sum = 8</pre></div>
+    <p class="hook">Declare, define, call.</p>
+  </div></details>
+
+  <details class="q" id="q5-5"><summary><span class="qno">5.5</span><span class="qt">Factorial using user-defined function fact()</span><span class="freq">×1</span></summary><div class="ans">
+<pre><code>#include &lt;stdio.h&gt;
+long fact(int n);
+int main()
+{
+    int n;
+    printf("Enter a number: ");
+    scanf("%d", &amp;n);
+    printf("Factorial = %ld", fact(n));
+    return 0;
+}
+long fact(int n)
+{
+    long f = 1;
+    int i;
+    for (i = 1; i &lt;= n; i++)
+        f = f * i;
+    return f;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>This is a function with parameters and a return value.</li><li>Execution starts from main(). The number is read into n, and fact(n) is called with n as the actual parameter.</li><li>The formal parameter n in fact() receives the value. Inside, f starts at 1 and is multiplied by 1, 2, …, n in the loop.</li><li>return f sends the factorial back to main(), where printf displays it.</li></ul><p class="expl-h">Output</p><pre class="out">Enter a number: 5
+Factorial = 120</pre></div>
+    <p class="hook">The factorial loop from 3.15, moved into fact() with return f.</p>
+  </div></details>
+
+  <details class="q" id="q5-6"><summary><span class="qno">5.6 · 5.7</span><span class="qt">Storage classes in C (list / short note)</span><span class="freq">×2 total</span></summary><div class="ans">
+    <p>A storage class tells a variable's <b>storage place, default value, scope and lifetime</b>. C has four:</p>
+    <div class="tbl"><table>
+      <tr><th>Class</th><th>Stored in</th><th>Default value</th><th>Scope</th><th>Lifetime</th></tr>
+      <tr><td><code>auto</code></td><td>memory (stack)</td><td>garbage</td><td>inside the block</td><td>till the block ends</td></tr>
+      <tr><td><code>register</code></td><td>CPU register</td><td>garbage</td><td>inside the block</td><td>till the block ends</td></tr>
+      <tr><td><code>static</code></td><td>memory</td><td>0</td><td>inside the block</td><td>whole program (keeps its value)</td></tr>
+      <tr><td><code>extern</code></td><td>memory</td><td>0</td><td>global (all files)</td><td>whole program</td></tr>
+    </table></div>
+<pre><code>void count()
+{
+    static int c = 0;   /* keeps its value between calls */
+    c++;
+    printf("%d ", c);
+}   /* calling count() 3 times prints 1 2 3 */</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>auto (local) variables are created when the block starts and destroyed when it ends.</li><li>register asks the compiler to keep the variable in a CPU register instead of main memory; register access is faster.</li><li>static variables are initialised only once and keep their value between function calls. That is why count() prints 1 2 3 and not 1 1 1.</li><li>extern (global) variables are defined outside all functions, are initialised to 0, and can be used by every function for the whole program.</li></ul><p class="expl-h">Output</p><pre class="out">1 2 3</pre></div>
+    <p class="hook">A Red Sports Engine: Auto, Register, Static, Extern. Static keeps its value; extern is global.</p>
+  </div></details>
+
+  <details class="q" id="q5-8"><summary><span class="qno">5.8</span><span class="qt">Local vs global variables</span><span class="freq">×1</span></summary><div class="ans">
+    <div class="tbl"><table>
+      <tr><th>Local</th><th>Global</th></tr>
+      <tr><td>declared inside a function or block</td><td>declared outside all functions</td></tr>
+      <tr><td>used only inside that function</td><td>used by every function</td></tr>
+      <tr><td>exists until the function ends</td><td>exists for the whole program</td></tr>
+      <tr><td>default value: garbage</td><td>default value: 0</td></tr>
+    </table></div>
+<pre><code>int g = 5;          /* global */
+int main()
+{
+    int x = 10;     /* local  */
+    printf("%d %d", g, x);
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>Scope is the part of the program where a variable is visible. Life span is how long it stays alive.</li><li>g is declared outside all functions, so it has global scope and lives for the whole program.</li><li>x is declared inside main(), so it is local: it exists only until main() ends and is not visible outside it.</li></ul><p class="expl-h">Output</p><pre class="out">5 10</pre></div>
+    <p class="hook">Inside = local, garbage. Outside = global, 0.</p>
+  </div></details>
+
+  <details class="q" id="q5-9"><summary><span class="qno">5.9</span><span class="qt">Parameter passing</span><span class="freq">×1</span></summary><div class="ans">
+    <ol>
+      <li><b>Call by value:</b> a copy of the value is passed. Changes inside the function do not change the original.</li>
+      <li><b>Call by reference:</b> the address is passed (using pointers). Changes inside the function change the original.</li>
+    </ol>
+<pre><code>void byValue(int x) { x = 100; }    /* original unchanged */
+void byRef(int *x)  { *x = 100; }   /* original becomes 100 */
+
+int a = 5;
+byValue(a);   /* a is still 5   */
+byRef(&amp;a);    /* a is now 100   */</code></pre>
+    <p>The full swap example is in <a href="#q7-8">7.8</a>.</p>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>Call by value: the values of the actual parameters are copied into the formal parameters. byValue changes only its own copy x, so a stays 5.</li><li>Call by address/reference: the address of the actual parameter is sent (&amp;a), and the formal parameter is declared as a pointer (int *x).</li><li>*x = 100 changes the value at that address, which is a itself, so a becomes 100.</li></ul></div>
+    <p class="hook">Value = photocopy; reference = the original's address.</p>
+  </div></details>
+
+  <details class="q" id="q5-11"><summary><span class="qno">5.11</span><span class="qt">Advantages of C library functions</span><span class="freq">×1</span></summary><div class="ans">
+    <ol>
+      <li>Ready to use, so they save programming time.</li>
+      <li>Already tested, so they are reliable.</li>
+      <li>Optimised, so they are efficient and fast.</li>
+      <li>Standard, so the program is portable across compilers.</li>
+      <li>Make programs shorter and easier to read.</li>
+    </ol>
+    <p class="hook">Ready, tested, fast, portable, short.</p>
+  </div></details>
+</section>
+
+<!-- ================= MODULE 1 ================= -->
+<section class="block" id="m1">
+  <div class="mod-head"><h2>Module 1 · Algorithms and Flowcharts</h2><span class="pri">Also prepare</span></div>
+
+  <details class="q" id="q1-1"><summary><span class="qno">1.1</span><span class="qt">Define algorithm</span><span class="freq hot">×2</span></summary><div class="ans">
+    <p>An <b>algorithm</b> is a finite, step-by-step set of instructions to solve a problem.</p>
+    <p>Characteristics:</p>
+    <ol>
+      <li><b>Input</b>: zero or more inputs.</li>
+      <li><b>Output</b>: at least one output.</li>
+      <li><b>Definiteness</b>: every step is clear.</li>
+      <li><b>Finiteness</b>: it ends after a finite number of steps.</li>
+      <li><b>Effectiveness</b>: every step is simple enough to be carried out.</li>
+    </ol>
+    <p class="hook">Finite steps to solve a problem. I-O-D-F-E: Input, Output, Definite, Finite, Effective.</p>
+  </div></details>
+
+  <details class="q" id="q1-5"><summary><span class="qno">1.5</span><span class="qt">Flowchart notations with meaning (any four)</span><span class="freq">×1</span></summary><div class="ans">
+    <svg class="shapes" viewBox="0 0 560 250" role="img" aria-label="Flowchart symbols: terminal oval, input/output parallelogram, process rectangle, decision diamond, flow line arrow, connector circle">
+      <g fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="20" y="20" width="140" height="50" rx="25"/>
+        <polygon points="230,20 370,20 350,70 210,70"/>
+        <rect x="410" y="20" width="130" height="50"/>
+        <polygon points="90,135 155,165 90,195 25,165"/>
+        <line x1="225" y1="165" x2="345" y2="165"/><polyline points="333,157 345,165 333,173"/>
+        <circle cx="475" cy="165" r="25"/>
+      </g>
+      <g fill="currentColor" font-family="IBM Plex Sans, system-ui, sans-serif" font-size="14" text-anchor="middle">
+        <text x="90" y="50">Start / Stop</text><text x="290" y="50">Input / Output</text><text x="475" y="50">Process</text>
+        <text x="90" y="170">Yes/No?</text><text x="475" y="170">A</text>
+        <text x="90" y="95">Terminal</text><text x="290" y="95">Input / Output</text><text x="475" y="95">Process</text>
+        <text x="90" y="225">Decision</text><text x="285" y="225">Flow line</text><text x="475" y="225">Connector</text>
+      </g>
+    </svg>
+    <ol>
+      <li><b>Oval (terminal)</b>: start or stop of the flowchart.</li>
+      <li><b>Parallelogram</b>: input or output (read / print).</li>
+      <li><b>Rectangle</b>: process or calculation.</li>
+      <li><b>Diamond</b>: decision (condition with Yes / No).</li>
+      <li><b>Arrow</b>: flow line, the direction of flow.</li>
+      <li><b>Circle</b>: connector, joins parts of a flowchart.</li>
+    </ol>
+    <p class="hook">Oval start, slanted box in/out, box work, diamond decide, arrow flow, circle connect.</p>
+  </div></details>
+
+  <details class="q" id="q1-3"><summary><span class="qno">1.3</span><span class="qt">Uses of flowchart (any two)</span><span class="freq">×1</span></summary><div class="ans">
+    <ol>
+      <li>Shows the logic of a program clearly, so it is easy to understand.</li>
+      <li>Helps in writing the program (coding) correctly.</li>
+      <li>Helps in finding errors (debugging).</li>
+      <li>Serves as documentation and helps communication between people.</li>
+    </ol>
+    <p class="hook">Understand, code, debug, document.</p>
+  </div></details>
+
+  <details class="q" id="q1-2"><summary><span class="qno">1.2</span><span class="qt">Flowchart: area of a circle</span><span class="freq">×1</span></summary><div class="ans">
+<pre class="mermaid">flowchart TD
+  A([Start]) --> B[/Read r/]
+  B --> C["area = 3.14 * r * r"]
+  C --> D[/Print area/]
+  D --> E([Stop])</pre>
+    <p class="hook">Start → read r → area = 3.14 × r × r → print → stop.</p>
+  </div></details>
+
+  <details class="q" id="q1-4"><summary><span class="qno">1.4</span><span class="qt">Flowchart for IF-ELSE statement</span><span class="freq">×1</span></summary><div class="ans">
+<pre class="mermaid">flowchart TD
+  A([Start]) --> B{"Condition?"}
+  B -- True --> C[Statement block 1]
+  B -- False --> D[Statement block 2]
+  C --> E[Next statement]
+  D --> E
+  E --> F([Stop])</pre>
+    <p class="hook">One diamond, two branches (True / False), both join again.</p>
+  </div></details>
+
+  <details class="q" id="q1-10"><summary><span class="qno">1.10</span><span class="qt">Flowchart: odd or even</span><span class="freq">×1</span></summary><div class="ans">
+<pre class="mermaid">flowchart TD
+  A([Start]) --> B[/Read n/]
+  B --> C{"n % 2 == 0 ?"}
+  C -- Yes --> D[/Print Even/]
+  C -- No --> E[/Print Odd/]
+  D --> F([Stop])
+  E --> F</pre>
+    <p class="hook">The if-else flowchart with n % 2 == 0 in the diamond.</p>
+  </div></details>
+
+  <details class="q" id="q1-6"><summary><span class="qno">1.6</span><span class="qt">Algorithm: reverse the digits of an integer</span><span class="freq">×1</span></summary><div class="ans">
+    <ol>
+      <li>Start</li>
+      <li>Read n</li>
+      <li>rev = 0</li>
+      <li>While n &gt; 0 repeat: digit = n % 10; rev = rev × 10 + digit; n = n / 10</li>
+      <li>Print rev</li>
+      <li>Stop</li>
+    </ol>
+    <p class="note">Example: n = 123 → rev = 3 → 32 → 321.</p>
+    <p class="hook">Take the last digit (% 10), add it to rev × 10, drop it (/ 10).</p>
+  </div></details>
+
+  <details class="q" id="q1-7"><summary><span class="qno">1.7</span><span class="qt">Algorithm: generate prime numbers (1 to N)</span><span class="freq">×1</span></summary><div class="ans">
+    <ol>
+      <li>Start</li>
+      <li>Read N</li>
+      <li>For num = 2 to N repeat steps 4 to 6</li>
+      <li>flag = 1</li>
+      <li>For i = 2 to num / 2: if num % i == 0 then flag = 0 and stop this inner loop</li>
+      <li>If flag == 1, print num</li>
+      <li>Stop</li>
+    </ol>
+    <p class="hook">For each number, try dividing by 2 … num/2; no divisor → prime.</p>
+  </div></details>
+
+  <details class="q" id="q1-8"><summary><span class="qno">1.8</span><span class="qt">Algorithm: count positive numbers in a set</span><span class="freq">×1</span></summary><div class="ans">
+    <ol>
+      <li>Start</li>
+      <li>Read N (how many numbers)</li>
+      <li>count = 0, i = 1</li>
+      <li>While i ≤ N repeat: read x; if x &gt; 0 then count = count + 1; i = i + 1</li>
+      <li>Print count</li>
+      <li>Stop</li>
+    </ol>
+    <p class="hook">count starts at 0; add 1 each time x &gt; 0.</p>
+  </div></details>
+
+  <details class="q" id="q1-9"><summary><span class="qno">1.9</span><span class="qt">Algorithm: exchange two variables using a temporary variable</span><span class="freq hot">×2</span></summary><div class="ans">
+    <ol>
+      <li>Start</li>
+      <li>Read a, b</li>
+      <li>temp = a</li>
+      <li>a = b</li>
+      <li>b = temp</li>
+      <li>Print a, b</li>
+      <li>Stop</li>
+    </ol>
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    int a, b, temp;
+    printf("Enter a and b: ");
+    scanf("%d %d", &amp;a, &amp;b);
+    temp = a;
+    a = b;
+    b = temp;
+    printf("a = %d, b = %d", a, b);
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>A third variable, temp, is needed because once a = b runs, the old value of a would be lost.</li><li>temp = a keeps a copy of a. a = b copies b into a. b = temp puts the old value of a into b.</li><li>Example: a = 10, b = 20 → temp = 10 → a = 20 → b = 10.</li></ul><p class="expl-h">Output</p><pre class="out">Enter a and b: 10 20
+a = 20, b = 10</pre></div>
+    <p class="hook">temp = a, a = b, b = temp (like swapping two glasses with a third).</p>
+  </div></details>
+</section>
+
+<!-- ================= MODULE 2 ================= -->
+<section class="block" id="m2">
+  <div class="mod-head"><h2>Module 2 · Basics of C and Operators</h2><span class="pri">Also prepare</span></div>
+
+  <details class="q" id="q2-1"><summary><span class="qno">2.1</span><span class="qt">Differentiate POP and OOP (any four points)</span><span class="freq hot">×2</span></summary><div class="ans">
+    <div class="tbl"><table>
+      <tr><th>Point</th><th>POP (procedure-oriented)</th><th>OOP (object-oriented)</th></tr>
+      <tr><td>Focus</td><td>functions / procedures</td><td>objects (data + functions)</td></tr>
+      <tr><td>Approach</td><td>top-down</td><td>bottom-up</td></tr>
+      <tr><td>Data security</td><td>data moves freely, less secure</td><td>data hidden (encapsulation), more secure</td></tr>
+      <tr><td>Features</td><td>no inheritance or polymorphism</td><td>inheritance, polymorphism, abstraction</td></tr>
+      <tr><td>Reuse</td><td>hard to reuse and extend</td><td>easy to reuse and maintain</td></tr>
+      <tr><td>Examples</td><td>C, Pascal, FORTRAN</td><td>C++, Java, Python</td></tr>
+    </table></div>
+    <p class="hook">POP: functions, top-down, open data, C. OOP: objects, bottom-up, hidden data, C++/Java.</p>
+  </div></details>
+
+  <details class="q" id="q2-4"><summary><span class="qno">2.4</span><span class="qt">Operators in C</span><span class="freq">×1</span></summary><div class="ans">
+    <ol>
+      <li><b>Arithmetic</b>: + − * / %</li>
+      <li><b>Relational</b>: &lt; &gt; &lt;= &gt;= == !=</li>
+      <li><b>Logical</b>: &amp;&amp; || !</li>
+      <li><b>Assignment</b>: = += −= *= /= %=</li>
+      <li><b>Increment / decrement</b>: ++ −−</li>
+      <li><b>Conditional (ternary)</b>: ? :</li>
+      <li><b>Bitwise</b>: &amp; | ^ ~ &lt;&lt; &gt;&gt;</li>
+      <li><b>Special</b>: sizeof, comma (,), &amp; and * (pointers), . and -&gt; (structures)</li>
+    </ol>
+    <p class="hook">ARLAICBS: Arithmetic, Relational, Logical, Assignment, Increment, Conditional, Bitwise, Special.</p>
+  </div></details>
+
+  <details class="q" id="q2-2"><summary><span class="qno">2.2</span><span class="qt">Arithmetic operators with a C program</span><span class="freq">×1</span></summary><div class="ans">
+    <p>+ addition, − subtraction, * multiplication, / division, % remainder (modulus, integers only).</p>
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    int a = 10, b = 3;
+    printf("a + b = %d\n", a + b);   /* 13 */
+    printf("a - b = %d\n", a - b);   /* 7  */
+    printf("a * b = %d\n", a * b);   /* 30 */
+    printf("a / b = %d\n", a / b);   /* 3 (integer division) */
+    printf("a %% b = %d\n", a % b);  /* 1  */
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>An arithmetic operator performs mathematical operations such as addition, subtraction, multiplication and division on numeric values.</li><li>a / b with integers gives the quotient only: 10 / 3 = 3 (the decimal part is dropped).</li><li>a % b gives the remainder: 10 % 3 = 1. % works only with integers.</li><li>In printf, %% is used to print the % sign itself.</li></ul><p class="expl-h">Output</p><pre class="out">a + b = 13
+a - b = 7
+a * b = 30
+a / b = 3
+a % b = 1</pre></div>
+    <p class="hook">10 and 3 → 13, 7, 30, 3, 1. Use %% to print a % sign.</p>
+  </div></details>
+
+  <details class="q" id="q2-3"><summary><span class="qno">2.3</span><span class="qt">Logical and relational operators with examples</span><span class="freq">×1</span></summary><div class="ans">
+    <p><b>Relational operators</b> compare two values; the result is 1 (true) or 0 (false).</p>
+    <div class="tbl"><table>
+      <tr><th>Op</th><th>Meaning</th><th>a = 5, b = 3</th></tr>
+      <tr><td>&lt;</td><td>less than</td><td>a &lt; b → 0</td></tr>
+      <tr><td>&gt;</td><td>greater than</td><td>a &gt; b → 1</td></tr>
+      <tr><td>&lt;=</td><td>less or equal</td><td>a &lt;= 5 → 1</td></tr>
+      <tr><td>&gt;=</td><td>greater or equal</td><td>b &gt;= 5 → 0</td></tr>
+      <tr><td>==</td><td>equal to</td><td>a == b → 0</td></tr>
+      <tr><td>!=</td><td>not equal</td><td>a != b → 1</td></tr>
+    </table></div>
+    <p><b>Logical operators</b> join conditions.</p>
+    <div class="tbl"><table>
+      <tr><th>Op</th><th>Meaning</th><th>Example (a = 5, b = 3)</th></tr>
+      <tr><td>&amp;&amp;</td><td>AND: true if both are true</td><td>(a &gt; 0 &amp;&amp; b &gt; 0) → 1</td></tr>
+      <tr><td>||</td><td>OR: true if any one is true</td><td>(a &lt; 0 || b &gt; 0) → 1</td></tr>
+      <tr><td>!</td><td>NOT: reverses</td><td>!(a &gt; b) → 0</td></tr>
+    </table></div>
+    <p class="hook">Relational compare (gives 1/0); logical combine (AND both, OR any, NOT flips).</p>
+  </div></details>
+
+  <details class="q" id="q2-5"><summary><span class="qno">2.5 · 2.6</span><span class="qt">Data types: definition, hierarchy, any four</span><span class="freq">×2 total</span></summary><div class="ans">
+    <p>A <b>data type</b> tells the compiler what kind of value a variable stores and how much memory it needs.</p>
+<pre class="mermaid">flowchart TD
+  A[C data types] --> B[Primary / basic]
+  A --> C[Derived]
+  A --> D[User-defined]
+  B --> B1[int, char, float, double, void]
+  C --> C1[array, pointer, function]
+  D --> D1[structure, union, enum, typedef]</pre>
+    <div class="tbl"><table>
+      <tr><th>Type</th><th>Stores</th><th>Size</th><th>Format</th></tr>
+      <tr><td><code>int</code></td><td>whole numbers</td><td>2 bytes (Turbo C) / 4 bytes (GCC)</td><td>%d</td></tr>
+      <tr><td><code>float</code></td><td>decimal numbers</td><td>4 bytes</td><td>%f</td></tr>
+      <tr><td><code>double</code></td><td>large decimals</td><td>8 bytes</td><td>%lf</td></tr>
+      <tr><td><code>char</code></td><td>one character</td><td>1 byte</td><td>%c</td></tr>
+    </table></div>
+    <p class="hook">P-D-U: Primary, Derived, User-defined. int 2/4, float 4, double 8, char 1.</p>
+  </div></details>
+
+  <details class="q" id="q2-7"><summary><span class="qno">2.7 · 2.8</span><span class="qt">Define variable and constant</span><span class="freq">×2 total</span></summary><div class="ans">
+    <p><b>Variable:</b> a named memory location whose value can change while the program runs. Example: <code>int age = 18;</code></p>
+    <p>Rules: starts with a letter or underscore, no spaces, not a keyword, case-sensitive.</p>
+    <p><b>Constant:</b> a fixed value that cannot change while the program runs. Examples: <code>10</code>, <code>3.14</code>, <code>'A'</code>, <code>"Hello"</code>. Declared as <code>const int MAX = 100;</code> or <code>#define PI 3.14</code>.</p>
+    <p class="hook">Variable can vary; constant stays constant.</p>
+  </div></details>
+
+  <details class="q" id="q2-9"><summary><span class="qno">2.9</span><span class="qt">Uses of printf() and scanf()</span><span class="freq">×1</span></summary><div class="ans">
+    <ul>
+      <li><b>printf()</b> displays output (messages and values) on the screen. <code>printf("Sum = %d", s);</code></li>
+      <li><b>scanf()</b> reads input from the keyboard into variables. <code>scanf("%d", &amp;n);</code> (&amp; gives the variable's address).</li>
+      <li>Both are in <code>stdio.h</code> and use format specifiers: %d int, %f float, %c char, %s string.</li>
+    </ul>
+    <p class="hook">printf prints out; scanf scans in (with &amp;).</p>
+  </div></details>
+
+  <details class="q" id="q2-11"><summary><span class="qno">2.11</span><span class="qt">Program: accept an integer and print it</span><span class="freq">×1</span></summary><div class="ans">
+<pre><code>#include &lt;stdio.h&gt;
+int main()
+{
+    int n;
+    printf("Enter an integer: ");
+    scanf("%d", &amp;n);
+    printf("You entered %d", n);
+    return 0;
+}</code></pre>
+    <div class="expl"><p class="expl-h">Explanation</p><ul><li>#include &lt;stdio.h&gt; is needed for printf() and scanf().</li><li>int n; declares an integer variable to hold the number.</li><li>printf() displays the message asking for input.</li><li>scanf("%d", &amp;n) reads an integer from the keyboard; &amp; gives the address of n, where the value is stored.</li><li>printf("You entered %d", n) prints the value back.</li></ul><p class="expl-h">Output</p><pre class="out">Enter an integer: 25
+You entered 25</pre></div>
+    <p class="hook">The skeleton with one scanf and one printf.</p>
+  </div></details>
+
+  <details class="q" id="q2-10"><summary><span class="qno">2.10</span><span class="qt">Event-driven approach with example</span><span class="freq">×1</span></summary><div class="ans">
+    <p>In <b>event-driven programming</b> the flow of the program is decided by <b>events</b> such as a mouse click, a key press or a message. The program waits for an event and then runs the matching <b>event handler</b> function.</p>
+    <p><b>Example:</b> in a login window, when the user clicks the "Login" button, the click event calls its handler, which checks the username and password. Used in GUI programs (Windows applications, Visual Basic, JavaScript web pages).</p>
+    <p class="hook">Event happens → handler runs. Click "Login" → check password.</p>
+  </div></details>
+
+  <details class="q" id="q2-12"><summary><span class="qno">2.12</span><span class="qt">Procedural vs object-oriented vs event-driven</span><span class="freq">×1</span></summary><div class="ans">
+    <div class="tbl"><table>
+      <tr><th>Point</th><th>Procedural</th><th>Object-oriented</th><th>Event-driven</th></tr>
+      <tr><td>Built around</td><td>functions</td><td>objects</td><td>events and handlers</td></tr>
+      <tr><td>Flow</td><td>fixed, top to bottom</td><td>objects calling methods</td><td>decided by user actions</td></tr>
+      <tr><td>Data</td><td>shared, global</td><td>hidden in objects</td><td>handled inside handlers</td></tr>
+      <tr><td>Used for</td><td>calculations, system programs</td><td>large applications</td><td>GUI and web apps</td></tr>
+      <tr><td>Examples</td><td>C, Pascal</td><td>C++, Java</td><td>Visual Basic, JavaScript</td></tr>
+    </table></div>
+    <p class="hook">Procedures, objects, events.</p>
+  </div></details>
+</section>
+
+<p class="note">Source: your PYQ module-wise frequency analysis of the four IT23102 papers. That analysis says the scan was unclear in places, so check any unclear question against the original paper. Integer sizes differ between Turbo C (2 bytes) and GCC (4 bytes); write the one your teacher uses.</p>
+</div>
+
+<script>
+(function () {
+  var KEY = 'it23102-learned';
+  var learned = {};
+  try { learned = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { learned = {}; }
+  var qs = Array.prototype.slice.call(document.querySelectorAll('details.q'));
+  var prog = document.getElementById('progress');
+  function update() {
+    var n = qs.filter(function (d) { return learned[d.id]; }).length;
+    prog.textContent = n + ' of ' + qs.length + ' learned';
+  }
+  qs.forEach(function (d) {
+    var ans = d.querySelector('.ans');
+    var lab = document.createElement('label'); lab.className = 'learn';
+    var box = document.createElement('input'); box.type = 'checkbox'; box.id = 'learn-' + d.id; box.checked = !!learned[d.id];
+    lab.appendChild(box); lab.appendChild(document.createTextNode('I can write this from memory'));
+    ans.appendChild(lab);
+    d.classList.toggle('learned', box.checked);
+    box.addEventListener('change', function () {
+      if (box.checked) learned[d.id] = 1; else delete learned[d.id];
+      d.classList.toggle('learned', box.checked);
+      try { localStorage.setItem(KEY, JSON.stringify(learned)); } catch (e) {}
+      update();
+    });
+  });
+  document.getElementById('btn-open').addEventListener('click', function () { qs.forEach(function (d) { d.open = true; }); });
+  document.getElementById('btn-close').addEventListener('click', function () { qs.forEach(function (d) { d.open = false; }); });
+  // a Top-10 link opens its answer
+  document.querySelectorAll('a[href^="#q"]').forEach(function (a) {
+    a.addEventListener('click', function () { var t = document.getElementById(a.getAttribute('href').slice(1)); if (t) t.open = true; });
+  });
+  update();
+})();
+</script>
+<script type="module">
+// Flowcharts render only when their answer is opened (hidden diagrams size wrongly).
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs';
+var dark = document.documentElement.dataset.theme === 'dark' || (document.documentElement.dataset.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'neutral', securityLevel: 'strict' });
+function draw(d) { var n = d.querySelectorAll('pre.mermaid:not([data-processed])'); if (n.length) mermaid.run({ nodes: n }).catch(function () {}); }
+document.querySelectorAll('details.q').forEach(function (d) { d.addEventListener('toggle', function () { if (d.open) draw(d); }); if (d.open) draw(d); });
+</script>
+
+</body>
+</html>
