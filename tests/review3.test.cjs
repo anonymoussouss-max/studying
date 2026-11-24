@@ -58,3 +58,8 @@ test('gentle return hides the hours-ladder advice, and the scene names the study
   assert.match(html, /try \{ if \(window\.StudyPlan\?\.gentleOf\?\.\(L\.sched, today\(\)\)\) return null; \} catch \(e\) \{\}\n\s*const s = look\(\)/);
   assert.match(html, /sd !== cal \? ' study day \(past midnight\)' : ''/);
 });
+
+test('minutes shown are whole: one-decimal sessions never leak 9:52.0999… PM into the plan', () => {
+  assert.match(html, /return Math\.floor\(Math\.max\(ses,blk\)\+1e-6\);\}/);
+  assert.ok(!html.includes("shortHours():'12'}-hour"), 'no 2.83-hour label');
+});
