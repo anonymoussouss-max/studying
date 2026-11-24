@@ -63,3 +63,13 @@ test('minutes shown are whole: one-decimal sessions never leak 9:52.0999… PM i
   assert.match(html, /return Math\.floor\(Math\.max\(ses,blk\)\+1e-6\);\}/);
   assert.ok(!html.includes("shortHours():'12'}-hour"), 'no 2.83-hour label');
 });
+
+test('four questions Ayan flagged are marked Important in the desk and the public page, and asked first', () => {
+  const pub = fs.readFileSync(path.join(__dirname, '..', 'it23102.html'), 'utf8');
+  for (const id of ['q2-11', 'q3-8', 'q3-10', 'q3-7']) for (const [n, src] of [['desk', html], ['public', pub]]) {
+    const a = src.indexOf('<details class="q" id="' + id + '">'); assert.ok(a > 0, n + ' ' + id);
+    assert.ok(src.slice(a, src.indexOf('</summary>', a)).includes('<span class="imp">★ Important</span>'), n + ' ' + id + ' badge');
+    assert.ok(src.includes('<a href="#' + id + '">'), n + ' ' + id + ' listed');
+  }
+  assert.match(cx, /!learned && IMP\.includes\(q\.id\) \? 1 :/);
+});

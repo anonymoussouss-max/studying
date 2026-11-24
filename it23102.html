@@ -58,7 +58,7 @@ details.q>summary{list-style:none;cursor:pointer;display:grid;grid-template-colu
 details.q>summary::-webkit-details-marker{display:none}
 .qno{font:600 .8rem var(--f-code);color:var(--muted)}
 .qt{font-weight:600}
-.freq{font:600 .75rem var(--f-code);color:var(--muted);white-space:nowrap}
+.imp{font:700 .72rem var(--f-body);color:var(--hook-fg);background:var(--hook);border-radius:999px;padding:1px 8px;white-space:nowrap}.imp-list{margin-top:14px}.imp-h{font-weight:600;margin:0 0 4px}.freq{font:600 .75rem var(--f-code);color:var(--muted);white-space:nowrap}
 .freq.hot{color:var(--accent)}
 details.q.learned .qt::after{content:" ✓";color:var(--ok)}
 .ans{padding:2px 16px 16px;display:grid;gap:10px;min-width:0}
@@ -138,6 +138,7 @@ int main()
       <li><a href="#q7-4">Pointer arithmetic</a> · 2 papers</li>
       <li><a href="#q1-1">Define algorithm</a> · 2 papers</li>
     </ol>
+  <div class="imp-list"><p class="imp-h">★ Flagged important</p><ul><li><a href="#q2-11">Accept an integer and print it</a></li><li><a href="#q3-8">Print 10 to 1 using a loop</a></li><li><a href="#q3-10">Even or odd</a></li><li><a href="#q3-7">continue statement (with break)</a></li></ul></div>
   </div>
 </section>
 
@@ -564,7 +565,7 @@ for (i = 1; i &lt;= 5; i++) { statements; }</code></pre>
     <p class="hook">while checks first, do-while checks last (runs once), for packs init; condition; update.</p>
   </div></details>
 
-  <details class="q" id="q3-7"><summary><span class="qno">3.7 · 3.14</span><span class="qt">break and continue with a program</span><span class="freq">×2 total</span></summary><div class="ans">
+  <details class="q" id="q3-7"><summary><span class="qno">3.7 · 3.14</span><span class="qt">break and continue with a program</span><span class="freq">×2 total</span><span class="imp">★ Important</span></summary><div class="ans">
     <ul>
       <li><b>break</b> ends the loop (or switch) immediately.</li>
       <li><b>continue</b> skips the rest of the current iteration and goes to the next one.</li>
@@ -587,7 +588,7 @@ int main()
     <p class="hook">break = leave the loop; continue = skip this turn. Output 1 2 3 4 6 7.</p>
   </div></details>
 
-  <details class="q" id="q3-8"><summary><span class="qno">3.8 · 3.9</span><span class="qt">Print 1 to 10 and 10 to 1 using a loop</span><span class="freq">×2 total</span></summary><div class="ans">
+  <details class="q" id="q3-8"><summary><span class="qno">3.8 · 3.9</span><span class="qt">Print 1 to 10 and 10 to 1 using a loop</span><span class="freq">×2 total</span><span class="imp">★ Important</span></summary><div class="ans">
 <pre><code>#include &lt;stdio.h&gt;
 int main()
 {
@@ -604,7 +605,7 @@ int main()
     <p class="hook">Up: start 1, &lt;= 10, i++. Down: start 10, &gt;= 1, i--.</p>
   </div></details>
 
-  <details class="q" id="q3-10"><summary><span class="qno">3.10</span><span class="qt">Program: even or odd</span><span class="freq">×1</span></summary><div class="ans">
+  <details class="q" id="q3-10"><summary><span class="qno">3.10</span><span class="qt">Program: even or odd</span><span class="freq">×1</span><span class="imp">★ Important</span></summary><div class="ans">
 <pre><code>#include &lt;stdio.h&gt;
 int main()
 {
@@ -1331,7 +1332,7 @@ a % b = 1</pre></div>
     <p class="hook">printf prints out; scanf scans in (with &amp;).</p>
   </div></details>
 
-  <details class="q" id="q2-11"><summary><span class="qno">2.11</span><span class="qt">Program: accept an integer and print it</span><span class="freq">×1</span></summary><div class="ans">
+  <details class="q" id="q2-11"><summary><span class="qno">2.11</span><span class="qt">Program: accept an integer and print it</span><span class="freq">×1</span><span class="imp">★ Important</span></summary><div class="ans">
 <pre><code>#include &lt;stdio.h&gt;
 int main()
 {

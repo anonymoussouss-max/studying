@@ -13974,7 +13974,7 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
       <li><a href="#q6-10">CRUD operations on files</a> · 2 papers</li>
       <li><a href="#q7-4">Pointer arithmetic</a> · 2 papers</li>
       <li><a href="#q1-1">Define algorithm</a> · 2 papers</li>
-    </ol></div>
+    </ol></div><div class="imp-list"><p class="imp-h">★ Flagged important</p><ul><li><a href="#q2-11">Accept an integer and print it</a></li><li><a href="#q3-8">Print 10 to 1 using a loop</a></li><li><a href="#q3-10">Even or odd</a></li><li><a href="#q3-7">continue statement (with break)</a></li></ul></div>
 <section class="block" data-mod="m7">
   <div class="mod-head"><h2>Module 7 · Pointers</h2><span class="pri">High priority</span></div>
 
@@ -14395,7 +14395,7 @@ for (i = 1; i &lt;= 5; i++) { statements; }</code></pre>
     <p class="hook">while checks first, do-while checks last (runs once), for packs init; condition; update.</p>
   </div></details>
 
-  <details class="q" id="q3-7"><summary><span class="qno">3.7 · 3.14</span><span class="qt">break and continue with a program</span><span class="freq">×2 total</span></summary><div class="ans">
+  <details class="q" id="q3-7"><summary><span class="qno">3.7 · 3.14</span><span class="qt">break and continue with a program</span><span class="freq">×2 total</span><span class="imp">★ Important</span></summary><div class="ans">
     <ul>
       <li><b>break</b> ends the loop (or switch) immediately.</li>
       <li><b>continue</b> skips the rest of the current iteration and goes to the next one.</li>
@@ -14418,7 +14418,7 @@ int main()
     <p class="hook">break = leave the loop; continue = skip this turn. Output 1 2 3 4 6 7.</p>
   </div></details>
 
-  <details class="q" id="q3-8"><summary><span class="qno">3.8 · 3.9</span><span class="qt">Print 1 to 10 and 10 to 1 using a loop</span><span class="freq">×2 total</span></summary><div class="ans">
+  <details class="q" id="q3-8"><summary><span class="qno">3.8 · 3.9</span><span class="qt">Print 1 to 10 and 10 to 1 using a loop</span><span class="freq">×2 total</span><span class="imp">★ Important</span></summary><div class="ans">
 <pre><code>#include &lt;stdio.h&gt;
 int main()
 {
@@ -14435,7 +14435,7 @@ int main()
     <p class="hook">Up: start 1, &lt;= 10, i++. Down: start 10, &gt;= 1, i--.</p>
   </div></details>
 
-  <details class="q" id="q3-10"><summary><span class="qno">3.10</span><span class="qt">Program: even or odd</span><span class="freq">×1</span></summary><div class="ans">
+  <details class="q" id="q3-10"><summary><span class="qno">3.10</span><span class="qt">Program: even or odd</span><span class="freq">×1</span><span class="imp">★ Important</span></summary><div class="ans">
 <pre><code>#include &lt;stdio.h&gt;
 int main()
 {
@@ -15156,7 +15156,7 @@ a % b = 1</pre></div>
     <p class="hook">printf prints out; scanf scans in (with &amp;).</p>
   </div></details>
 
-  <details class="q" id="q2-11"><summary><span class="qno">2.11</span><span class="qt">Program: accept an integer and print it</span><span class="freq">×1</span></summary><div class="ans">
+  <details class="q" id="q2-11"><summary><span class="qno">2.11</span><span class="qt">Program: accept an integer and print it</span><span class="freq">×1</span><span class="imp">★ Important</span></summary><div class="ans">
 <pre><code>#include &lt;stdio.h&gt;
 int main()
 {
@@ -15231,6 +15231,8 @@ You entered 25</pre></div>
     return { id: d.id, mod: 'm' + d.id.slice(1).split('-')[0], q: d.querySelector('.qt').textContent.trim(), no: d.querySelector('.qno').textContent.trim(), a: a.textContent.replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim(), hook };
   });
   const TOP = [...tpl.content.querySelectorAll('.top10 a')].map(a => a.getAttribute('href').slice(1));
+  // questions Ayan flagged ★ Important: asked first in a test until ticked as learned
+  const IMP = [...tpl.content.querySelectorAll('.imp-list a')].map(a => a.getAttribute('href').slice(1));
   // a misunderstanding Ayan saved ("does writing through *p change a?"): Iroha asks one new example on exactly that point
   const DQ = id => { const m = /^doubt:(.+)$/.exec(id || ''), d = m && X().doubts.find(x => x.id === m[1]); return d ? { id, doubt: d, q: 'One new example on your saved doubt: ' + d.t, no: 'your doubt', a: '', hook: '' } : null; };
   const byId = id => QS.find(q => q.id === id) || DQ(id);
@@ -15244,7 +15246,7 @@ You entered 25</pre></div>
   function pick(n = 5) {
     const cov = covered(day()), all = cov.length === 0 || day() >= '2026-11-26';
     const rank = q => { const lr = lastResult(q.id), learned = !!X().learned[q.id], reached = all || cov.includes(q.mod) || (cov.includes('top') && TOP.includes(q.id));
-      return lr === 'review' ? 0 : !learned && reached ? (TOP.includes(q.id) ? 1 : 2) : !learned ? 3 : 4; };
+      return lr === 'review' ? 0 : !learned && IMP.includes(q.id) ? 1 : !learned && reached ?(TOP.includes(q.id) ? 1 : 2) : !learned ? 3 : 4; };
     return QS.map((q, i) => ({ q, i, r: rank(q) })).sort((a, b) => a.r - b.r || a.i - b.i).slice(0, n).map(o => o.q.id);
   }
   // only answers ticked as learned (optionally one module): the ones tested longest ago first
@@ -15403,7 +15405,7 @@ You entered 25</pre></div>
 .kg-cx-bank .pri{font-size:11px;opacity:.8;text-transform:uppercase;letter-spacing:.06em}
 .kg-cx-bank details.q{border:1px solid rgba(196,182,255,.2);border-radius:10px}.kg-cx-bank details.q[open]{border-color:rgba(127,227,255,.55)}
 .kg-cx-bank details.q>summary{cursor:pointer;list-style:none;display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:8px 10px;align-items:baseline}
-.kg-cx-bank details.q>summary::-webkit-details-marker{display:none}.kg-cx-bank .qno,.kg-cx-bank .freq{font-size:12px;opacity:.7;white-space:nowrap}.kg-cx-bank .freq.hot{opacity:1;color:#7fe3ff}
+.kg-cx-bank details.q>summary::-webkit-details-marker{display:none}.kg-cx-bank .imp{font-size:11px;font-weight:700;color:#ffd166;white-space:nowrap;margin-left:6px}.kg-cx-bank .imp-list{margin:10px 0}.kg-cx-bank .imp-h{font-weight:700;color:#ffd166;margin:0 0 4px}.kg-cx-bank .qno,.kg-cx-bank .freq{font-size:12px;opacity:.7;white-space:nowrap}.kg-cx-bank .freq.hot{opacity:1;color:#7fe3ff}
 .kg-cx-bank .qt{font-weight:600}.kg-cx-bank details.q.learned .qt::after{content:" ✓";color:#4cc38a}
 .kg-cx-bank .ans{padding:0 12px 12px;display:grid;gap:8px;min-width:0}.kg-cx-bank .ans p,.kg-cx-bank .ans ul,.kg-cx-bank .ans ol{margin:0}
 .kg-cx-bank pre{margin:0;overflow-x:auto;background:rgba(0,0,0,.28);border-radius:8px;padding:8px 10px;font:12.5px/1.5 ui-monospace,Consolas,monospace;white-space:pre}
