@@ -1063,7 +1063,8 @@ body.habit-shh #hb-session-card {text-align:center;}
     out.cuts=cuts;return out;
   }
   // ---- the queue: what each study block holds, from real progress ----
-  const REVMIN={maths:90,physics:30,chem:30},HWMIN={maths:45,physics:30,chem:30},LECMIN={maths:150,physics:105,chem:95};
+  // initial estimates (handoff §6), refined by the median of real records in syl.took once three exist
+  const REVMIN={maths:75,physics:45,chem:30},HWMIN={maths:45,physics:30,chem:30},LECMIN={maths:150,physics:105,chem:95},STAGEMIN={tah:60,ktk:30};
   const medianOf=a=>{const s=(Array.isArray(a)?a:[]).map(Number).filter(n=>n>0).slice(-15).sort((x,y)=>x-y);if(s.length<3)return 0;const k=s.length;return Math.ceil((k%2?s[(k-1)/2]:(s[k/2-1]+s[k/2])/2)/5)*5;};
   const lecMin=(syl,s)=>medianOf(((syl||{}).watch||{})[s])||LECMIN[s];
   // the next lecture of a subject's active course, or null when its counts are missing or it is finished
@@ -1071,11 +1072,57 @@ body.habit-shh #hb-session-card {text-align:center;}
     for(const id of order){const c=(syl.courses||{})[id];if(!c||!Array.isArray(c.chapters))continue;
       for(let k=0;k<c.chapters.length;k++){const [name,n]=c.chapters[k],d=(c.done||[])[k]||0;if(n==null)return {missing:true,course:id,chapter:name};if(d<n)return {course:id,ci:k,chapter:name,lec:d+1,of:n,teacher:c.teacher||''};}}
     return null;}
+  // ---- learning cycle (handoff §6): watching, re-solving ALL class examples, and assigned homework are separate stages.
+  // Maths: lecture -> all class re-attempts -> TAH/KCLS -> KTK. DPP and module work are never added automatically.
+  const tookMin=(syl,kind,s,def)=>medianOf((((syl||{}).took||{})[kind]||{})[s])||def;
+  const revMin=(syl,s)=>tookMin(syl,'re',s,REVMIN[s]);
+  const stageMin=(syl,st,s)=>st==='tah'||st==='ktk'?tookMin(syl,st,s,STAGEMIN[st]):tookMin(syl,'hw',s,HWMIN[s]);
+  // the homework stages a finished lecture opens; each waits for the one before it (rv id, then the previous stage)
+  function cycleAfterLecture(syl,subj,title,revId,today){
+    if(subj!=='maths'||!syl)return [];if(!Array.isArray(syl.hw))syl.hw=[];const out=[];let after=revId,base='hw'+Date.now().toString(36);
+    for(const [st,name] of [['tah','TAH/KCLS'],['ktk','KTK']]){const h={id:base+st,subj,title:`${name} · ${title}`,essential:true,mins:stageMin(syl,st,subj),next:'',status:'open',made:today||'',stage:st,lec:title,after};syl.hw.push(h);out.push(h);after=h.id;}
+    return out;}
+  // ---- question tracking (handoff §7): one unique question is one work item, never a PDF page count ----
+  const Q_STATES=['unattempted','independent','help','retry'],Q_ROLES=['class','tah','kcls','ktk','dpp','module','hw'];
+  const qn=x=>String(x==null?'':x).toLowerCase().replace(/\s+/g,' ').replace(/^(q|que|question|ex|example)\.?\s*/,'').trim();
+  const qCanon=(syl,q)=>{let k=0;while(q&&q.dupOf&&k++<20)q=(syl.qs||[]).find(x=>x.id===q.dupOf)||null;return q;};
+  // add a question. Same lecture, page, label and part: the same item (its roles merge). A worked-solution slide never makes a task.
+  // Same label and part elsewhere, or a hinted match: a separate item that asks Ayan to confirm before anything is merged.
+  function qAdd(syl,q,now){
+    if(!syl||!q||!SUB3.includes(q.subj)||!String(q.label||'').trim())return {item:null,why:'needs a subject and a printed label'};
+    if(!Array.isArray(syl.qs))syl.qs=[];const roles=[].concat(q.role||q.roles||'class').filter(r=>Q_ROLES.includes(r));
+    const same=x=>x.subj===q.subj&&qn(x.label)===qn(q.label)&&qn(x.part)===qn(q.part),exact=syl.qs.find(x=>same(x)&&qn(x.lec)===qn(q.lec)&&qn(x.page)===qn(q.page));
+    if(q.solution){const m=exact||syl.qs.find(x=>same(x)&&qn(x.lec)===qn(q.lec))||null;if(m){m.seen=[...new Set([...(m.seen||[]),String(q.page||'')])].slice(-10);}return {item:m?qCanon(syl,m):null,solution:true};}
+    if(exact){const c=qCanon(syl,exact);c.roles=[...new Set([...(c.roles||[]),...roles])];return {item:c,same:true};}
+    const item={id:'q'+(now||Date.now()).toString(36)+syl.qs.length,subj:q.subj,lec:String(q.lec||'').slice(0,80),page:String(q.page||'').slice(0,12),label:String(q.label).trim().slice(0,30),part:String(q.part||'').trim().slice(0,12),
+      roles:roles.length?roles:['class'],state:'unattempted',tries:[],checked:false,doubts:[],work:String(q.work||'').slice(0,200),made:q.d||''};
+    const cand=(q.sameAs&&syl.qs.find(x=>x.id===q.sameAs))||syl.qs.find(x=>same(x)&&!x.dupOf);if(cand)item.ask=cand.id;
+    syl.qs.push(item);return {item,ask:cand?cand.id:null};}
+  // Ayan's answer to "is this the same question?": yes merges roles into the earlier item (one attempt then covers both); no keeps both
+  function qConfirm(syl,id,same){const q=(syl.qs||[]).find(x=>x.id===id);if(!q||!q.ask)return null;const o=qCanon(syl,(syl.qs||[]).find(x=>x.id===q.ask));delete q.ask;
+    if(same&&o&&o!==q){q.dupOf=o.id;o.roles=[...new Set([...(o.roles||[]),...(q.roles||[])])];o.tries=(o.tries||[]).concat(q.tries||[]);if(q.checked)o.checked=true;o.doubts=(o.doubts||[]).concat(q.doubts||[]);if(Q_STATES.indexOf(q.state)>0&&o.state==='unattempted')o.state=q.state;return o;}
+    q.notSame=[...new Set([...(q.notSame||[]),o&&o.id].filter(Boolean))];return q;}
+  // record work on a question. how: 'independent' | 'help' | 'retry'. Earlier attempts are never rewritten,
+  // so an attempt that needed help can never turn into independent credit; only a later independent attempt earns it.
+  function qMark(syl,id,ev,d){const q=qCanon(syl,(syl.qs||[]).find(x=>x.id===id));if(!q)return null;ev=ev||{};
+    if(ev.how==='independent'||ev.how==='help'){q.tries=(q.tries||[]).concat({d:d||'',how:ev.how});q.state=ev.how;if(ev.how==='help')q.retry=true;else q.retry=false;}
+    else if(ev.how==='retry'){q.state='retry';q.retry=true;}
+    if(ev.checked!=null){q.checked=!!ev.checked;if(q.checked)q.checkedD=d||'';}
+    if(ev.doubt){q.doubts=(q.doubts||[]).concat({t:String(ev.doubt).slice(0,200),d:d||'',open:true});}
+    if(ev.resolve!=null&&q.doubts&&q.doubts[ev.resolve])q.doubts[ev.resolve].open=false;
+    if(ev.work)q.work=String(ev.work).slice(0,200);
+    return q;}
+  const qCredit=q=>!!q&&(q.tries||[]).some(t=>t.how==='independent');
+  // a lecture's class examples: how many exist, how many are untouched, and the exact one to resume at
+  function qProgress(syl,subj,lec,role){const want=role||'class',all=(syl&&syl.qs||[]).filter(x=>!x.dupOf&&x.subj===subj&&qn(x.lec)===qn(lec)&&(x.roles||[]).includes(want));
+    const open=all.filter(x=>!(x.tries||[]).length);return {total:all.length,open:open.length,retry:all.filter(x=>x.retry).length,next:open[0]?open[0].label+(open[0].part?' ('+open[0].part+')':''):'',ask:(syl&&syl.qs||[]).filter(x=>x.ask).length};}
   function buildTasks(L,day,opts={}){
-    const syl=L.syl||{},pos=syl.pos||{},out=[];
+    const syl=L.syl||{},pos=syl.pos||{},out=[],openHw=new Set((syl.hw||[]).filter(h=>h&&h.status==='open').map(h=>'hw:'+h.id)),openRv=new Set((syl.revs||[]).filter(r=>r&&!r.done).map(r=>'rv:'+r.id));
     for(const s of SUB3){const a=pos[s];if(a&&a.active){out.push({type:'lecture',subj:s,cont:true,rem:Math.max(15,lecMin(syl,s)-(+a.spent||0)),title:`Finish ${a.chapter||SNAME[s]} · lecture ${a.lec||''}${a.at?' from '+a.at:''}`,ref:a});}}
-    for(const r of syl.revs||[])if(r&&!r.done&&SUB3.includes(r.subj))out.push({type:'revision',subj:r.subj,rem:REVMIN[r.subj],title:`Revise ${r.title} · the whole lecture`,ref:r,ready:true});
-    for(const h of syl.hw||[])if(h&&h.status==='open'&&h.essential!==false&&SUB3.includes(h.subj))out.push({type:'homework',subj:h.subj,rem:Math.max(10,+h.mins||HWMIN[h.subj]),title:`Homework · ${h.title}${h.next&&!/^parked/.test(h.next)?' · next: '+h.next:''}`,ref:h});
+    for(const r of syl.revs||[])if(r&&!r.done&&SUB3.includes(r.subj)){const p=qProgress(syl,r.subj,r.title),at=p.next||(r.next||'');
+      out.push({type:'revision',subj:r.subj,rem:Math.max(10,revMin(syl,r.subj)-(+r.spent||0)),title:`Revise ${r.title} · re-solve ALL class examples independently${at?' · resume at '+at:''}${p.total?' · '+p.open+' of '+p.total+' untouched':''}`,ref:r,ready:true,key:'rv:'+r.id});}
+    for(const h of syl.hw||[])if(h&&h.status==='open'&&h.essential!==false&&SUB3.includes(h.subj)){const dep=h.after?(String(h.after).startsWith('rv')?'rv:':'hw:')+h.after:'',after=dep&&(openRv.has(dep)||openHw.has(dep))?dep:'';
+      out.push({type:'homework',subj:h.subj,rem:Math.max(10,(+h.mins||stageMin(syl,h.stage,h.subj))-(+h.spent||0)),title:`Homework · ${h.title}${h.next&&!/^parked/.test(h.next)?' · next: '+h.next:''}`,ref:h,key:'hw:'+h.id,after});}
     if(!opts.noNewLectures)for(const s of SUB3){if(out.some(x=>x.type==='lecture'&&x.subj===s))continue;const n=nextLecture(syl,s);if(n&&!n.missing)out.push({type:'lecture',subj:s,cont:false,rem:lecMin(syl,s),title:`Watch ${n.chapter} · lecture ${n.lec} of ${n.of}`,ref:n});}
     return out;
   }
@@ -1100,7 +1147,9 @@ body.habit-shh #hb-session-card {text-align:center;}
   // fill study segments in time order. A lecture finished in an earlier block makes its revision eligible later the same day.
   function assign(segs,tasks,focus,o={}){
     const pool=o.pool||tasks.map(t=>Object.assign({},t)),deficitOrder=[focus,...SUB3.filter(s=>s!==focus)],rows=[];let n=0;
-    const pick=role=>{const open=pool.filter(t=>t.rem>=5&&t.ready!==false&&!(o.examPrep&&t.type==='lecture'&&!t.cont)),owed=s=>open.some(x=>x.subj===s&&(x.type==='revision'||x.type==='homework'||(x.type==='lecture'&&x.cont)));
+    // a stage waits for the one before it; a Maths lecture's homework stages begin the day after it is watched (a two-day cycle)
+    const waits=t=>(t.from!=null&&t.from>(o.dayNo||0))||(!!t.after&&pool.some(x=>x.key===t.after&&x.rem>=5));
+    const pick=role=>{const open=pool.filter(t=>t.rem>=5&&t.ready!==false&&!waits(t)&&!(o.examPrep&&t.type==='lecture'&&!t.cont)),owed=s=>open.some(x=>x.subj===s&&(x.type==='revision'||x.type==='homework'||(x.type==='lecture'&&x.cont)));
       const live=open.filter(t=>!(t.type==='lecture'&&!t.cont&&owed(t.subj))),f=t=>t.subj===focus?0:1,by=(fn)=>live.filter(fn).sort((a,b)=>f(a)-f(b))[0];
       if(role==='L')return by(t=>t.type==='lecture'&&t.cont&&t.subj===focus)||by(t=>t.subj===focus&&t.type==='revision')||by(t=>t.subj===focus&&t.type==='homework')||by(t=>t.type==='lecture'&&t.subj===focus)||by(t=>t.type==='lecture'&&t.cont)||pick('P');
       // Sunday: only unfinished work of the subject most below its share; never a new lecture
@@ -1125,9 +1174,11 @@ body.habit-shh #hb-session-card {text-align:center;}
         rows.push(Object.assign({},g,{s:t,e:last,subj:k.subj,title:k.title,task:{type:k.type,subj:k.subj,cont:!!k.cont,ref:k.ref?{chapter:k.ref.chapter,lec:k.ref.lec,id:k.ref.id}:null}}));
         k.rem-=m;t=last;
         if(k.rem<5&&k.type==='lecture'){ // its whole-lecture revision becomes possible after this, never before
-          pool.push({type:'revision',subj:k.subj,rem:REVMIN[k.subj],title:`Revise ${k.ref?.chapter||SNAME[k.subj]} · lecture ${k.ref?.lec||''} · the whole lecture (once it is finished)`,ref:k.ref,sim:true});
+          const rk='sim:rv:'+(o.dayNo||0)+':'+(n++);pool.push({type:'revision',subj:k.subj,rem:revMin(o.syl,k.subj),title:`Revise ${k.ref?.chapter||SNAME[k.subj]} · lecture ${k.ref?.lec||''} · re-solve ALL class examples (once the lecture is finished)`,ref:k.ref,sim:true,key:rk});
           if(o.week&&k.ref&&k.ref.course!=null){const nx=nextAfter(o.syl,Object.assign({subj:k.subj},k.ref));if(nx)pool.push({type:'lecture',subj:k.subj,cont:false,rem:lecMin(o.syl,k.subj),title:`Watch ${nx.chapter} · lecture ${nx.lec} of ${nx.of}`,ref:nx});}
-          if(!k.cont&&k.subj==='maths'&&!o.noSimHomework)pool.push({type:'homework',subj:'maths',rem:HWMIN.maths,title:`Homework from ${k.ref?.chapter||'Maths'} · lecture ${k.ref?.lec||''} (if set)`,sim:true});}
+          if(k.subj==='maths'&&!o.noSimHomework){const lt=`${k.ref?.chapter||'Maths'} · lecture ${k.ref?.lec||''}`,tk=rk+':tah';
+            pool.push({type:'homework',subj:'maths',rem:stageMin(o.syl,'tah','maths'),title:`Homework · TAH/KCLS · ${lt}`,sim:true,key:tk,after:rk,from:(o.dayNo||0)+1});
+            pool.push({type:'homework',subj:'maths',rem:stageMin(o.syl,'ktk','maths'),title:`Homework · KTK · ${lt}`,sim:true,key:rk+':ktk',after:tk});}}
       }
     }
     const deferred=pool.filter(x=>x.rem>=5&&!x.sim&&(x.type!=='lecture'||x.cont)).map(x=>({type:x.type,subj:x.subj,title:x.title,min:Math.round(x.rem)}));
@@ -1329,7 +1380,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const daysLeft=w===0?0:7-w,loggedAny=ss.some(s=>s&&s.date===day&&s.subject!=='Other'&&(+s.minutes||0)>0)||Object.values(((desk.state||desk).days||{})[day]?.completed||{}).some(x=>+x>0)||!!(habit.active&&habit.active.date===day);
     return {actual14:a14,loggedAny,diplomaToday:daysLeft?Math.max(0,Math.ceil((target-dipDone)/daysLeft/5)*5):0,diplomaTarget:target,diplomaDone:dipDone,monday:mon};}
   const nowClock=()=>{const n=new Date();let m=n.getHours()*60+n.getMinutes();if(m<240)m+=1440;return m;};
-  const api={DAY_HOURS,dayHours,reviewOf,reviewSettle,cExam,gentleOf,gentleUsed,astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,forecast:(L,hist)=>forecast(L||labData(),hist||{}),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={DAY_HOURS,dayHours,reviewOf,reviewSettle,cExam,gentleOf,gentleUsed,astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,cycleAfterLecture,qAdd,qConfirm,qMark,qCredit,qProgress,Q_STATES,Q_ROLES,STAGEMIN,revMin,forecast:(L,hist)=>forecast(L||labData(),hist||{}),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -8271,7 +8322,8 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   if (!L.sched || typeof L.sched !== 'object') L.sched = { v: 1, since: today(), trialStart: today() };
   L.sched = SP().schedOf(L); if (!L.sched.since) L.sched.since = today(); if (!L.sched.trialStart) L.sched.trialStart = today(); L.sched.v = 1;
   if (!L.syl || typeof L.syl !== 'object' || !L.syl.courses) L.syl = SP().seedSyllabus();
-  for (const k of ['revs', 'hw']) if (!Array.isArray(L.syl[k])) L.syl[k] = [];
+  for (const k of ['revs', 'hw', 'qs']) if (!Array.isArray(L.syl[k])) L.syl[k] = [];
+  if (!L.syl.took || typeof L.syl.took !== 'object') L.syl.took = {};
   if (!L.syl.pos || typeof L.syl.pos !== 'object') L.syl.pos = {};
   if (!L.syl.watch || typeof L.syl.watch !== 'object') L.syl.watch = { maths: [], physics: [], chem: [] };
   // the old hours picker's settings stay saved (history and backups) but no longer drive free days
@@ -8343,7 +8395,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     const sy = syl(), p = sy.pos[subj], n = SP().nextLecture(sy, subj), cur = p && p.course ? p : (n && !n.missing ? n : null); if (!cur) return null;
     const c = sy.courses[cur.course]; if (!c) return null; c.done = c.done || []; c.done[cur.ci] = Math.min(c.chapters[cur.ci][1] || 999, (c.done[cur.ci] || 0) + 1);
     const spent = (+((p && p.spent) || 0)) + (spentNow || 0); if (spent >= 30) { (sy.watch[subj] = sy.watch[subj] || []).push(Math.round(spent)); sy.watch[subj] = sy.watch[subj].slice(-30); }
-    const title = `${cur.chapter} · lecture ${cur.lec}`; sy.revs.push({ id: 'rv' + Date.now().toString(36), subj, title, done: false, made: today() }); delete sy.pos[subj]; (sy.lastFin = sy.lastFin && typeof sy.lastFin === 'object' ? sy.lastFin : {})[subj] = Date.now(); S().flow = { d: today(), kind: 'revise', subj, title };
+    const title = `${cur.chapter} · lecture ${cur.lec}`, rid = 'rv' + Date.now().toString(36); sy.revs.push({ id: rid, subj, title, done: false, made: today(), stage: 'reattempt' }); SP().cycleAfterLecture(sy, subj, title, rid, today()); delete sy.pos[subj]; (sy.lastFin = sy.lastFin && typeof sy.lastFin === 'object' ? sy.lastFin : {})[subj] = Date.now(); S().flow = { d: today(), kind: 'revise', subj, title };
     audit('lecture finished', SN[subj] + ' · ' + title); return title;
   }
   // lecture time comes only from the paused-aware session timer; a ledger (syl.timerSeen) remembers what each session already gave,
@@ -8530,14 +8582,32 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
       <form data-f="kgdwake" class="kl-row" style="flex-wrap:wrap"><label class="kl-small">Woke at <input type="time" name="at" value="${woke != null ? timeVal(+woke) : ''}"></label><button>Set</button>${quick}<button type="button" class="kl-ghost" data-a="kgdwake" data-v="now">Now</button></form>
       <p class="kl-small">Today is ${esc(SN[v.info.focus] || '')}-heavy${foc === 'auto' ? ' (auto, from the last two weeks)' : ''}: <span role="group">${['auto', ...SUB].map(s => `<button type="button" class="kl-ghost" data-a="kgdfocus" data-v="${s}" aria-pressed="${foc === s}">${s === 'auto' ? 'Auto' : SN[s]}</button>`).join(' ')}</span></p>`;
   }
+  // question tracker (handoff §7): unique questions, not pages; attempts, checking and doubts are kept apart
+  const QHOW = { unattempted: 'not attempted', independent: 'attempted on your own', help: 'needed help', retry: 'retry on your own later' };
+  function questionsHTML() {
+    const sy = syl(), qs = sy.qs || [], byId = id => qs.find(x => x.id === id), src = q => `${q.label}${q.part ? ' (' + q.part + ')' : ''} · ${q.lec || 'no lecture'}${q.page ? ' p' + q.page : ''}`;
+    const asks = qs.filter(q => q.ask && byId(q.ask)).map(q => `<li>Is <b>${esc(src(q))}</b> the same question as <b>${esc(src(byId(q.ask)))}</b>? <button type="button" class="kl-ghost" data-a="kgqsame" data-v="${esc(q.id)}" data-y="1">Same question</button><button type="button" class="kl-ghost" data-a="kgqsame" data-v="${esc(q.id)}" data-y="0">Different</button></li>`).join('');
+    const live = qs.filter(q => !q.dupOf && (!SP().qCredit(q) || q.retry || !q.checked || (q.doubts || []).some(d => d.open))).slice(-40);
+    const li = live.map(q => `<li>${esc(SN[q.subj])} · ${esc(src(q))} <small>${esc((q.roles || []).join(' + ').toUpperCase())} · ${esc(QHOW[q.state] || q.state)}${q.checked ? ' · checked' : ''}${(q.doubts || []).filter(d => d.open).length ? ' · doubt open' : ''}${q.work ? ' · ' + esc(q.work) : ''}</small>
+      <span role="group"><button type="button" class="kl-ghost" data-a="kgqmark" data-v="${esc(q.id)}" data-h="independent">On my own</button><button type="button" class="kl-ghost" data-a="kgqmark" data-v="${esc(q.id)}" data-h="help">Needed help</button><button type="button" class="kl-ghost" data-a="kgqmark" data-v="${esc(q.id)}" data-h="retry">Retry later</button><button type="button" class="kl-ghost" data-a="kgqmark" data-v="${esc(q.id)}" data-h="checked" aria-pressed="${!!q.checked}">Checked</button></span>
+      <form data-f="kgqdoubt" class="kl-row"><input type="hidden" name="id" value="${esc(q.id)}"><input name="doubt" maxlength="200" placeholder="unresolved doubt (optional)"><button>Save doubt</button>${(q.doubts || []).some(d => d.open) ? `<button type="button" class="kl-ghost" data-a="kgqresolve" data-v="${esc(q.id)}">Doubt resolved</button>` : ''}</form></li>`).join('');
+    const lecs = [...new Set(sy.revs.filter(r => !r.done).map(r => r.title).concat(sy.hw.filter(h => h.status === 'open' && h.lec).map(h => h.lec)))].map(t => `<option value="${esc(t)}">`).join('');
+    const opts = SUB.map(s => `<option value="${s}">${SN[s]}</option>`).join(''), roles = SP().Q_ROLES.map(r => `<option value="${r}">${r === 'class' ? 'class example' : r.toUpperCase()}</option>`).join('');
+    return `<p class="kl-small"><b>Questions</b> · one line per unique question (not per page). A repeated solution slide is not a new task; one attempt covers a class example and its homework entry when they are the same question. An attempt that needed help stays a supported attempt.</p>
+      ${asks ? `<ul class="kl-list">${asks}</ul>` : ''}${li ? `<ul class="kl-list">${li}</ul>` : ''}
+      <form data-f="kgqadd" class="kl-row" style="flex-wrap:wrap"><select name="subj">${opts}</select><input name="lec" list="kg-q-lecs" maxlength="80" placeholder="source lecture"><datalist id="kg-q-lecs">${lecs}</datalist><input name="page" maxlength="12" placeholder="page" style="width:4em"><input name="label" required maxlength="30" placeholder="printed label, e.g. Q7" style="width:9em"><input name="part" maxlength="12" placeholder="part" style="width:4em"><select name="role">${roles}</select><label class="kl-small"><input type="checkbox" name="solution"> solution slide</label><button>Add question</button></form>`;
+  }
   function workHTML() {
     const sy = syl(), revs = sy.revs.filter(r => !r.done), hw = sy.hw.filter(h => h.status === 'open');
-    const rv = revs.map(r => `<li>${esc(SN[r.subj])} · ${esc(r.title)} <button type="button" class="kl-ghost" data-a="kgdrev" data-v="${esc(r.id)}">Revision done</button></li>`).join('');
-    const hl = hw.map(h => `<li>${esc(SN[h.subj])} · ${esc(h.title)} <small>${h.essential === false ? 'additional' : 'essential'} · about ${h.mins || SP().HWMIN[h.subj]} min${hwLine(h) ? ' · ' + esc(hwLine(h)) : ''}</small> <button type="button" class="kl-ghost" data-a="kghwdone" data-v="${esc(h.id)}">Done</button><button type="button" class="kl-ghost" data-a="kghwess" data-v="${esc(h.id)}">${h.essential === false ? 'Make essential' : 'Make additional'}</button><button type="button" class="kl-ghost" data-a="kghwpark" data-v="${esc(h.id)}" title="Puts a stuck question in Doubts">Park a doubt</button><details><summary class="kl-small">Progress</summary>${hwProgForm(h)}</details></li>`).join('');
+    const rv = revs.map(r => { const p = SP().qProgress(sy, r.subj, r.title), at = p.next || r.next || '';
+      return `<li>${esc(SN[r.subj])} · ${esc(r.title)} · re-solve ALL class examples <small>${p.total ? `${p.open} of ${p.total} class examples untouched${p.retry ? ` · ${p.retry} marked for an independent retry` : ''}` : 'add the class examples below to track them one by one'}${at ? ' · resume at ' + esc(at) : ''}</small> <button type="button" class="kl-ghost" data-a="kgdrev" data-v="${esc(r.id)}">All re-attempted</button>
+        <form data-f="kgrevnext" class="kl-row" style="flex-wrap:wrap"><input type="hidden" name="id" value="${esc(r.id)}"><label class="kl-small">Resume at <input name="next" value="${esc(r.next || '')}" maxlength="40" placeholder="Q7" style="width:6em"></label><label class="kl-small">min spent so far <input name="spent" type="number" min="0" max="600" value="${+r.spent || ''}" style="width:5em"></label><button>Save</button></form></li>`; }).join('');
+    const waitName = h => { if (!h.after) return ''; const r = sy.revs.find(x => x.id === h.after && !x.done), o = sy.hw.find(x => x.id === h.after && x.status === 'open'); return r ? 'after the class re-attempts' : o ? 'after ' + o.title.split(' · ')[0] : ''; };
+    const hl = hw.map(h => `<li>${esc(SN[h.subj])} · ${esc(h.title)} <small>${waitName(h) ? esc(waitName(h)) + ' · ' : ''}${h.essential === false ? 'additional' : 'essential'} · about ${h.mins || SP().HWMIN[h.subj]} min${hwLine(h) ? ' · ' + esc(hwLine(h)) : ''}</small> <button type="button" class="kl-ghost" data-a="kghwdone" data-v="${esc(h.id)}">Done</button><button type="button" class="kl-ghost" data-a="kghwess" data-v="${esc(h.id)}">${h.essential === false ? 'Make essential' : 'Make additional'}</button><button type="button" class="kl-ghost" data-a="kghwpark" data-v="${esc(h.id)}" title="Puts a stuck question in Doubts">Park a doubt</button><details><summary class="kl-small">Progress</summary>${hwProgForm(h)}</details></li>`).join('');
     const opts = SUB.map(s => `<option value="${s}">${SN[s]}</option>`).join('');
     return `<details${ko('work')}><summary class="kl-small">Revision, homework and German · ${revs.length} revision${revs.length === 1 ? '' : 's'} waiting · ${hw.length} homework open</summary>
-      <p class="kl-small">A lecture's whole revision appears here only once the lecture is marked finished. Homework carries over to the next study day with its next step; it never pushes bedtime.</p>
-      ${rv ? `<ul class="kl-list">${rv}</ul>` : ''}${hl ? `<ul class="kl-list">${hl}</ul>` : ''}<p class="kl-small"><b>German</b></p>${germanTools()}
+      <p class="kl-small">Watching a lecture completes only the watching. Its re-attempts (every class example, solved again on your own) appear once the lecture is marked finished; in Maths, TAH/KCLS comes next and KTK last. DPP and module work are only planned if you add them. Unfinished work resumes at the exact question in the next study block for that subject; it never pushes bedtime.</p>
+      ${rv ? `<ul class="kl-list">${rv}</ul>` : ''}${hl ? `<ul class="kl-list">${hl}</ul>` : ''}${questionsHTML()}<p class="kl-small"><b>German</b></p>${germanTools()}
       <form data-f="kghwadd" class="kl-row" style="flex-wrap:wrap"><select name="subj">${opts}</select><input name="title" required maxlength="140" placeholder="e.g. Basic Maths L21 exercise 1-12"><label class="kl-small">min <input name="mins" type="number" min="10" max="300" style="width:5em"></label><label class="kl-small"><input type="checkbox" name="extra"> additional (not essential)</label><input name="next" maxlength="100" placeholder="next step (optional)"><button>Add homework</button></form></details>`;
   }
   function settingsHTML(v) {
@@ -8615,7 +8685,10 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     kgdgo: b => { if (b.dataset.v === 'resume') { M.go('today'); document.getElementById('hb-session-card')?.scrollIntoView({ behavior: 'smooth' }); return; }
       if (!window.HabitDesk?.startBlock) return toast('open the desk below to start a timer 🌙'); window.HabitDesk.startBlock(b.dataset.v); },
     kgdlecdone: b => { const s = b.dataset.v; syncLectureTime(); const t = finishLecture(s, timerTake(s)); if (!t) return toast('no lecture to finish for ' + SN[s]); redo(`${t} finished. its whole-lecture revision is next in line 🌙`); },
-    kgdrev: b => { const r = syl().revs.find(x => x.id === b.dataset.v); if (!r) return; r.done = true; r.doneD = today(); S().flow = { d: today(), kind: 'homework', subj: r.subj, title: r.title }; audit('revision done', SN[r.subj] + ' · ' + r.title); redo('revision marked done 🌙'); },
+    kgqsame: b => { const q = SP().qConfirm(syl(), b.dataset.v, b.dataset.y === '1'); if (!q) return; audit('question match', b.dataset.y === '1' ? 'same question' : 'different questions'); redo(); },
+    kgqmark: b => { const h = b.dataset.h, q = (syl().qs || []).find(x => x.id === b.dataset.v); if (!q) return; SP().qMark(syl(), q.id, h === 'checked' ? { checked: !SP().qMark(syl(), q.id, {}).checked } : { how: h }, today()); redo(); },
+    kgqresolve: b => { const q = SP().qMark(syl(), b.dataset.v, {}); if (!q) return; (q.doubts || []).forEach(d => { d.open = false; }); redo(); },
+    kgdrev: b => { const r = syl().revs.find(x => x.id === b.dataset.v); if (!r) return; r.done = true; r.doneD = today(); if (+r.spent >= 10) { const t = syl().took = syl().took || {}; ((t.re = t.re || {})[r.subj] = t.re[r.subj] || []).push(Math.round(+r.spent)); t.re[r.subj] = t.re[r.subj].slice(-30); } S().flow = { d: today(), kind: 'homework', subj: r.subj, title: r.title }; audit('revision done', SN[r.subj] + ' · ' + r.title); redo('revision marked done 🌙'); },
     kgdflow: () => { delete S().flow; redo(); },
     kgdgerman1: b => { const u = Math.max(0, (+S().germanUnit || 0) + (+b.dataset.v || 0)); S().germanUnit = u; audit('German unit', SP().germanTitle(u)); redo(+b.dataset.v > 0 ? 'next German unit is ready for your next German block 🌙' : ''); },
     kgdweek: b => { const k = b.dataset.v, mon = SP().mondayOf(today()), ws = S().weekSize = S().weekSize || {}; if (!['full', 'lighter', 'minimal'].includes(k)) return; if (k === 'full') delete ws[mon]; else ws[mon] = k; audit('week size', k + ' from ' + mon); redo(k === 'full' ? 'back to the normal week 🌙' : `a ${k} week: every day of it is smaller, nothing to catch up later 🌙`); },
@@ -8641,6 +8714,11 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     kgdwake: v => { const c = readClock(v.at); if (c == null) return toast('pick the time you woke up 🌙'); if (c > 1290) return toast('after 9:30 PM there is no study to plan. rest; tomorrow starts fresh 🌙'); const d = today(); S().wake[d] = Math.round(c / 5) * 5; delete S().switches[d]; if (WAKE[S().plan[d]]) S().plan[d] = 'auto'; audit('wake time', clk(c)); redo(); },
     kgdts: v => { const s = v.subj; if (!SUB.includes(s)) return; const at = String(v.at || '').trim(); if (at && !/^\d{1,2}(:\d{2}){1,2}$/.test(at)) return toast('type it like 42:10 or 1:02:30 🌙'); syncLectureTime(); const seen0 = JSON.stringify(syl().timerSeen || {}); const add = timerTake(s);
       if (!saveTimestamp(s, at, add)) { syl().timerSeen = JSON.parse(seen0); return toast('no lecture in progress for ' + SN[s]); } delete syl().pos[s].lastBlock; delete syl().pos[s].lastAdd; audit('lecture timestamp', SN[s] + ' ' + at); redo('timestamp saved. it picks up from there next time 🌙'); },
+    kgrevnext: v => { const r = syl().revs.find(x => x.id === v.id); if (!r) return; r.next = String(v.next || '').trim().slice(0, 40); if (v.spent !== '' && v.spent != null) r.spent = Math.max(0, Math.min(600, +v.spent || 0)); redo('saved · the next block resumes there'); },
+    kgqadd: v => { const r = SP().qAdd(syl(), { subj: v.subj, lec: String(v.lec || '').trim(), page: v.page, label: v.label, part: v.part, role: v.role, solution: !!v.solution, d: today() });
+      if (!r.item && !r.solution) return toast(r.why || 'not added'); audit('question', r.solution ? 'solution slide noted' : r.same ? 'same question, roles merged' : 'added ' + r.item.label);
+      redo(r.solution ? (r.item ? 'solution slide noted on the existing question · no new task' : 'a solution slide is not a new task') : r.ask ? 'added · please confirm whether it is the same question as the earlier one' : r.same ? 'already tracked · roles merged' : ''); },
+    kgqdoubt: v => { const t = String(v.doubt || '').trim(); if (!t) return; SP().qMark(syl(), v.id, { doubt: t }, today()); redo(); },
     kghwadd: v => { const t = String(v.title || '').trim(); if (!t || !SUB.includes(v.subj)) return; if (S().flow && S().flow.kind === 'homework') delete S().flow; syl().hw.push({ id: 'hw' + Date.now().toString(36), subj: v.subj, title: t.slice(0, 140), essential: !v.extra, mins: Math.max(10, Math.min(300, +v.mins || SP().HWMIN[v.subj])), next: String(v.next || '').slice(0, 100), status: 'open', made: today() }); audit('homework added', t); redo(); },
     kghwprog: v => { const h = syl().hw.find(x => x.id === v.id); if (!h) return; h.done = String(v.done || '').trim().slice(0, 40); h.next = String(v.next || '').trim().slice(0, 60); const st = String(v.stuck || '').trim().slice(0, 60), fresh = st && st !== h.stuck;
       if (fresh) (L.doubts = L.doubts || []).push({ id: Date.now().toString(36), ch: '', t: `${SN[h.subj]} · ${h.title}: stuck on ${st}`.slice(0, 400), d: today(), done: false });
@@ -13409,7 +13487,7 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
       return `${r.title}: ${clk(s)}–${clk(e)}`; },
     lecture: o => { const s = subjOf(o.subj), at = String(o.at || '').trim(); need(/^\d{1,2}(:\d{2}){1,2}$/.test(at), 'timestamp like 42:10'); const sy = L().syl, n = SP().nextLecture(sy, s); const p = sy.pos[s] || (n && !n.missing ? { course: n.course, ci: n.ci, chapter: n.chapter, lec: n.lec } : null); need(p, 'no lecture in progress'); p.active = true; p.at = at; p.d = today(); sy.pos[s] = p; return `${SN[s]} lecture saved at ${at}`; },
     lecturedone: o => { const s = subjOf(o.subj), sy = L().syl, p = sy.pos[s], n = SP().nextLecture(sy, s), cur = p && p.course ? p : (n && !n.missing ? n : null); need(cur, 'no lecture to finish'); const c = sy.courses[cur.course];
-      c.done = c.done || []; c.done[cur.ci] = Math.min(c.chapters[cur.ci][1] || 999, (c.done[cur.ci] || 0) + 1); sy.revs.push({ id: 'rv' + Date.now().toString(36), subj: s, title: `${cur.chapter} · lecture ${cur.lec}`, done: false, made: today() }); delete sy.pos[s]; return `${SN[s]} ${cur.chapter} lecture ${cur.lec} finished`; },
+      c.done = c.done || []; c.done[cur.ci] = Math.min(c.chapters[cur.ci][1] || 999, (c.done[cur.ci] || 0) + 1); const rid = 'rv' + Date.now().toString(36), lt = `${cur.chapter} · lecture ${cur.lec}`; sy.revs.push({ id: rid, subj: s, title: lt, done: false, made: today(), stage: 'reattempt' }); SP().cycleAfterLecture(sy, s, lt, rid, today()); delete sy.pos[s]; return `${SN[s]} ${cur.chapter} lecture ${cur.lec} finished`; },
     progress: o => { const sy = L().syl, c = sy.courses[o.course]; need(c, 'unknown course'); const k = Number.isInteger(+o.chapter) ? +o.chapter : c.chapters.findIndex(x => x[0].toLowerCase().includes(String(o.chapter || '').toLowerCase())); need(c.chapters[k], 'unknown chapter');
       if (o.count != null) c.chapters[k][1] = Math.max(1, Math.min(400, +o.count)); if (o.done != null) { c.done = c.done || []; c.done[k] = Math.max(0, Math.min(c.chapters[k][1] || 400, +o.done)); } return `${c.name} · ${c.chapters[k][0]}: ${(c.done || [])[k] || 0}/${c.chapters[k][1] ?? '?'}`; },
     addchapter: o => { const sy = L().syl, c = sy.courses[o.course]; need(c, 'unknown course'); const nm = String(o.name || '').trim(), n = +o.count; need(nm && n > 0, 'chapter needs a name and a lecture count'); c.chapters = c.chapters.filter(x => x[1] != null || !/count missing/.test(x[0])); c.chapters.push([nm.slice(0, 80), Math.min(400, n)]); return `${c.name}: added ${nm} (${n})`; },
