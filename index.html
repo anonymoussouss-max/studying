@@ -1077,6 +1077,9 @@ body.habit-shh #hb-session-card {text-align:center;}
   const tookMin=(syl,kind,s,def)=>medianOf((((syl||{}).took||{})[kind]||{})[s])||def;
   const revMin=(syl,s)=>tookMin(syl,'re',s,REVMIN[s]);
   const stageMin=(syl,st,s)=>st==='tah'||st==='ktk'?tookMin(syl,st,s,STAGEMIN[st]):tookMin(syl,'hw',s,HWMIN[s]);
+  // ONE set of per-lecture stage estimates, read by both the cycle planner's numbers above and the forecast: the initial
+  // values refined by the median of real records. Maths homework = TAH/KCLS + KTK, exactly as the cycle schedules it.
+  const stageEst=(syl,s)=>({lecture:lecMin(syl,s),reattempt:revMin(syl,s),homework:s==='maths'?stageMin(syl,'tah',s)+stageMin(syl,'ktk',s):stageMin(syl,'hw',s)});
   // the homework stages a finished lecture opens; each waits for the one before it (rv id, then the previous stage)
   function cycleAfterLecture(syl,subj,title,revId,today){
     if(subj!=='maths'||!syl)return [];if(!Array.isArray(syl.hw))syl.hw=[];const out=[];let after=revId,base='hw'+Date.now().toString(36);
@@ -1168,7 +1171,7 @@ body.habit-shh #hb-session-card {text-align:center;}
       if(g.role==='Gphys'){rows.push(Object.assign({},g,{subj:'physics',title:'Physics · 15 minutes, then decide. Stopping after this is a complete day.',task:{type:'gentle'}}));continue;}
       let t=g.s;
       while(g.e-t>=5){const k=pick(g.role);
-        if(!k&&g.role==='SUN'){rows.push(Object.assign({},g,{s:t,subj:focus,title:'Sunday · '+SNAME[focus]+' (needs more attention) · an unfinished example, an assigned question or one specific gap',task:{type:'practice',subj:focus,sunday:true}}));t=g.e;break;}
+        if(!k&&g.role==='SUN'){rows.push(Object.assign({},g,{s:t,subj:focus,title:'Sunday · '+SNAME[focus]+(o.provisional?' (provisional pick: not enough recorded PCM time yet to compare shares)':' (needs more attention)')+' · an unfinished example, an assigned question or one specific gap',task:{type:'practice',subj:focus,sunday:true}}));t=g.e;break;}
         if(!k){rows.push(Object.assign({},g,{s:t,subj:focus,title:SNAME[focus]+' · independent problems (older topics count within today\'s allowance)',task:{type:'practice',subj:focus}}));t=g.e;break;}
         const m=Math.min(k.rem,g.e-t),last=g.e-t-m<5?g.e:t+m;
         rows.push(Object.assign({},g,{s:t,e:last,subj:k.subj,title:k.title,task:{type:k.type,subj:k.subj,cont:!!k.cont,ref:k.ref?{chapter:k.ref.chapter,lec:k.ref.lec,id:k.ref.id}:null}}));
@@ -1259,7 +1262,7 @@ body.habit-shh #hb-session-card {text-align:center;}
 
     const tasks=ctx.pool?[]:buildTasks(L,dayIso,{noNewLectures:!!prep});
     const focus=dayFocus(L,dayIso,ctx.actual14||{});
-    const {rows,deferred}=assign(segs,tasks,focus,{now:nowClock,dayNo:Math.floor(Date.parse(dayIso+'T12:00:00')/864e5),firstOfDay:!ctx.loggedAny,examPrep:!!prep,astroTitle:astroNext(L.astro,dayIso).text,pool:ctx.pool,week:!!ctx.pool,syl:L.syl||{},germanUnit:+S.germanUnit||0});
+    const {rows,deferred}=assign(segs,tasks,focus,{provisional:!['maths','physics','chem'].some(k=>+(ctx.actual14||{})[k]>0),now:nowClock,dayNo:Math.floor(Date.parse(dayIso+'T12:00:00')/864e5),firstOfDay:!ctx.loggedAny,examPrep:!!prep,astroTitle:astroNext(L.astro,dayIso).text,pool:ctx.pool,week:!!ctx.pool,syl:L.syl||{},germanUnit:+S.germanUnit||0});
     const cut=(segs.cuts||[]).reduce((a,c)=>a+c.m,0);
     if(GR)deferred.length=0; // gentle return: nothing is pushed onto another day; unfinished work waits in the parked list
     if(replan)replan.moved=deferred.map(x=>x.title+' ('+x.min+' min)');
@@ -1356,19 +1359,23 @@ body.habit-shh #hb-session-card {text-align:center;}
   // Sunday 60 min PCM; a day off 0) minus German and astrophysics; the week's diploma hours come off too. Two answers:
   // a hypothetical pace (that capacity, if every day were kept) and a forecast from real recent PCM study (2+ weeks needed).
   // Counts that are missing or provisional are listed; with any of them no completion date is claimed.
-  const REATT={maths:[20,40],physics:[15,30],chem:[15,30]}; // re-attempting missed questions, per lecture (low, high)
+  const REATT={maths:[20,40],physics:[15,30],chem:[15,30]}; // EXTRA retries of missed questions per lecture (low, high), shown separately; the class re-attempts themselves come from stageEst
   function pcmCapacity(L,from){const S=schedOf(L),days=[];let week=0;
     for(let k=0;k<7;k++){const d=add8(from,k),dow=new Date(d+'T12:00:00').getDay(),GR=gentleOf(S,d),off=((L.dayTypes||{})[d]||{}).t==='rest';
-      let all,src;if(off){all=0;src='day off';}else if(dow===0){all=90;src='Sunday';}else if(GR){all=GR.stopped||!GR.cap?0:GR.cap;src='Gentle Return'+(GR.cap?' cap':' (no maximum set)');}
+      // Gentle Return and Done come before Sunday: a capped or stopped Sunday is never forecast as 60 + 30
+      let all,src;if(off){all=0;src='day off';}else if(GR){all=GR.stopped||!GR.cap?0:dow===0?Math.min(90,GR.cap):GR.cap;src=GR.stopped?'Done for today':'Gentle Return'+(GR.cap?' cap':' (no maximum set)');}
+      else if(dow===0){all=90;src='Sunday';}
       else{const h=dayHours(S,d)||6;all=h*60;src=h+' h';}
-      const ger=off||!all?0:dow===0?30:Math.min(all,+S.german||0),ast=dow===0||!all?0:Math.min(all-ger,astroMinutes(S,d)),pcm=Math.max(0,all-ger-ast);
+      const ger=off||!all?0:dow===0?Math.min(30,all):Math.min(all,+S.german||0),ast=dow===0||!all?0:Math.min(all-ger,astroMinutes(S,d)),pcm=Math.max(0,all-ger-ast);
       days.push({d,src,all,german:ger,astro:ast,pcm});week+=pcm;}
     const dip=+((S.diploma.heavy||{})[mondayOf(from)])||+S.diploma.week||0;
     return {days,diploma:dip,weekly:Math.max(0,week-dip)};}
   function forecast(L,hist={},from){
     const syl=L.syl||{},per={},missing=[],provisional=[],absent=[],day0=from||studyDate();
     const parts={lecture:[0,0],revision:[0,0],homework:[0,0],reattempt:[0,0]};
-    const rng={maths:{lecture:[lecMin(syl,'maths'),180],revision:[REVMIN.maths,90],homework:[HWMIN.maths,90]},physics:{lecture:[lecMin(syl,'physics'),115],revision:[30,30],homework:[30,45]},chem:{lecture:[lecMin(syl,'chem'),110],revision:[30,30],homework:[30,45]}};
+    // low = the shared estimate the planner schedules with (stageEst); high = the handoff's upper end where it gives one
+    const HI={maths:{lecture:180,revision:90,homework:120}},rng={};
+    for(const s of SUB3){const e=stageEst(syl,s),h=HI[s]||{};rng[s]={lecture:[e.lecture,Math.max(e.lecture,h.lecture||0)],revision:[e.reattempt,Math.max(e.reattempt,h.revision||0)],homework:[e.homework,Math.max(e.homework,h.homework||0)]};}
     let low=0,high=0;
     for(const s of SUB3){let rem=0,done=0,total=0;
       for(const id of (syl.order||{})[s]||[]){const c=(syl.courses||{})[id];if(!c)continue;
@@ -1418,7 +1425,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const daysLeft=w===0?0:7-w,loggedAny=ss.some(s=>s&&s.date===day&&s.subject!=='Other'&&(+s.minutes||0)>0)||Object.values(((desk.state||desk).days||{})[day]?.completed||{}).some(x=>+x>0)||!!(habit.active&&habit.active.date===day);
     return {actual14:a14,loggedAny,diplomaToday:daysLeft?Math.max(0,Math.ceil((target-dipDone)/daysLeft/5)*5):0,diplomaTarget:target,diplomaDone:dipDone,monday:mon};}
   const nowClock=()=>{const n=new Date();let m=n.getHours()*60+n.getMinutes();if(m<240)m+=1440;return m;};
-  const api={DAY_HOURS,dayHours,reviewOf,reviewSettle,cExam,gentleOf,gentleUsed,astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,cycleAfterLecture,qAdd,qConfirm,qMark,qCredit,qProgress,Q_STATES,Q_ROLES,STAGEMIN,revMin,forecast:(L,hist,from)=>forecast(L||labData(),hist||{},from),pcmCapacity:(L,from)=>pcmCapacity(L||labData(),from||studyDate()),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={DAY_HOURS,dayHours,reviewOf,reviewSettle,cExam,gentleOf,gentleUsed,astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,cycleAfterLecture,qAdd,qConfirm,qMark,qCredit,qProgress,Q_STATES,Q_ROLES,STAGEMIN,revMin,stageEst,forecast:(L,hist,from)=>forecast(L||labData(),hist||{},from),pcmCapacity:(L,from)=>pcmCapacity(L||labData(),from||studyDate()),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -8356,6 +8363,21 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   const { L, save, today, esc } = M;
   const SP = () => window.StudyPlan;
   const SUB = ['maths', 'physics', 'chem'], SN = { maths: 'Maths', physics: 'Physics', chem: 'Chemistry' };
+  // Timer minutes reach the homework they were for: a session started from a "Homework · <title>" block adds its minutes
+  // to that homework's spent time, once per session (h.sess keeps the ids). The longest matching title wins.
+  function creditHw() {
+    let hab = {}; try { hab = JSON.parse(localStorage.getItem('ame-habit-v1') || '{}') || {}; } catch (e) {}
+    const hw = ((L.syl || {}).hw || []).filter(h => h && h.title); let ch = false;
+    for (const s of Array.isArray(hab.sessions) ? hab.sessions : []) {
+      if (!s || !(+s.minutes > 0) || !/^Homework · /.test(String(s.task || ''))) continue;
+      const h = hw.filter(x => String(s.task).startsWith('Homework · ' + x.title) && (!x.made || !s.date || s.date >= x.made)).sort((a, b) => b.title.length - a.title.length)[0];
+      if (!h || (h.sess || []).includes(s.id)) continue;
+      (h.sess = h.sess || []).push(s.id); h.spent = Math.min(600, Math.round((+h.spent || 0) + (+s.minutes))); ch = true;
+    }
+    if (ch) save(); return ch;
+  }
+  window.addEventListener('habit:change', () => { try { creditHw(); } catch (e) {} }); setTimeout(() => { try { creditHw(); } catch (e) {} }, 2000);
+  window.__kgCreditHw = creditHw;
   // ---- one-time, backward-compatible migration: new keys only; nothing existing is removed ----
   if (!L.sched || typeof L.sched !== 'object') L.sched = { v: 1, since: today(), trialStart: today() };
   L.sched = SP().schedOf(L); if (!L.sched.since) L.sched.since = today(); if (!L.sched.trialStart) L.sched.trialStart = today(); L.sched.v = 1;
@@ -8699,7 +8721,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
       ${f.complete ? '' : `<p class="kl-small" data-kg="fc-incomplete"><b>Not a completion date.</b> ${f.absent.length ? 'Missing lecture counts: ' + esc(f.absent.join('; ')) + '. ' : ''}${f.provisionalCounts.length ? 'Provisional counts: ' + esc(f.provisionalCounts.join('; ')) + '. ' : ''}The ranges below cover the counted lectures only.</p>`}
       <p class="kl-small" data-kg="fc-pace"><b>Hypothetical pace</b> (your selected capacity, ${dur(f.pace.weekly)} PCM a week after German, astrophysics and ${dur(f.capacity.diploma)} diploma, if it were kept): ${f.pace.weekly ? span(f.pace) : 'no PCM capacity is selected this week'}.</p>
       <p class="kl-small" data-kg="fc-actual"><b>Forecast from real study</b>: ${f.actual ? `your last ${f.actual.weeksUsed} weeks averaged ${dur(f.actual.weekly)} PCM, so ${span(f.actual)}` : 'not yet: it needs at least two full weeks of logged PCM study'}.</p>
-      <p class="kl-small">Remaining work for the counted lectures: lectures ${pr('lecture')}, revision ${pr('revision')}, homework ${pr('homework')}, re-attempts ${pr('reattempt')}. Uncertainty: ${esc(f.uncertainty)}.</p>
+      <p class="kl-small">Remaining work for the counted lectures: lectures ${pr('lecture')}, class re-attempts ${pr('revision')}, homework (Maths: TAH/KCLS + KTK) ${pr('homework')}, plus extra retries of missed questions ${pr('reattempt')}. The low end uses the same per-stage times the planner schedules with, refined from your real records. Uncertainty: ${esc(f.uncertainty)}.</p>
       <p class="kl-small">Assumptions: ${f.assumptions.map(esc).join('; ')}.</p>
       ${f.missing.length ? `<p class="kl-small"><b>Uncertain or missing:</b> ${f.missing.map(esc).join('; ')}.</p>` : ''}
       <p class="kl-small"><b>Coverage</b> (lectures watched) and <b>understanding</b> are different things. Last 14 days: ${u.indep} independent correct answers, ${u.explained} explanations. Watching and rereading never count as mastery.</p>
@@ -8753,7 +8775,10 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
       try { const r = await window.__kgAsk('iroha', msg); text = r && typeof r.reply === 'string' ? r.reply.trim() : ''; } catch (_) {}
       if (!text) { b.disabled = false; b.textContent = 'Ask Iroha for the 3 check problems'; return toast('Iroha could not answer just now 🌙'); }
       (sy.readyQ = sy.readyQ && typeof sy.readyQ === 'object' ? sy.readyQ : {})[key] = { d: today(), text: text.slice(0, 3000) }; audit('readiness problems', SN[s] + ' · ' + name); redo(); },
-    kghwdone: b => { const h = syl().hw.find(x => x.id === b.dataset.v); if (!h) return; h.status = 'done'; h.doneD = today(); audit('homework done', h.title); redo(); },
+    // done: its real timed minutes (creditHw) refine the shared estimate for that stage (TAH/KCLS, KTK, or other homework)
+    kghwdone: b => { const h = syl().hw.find(x => x.id === b.dataset.v); if (!h) return; h.status = 'done'; h.doneD = today();
+      if (+h.spent >= 10) { const t = syl().took = syl().took || {}, k = h.stage === 'tah' || h.stage === 'ktk' ? h.stage : 'hw'; ((t[k] = t[k] || {})[h.subj] = t[k][h.subj] || []).push(Math.round(+h.spent)); t[k][h.subj] = t[k][h.subj].slice(-30); }
+      audit('homework done', h.title); redo(); },
     kghwess: b => { const h = syl().hw.find(x => x.id === b.dataset.v); if (!h) return; h.essential = h.essential === false; redo(); },
     kghwpark: b => { const h = syl().hw.find(x => x.id === b.dataset.v); if (!h) return; const q = prompt('Which question are you stuck on? It goes to Doubts with this homework.', ''); if (!q) return; (L.doubts = L.doubts || []).push({ id: Date.now().toString(36), ch: '', t: `${SN[h.subj]} · ${h.title}: ${q}`.slice(0, 400), d: today(), done: false }); h.next = 'parked: ' + q.slice(0, 60); redo('parked in Doubts. the rest of the homework can go on 🌙'); },
     kgddip: b => { const v = view(), wk = SP().schedCtx(v.d), m = +b.dataset.v; S().diploma.heavy[wk.monday] = m; audit('diploma week', dur(m)); redo(`diploma this week: ${dur(m)}. it replaces PCM time, the day doesn't get longer 🌙`); },
@@ -9694,6 +9719,8 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   const SC = () => (L.sched = L.sched || {}), audit = (a, d) => window.__kgDeskAudit?.(a, d);
   const fmtD = d => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
   const FEEL = { yes: 'Yes', mixed: 'Mixed', no: 'No' };
+  // the week's timed study minutes (seven study days from its start), shown as context next to the question
+  const weekMin = d0 => { try { const f = window.HabitDesk?.minutes; if (!f) return null; let n = 0; for (let k = 0; k < 7; k++) n += +f(add(d0, k)) || 0; return Math.round(n); } catch (e) { return null; } };
   function reviewCard() {
     const SP = window.StudyPlan; if (!SP?.reviewOf || window.__kgOnBreak) return '';
     const S = SC(), R = S.review, d = today(), head = '<p class="kl-eyebrow">✦ WEEKLY CHECK-IN · SIX TO EIGHT HOURS</p>';
@@ -9705,7 +9732,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     if (S.allow8) return `<section class="kl-card kl-mini kg-review">${head}<p><b>Eight-hour normal days are available from ${esc(fmtD(S.allow8.from))}.</b> The basis: ${S.allow8.basis.map(b => 'week ' + b.week + ' ' + FEEL[b.feel]).join(', ')}, and you said eight hours felt wanted and manageable.</p>${gr ? '<p class="kl-small">Gentle return is on, so its own maximum stays in charge. Eight hours waits for when you go back to the normal planner.</p>' : ''}<p class="kl-small">It's capacity, not a quota. A day's own hours choice, Done for today and exam preparation still come first.</p>${what}</section>`;
     if (r.stopped) return `<section class="kl-card kl-mini kg-review">${head}<p>You chose to stay at six hours. Your check-in history is kept.</p><div class="kl-row"><button class="kl-ghost" data-a="kgrev" data-v="resume">Start checking in again</button></div></section>`;
     if (r.paused) return `<section class="kl-card kl-mini kg-review">${head}<p>Check-ins are paused. Nothing progresses and nothing is owed. When you resume, the four most recent weeks count.</p><div class="kl-row"><button class="kl-ghost" data-a="kgrev" data-v="resume">Resume check-ins</button></div></section>`;
-    const form = r.due == null ? '' : `<form data-f="kgrev" class="kl-stack"><input type="hidden" name="week" value="${r.due}"><p><b>Week ${r.due + 1} (from ${esc(fmtD(r.weekStart(r.due)))}): did the week's studying feel manageable?</b></p>
+    const form = r.due == null ? '' : `<form data-f="kgrev" class="kl-stack"><input type="hidden" name="week" value="${r.due}"><p><b>Week ${r.due + 1} (from ${esc(fmtD(r.weekStart(r.due)))}): did the week's studying feel manageable?</b></p>${(m => m == null ? '' : `<p class="kl-small">Timer that week: ${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}, for context only; your answer is what counts.</p>`)(weekMin(r.weekStart(r.due)))}
       <div class="kl-row" role="radiogroup">${Object.entries(FEEL).map(([k, t]) => `<label class="kl-check"><input type="radio" name="feel" value="${k}" required> ${t}</label>`).join(' ')}</div>
       ${r.askReady ? '<label class="kl-check"><input type="checkbox" name="ready8"> Eight-hour normal days feel wanted and manageable</label>' : ''}
       <label class="kl-small">Anything to add (optional)<input name="note" maxlength="200"></label><button class="kl-primary">Save this week's answer</button></form>`;
