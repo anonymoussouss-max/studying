@@ -107,3 +107,28 @@ test('it never writes the study record; its own writes go only to kg-cult-v1; an
   assert.ok(html.includes("learning: ['Practising'"));
   assert.ok(/BK_KEYS = \[[^\]]*'kg-cult-v1'/.test(html), 'complete backup includes the cultivation records');
 });
+test('planned Inorganic counts are proposals: unused until accepted, provisional after, and incomplete chapters still block placement', () => {
+  const base = L({ courses: { ic11: course('chem', [['Class 11 inorganic (lecture count missing)', null]], []) } });
+  const v0 = cultivation(base);
+  assert.ok(v0.subjects.chem.missing.includes('Class 11 inorganic (lecture count missing)'));
+  const acc = st({ catalog: { ic11: { chapters: K.PLANNED.ic11.chapters.map(([n, c]) => [n, c]), by: 'you' } } });
+  const v1 = cultivation(base, null, acc), bond = gu(v1, 'chem', 'Chemical Bonding and Molecular Structure');
+  assert.strictEqual(bond.lectures, 23); assert.strictEqual(bond.planned, true); assert.strictEqual(bond.done, 0);
+  assert.ok(v1.subjects.chem.missing.includes('s-Block Elements')); assert.strictEqual(v1.placement, 'not-computed');
+});
+test('provisional skill drafts are never mastery gates until approved', () => {
+  const d = K.DRAFTS['Basic Mathematics']; assert.ok(/reference-only/.test(d.src));
+  const list = d.list.map(([name, depth], i) => ({ id: 's' + i, name, depth }));
+  const inv = { status: 'verified', items: [] }, medals = { 'm-quadratic-equations': { d: 'x', score: 80 } };
+  const draft = st({ inv: { [QE]: inv }, skills: { [QE]: { status: 'draft', list } } });
+  const g = gu(cultivation(L({ medals }), null, draft), 'maths', 'Quadratic Equations');
+  assert.strictEqual(g.skills, null); assert.strictEqual(g.refine.defined, false);
+  assert.ok(Object.values(K.DRAFTS).every(x => x.src && x.list.length));
+});
+test('the same DPP question from two files is proposed once (content identity), different questions are kept', () => {
+  const a = K.parseDPP('Physics DPP: 1\nVectors\nQ1 Find the resultant of two forces of 3 N and 4 N at right angles\nQ2 A unit vector along i + j', 'Vectors DPP 01 (of lec 02).pdf');
+  const b = K.parseDPP('Physics DPP: 1\nVectors\nQ1 Find the resultant of two forces of 3 N and 4 N at right angles\nQ2 Something different entirely here', 'merged.pdf');
+  assert.strictEqual(a.items[0].fp, b.items[0].fp); assert.notStrictEqual(a.items[1].fp, b.items[1].fp);
+  assert.ok(html.includes('fps.has(x.fp)'));
+  assert.strictEqual(K.parseDPP('Physics DPP: 4\nVectors\nQ1 x', 'Vectors  DPP 04 (Extra DPP).pdf').items[0].label, 'DPP 4 (extra) · Q1');
+});

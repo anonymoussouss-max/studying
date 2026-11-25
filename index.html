@@ -15805,13 +15805,26 @@ You entered 25</pre></div>
   const LINKS = { 'Sets': ['m-sets-relations-functions'], 'Trigonometric Functions': ['m-trigonometric-ratios-identities'], 'Trigonometric Equations': ['m-trigonometric-equations'], 'Quadratic Equations': ['m-quadratic-equations'], 'Sequence and Series': ['m-sequences-series'], 'Permutations': ['m-permutations-combinations'], 'Binomial Theorem': ['m-binomial-theorem'], 'Straight Lines': ['m-straight-lines'], 'Circles': ['m-circles'], 'Statistics': ['m-statistics'], 'Parabola': ['m-parabola'], 'Ellipse': ['m-ellipse'], 'Hyperbola': ['m-hyperbola'], 'Complex Numbers': ['m-complex-numbers'], 'Solution of Triangles': ['m-properties-of-triangles'],
     'Motion in a Straight Line': ['p-kinematics-1d'], 'Errors': ['p-errors-measurement'], 'Motion in a Plane': ['p-kinematics-2d-projectiles', 'p-relative-motion'], 'Laws of Motion': ['p-newton-s-laws-of-motion', 'p-friction'], 'Circular Motion': ['p-circular-motion'], 'Work, Power and Energy': ['p-work-energy-power'], 'Centre of Mass': ['p-centre-of-mass-collisions'], 'Thermal Properties of Matter': ['p-thermal-expansion-calorimetry', 'p-heat-transfer'], 'Mechanical Properties of Solids': ['p-elasticity'], 'Rotational Motion': ['p-rotational-motion'], 'Thermodynamics and KTG': ['p-thermodynamics', 'p-kinetic-theory-of-gases'], 'Oscillations': ['p-simple-harmonic-motion'], 'Waves': ['p-waves-on-a-string', 'p-sound-waves'], 'Mechanical Properties of Fluids': ['p-fluid-mechanics', 'p-surface-tension-viscosity'], 'Gravitation': ['p-gravitation'],
     'Basic Concepts': ['c-mole-concept'], 'Structure of Atom': ['c-atomic-structure'], 'States of Matter': ['c-gaseous-state'], 'Thermodynamics': ['c-thermodynamics-thermochemistry'], 'Chemical Equilibrium': ['c-chemical-equilibrium'], 'Ionic Equilibrium': ['c-ionic-equilibrium'], 'Redox': ['c-redox-reactions'] };
+  // Catalogue proposals from supplied materials. Shown with their source; used only after you accept them, and labelled provisional even then.
+  const PLANNED = { ic11: { src: 'Official PW lecture planner, Arjuna JEE 2027 Inorganic Chemistry, Kunwar Om Pandey (your named teacher). A planned schedule, not yet confirmed against your course.',
+    chapters: [['Classification of Elements and Periodicity in Properties', 13, 'complete in the planner'], ['Chemical Bonding and Molecular Structure', 23, 'complete in the planner'],
+      ['p-Block Elements (Groups 13 and 14)', null, 'the planner shows 5 lectures up to 3 Feb 2027, then ends'], ['s-Block Elements', null, 'the planner shows 2 lectures, then ends'], ['Hydrogen and its Compounds', null, 'the planner shows 1 lecture, then ends']] } };
+  // PROVISIONAL draft skill lists, for your review only. Never used as mastery gates until you approve a list.
+  const D = 'developed', I = 'introduced';
+  const DRAFTS = {
+    'Basic Mathematics': { src: 'Draft from the reference-only Arjuna Maths planner topics (another teacher) and your Arjuna Basic Mathematics DPP 07', list: [['Number system and interval notation', I], ['Wavy-curve (sign scheme) method for polynomial and rational inequalities', D], ['Logarithm laws, logarithmic equations and inequalities with base cases', D], ['Modulus equations and inequalities', D], ['Checking domain and validity of solutions', D]] },
+    'Basic Concepts': { src: 'Draft from your 12 "Some Basic Concepts of Chemistry" DPPs (lectures 5–20); the topics are general chapter content, not read question by question', list: [['Mole, molar mass and Avogadro-number conversions', D], ['Percentage composition, empirical and molecular formula', D], ['Stoichiometry and limiting reagent', D], ['Concentration terms (molarity, molality, mole fraction, % w/w, ppm) and their interconversion', D], ['Dilution and mixing of solutions', D]] },
+    'Errors': { src: 'Draft from a "Units and Dimensions" DPP that may be from another course year; this chapter mapping is uncertain', list: [['Unit conversion and dimensional formulae', D], ['Dimensional analysis: checking and deriving relations', D], ['Significant figures and rounding', I], ['Propagation of errors in sums, products and powers', D]] },
+    'Classification of Elements and Periodicity in Properties': { src: 'Draft from the topic column of your official Inorganic planner (Kunwar Om Pandey)', list: [['Electronic configuration and s, p, d, f block placement', D], ['Screening effect and effective nuclear charge', D], ['Trends in atomic and ionic radii', D], ['Ionisation enthalpy and electron gain enthalpy trends, with exceptions', D], ['Electronegativity scales and applications', D], ['Acidic, basic and amphoteric nature of oxides', D], ['Anomalous second-period behaviour and diagonal relationship', I]] },
+    'Chemical Bonding and Molecular Structure': { src: 'Draft from the topic column of your official Inorganic planner (Kunwar Om Pandey)', list: [['Ionic bonding and lattice energy', D], ['Lewis structures, formal charge and resonance', D], ['VSEPR shapes and bond angles', D], ['Valence bond theory and hybridisation', D], ['Counting sigma, pi and p(pi)–p(pi) bonds', D], ['Polarisability, Fajans’ rules and dipole moment', D], ['Molecular orbital theory: bond order and magnetism', D], ['Bond parameters and bond enthalpy', D], ['Hydrogen bonding and intermolecular forces', D], ['Back bonding and bridge bonding', 'advanced']] }
+  };
   const ACQ_KINDS = ['tah', 'kcls', 'ktk', 'hw', 'dpp']; // module items are listed apart and never count for acquisition
   const KIND_NAME = { tah: 'TAH', kcls: 'KCLS', ktk: 'KTK', hw: 'Homework', dpp: 'DPP', module: 'Module' };
   const DEPTH = { introduced: 1, developed: 2, advanced: 3 };
   const SHARE = { obtained: 40, learning: 75, proof: 90, proven: 100 };
   const STORE = 'kg-cult-v1';
   const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  const blankStore = () => ({ v: 1, inv: {}, skills: {}, legacy: {}, ev: [], log: [] });
+  const blankStore = () => ({ v: 1, inv: {}, skills: {}, legacy: {}, catalog: {}, ev: [], log: [] });
   const readStore = ls => { let s = null; try { s = JSON.parse(ls.getItem(STORE)); } catch (e) {} return Object.assign(blankStore(), s && typeof s === 'object' ? s : {}); };
 
   // A genuine attempt: how it was done, plus working (text or photo) or a "stuck at" note. Opening an item or a running timer never counts.
@@ -15831,6 +15844,8 @@ You entered 25</pre></div>
     return { scope, why, total: counted.length, attempted: attempted.length, assisted: attempted.filter(i => i.attempt.how !== 'independent').length, modules: live.filter(i => i.kind === 'module').length, proposed: proposed.length };
   }
   // Proposals from a DPP's text (pdf.js or pasted). Proposed only: you confirm, correct or reject each one.
+  // Each question keeps its own text, so the same question arriving in two files (or a merged file) is proposed once.
+  const hash = s => { let x = 0; for (let i = 0; i < s.length; i++) x = (Math.imul(x, 31) + s.charCodeAt(i)) >>> 0; return x.toString(36); };
   function parseDPP(text, file) {
     const t = String(text || ''), f = String(file || '');
     const no = (/DPP\s*[:#-]?\s*(\d+)/i.exec(t) || /DPP\s*0*(\d+)/i.exec(f) || [])[1];
@@ -15838,10 +15853,12 @@ You entered 25</pre></div>
     const subj = /\bmaths?\b|mathematics/i.test(t) ? 'maths' : /physics/i.test(t) ? 'physics' : /chem/i.test(t) ? 'chem' : '';
     const lec = (/of\s*lec(?:ture)?\.?\s*(\d+)/i.exec(f) || /of\s*lec(?:ture)?\.?\s*(\d+)/i.exec(t) || [])[1] || '';
     const keyAt = t.search(/answer\s*key/i), body = keyAt >= 0 ? t.slice(0, keyAt) : t;
-    const qs = [...new Set([...body.matchAll(/\bQ\s*(\d{1,3})\b/g)].map(m => +m[1]))].sort((a, b) => a - b);
-    const chapter = (/DPP\s*[:#-]?\s*\d+\s*\n+\s*([A-Za-z][A-Za-z ,&'()-]{2,60})\n/i.exec(t) || /^\s*(.+?)\s+DPP\b/i.exec(f) || [])[1] || '';
-    return { subj, no: +no, lec: lec ? +lec : null, chapter: chapter.trim(), hasKey: keyAt >= 0,
-      items: qs.map(n => ({ id: `dpp${no}-q${n}`, kind: 'dpp', label: `DPP ${no} · Q${n}`, status: 'proposed', src: { file: f, kind: 'dpp-pdf' }, lec: lec ? +lec : null })) };
+    const parts = body.split(/\bQ\s*(\d{1,3})\b/), qtext = {};
+    for (let i = 1; i < parts.length; i += 2) { const n = +parts[i]; if (!(n in qtext)) qtext[n] = parts[i + 1].replace(/\s+/g, ' ').trim().slice(0, 300); }
+    const qs = Object.keys(qtext).map(Number).sort((a, b) => a - b), extra = /extra/i.test(f);
+    const chapter = ((/DPP\s*[:#-]?\s*\d+\s*\n+\s*([A-Za-z][A-Za-z ,&'()-]{2,60})\n/i.exec(t) || /^\s*(.+?)[\s_]*DPP\b/i.exec(f) || [])[1] || '').replace(/[\s_]+$/, '').trim();
+    return { subj, no: +no, lec: lec ? +lec : null, extra, chapter, hasKey: keyAt >= 0,
+      items: qs.map(n => { const fp = norm(qtext[n]).slice(0, 160); return { id: `dpp${no}-q${n}-${hash(fp)}`, kind: 'dpp', label: `DPP ${no}${extra ? ' (extra)' : ''} · Q${n}`, text: qtext[n], fp, status: 'proposed', src: { file: f, kind: 'dpp-pdf' }, lec: lec ? +lec : null }; }) };
   }
   // Questions you already logged for a chapter become proposals, never a complete list. Auto-made TAH/KTK placeholders are not used.
   function proposeFromLogged(syl, subj, name) {
@@ -15899,20 +15916,22 @@ You entered 25</pre></div>
     const syl = L && L.syl, medals = (L && L.medals) || {}, out = { edition: 0, subjects: {} };
     if (!syl || !syl.courses) { out.placement = 'not-computed'; out.why = ['maths', 'physics', 'chem']; out.ed = edition(out, store); return out; }
     const covers = {};
-    for (const [cid, c] of Object.entries(syl.courses)) if (c.cls === 11 && !c.provisional) (c.chapters || []).forEach(([name]) => { const k = cid + ':' + name, s = skillsOf(store, k); if (s) covers[k] = s; });
+    const chaptersOf = (cid, c) => (store.catalog && store.catalog[cid] && store.catalog[cid].chapters) || c.chapters || [];
+    for (const [cid, c] of Object.entries(syl.courses)) if (c.cls === 11 && !c.provisional) chaptersOf(cid, c).forEach(([name]) => { const k = cid + ':' + name, s = skillsOf(store, k); if (s) covers[k] = s; });
     const alloc = allocate(store.ev, covers);
     for (const [cid, c] of Object.entries(syl.courses)) {
       if (c.cls !== 11 || c.provisional) continue;
       const s = out.subjects[c.subj] = out.subjects[c.subj] || { gu: [], missing: [] };
-      (c.chapters || []).forEach(([name, n], k) => {
+      const planned = !!(store.catalog && store.catalog[cid]);
+      chaptersOf(cid, c).forEach(([name, n], k) => {
         if (!n) { s.missing.push(name); return; }
-        const key = cid + ':' + name, done = Math.max(0, Math.min(n, +((c.done || [])[k] || 0))), lecDone = done >= n;
+        const key = cid + ':' + name, done = planned ? 0 : Math.max(0, Math.min(n, +((c.done || [])[k] || 0))), lecDone = done >= n;
         const inv = invState(store.inv[key]), logged = proposeFromLogged(syl, c.subj, name).length;
         const acq = !lecDone ? 'not-obtained' : inv.scope !== 'verified' ? 'scope-unverified' : inv.attempted === inv.total ? 'obtained' : 'attempts-open';
         const legacy = legacyOf(name, key, medals, store), need = skillsOf(store, key), ref = refinement(need, alloc.credit[key]);
         const level = acq !== 'obtained' ? 'none' : legacy.state === 'recognised' ? 'proof' : ref.defined && ref.shown.length === need.length ? 'learning' : 'obtained';
         const share = level === 'none' ? 0 : level === 'proof' ? SHARE.proof : level === 'learning' ? SHARE.learning : SHARE.obtained + ref.share;
-        s.gu.push({ id: key, key, name, rank: RANK[name] || null, lectures: n, done, weight: n * (MULT[c.subj] || 1), inv, logged, acq, level, share,
+        s.gu.push({ id: key, key, planned, name, rank: RANK[name] || null, lectures: n, done, weight: n * (MULT[c.subj] || 1), inv, logged, acq, level, share,
           scope: inv.scope, assigned: inv.total, attempted: inv.attempted, modules: inv.modules,
           legacy: legacy.state, legacyInfo: legacy, links: legacy.links, medalled: legacy.medalled, skills: need, refine: ref, signals: (alloc.signals[key] || []).length,
           evidence: legacy.links.map(id => ({ id, label: evidenceOf ? evidenceOf(id) : '' })) });
@@ -15928,7 +15947,7 @@ You entered 25</pre></div>
     out.ed = edition(out, store); out.skipped = alloc.skipped;
     return out;
   }
-  window.KgCult = { cultivation, RANK, LINKS, MULT, SHARE, DEPTH, STORE, genuine, invState, parseDPP, proposeFromLogged, legacyOf, allocate, refinement, edition, blankStore, readStore };
+  window.KgCult = { cultivation, PLANNED, DRAFTS, RANK, LINKS, MULT, SHARE, DEPTH, STORE, genuine, invState, parseDPP, proposeFromLogged, legacyOf, allocate, refinement, edition, blankStore, readStore };
 
   const M = window.MoonLab; if (!M || !M.PANELS) return;
   const esc = M.esc, SN = { maths: 'Maths', physics: 'Physics', chem: 'Chemistry' };
@@ -15954,6 +15973,7 @@ You entered 25</pre></div>
     const sk = st.skills[g.key] || { status: 'draft', list: [] };
     return `<div class="kl-stack"><p class="kl-small"><b>Essential skills</b> · ${sk.status === 'approved' ? 'approved by you' : 'draft, not used until you approve it'}. Each skill has a depth: introduced, developed or advanced.</p>
       ${(sk.list || []).map(s => `<div class="kl-li"><span>${esc(s.name)} <span class="kl-small">· ${esc(s.depth)}</span></span>${sk.status !== 'approved' ? `<button class="kl-ghost" data-a="cskdel" data-k="${esc(g.key)}" data-id="${esc(s.id)}">Remove</button>` : ''}</div>`).join('')}
+      ${!(sk.list || []).length && DRAFTS[g.name] ? `<p class="kl-small">A provisional draft is available: ${esc(DRAFTS[g.name].src)}.</p><button class="kl-ghost" data-a="cdraft" data-k="${esc(g.key)}">Load the draft to review</button>` : ''}${sk.src ? `<p class="kl-small">Source: ${esc(sk.src)}</p>` : ''}
       ${sk.status !== 'approved' ? `<form data-f="cskill" data-k="${esc(g.key)}" class="kl-row"><input name="name" required maxlength="100" placeholder="Skill, e.g. sign scheme for rational inequalities" aria-label="Skill"><select name="depth" aria-label="Depth"><option>introduced</option><option selected>developed</option><option>advanced</option></select><button>Add skill</button></form>` : ''}
       <div class="kl-row">${sk.status === 'approved' ? `<button class="kl-ghost" data-a="cskstat" data-k="${esc(g.key)}" data-s="draft">Edit the list</button>` : (sk.list || []).length ? `<button data-a="cskstat" data-k="${esc(g.key)}" data-s="approved">Approve this list</button>` : ''}</div>
       ${g.legacy && g.skills ? `<p class="kl-small">Medal paper coverage (you confirm what the old proof covered):</p>${g.medalled.map(id => g.skills.map(s => `<label class="kl-small"><input type="checkbox" data-ccov="${esc(id)}" data-skill="${esc(s.id)}" ${((st.legacy[id] || {}).covered || []).includes(s.id) ? 'checked' : ''}> ${esc(s.name)} (${esc(id)})</label>`).join('')).join('')}` : ''}</div>`;
@@ -15970,15 +15990,18 @@ You entered 25</pre></div>
     return `<section class="kl-card kl-stack"><p class="kl-eyebrow">CULTIVATION · PREVIEW</p><h3>Your chapter Gu, from the records you already have</h3>
       <p class="kl-small">Nothing here changes your study record. A Gu is obtained when all its lectures are done and every item on its <b>verified</b> checklist (TAH/KCLS, KTK, homework, DPP) has a genuine attempt: working or a "stuck at" note, on your own or with help. Help counts for acquisition, never for mastery. Without a checklist you've confirmed, the scope shows as unverified, not as missing work. Shares: 40% obtained, rising towards 75% (Learning) as approved essential skills are shown independently, 90% after a proof. No extra study time is added for any of this.</p>
       <p class="kl-small"><b>Catalogue:</b> Class 11 edition 0 ${v.ed.complete ? '(complete)' : `(incomplete: ${v.ed.missing.map(esc).join(', ')})`}. Class 12: ${esc(v.ed.class12)}.</p>
+      ${Object.entries(PLANNED).map(([cid, p]) => M.L.syl && M.L.syl.courses[cid] ? (st.catalog[cid] ? `<p class="kl-small"><b>${esc(M.L.syl.courses[cid].name)}:</b> using planned counts you accepted (provisional; lecture progress for these chapters isn't recorded yet). <button class="kl-ghost" data-a="cplan" data-c="${cid}" data-s="off">Stop using them</button></p>` : `<div class="kl-stack"><p class="kl-small"><b>Proposed counts for ${esc(M.L.syl.courses[cid].name)}</b> · ${esc(p.src)}</p>${p.chapters.map(([n, c, note]) => `<p class="kl-small">· ${esc(n)}: ${c == null ? 'count unknown' : c + ' lectures'} (${esc(note)})</p>`).join('')}<div class="kl-row"><button class="kl-ghost" data-a="cplan" data-c="${cid}" data-s="on">Use these as provisional counts</button></div></div>`) : '').join('')}
       <p class="kl-small"><b>Placement:</b> ${v.placement === 'computable' ? 'all Class 11 subjects catalogued; placement is a proposal for you to accept.' : `not computed yet. ${v.why.map(x => SN[x] || x).join(', ')} ${v.why.length > 1 ? 'have' : 'has'} an incomplete catalogue, and placement never uses partial totals. Missing data is not evidence of a low rank.`}</p></section>` + subj;
   };
   const A = M.ACTIONS, F = M.FORMS;
   const inv = (s, k) => (s.inv[k] = s.inv[k] || { status: 'incomplete', items: [] });
-  const addItems = (s, k, items) => { const i = inv(s, k), have = new Set(i.items.map(x => x.id)); const fresh = items.filter(x => !have.has(x.id)); i.items.push(...fresh); if (fresh.length && i.status === 'verified') i.status = 'incomplete'; return fresh.length; };
+  const addItems = (s, k, items) => { const i = inv(s, k), have = new Set(i.items.map(x => x.id)), fps = new Set(i.items.map(x => x.fp).filter(x => x && x.length > 20)); const fresh = items.filter(x => { if (have.has(x.id) || (x.fp && x.fp.length > 20 && fps.has(x.fp))) return false; have.add(x.id); if (x.fp) fps.add(x.fp); return true; }); i.items.push(...fresh); if (fresh.length && i.status === 'verified') i.status = 'incomplete'; return fresh.length; };
   A.copen = b => { open = open === b.dataset.k ? '' : b.dataset.k; M.render(); };
   A.cinv = b => { const s = store(), it = inv(s, b.dataset.k).items[+b.dataset.i]; if (!it) return; it.status = b.dataset.s; it.by = 'you'; put(s, `item ${it.id} -> ${it.status}`); };
   A.cinvstat = b => { const s = store(), i = inv(s, b.dataset.k); if (b.dataset.s === 'verified' && i.items.some(x => x.status === 'proposed' && ACQ_KINDS.includes(x.kind))) return alert('Check the proposed items first: mark each one Assigned or Not assigned.'); i.status = b.dataset.s; put(s, `checklist ${b.dataset.k} -> ${i.status}`); };
   A.cpropose = b => { const s = store(), [cid, ...rest] = b.dataset.k.split(':'), c = M.L.syl.courses[cid]; const n = addItems(s, b.dataset.k, proposeFromLogged(M.L.syl, c.subj, rest.join(':'))); put(s, `proposed ${n} from logged questions`); };
+  A.cplan = b => { const s = store(), p = PLANNED[b.dataset.c]; if (!p) return; s.catalog = s.catalog || {}; if (b.dataset.s === 'on') s.catalog[b.dataset.c] = { chapters: p.chapters.map(([n, c]) => [n, c]), src: p.src, by: 'you', at: Date.now() }; else delete s.catalog[b.dataset.c]; put(s, `catalog ${b.dataset.c} -> ${b.dataset.s}`); };
+  A.cdraft = b => { const s = store(), name = b.dataset.k.split(':').slice(1).join(':'), d = DRAFTS[name]; if (!d || (s.skills[b.dataset.k] && s.skills[b.dataset.k].list.length)) return; s.skills[b.dataset.k] = { status: 'draft', src: d.src, by: 'draft', list: d.list.map(([n, depth], i) => ({ id: 'd' + i + '-' + norm(n).slice(0, 24).replace(/ /g, '-'), name: n, depth })) }; put(s, 'draft skills loaded ' + b.dataset.k); };
   A.cskdel = b => { const s = store(), sk = s.skills[b.dataset.k]; if (!sk) return; sk.list = sk.list.filter(x => x.id !== b.dataset.id); put(s, 'skill removed'); };
   A.cskstat = b => { const s = store(), sk = s.skills[b.dataset.k]; if (!sk) return; sk.status = b.dataset.s; sk.at = Date.now(); put(s, `skills ${b.dataset.k} -> ${sk.status}`); };
   F.citem = (v, f) => { const s = store(); addItems(s, f.dataset.k, [{ id: 'm' + Date.now().toString(36), kind: v.kind, label: v.label, status: 'confirmed', by: 'you', src: { kind: 'manual', note: v.src || '' } }]); put(s, 'item added'); };
