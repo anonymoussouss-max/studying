@@ -2102,7 +2102,7 @@ window.__KG_BUILTIN = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: ctrl.signal,
-        body: JSON.stringify(Object.assign({ messages, context, character: who }, image ? (Array.isArray(image) ? { images: image } : { image }) : {}, long ? { long: true } : {}, image && window.__kgBulk ? { bulk: true } : {}))
+        body: JSON.stringify(Object.assign({ messages, context, character: who }, image ? (Array.isArray(image) ? { images: image } : { image }) : {}, long ? { long: true } : {}, image && window.__kgBulk ? { bulk: true } : {}, window.__kgPurpose ? { purpose: window.__kgPurpose } : {}))
       });
       if (!res.ok) {
         let bodyText = "";
@@ -7279,7 +7279,7 @@ window.KG_RECALL = {
 
   /* ---------- 1. phone + laptop sync (through the backend's /api/sync and a free Upstash database) ---------- */
   const SYNC_URL = 'https://ame-bkend321.vercel.app/api/sync';
-  const KEYS = ['ame-habit-v1', 'desk-needy-v1', 'ame-journal-v1', 'ame-chat', 'ame-talk-v1', 'ame-mute-v1', 'ame-pos-v1', 'mp-v2', 'iroha-chat', 'iroha-pos-v1', 'kg-lab-v1', 'kg-look', 'kg-cult-v1'];
+  const KEYS = ['ame-habit-v1', 'desk-needy-v1', 'ame-journal-v1', 'ame-chat', 'ame-talk-v1', 'ame-mute-v1', 'ame-pos-v1', 'mp-v2', 'iroha-chat', 'iroha-pos-v1', 'kg-lab-v1', 'kg-look', 'kg-cult-v1', 'kg-tomb-v1'];
   const sync = () => M.read('kg-sync', {}) || {}, setSync = o => { try { localStorage.setItem('kg-sync', JSON.stringify(Object.assign(sync(), o))); } catch (e) {} };
   if (!localStorage.getItem('kg-device')) try { localStorage.setItem('kg-device', Math.random().toString(36).slice(2, 10)); } catch (e) {}
   const device = () => localStorage.getItem('kg-device') || '';
@@ -11085,17 +11085,19 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
   const fromData = async u => (await fetch(u)).blob();
   // one complete backup (v2): every user-data key plus every attached file, each file with a SHA-256 in a manifest.
   // It also reads the older formats: the v1 full backup and the habit desk's records-only backup.
-  const BK_KEYS = [...new Set([...KEYS, 'ame-mute-v1', 'kg-bond-v1', 'kg-need-log', 'kg-chat-meta', 'kg-drafts', 'kg-plain', 'kg-cult-v1'])];
+  const BK_KEYS = [...new Set([...KEYS, 'ame-mute-v1', 'kg-bond-v1', 'kg-need-log', 'kg-chat-meta', 'kg-drafts', 'kg-plain', 'kg-cult-v1', 'kg-tomb-v1'])];
   const sha = async s => { try { const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(h)].map(x => x.toString(16).padStart(2, '0')).join(''); } catch (e) { return ''; } };
   // bkCheck: pure archive check. Returns the format, the files that fail their checksum or are absent, and whether records parse.
-  const bkCheck = async b => {
+  // tombs: ids of files you deleted (a tombstone). They're skipped, never reported missing, never restored.
+  const bkCheck = async (b, tombs = {}) => {
     if (b && b.app === 'ame-desk' && b.version === 1 && b.storage && typeof b.storage === 'object') return { ok: true, format: 'habit-v1', data: b.storage, files: [], bad: [], partialFormat: true };
     if (!b || !/^kaguya-desk-full-v[12]$/.test(b.format) || !b.data || typeof b.data !== 'object' || !Array.isArray(b.files)) return { ok: false, why: "That file isn't a Kaguya Desk backup, or it's damaged." };
     try { if (typeof JSON.parse(b.data['kg-lab-v1']) !== 'object') throw 0; } catch (e) { return { ok: false, why: 'The study record inside this backup is damaged.' }; }
     const bad = [];
     if (b.format === 'kaguya-desk-full-v2') {
-      const have = new Map(b.files.map(([k, v]) => [k, v]));
+      const have = new Map(b.files.map(([k, v]) => [k, v])); let own = {}; try { own = JSON.parse(b.data['kg-tomb-v1'] || '{}') || {}; } catch (e) {}
       for (const m of b.manifest || []) {
+        if (tombs[m.id] || own[m.id]) continue;
         const v = have.get(m.id), u = v && v.blob && v.blob.dataUrl;
         if (!v) bad.push({ id: m.id, name: m.name, why: 'missing' });
         else if (u && m.sha && (await sha(u)) !== m.sha) bad.push({ id: m.id, name: m.name, why: 'damaged' });
@@ -11120,7 +11122,8 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
   }
   async function fullRestore(file) {
     let b; try { b = JSON.parse(await file.text()); } catch (e) { b = null; }
-    const r = await bkCheck(b);
+    let tombNow = {}; try { tombNow = JSON.parse(localStorage.getItem('kg-tomb-v1') || '{}') || {}; } catch (e) {}
+    const r = await bkCheck(b, tombNow);
     if (!r.ok) { alert(r.why + ' Nothing was changed.'); return; }
     let partial = false;
     if (r.bad.length) {
@@ -11135,7 +11138,9 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
     try {
       // only a v2 backup lists every key, so only a v2 restore removes keys it doesn't contain
       for (const k of BK_KEYS) { if (k in r.data) localStorage.setItem(k, r.data[k]); else if (r.format === 'full-v2') localStorage.removeItem(k); }
-      const skip = new Set(r.bad.map(x => x.id)), pairs = [];
+      let tombOld = {}; try { tombOld = JSON.parse(r.data['kg-tomb-v1'] || '{}') || {}; } catch (e) {}
+      const tombAll = Object.assign({}, tombOld, tombNow); if (Object.keys(tombAll).length) localStorage.setItem('kg-tomb-v1', JSON.stringify(tombAll)); // deletions survive any restore
+      const skip = new Set(r.bad.map(x => x.id).concat(Object.keys(tombAll))), pairs = [];
       for (const [k, v] of r.files) { if (skip.has(k)) continue; const c = Object.assign({}, v); if (c.blob && c.blob.dataUrl) { const bl = await fromData(c.blob.dataUrl); c.blob = new File([bl], c.blob.name || 'notes.pdf', { type: bl.type }); } pairs.push([k, c]); }
       if (pairs.length) await M.notesDB?.load?.(pairs); // one IndexedDB transaction: all files or none
       if (partial) localStorage.setItem('kg-restore-missing', JSON.stringify({ at: Date.now(), files: r.bad })); else localStorage.removeItem('kg-restore-missing');
@@ -15929,11 +15934,13 @@ You entered 25</pre></div>
         const inv = invState(store.inv[key]), logged = proposeFromLogged(syl, c.subj, name).length;
         const acq = !lecDone ? 'not-obtained' : inv.scope !== 'verified' ? 'scope-unverified' : inv.attempted === inv.total ? 'obtained' : 'attempts-open';
         const legacy = legacyOf(name, key, medals, store), need = skillsOf(store, key), ref = refinement(need, alloc.credit[key]);
-        const level = acq !== 'obtained' ? 'none' : legacy.state === 'recognised' ? 'proof' : ref.defined && ref.shown.length === need.length ? 'learning' : 'obtained';
-        const share = level === 'none' ? 0 : level === 'proof' ? SHARE.proof : level === 'learning' ? SHARE.learning : SHARE.obtained + ref.share;
+        const pass = (store.passes || {})[key], proofAt = pass ? pass.at : legacy.state === 'recognised' ? Date.parse(((medals[legacy.medalled[0]] || {}).d) || '') : NaN;
+        const ret = need && Number.isFinite(proofAt) && window.KgProof ? window.KgProof.retention({ proofAt, now: (L && L.__now) || Date.now(), need, evidence: (store.ev || []).filter(e => e.gu === key) }) : null;
+        const level = acq !== 'obtained' ? 'none' : ret && ret.proven ? 'proven' : pass || legacy.state === 'recognised' ? 'proof' : ref.defined && ref.shown.length === need.length ? 'learning' : 'obtained';
+        const share = level === 'none' ? 0 : level === 'proven' ? SHARE.proven : level === 'proof' ? SHARE.proof : level === 'learning' ? SHARE.learning : SHARE.obtained + ref.share;
         s.gu.push({ id: key, key, planned, name, rank: RANK[name] || null, lectures: n, done, weight: n * (MULT[c.subj] || 1), inv, logged, acq, level, share,
           scope: inv.scope, assigned: inv.total, attempted: inv.attempted, modules: inv.modules,
-          legacy: legacy.state, legacyInfo: legacy, links: legacy.links, medalled: legacy.medalled, skills: need, refine: ref, signals: (alloc.signals[key] || []).length,
+          legacy: legacy.state, legacyInfo: legacy, links: legacy.links, medalled: legacy.medalled, skills: need, refine: ref, signals: (alloc.signals[key] || []).length, retention: ret,
           evidence: legacy.links.map(id => ({ id, label: evidenceOf ? evidenceOf(id) : '' })) });
       });
     }
@@ -15954,7 +15961,7 @@ You entered 25</pre></div>
   const store = () => readStore(localStorage);
   const put = (s, what) => { s.log = (s.log || []).concat({ at: Date.now(), what }).slice(-500); localStorage.setItem(STORE, JSON.stringify(s)); M.render(); };
   const ACQ = { 'not-obtained': 'Not obtained: lectures still to finish', 'scope-unverified': 'Lectures complete · Assignment scope unverified', 'attempts-open': 'Lectures complete · assigned items still to attempt', 'obtained': 'Gu obtained' };
-  const LEVEL = { none: '', obtained: 'Obtained', learning: 'Learning', proof: 'Proof passed — retention pending' };
+  const LEVEL = { none: '', obtained: 'Obtained', learning: 'Learning', proof: 'Proof passed — retention pending', proven: 'Proven · five dots · fully refined' };
   let open = '';
   M.SECTIONS.study.push(['cultivation', '⛰ Cultivation']);
   const guByKey = (v, key) => Object.values(v.subjects).flatMap(s => s.gu).find(g => g.key === key);
@@ -15984,9 +15991,10 @@ You entered 25</pre></div>
       ${s.complete ? '' : `<p class="kl-small">Catalogue incomplete: ${s.missing.map(esc).join(', ')}. This percentage is not used for placement.</p>`}
       ${s.gu.map(g => `<div class="kl-li"><span><b>${esc(g.name)}</b>${g.rank ? ` · Rank ${g.rank} Gu (proposed)` : ''}${g.level !== 'none' ? ` · ${LEVEL[g.level]}` : ''}<br><span class="kl-small">${ACQ[g.acq]} · lectures ${g.done}/${g.lectures}${g.inv.total ? ` · assigned items attempted ${g.attempted}/${g.assigned}` : ''}${g.inv.assisted ? ` (${g.inv.assisted} with help)` : ''}${g.modules ? ` · ${g.modules} module item${g.modules > 1 ? 's' : ''} (not required)` : ''}${g.logged && g.inv.scope !== 'verified' ? ` · ${g.logged} logged question${g.logged > 1 ? 's' : ''} (not a checklist)` : ''}
         ${g.legacy === 'recognised' ? ' · <b>Legacy proof recognised — retention pending</b>' : g.legacy === 'uncertain' ? ` · <b>Legacy proof — scope uncertain</b> (medal kept; still needed: ${g.legacyInfo.missing.map(esc).join('; ')})` : ''}
+        ${g.retention ? ` · retention: ${esc(g.retention.note)}${g.retention.next.length ? ' · next check (inside your Mix-in time): ' + g.retention.next.length + ' skill' + (g.retention.next.length > 1 ? 's' : '') : ''}` : ''}
         ${g.refine.defined ? ` · skills shown independently ${g.refine.shown.length}/${g.skills.length}` : ''}
         ${g.links.length ? ` · evidence: ${g.evidence.map(e => esc(e.label || '—')).join(', ')}` : ' · linked chapters not yet mapped'}</span></span><span class="kl-row"><b>${g.share}%</b><button class="kl-ghost" data-a="copen" data-k="${esc(g.key)}" aria-expanded="${open === g.key}">${open === g.key ? 'Close' : 'Details'}</button></span></div>
-        ${open === g.key ? checklist(g, st) + skillBox(g, st) : ''}`).join('')}</section>`).join('');
+        ${open === g.key ? checklist(g, st) + skillBox(g, st) + (window.KgCultProof && !st.proof ? window.KgCultProof(g.key) : '') : ''}`).join('')}</section>`).join('');
     return `<section class="kl-card kl-stack"><p class="kl-eyebrow">CULTIVATION · PREVIEW</p><h3>Your chapter Gu, from the records you already have</h3>
       <p class="kl-small">Nothing here changes your study record. A Gu is obtained when all its lectures are done and every item on its <b>verified</b> checklist (TAH/KCLS, KTK, homework, DPP) has a genuine attempt: working or a "stuck at" note, on your own or with help. Help counts for acquisition, never for mastery. Without a checklist you've confirmed, the scope shows as unverified, not as missing work. Shares: 40% obtained, rising towards 75% (Learning) as approved essential skills are shown independently, 90% after a proof. No extra study time is added for any of this.</p>
       <p class="kl-small"><b>Catalogue:</b> Class 11 edition 0 ${v.ed.complete ? '(complete)' : `(incomplete: ${v.ed.missing.map(esc).join(', ')})`}. Class 12: ${esc(v.ed.class12)}.</p>
@@ -16078,6 +16086,213 @@ You entered 25</pre></div>
     const f = t.files[0]; if (f.size > 40 * 1024 * 1024) return alert('That file is over 40 MB. Choose a shorter clip.');
     try { await setClip({ name: f.name, blob: f, at: Date.now() }); clipInfo = { name: f.name, size: f.size }; M.render(); } catch (err) { alert("Couldn't save the clip on this device. Nothing was changed."); }
   });
+})();
+</script>
+<script id="kg-proof-script">
+/* ---------- Photo proofs, appeals, retention and exposure (rev 4). Pure rules first (window.KgProof), then a thin panel. ----------
+   Photos are the primary evidence and live in the attached-notes store (so the complete backup carries them).
+   Iroha's reading and marking are an AI's provisional judgement: shown with reasons, correctable, appealable, never presented as authoritative. */
+(function () {
+  const DAY = 86400000;
+  /* -- the proof session: a small state machine. The timer runs only while Solving. -- */
+  const STATES = ['solving', 'capturing', 'submitted', 'reading', 'assessed', 'pending'];
+  function newSession(o) { return { id: o.id, gu: o.gu, ch: o.ch || '', qs: o.qs || [], limit: o.limit || 3600000, state: 'solving', acc: 0, since: o.now, photos: [], decl: null, reads: {}, marks: {}, appeals: [], history: [{ at: o.now, ev: 'start' }] }; }
+  const elapsed = (s, now) => s.acc + (s.state === 'solving' && s.since ? Math.max(0, now - s.since) : 0);
+  function step(s, ev, now, data) {
+    const t = Object.assign({}, s, { history: s.history.concat({ at: now, ev }) });
+    const stop = () => { t.acc = elapsed(s, now); t.since = null; };
+    switch (ev) {
+      case 'capture': if (s.state !== 'solving') return s; stop(); t.state = 'capturing'; return t;           // camera, upload, retries: paused
+      case 'resume': if (s.state !== 'capturing') return s; t.state = 'solving'; t.since = now; return t;     // back to solving: the clock runs again
+      case 'photo': if (!['solving', 'capturing'].includes(s.state)) return s; t.photos = s.photos.concat(data); return t;
+      case 'submit': if (!['solving', 'capturing'].includes(s.state) || !data || !data.decl || !s.photos.some(p => p.saved)) return s; stop(); t.state = 'submitted'; t.decl = data.decl; return t;
+      case 'reading': if (!['submitted', 'pending'].includes(s.state)) return s; t.state = 'reading'; return t;
+      case 'read-failed': if (s.state !== 'reading') return s; t.state = 'submitted'; t.error = data || 'failed'; return t; // nothing awarded, photos kept
+      case 'marked': if (s.state !== 'reading') return s; t.reads = data.reads || {}; t.marks = data.marks || {}; t.state = Object.values(t.marks).some(m => decide(m) === 'pending') ? 'pending' : 'assessed'; t.error = ''; return t;
+      case 'clarify': if (!['pending', 'assessed'].includes(s.state)) return s; t.reads = Object.assign({}, s.reads, { [data.q]: Object.assign({}, s.reads[data.q], { fix: data.text, fixedAt: now }) }); t.state = 'pending'; return t;
+      default: return s;
+    }
+  }
+  // After a refresh: the saved state is restored as is. While Solving the clock is wall time (you keep working on paper);
+  // in Capturing it stays paused. Work that wasn't submitted is shown as "not submitted" and is never assessed.
+  const restore = (s, now) => s ? Object.assign({}, s, { restoredAt: now, notSubmitted: ['solving', 'capturing'].includes(s.state) }) : null;
+
+  /* -- marking: per question, from Iroha's structured reading. Uncertain stays pending, never wrong. -- */
+  const RUBRIC = ['method', 'concept', 'execution', 'checks']; // each 0–2
+  function decide(m) {
+    if (!m || m.void) return m && m.void ? 'void' : 'pending';
+    if (m.appealOpen) return 'pending';
+    if (m.readable === false || (m.unclear || []).some(u => u.changesVerdict)) return 'pending';
+    const r = m.rubric || {}; if (!RUBRIC.every(k => [0, 1, 2].includes(r[k]))) return 'pending';
+    const method = m.validAlternative && r.method >= 1 ? 2 : r.method;
+    if (method < 2 || r.concept < 2) return 'not-yet';            // a matching final answer never rescues invalid reasoning
+    return r.execution === 2 ? 'pass' : r.execution === 1 ? 'pass-slip' : 'not-yet'; // a minor slip passes when understanding is sound
+  }
+  // Chapter result: every approved essential skill shown by a passing question. No approved list = pending, never a guessed list.
+  function chapterResult(s, need) {
+    if (!need || !need.length) return { result: 'pending', why: 'no approved essential-skill list for this chapter' };
+    if (!['assessed', 'pending'].includes(s.state)) return { result: s.state === 'solving' || s.state === 'capturing' ? 'not-submitted' : 'pending', why: 'not assessed yet' };
+    const shown = new Set(), open = new Set();
+    for (const q of s.qs) { const v = decide(s.marks[q.id]), sk = (s.marks[q.id] && s.marks[q.id].skills) || q.skills || []; for (const k of sk) (v === 'pass' || v === 'pass-slip' ? shown : v === 'pending' || v === 'void' ? open : new Set()).add(k); }
+    const missing = need.filter(k => !shown.has(k.id)), waiting = missing.filter(k => open.has(k.id));
+    if (!missing.length) return { result: 'pass', why: '', shown: [...shown] };
+    if (waiting.length) return { result: 'pending', why: 'waiting on: ' + waiting.map(k => k.name).join(', '), missing };
+    return { result: 'not-yet', why: 'not yet shown: ' + missing.map(k => k.name).join(', '), missing };
+  }
+  // Iroha's reply → a structured mark. Anything malformed stays pending.
+  function parseMarks(reply, qs) {
+    let j = null; try { j = JSON.parse(String(reply || '').replace(/^[^{]*/, '').replace(/[^}]*$/, '')); } catch (e) {}
+    const reads = {}, marks = {};
+    for (const q of qs) {
+      const x = j && Array.isArray(j.questions) ? j.questions.find(y => String(y.id) === String(q.id)) : null;
+      reads[q.id] = { text: x && typeof x.transcription === 'string' ? x.transcription : '', unclear: x && Array.isArray(x.unclear) ? x.unclear : [] };
+      marks[q.id] = x ? { readable: x.readable !== false, unclear: reads[q.id].unclear, rubric: x.rubric || {}, finalMatches: !!x.finalMatches, validAlternative: !!x.validAlternative, skills: Array.isArray(x.skills) ? x.skills : [], why: String(x.rationale || '').slice(0, 1200), by: 'Iroha (AI, provisional)' } : { readable: false, why: 'no reading returned', by: 'Iroha (AI, provisional)' };
+    }
+    return { reads, marks, ok: !!j };
+  }
+
+  /* -- appeals: originals kept; two models agreeing never closes a credible appeal. -- */
+  const BASES = ['reference', 'corrected-solution', 'teacher', 'explicit-reasoning'];
+  function appeal(s, q, kind, text, now) { const a = { id: 'ap' + now.toString(36), q, kind, text, at: now, status: 'open', history: [{ at: now, ev: 'opened', text }] }; const m = Object.assign({}, s.marks[q], { appealOpen: true }); return Object.assign({}, s, { appeals: s.appeals.concat(a), marks: Object.assign({}, s.marks, { [q]: m }), state: 'pending' }); }
+  function resolve(s, apId, r, now) {
+    const a = s.appeals.find(x => x.id === apId); if (!a || a.status !== 'open') return { s, ok: false, why: 'no open appeal' };
+    if (!BASES.includes(r.basis) || !String(r.reasoning || '').trim()) return { s, ok: false, why: r.basis === 'model-agreement' ? 'agreement between models is not a basis: it stays open' : 'needs a reference, a corrected solution, a teacher or explicit reasoning' };
+    const na = Object.assign({}, a, { status: 'closed', outcome: r.outcome, history: a.history.concat({ at: now, ev: 'closed', basis: r.basis, ref: r.ref || '', reasoning: r.reasoning, outcome: r.outcome }) });
+    const old = s.marks[a.q] || {}, m = Object.assign({}, old, { appealOpen: false, prior: (old.prior || []).concat({ at: now, rubric: old.rubric, why: old.why }) });
+    if (r.outcome === 'faulty-question') m.void = true; if (r.outcome === 'upheld' && r.rubric) m.rubric = r.rubric;
+    const t = Object.assign({}, s, { appeals: s.appeals.map(x => x.id === apId ? na : x), marks: Object.assign({}, s.marks, { [a.q]: m }) });
+    t.state = Object.values(t.marks).some(x => decide(x) === 'pending') ? 'pending' : 'assessed';
+    return { s: t, ok: true };
+  }
+
+  /* -- exposure: tracked per question, not per family. -- */
+  const eligible = (ex, qid, purpose) => { const e = (ex || {})[qid] || {}; return purpose === 'training' ? true : !e.seen && !e.solution; };
+  const FRESH = ['new-setup', 'changed-unknown', 'added-constraint', 'different-route'];
+  function replacementOk(kind, purpose, family) { if (purpose === 'bank') return FRESH.includes(kind) || (kind === 'numeric-substitution' && !(family && family.handsSteps)); return FRESH.includes(kind); }
+  // Bank completion: the original entry is fulfilled by its own independent success or by a successful fresh replacement. No new obligation.
+  const bankDone = (entry, results) => results.some(r => r.how === 'independent' && r.ok && (r.entry === entry.id || (r.replaces === entry.id && replacementOk(r.kind, 'bank', entry.family))));
+
+  /* -- retention: 7–14 days after the proof, inside the existing older-material allowance; rest days postpone without debt. -- */
+  function retention(o) {
+    const day = d => Math.floor(d / DAY), p = day(o.proofAt), today = day(o.now);
+    const paused = (o.pausedDays || []).filter(d => d >= p && d <= today).length; // Rest, Gentle Return, Done for today
+    const opens = p + 7 + paused, due = p + 14 + paused, need = o.need || [];
+    const ev = (o.evidence || []).filter(e => e.how === 'independent' && e.fresh && day(e.at) > p); // a later day, fresh and independent
+    const covered = need.filter(k => ev.some(e => (e.skills || [e.skill]).includes(k.id))), uncovered = need.filter(k => !covered.includes(k));
+    const items = new Set(ev.filter(e => (e.skills || [e.skill]).some(x => need.some(k => k.id === x))).map(e => e.id));
+    const proven = need.length > 0 && !uncovered.length && items.size >= 2; // one later correct answer is never enough
+    const size = Math.min(uncovered.length, 4, Math.max(2, Math.ceil(need.length / 3)));
+    return { opensDay: opens, dueDay: due, open: today >= opens, proven, covered: covered.map(k => k.id), uncovered: uncovered.map(k => k.id), next: today >= opens && !proven ? uncovered.slice(0, size).map(k => k.id) : [], evidenceItems: items.size,
+      note: `${covered.length} of ${need.length} skills retained${paused ? `; postponed ${paused} day${paused > 1 ? 's' : ''} for rest, without debt` : ''}` };
+  }
+  window.KgProof = { newSession, elapsed, step, restore, decide, chapterResult, parseMarks, appeal, resolve, eligible, replacementOk, bankDone, retention, RUBRIC, BASES, STATES };
+
+  /* -- evidence photos: stored with the attached notes; deletions leave a tombstone so no restore or sync brings them back. -- */
+  const TOMB = 'kg-tomb-v1';
+  const tombs = () => { try { return JSON.parse(localStorage.getItem(TOMB)) || {}; } catch (e) { return {}; } };
+  const db = () => new Promise((ok, no) => { const r = indexedDB.open('kg-notes', 1); r.onupgradeneeded = () => r.result.createObjectStore('files'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+  const idb = async (mode, fn) => { const d = await db(); return new Promise((ok, no) => { const t = d.transaction('files', mode), q = fn(t.objectStore('files')); t.oncomplete = () => { d.close(); ok(q && q.result); }; t.onerror = t.onabort = () => { d.close(); no(t.error); }; }); };
+  const evidence = {
+    put: (id, v) => idb('readwrite', s => s.put(v, id)),
+    get: id => tombs()[id] ? Promise.resolve(null) : idb('readonly', s => s.get(id)).catch(() => null),
+    del: async (id, what) => { const t = tombs(); t[id] = { at: Date.now(), what: what || 'photo', by: 'you' }; localStorage.setItem(TOMB, JSON.stringify(t)); await idb('readwrite', s => s.delete(id)).catch(() => {}); },
+    sweep: async () => { const ids = Object.keys(tombs()); if (ids.length) await idb('readwrite', s => { for (const id of ids) s.delete(id); return null; }).catch(() => {}); }
+  };
+  window.KgEvidence = evidence;
+  const M = window.MoonLab; if (!M || !M.PANELS) return;
+  evidence.sweep(); // a tombstone that arrived by sync removes this device's copy too
+
+  /* -- the panel: one proof at a time, inside Cultivation → Details. -- */
+  const STORE = window.KgCult.STORE, read = () => window.KgCult.readStore(localStorage);
+  const save = (s, what) => { s.log = (s.log || []).concat({ at: Date.now(), what }).slice(-500); localStorage.setItem(STORE, JSON.stringify(s)); M.render(); };
+  const esc = M.esc, clock = ms => { const m = Math.floor(ms / 60000), x = Math.floor(ms / 1000) % 60; return m + ':' + String(x).padStart(2, '0'); };
+  const VERDICT = { pass: 'Pass', 'pass-slip': 'Pass with slip', 'not-yet': 'Not yet', pending: 'Pending', void: 'Void (faulty question, not counted)' };
+  const missingNow = () => { try { return new Set(((JSON.parse(localStorage.getItem('kg-restore-missing')) || {}).files || []).map(f => f.id)); } catch (e) { return new Set(); } };
+  window.KgCultProof = key => {
+    const st = read(), s = st.proof && st.proof.gu === key ? restore(st.proof, Date.now()) : null, need = (st.skills[key] && st.skills[key].status === 'approved') ? st.skills[key].list : null;
+    if (!s) return `<div class="kl-stack"><p class="kl-small"><b>Photo proof</b> · closed book: no formula sheet, notes, solutions or help. Constants may be given; methods aren't. You solve on paper or a whiteboard and photograph your working. ${need ? `One question per essential skill (${need.length}).` : 'Needs an approved essential-skill list first, so the result can say which skills you showed.'}</p>${need ? `<button data-a="pstart" data-k="${esc(key)}">Start a photo proof</button>` : ''}</div>`;
+    const now = Date.now(), el = elapsed(s, now), res = chapterResult(s, need), miss = missingNow();
+    const qhtml = s.qs.map((q, i) => { const m = s.marks[q.id], v = m ? decide(m) : '', r = s.reads[q.id] || {}, ap = s.appeals.filter(a => a.q === q.id);
+      return `<div class="kl-qitem"><p><b>${i + 1}.</b> ${esc(q.t)}</p><p class="kl-small">Photos: ${s.photos.filter(p => p.q === q.id).map(p => p.saved ? (miss.has(p.id) ? '⚠ evidence missing' : '✓ saved') : 'not saved').join(', ') || 'none yet'}</p>
+        ${m ? `<p class="kl-small"><b>${VERDICT[v]}</b> · ${esc(m.by || '')}${m.why ? ': ' + esc(m.why) : ''}</p><details><summary class="kl-small">Iroha's reading (correct it if she misread)</summary><p class="kl-small">${esc(r.fix || r.text || '—')}</p>${(r.unclear || []).map(u => `<p class="kl-small">Unclear: ${esc(u.where || '')} ${u.changesVerdict ? '(could change the result)' : ''}</p>`).join('')}<form data-f="pfix" data-q="${esc(q.id)}" class="kl-row"><input name="text" maxlength="600" placeholder="What you actually wrote" aria-label="Correct the reading"><button>Send correction</button></form></details>
+          ${ap.map(a => `<p class="kl-small">Appeal (${esc(a.kind)}): ${esc(a.text)} · ${a.status === 'open' ? 'open, stays pending until settled by a reference, a corrected solution, a teacher or explicit reasoning' : 'closed: ' + esc(a.outcome)}</p>${a.status === 'open' ? `<form data-f="psettle" data-ap="${esc(a.id)}" class="kl-row"><select name="basis" aria-label="Basis"><option value="reference">A reference</option><option value="corrected-solution">A corrected solution</option><option value="teacher">A teacher</option><option value="explicit-reasoning">Explicit reasoning</option></select><select name="outcome" aria-label="Outcome"><option value="upheld">Objection upheld</option><option value="faulty-question">Question was faulty</option><option value="rejected">Original marking stands</option></select><input name="ref" maxlength="200" placeholder="Reference (book, page, link)" aria-label="Reference"><input name="reasoning" required maxlength="800" placeholder="The reasoning that settles it" aria-label="Reasoning"><button class="kl-ghost">Settle</button></form>` : ''}`).join('')}
+          ${!ap.some(a => a.status === 'open') ? `<form data-f="pappeal" data-q="${esc(q.id)}" class="kl-row"><select name="kind" aria-label="Appeal type"><option value="alternative">Valid alternative method</option><option value="counterexample">Counterexample</option><option value="reference">Reference contradicts the key</option><option value="faulty-question">Faulty question</option></select><input name="text" required maxlength="600" placeholder="Your objection" aria-label="Objection"><button class="kl-ghost">Appeal</button></form>` : ''}` : ''}</div>`; }).join('');
+    const live = s.state === 'solving' || s.state === 'capturing';
+    return `<div class="kl-stack"><p class="kl-eyebrow">PHOTO PROOF · ${esc(s.state.toUpperCase())}</p>
+      ${s.notSubmitted && live ? '<p class="kl-small">Restored after a reload: this work is <b>not submitted</b> and nothing has been assessed.</p>' : ''}
+      <p class="kl-timer">${clock(el)} / ${clock(s.limit)}${s.state === 'capturing' ? ' · paused while you photograph' : ''}${el > s.limit && live ? ' · time is up: photograph and submit' : ''}</p>${qhtml}
+      ${live ? `<div class="kl-row">${s.state === 'solving' ? '<button class="kl-ghost" data-a="pcap">📷 Photograph my working (pauses the clock)</button>' : `<label class="kl-ghost">Add photos <input type="file" accept="image/*" capture="environment" multiple data-pphoto hidden></label><select data-pq aria-label="Which question">${s.qs.map((q, i) => `<option value="${esc(q.id)}">Question ${i + 1}</option>`).join('')}</select><button class="kl-ghost" data-a="presume">Back to solving</button>`}</div>
+        <form data-f="psubmit" class="kl-stack"><label class="kl-small"><input type="checkbox" name="decl" required> I worked closed-book: no formula sheet, notes, solutions or outside help.</label><button>Submit for reading</button></form>` : ''}
+      ${s.state === 'submitted' ? `<p class="kl-small">${s.error ? 'Sending failed (' + esc(s.error) + '). Your photos are saved and nothing was awarded. ' : ''}Submitted. Iroha reads each photo, then marks method, reasoning, execution and checks.</p><button data-a="psend">${s.error ? 'Try again' : 'Send to Iroha'}</button>` : ''}
+      ${s.state === 'reading' ? '<p class="kl-small">Iroha is reading your working…</p>' : ''}
+      ${['assessed', 'pending'].includes(s.state) ? `<p class="kl-small"><b>Chapter result: ${res.result === 'pass' ? 'Proof passed — retention pending' : res.result === 'not-yet' ? 'Not yet' : 'Pending'}</b>${res.why ? ' · ' + esc(res.why) : ''}. This is Iroha's provisional marking, not an authoritative verdict; appeal anything you disagree with.</p>${s.state === 'pending' ? '<button class="kl-ghost" data-a="psend">Ask Iroha to read again</button>' : ''}` : ''}
+      <button class="kl-ghost" data-a="pclose">${live ? 'Abandon (photos are kept)' : 'Close'}</button></div>`;
+  };
+  const upd = (fn, what) => { const st = read(); if (!st.proof) return; st.proof = fn(st.proof);
+    const sk = st.skills[st.proof.gu], res = chapterResult(st.proof, sk && sk.status === 'approved' ? sk.list : null);
+    st.passes = st.passes || {}; if (res.result === 'pass' && !st.passes[st.proof.gu]) st.passes[st.proof.gu] = { at: Date.now(), session: st.proof.id, by: 'photo proof (Iroha, provisional)' };
+    save(st, what); return st.proof; };
+  const A = M.ACTIONS, F = M.FORMS;
+  A.pstart = async b => {
+    const key = b.dataset.k, st = read(), need = st.skills[key] && st.skills[key].status === 'approved' ? st.skills[key].list : null; if (!need) return;
+    const name = key.split(':').slice(1).join(':'), ch = (window.KgCult.LINKS[name] || [])[0];
+    if (!ch || !M.getSet) return alert('No question source is mapped for this chapter yet, so a proof paper can\'t be made. Nothing was changed.');
+    const r = await M.getSet([ch], need.length, null, { hard: true });
+    if (!r || r.error || !r.qs) return alert("Couldn't get a proof paper right now. Nothing was changed.");
+    const ex = st.exposure || {}, qs = r.qs.filter(q => eligible(ex, q.bid || q.t, 'proof')).slice(0, need.length).map((q, i) => ({ id: 'q' + i, t: q.t, bid: q.bid || '', a: q.a, skills: [] }));
+    if (qs.length < need.length) return alert('Not enough unseen questions for this chapter. Nothing was changed.');
+    st.proof = newSession({ id: 'pf' + Date.now().toString(36), gu: key, ch, qs, limit: Math.max(15, need.length * 8) * 60000, now: Date.now() });
+    st.exposure = ex; for (const q of qs) ex[q.bid || q.t] = Object.assign({}, ex[q.bid || q.t], { seen: Date.now(), purpose: 'proof' });
+    save(st, 'proof started');
+  };
+  A.pcap = () => upd(s => step(s, 'capture', Date.now()), 'capture');
+  A.presume = () => upd(s => step(s, 'resume', Date.now()), 'resume');
+  A.pclose = () => { const st = read(); if (st.proof) { st.proofs = (st.proofs || []).concat(st.proof).slice(-50); st.proof = null; save(st, 'proof closed'); } };
+  F.psubmit = v => upd(s => { const t = step(s, 'submit', Date.now(), { decl: v.decl ? { at: Date.now(), text: 'closed-book declaration' } : null }); if (t === s) alert(s.photos.some(p => p.saved) ? 'Tick the closed-book declaration first.' : 'Add at least one photo of your working first.'); return t; }, 'submit');
+  F.pfix = (v, f) => upd(s => step(s, 'clarify', Date.now(), { q: f.dataset.q, text: v.text }), 'clarify');
+  F.psettle = (v, f) => upd(s => { const r = resolve(s, f.dataset.ap, { basis: v.basis, ref: v.ref, reasoning: v.reasoning, outcome: v.outcome }, Date.now()); if (!r.ok) alert(r.why); return r.s; }, 'appeal settled');
+  F.pappeal = (v, f) => upd(s => appeal(s, f.dataset.q, v.kind, v.text, Date.now()), 'appeal');
+  const toData = blob => new Promise(ok => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.readAsDataURL(blob); });
+  A.psend = async () => {
+    let s = upd(x => step(x, 'reading', Date.now()), 'reading'); if (!s || s.state !== 'reading') return;
+    try {
+      const imgs = []; for (const p of s.photos.filter(x => x.saved)) { const rec = await evidence.get(p.id); if (rec && rec.blob) imgs.push({ q: p.q, url: await toData(rec.blob) }); }
+      if (!imgs.length) throw new Error('no saved photos found on this device');
+      const st = read(), need = st.skills[s.gu].list, reads = [];
+      for (let i = 0; i < imgs.length; i += 3) { // the backend takes up to 3 images per request
+        const batch = imgs.slice(i, i + 3), images = batch.map(x => ({ media_type: x.url.slice(5, x.url.indexOf(';')), data: x.url.slice(x.url.indexOf(',') + 1) }));
+        window.__kgPurpose = 'proof-read';
+        const r = await window.__kgAsk('iroha', `[proof transcription, not typed by me] Transcribe these photos of my handwritten working exactly, line by line, for question ids ${batch.map(x => x.q).join(', ')} (in photo order). Mark anything you can't read as [?]. Don't solve, judge or add anything. Plain text only.`, images, true);
+        window.__kgPurpose = '';
+        if (!r || r.error || !r.reply) throw new Error(r && r.error || 'no reply');
+        reads.push(batch.map(x => x.q).join(',') + ':\n' + r.reply);
+      }
+      const prompt = `[proof marking request, not typed by me] Closed-book chapter proof. Mark each question from my transcribed working only. Skills to identify (ids): ${need.map(k => k.id + ' = ' + k.name).join('; ')}.
+Questions: ${s.qs.map(q => `${q.id}: ${q.t} (reference answer: ${q.a})`).join(' | ')}
+My transcribed working: ${reads.join('\n---\n').slice(0, 12000)}
+${Object.entries(s.reads).filter(([, r]) => r.fix).map(([q, r]) => `My correction for ${q}: ${r.fix}`).join('\n')}
+Reply with JSON only: {"questions":[{"id":"q0","transcription":"...","readable":true,"unclear":[{"where":"...","changesVerdict":false}],"rubric":{"method":0-2,"concept":0-2,"execution":0-2,"checks":0-2},"finalMatches":true,"validAlternative":false,"skills":["skill ids shown"],"rationale":"..."}]}
+Rules: a right final answer with invalid reasoning gets method 0 or 1. A minor arithmetic slip with sound reasoning gets execution 1. A valid method different from the reference is validAlternative true. If notation or handwriting could change the result, list it in unclear with changesVerdict true rather than guessing. The reference answer may itself be wrong: say so in rationale.`;
+      const r = await window.__kgAsk('iroha', prompt, null, true);
+      if (!r || r.error || !r.reply) throw new Error(r && r.error || 'no reply');
+      const pm = parseMarks(r.reply, s.qs);
+      upd(x => step(x, 'marked', Date.now(), pm), 'marked');
+    } catch (e) { window.__kgPurpose = ''; upd(x => step(x, 'read-failed', Date.now(), String(e.message || e).slice(0, 120)), 'read failed'); }
+  };
+  document.addEventListener('change', async e => {
+    const t = e.target; if (!t.dataset || !('pphoto' in t.dataset) || !t.files || !t.files.length) return;
+    const q = (document.querySelector('[data-pq]') || {}).value || 'q0', st = read(); if (!st.proof) return;
+    for (const f of t.files) {
+      const id = 'ev:' + st.proof.id + ':' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      let saved = false; try { await evidence.put(id, { name: f.name, blob: f, kind: 'proof-photo', proof: st.proof.id, q, at: Date.now() }); saved = true; } catch (err) {}
+      upd(s => step(s, 'photo', Date.now(), { id, q, saved, name: f.name }), saved ? 'photo saved' : 'photo save failed');
+      if (!saved) alert(`Couldn't save ${f.name} on this device. Try again; nothing else was lost.`);
+    }
+  });
+  setInterval(() => { const el = document.querySelector('.kl-timer'); const st = read(); if (el && st.proof && st.proof.state === 'solving') M.render(); }, 15000);
+  // show it inside the cultivation Details panel
+  const base = M.PANELS.cultivation;
+  M.PANELS.cultivation = () => { const h = base(); const st = read(); return st.proof ? h.replace('</section>', `<div class="kl-stack">${window.KgCultProof(st.proof.gu)}</div></section>`) : h; };
 })();
 </script>
 </body></html>
