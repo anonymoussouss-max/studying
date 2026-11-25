@@ -132,7 +132,7 @@ test('amended drafts: Units and Dimensions is separate from Errors; scope notes 
   assert.ok(!K.DRAFTS['Errors'].list.some(([n]) => /dimension/i.test(n)));
   assert.ok(/remaining lectures/.test(K.DRAFTS['Basic Mathematics'].scope));
   assert.ok(K.DRAFTS['Basic Mathematics'].list.some(([n]) => /denominator/.test(n)) && K.DRAFTS['Basic Mathematics'].list.some(([n]) => /base cases/.test(n)));
-  assert.ok(/purity and yield/.test(K.DRAFTS['Basic Concepts'].scope) && !K.DRAFTS['Basic Concepts'].list.some(([n]) => /purity|yield/i.test(n)), 'candidates are noted, not made mandatory');
+  assert.ok(/percentage yield/.test(K.DRAFTS['Basic Concepts'].scope) && K.DRAFTS['Basic Concepts'].list.filter(([n]) => /yield|gas|normality/i.test(n)).every(([n]) => /keep only if taught/.test(n)), 'worksheet-evidenced candidates are labelled, not made mandatory');
   assert.ok(K.DRAFTS['Chemical Bonding and Molecular Structure'].list.some(([n]) => /Bond polarity versus molecular polarity/.test(n)));
   assert.ok(K.SOURCES.some(x => x.chapter === 'Vectors') && !K.LINKS['Motion in a Plane'].includes('vectors'));
   assert.ok(html.includes('It does not certify any generated question or reference solution.'));
@@ -161,4 +161,13 @@ test('the same DPP question from two files is proposed once (content identity), 
   assert.strictEqual(a.items[0].fp, b.items[0].fp); assert.notStrictEqual(a.items[1].fp, b.items[1].fp);
   assert.ok(html.includes('fps.has(x.fp)'));
   assert.strictEqual(K.parseDPP('Physics DPP: 4\nVectors\nQ1 x', 'Vectors  DPP 04 (Extra DPP).pdf').items[0].label, 'DPP 4 (extra) · Q1');
+});
+test('handoff skill tags ride on DPP proposals as unapproved content tags, with their source batch', () => {
+  assert.strictEqual(Object.values(K.TAGS).reduce((a, t) => a + Object.keys(t.q).length, 0), 180);
+  const t = K.tagFor('Some Basic Concepts of Chemistry _ DPP 07 (Of Lec 14).pdf', 5);
+  assert.ok(t && t.status === 'proposed' && /2026/.test(t.batch));
+  const p = K.parseDPP('Chemistry DPP: 7\nQ5 yield question here', 'Some Basic Concepts of Chemistry _ DPP 07 (Of Lec 14).pdf');
+  assert.strictEqual(p.items[0].tag.status, 'proposed'); assert.strictEqual(p.items[0].status, 'proposed');
+  assert.strictEqual(K.DRAFTS['Basic Concepts'].list.filter(([n]) => /candidate: keep only if taught/.test(n)).length, 3);
+  assert.ok(/does not validate the rest of the bank/.test(K.STARTERS['m11:Basic Mathematics'].doc.keyAudit));
 });
