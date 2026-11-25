@@ -111,10 +111,40 @@ test('planned Inorganic counts are proposals: unused until accepted, provisional
   const base = L({ courses: { ic11: course('chem', [['Class 11 inorganic (lecture count missing)', null]], []) } });
   const v0 = cultivation(base);
   assert.ok(v0.subjects.chem.missing.includes('Class 11 inorganic (lecture count missing)'));
-  const acc = st({ catalog: { ic11: { chapters: K.PLANNED.ic11.chapters.map(([n, c]) => [n, c]), by: 'you' } } });
+  const ver = id => K.PLANNED.ic11.versions.find(v => v.id === id);
+  assert.strictEqual(ver('pw-a').chapters.find(c => c[0].startsWith('p-Block'))[1], 5); assert.strictEqual(ver('pw-b').chapters.find(c => c[0].startsWith('p-Block'))[1], 6);
+  const acc = st({ catalog: { ic11: { version: 'pw-a', label: 'A', chapters: ver('pw-a').chapters, by: 'you', confirmed: false } } });
   const v1 = cultivation(base, null, acc), bond = gu(v1, 'chem', 'Chemical Bonding and Molecular Structure');
   assert.strictEqual(bond.lectures, 23); assert.strictEqual(bond.planned, true); assert.strictEqual(bond.done, 0);
-  assert.ok(v1.subjects.chem.missing.includes('s-Block Elements')); assert.strictEqual(v1.placement, 'not-computed');
+  assert.strictEqual(v1.placement, 'not-computed', 'Organic still missing'); assert.strictEqual(v1.ed.provisional, true);
+});
+test('with both chemistry plans in use but unconfirmed, placement is provisional only; confirming them is a separate step', () => {
+  const base = L({ courses: { ic11: course('chem', [['x', null]], []), oc11: course('chem', [['y', null]], []) } });
+  const cat = { ic11: { version: 'pw-b', label: 'B', chapters: K.PLANNED.ic11.versions[1].chapters, confirmed: false }, oc11: { version: 'scribd-ra', label: 'RA', chapters: K.PLANNED.oc11.versions[0].chapters, confirmed: false } };
+  const v = cultivation(base, null, st({ catalog: cat }));
+  assert.strictEqual(v.ed.complete, true); assert.strictEqual(v.placement, 'provisional'); assert.strictEqual(v.ed.provisionalWhy.length, 2);
+  assert.strictEqual(gu(v, 'chem', 'Isomerism').lectures, 13); assert.ok(/2\.0/.test(K.PLANNED.oc11.versions[0].status + K.PLANNED.oc11.versions[0].src));
+  cat.ic11.confirmed = cat.oc11.confirmed = true;
+  assert.strictEqual(cultivation(base, null, st({ catalog: cat })).placement, 'computable');
+});
+test('amended drafts: Units and Dimensions is separate from Errors; scope notes say what is still unverified', () => {
+  assert.ok(K.DRAFTS['Units and Dimensions'] && K.DRAFTS['Errors']);
+  assert.ok(!K.DRAFTS['Errors'].list.some(([n]) => /dimension/i.test(n)));
+  assert.ok(/remaining lectures/.test(K.DRAFTS['Basic Mathematics'].scope));
+  assert.ok(K.DRAFTS['Basic Mathematics'].list.some(([n]) => /denominator/.test(n)) && K.DRAFTS['Basic Mathematics'].list.some(([n]) => /base cases/.test(n)));
+  assert.ok(/purity and yield/.test(K.DRAFTS['Basic Concepts'].scope) && !K.DRAFTS['Basic Concepts'].list.some(([n]) => /purity|yield/i.test(n)), 'candidates are noted, not made mandatory');
+  assert.ok(K.DRAFTS['Chemical Bonding and Molecular Structure'].list.some(([n]) => /Bond polarity versus molecular polarity/.test(n)));
+  assert.ok(K.SOURCES.some(x => x.chapter === 'Vectors') && !K.LINKS['Motion in a Plane'].includes('vectors'));
+  assert.ok(html.includes('It does not certify any generated question or reference solution.'));
+});
+test('the prepared DPP 07 checklist is document-complete (Q1–Q10, no answer key), proposed only, unattempted, and never chapter-complete', () => {
+  const s = K.STARTERS['m11:Basic Mathematics'];
+  assert.strictEqual(s.items.length, 10); assert.strictEqual(s.doc.docComplete, true); assert.strictEqual(s.doc.lec, 15);
+  assert.ok(s.items.every(i => i.status === 'proposed' && !i.attempt && i.kind === 'dpp'));
+  assert.ok(!s.items.some(i => /answer|key/i.test(i.label)));
+  const inv = { status: 'incomplete', docs: [s.doc], items: s.items.map(i => Object.assign({}, i, { status: 'confirmed' })) };
+  const g = gu(cultivation(L(), null, st({ inv: { 'm11:Basic Mathematics': inv } })), 'maths', 'Basic Mathematics');
+  assert.strictEqual(g.inv.scope, 'unverified'); assert.strictEqual(g.inv.attempted, 0);
 });
 test('provisional skill drafts are never mastery gates until approved', () => {
   const d = K.DRAFTS['Basic Mathematics']; assert.ok(/reference-only/.test(d.src));
