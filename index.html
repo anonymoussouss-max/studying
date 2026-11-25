@@ -1190,12 +1190,29 @@ body.habit-shh #hb-session-card {text-align:center;}
     for(const role of ['P','H'])for(const g of segs.slice().reverse()){if(dip<5)break;if(g.kind!=='study'||g.role!==role||g.ext||(nowClock!=null&&g.e<=nowClock))continue;const len=g.e-g.s;
       if(len<=dip||len-dip<15){g.role='D';dip-=len;}else{const k=segs.indexOf(g);segs.splice(k+1,0,Object.assign({},g,{s:g.s+dip,role:g.role}));g.e=g.s+dip;g.role='D';dip=0;}}
 
+    // automatic re-plan (handoff §11): when study ran past its planned time, the day's total stays inside today's allowance.
+    // over = study actually done − planned study time already elapsed (minus what Undo kept). The latest future PCM blocks
+    // give way to free time (never the block in progress, German, diploma, astrophysics or C exam); assign() then moves what
+    // no longer fits to the next study day. Nothing is ever added; Gentle Return days keep their own cap and Done.
+    let replan=null;
+    {const nowC=nowClock==null?-1:nowClock,used=ctx.used!=null?+ctx.used:dayIso===studyDate()?gentleUsed(dayIso):null;
+      if(!GR&&nowC>=0&&used!=null){const st=segs.filter(x=>x.kind==='study'),elapsed=st.reduce((n,x)=>n+Math.max(0,Math.min(x.e,nowC)-x.s),0);
+        const undo=(((S.replanUndo||{})[dayIso])||[]).reduce((n,u)=>n+Math.max(0,+(u&&u.grant)||0),0),over=Math.round(used-elapsed-undo);
+        if(over>=5){let left=over;const trimmed=[];
+          for(let i=segs.length-1;i>=0&&left>0;i--){const x=segs[i];if(x.kind!=='study'||x.s<nowC||!['L','P','R','H','SUN'].includes(x.role))continue;
+            const len=x.e-x.s,cut=len-Math.min(left,len)<15?len:Math.min(left,len);
+            trimmed.push({s:x.e-cut,e:x.e});left-=cut;
+            if(cut>=len)segs[i]={s:x.s,e:x.e,kind:'rest',id:'free-rp'+x.s,title:'Free time · re-planned'};
+            else{segs.splice(i+1,0,{s:x.e-cut,e:x.e,kind:'rest',id:'free-rp'+(x.e-cut),title:'Free time · re-planned'});x.e-=cut;}}
+          replan={at:nowC,over,freed:trimmed.reduce((n,t)=>n+t.e-t.s,0),trimmed:trimmed.reverse()};}}}
+
     const tasks=ctx.pool?[]:buildTasks(L,dayIso,{noNewLectures:!!prep});
     const focus=dayFocus(L,dayIso,ctx.actual14||{});
     const {rows,deferred}=assign(segs,tasks,focus,{now:nowClock,dayNo:Math.floor(Date.parse(dayIso+'T12:00:00')/864e5),firstOfDay:!ctx.loggedAny,examPrep:!!prep,astroTitle:astroNext(L.astro,dayIso).text,pool:ctx.pool,week:!!ctx.pool,syl:L.syl||{},germanUnit:+S.germanUnit||0});
     const cut=(segs.cuts||[]).reduce((a,c)=>a+c.m,0);
     if(GR)deferred.length=0; // gentle return: nothing is pushed onto another day; unfinished work waits in the parked list
-    return {rows,deferred,cutMinutes:cut,plan,chosen,wake:W,focus,hours:hrs||0,gentle:GR,extend:!!opt(plan).extend,examPrep:prep?prep.name||'Diploma exams':'',examDays:examDays.length,switched:sw.length};
+    if(replan)replan.moved=deferred.map(x=>x.title+' ('+x.min+' min)');
+    return {rows,deferred,cutMinutes:cut,plan,chosen,wake:W,focus,hours:hrs||0,gentle:GR,replan,replanUndo:((S.replanUndo||{})[dayIso])||[],extend:!!opt(plan).extend,examPrep:prep?prep.name||'Diploma exams':'',examDays:examDays.length,switched:sw.length};
   }
   const WEEK_BUDGET={lighter:270,minimal:150},DAY_HOURS=[4,5,6,7,8];
   // C exam (IT23102, Thu 26 Nov 2026, 10 AM): Ayan's dated timetable, added 23 Nov. After its last day nothing of it shows; no record is touched.
@@ -1283,24 +1300,45 @@ body.habit-shh #hb-session-card {text-align:center;}
       rows.push([id,r.title,r.kind,len,r.kind==='study'?BUCK[r.subj]||null:null,{role:r.role||null,subj:r.subj||null,task:r.task||null,entry:!!r.entry,optional:!!r.optional,past:!!r.past,clock:r.s,ext:!!r.ext,edited:!!r.edited}]);}
     rows.origin=d.wake-630;rows.info=d;const md=(L||{}).medsAt;if(md!=null&&+md+630>=d.wake)addMeds(rows,+md+630-d.wake);return rows;
   }
-  // ---- forecast: a range from remaining lectures, real durations and real weekly capacity ----
-  function forecast(L,hist={}){
-    const syl=L.syl||{},S=schedOf(L),per={},missing=[];
-    const perLec={maths:[lecMin(syl,'maths')+REVMIN.maths+HWMIN.maths,180+90+90],physics:[lecMin(syl,'physics')+30+30,115+30+45],chem:[lecMin(syl,'chem')+30+30,110+30+45]};
+  // ---- forecast (handoff §13): a range from remaining lectures, real durations and the capacity actually selected ----
+  // Capacity per day = the day's allowance (6 h, 8 h after the weekly review, a day's own hours, or the Gentle Return cap;
+  // Sunday 60 min PCM; a day off 0) minus German and astrophysics; the week's diploma hours come off too. Two answers:
+  // a hypothetical pace (that capacity, if every day were kept) and a forecast from real recent PCM study (2+ weeks needed).
+  // Counts that are missing or provisional are listed; with any of them no completion date is claimed.
+  const REATT={maths:[20,40],physics:[15,30],chem:[15,30]}; // re-attempting missed questions, per lecture (low, high)
+  function pcmCapacity(L,from){const S=schedOf(L),days=[];let week=0;
+    for(let k=0;k<7;k++){const d=add8(from,k),dow=new Date(d+'T12:00:00').getDay(),GR=gentleOf(S,d),off=((L.dayTypes||{})[d]||{}).t==='rest';
+      let all,src;if(off){all=0;src='day off';}else if(dow===0){all=90;src='Sunday';}else if(GR){all=GR.stopped||!GR.cap?0:GR.cap;src='Gentle Return'+(GR.cap?' cap':' (no maximum set)');}
+      else{const h=dayHours(S,d)||6;all=h*60;src=h+' h';}
+      const ger=off||!all?0:dow===0?30:Math.min(all,+S.german||0),ast=dow===0||!all?0:Math.min(all-ger,astroMinutes(S,d)),pcm=Math.max(0,all-ger-ast);
+      days.push({d,src,all,german:ger,astro:ast,pcm});week+=pcm;}
+    const dip=+((S.diploma.heavy||{})[mondayOf(from)])||+S.diploma.week||0;
+    return {days,diploma:dip,weekly:Math.max(0,week-dip)};}
+  function forecast(L,hist={},from){
+    const syl=L.syl||{},per={},missing=[],provisional=[],absent=[],day0=from||studyDate();
+    const parts={lecture:[0,0],revision:[0,0],homework:[0,0],reattempt:[0,0]};
+    const rng={maths:{lecture:[lecMin(syl,'maths'),180],revision:[REVMIN.maths,90],homework:[HWMIN.maths,90]},physics:{lecture:[lecMin(syl,'physics'),115],revision:[30,30],homework:[30,45]},chem:{lecture:[lecMin(syl,'chem'),110],revision:[30,30],homework:[30,45]}};
     let low=0,high=0;
     for(const s of SUB3){let rem=0,done=0,total=0;
       for(const id of (syl.order||{})[s]||[]){const c=(syl.courses||{})[id];if(!c)continue;
-        if(!Array.isArray(c.chapters)||c.chapters.some(x=>x[1]==null)){missing.push(c.name||id);continue;}
-        const t=c.chapters.reduce((a,x)=>a+(+x[1]||0),0),d=c.chapters.reduce((a,x,k)=>a+Math.min(+x[1]||0,(c.done||[])[k]||0),0);total+=t;done+=d;rem+=t-d;if(c.provisional)missing.push((c.name||id)+' (provisional count)');}
-      per[s]={rem,done,total};low+=rem*perLec[s][0]*1.10;high+=rem*perLec[s][1]*1.25;}
-    // weekly PCM minutes: planned (6 days of 6 h, minus German and diploma) until 2 weeks of history exist
-    const planned=6*(360-S.german)-(+S.diploma.week||120);
+        if(!Array.isArray(c.chapters)||c.chapters.some(x=>x[1]==null)){missing.push(c.name||id);absent.push(c.name||id);continue;}
+        const t=c.chapters.reduce((a,x)=>a+(+x[1]||0),0),d=c.chapters.reduce((a,x,k)=>a+Math.min(+x[1]||0,(c.done||[])[k]||0),0);total+=t;done+=d;rem+=t-d;if(c.provisional){missing.push((c.name||id)+' (provisional count)');provisional.push(c.name||id);}}
+      per[s]={rem,done,total};
+      for(const p of ['lecture','revision','homework'])for(const i of [0,1])parts[p][i]+=rem*Math.max(rng[s][p][0],i?rng[s][p][1]:0)*(i?1.25:1.10);
+      for(const i of [0,1])parts.reattempt[i]+=rem*REATT[s][i]*(i?1.25:1.10);}
+    for(const p in parts){parts[p]=parts[p].map(Math.round);low+=parts[p][0];high+=parts[p][1];}
+    const cap=pcmCapacity(L,day0),planned=cap.weekly;
     const weeks=Array.isArray(hist.weeks)?hist.weeks.filter(n=>n>=0):[];const histOK=weeks.length>=2;
     const avg=histOK?weeks.slice(-4).reduce((a,b)=>a+b,0)/Math.min(4,weeks.length):0;
-    const fast=histOK?Math.max(60,avg*1.15):planned,slow=histOK?Math.max(60,avg*0.85):planned*0.6;
-    const wLow=low/fast,wHigh=high/slow;
-    return {per,missing:[...new Set(missing)],weeksLow:Math.round(wLow),weeksHigh:Math.round(wHigh),provisional:!histOK,plannedWeekly:planned,actualWeekly:Math.round(avg),
-      minutesLow:Math.round(low),minutesHigh:Math.round(high),aimWeeks:104,assumptions:['durations: lecture '+SUB3.map(s=>SNAME[s]+' '+lecMin(syl,s)+' min').join(', ')+'; revision Maths 90, Physics 30, Chemistry 30; homework Maths 45+, Physics 30, Chemistry 30','plus 10-25% for older-topic practice and tests','capacity: '+(histOK?'your last '+Math.min(4,weeks.length)+' weeks of real PCM study':'the planned week (6 days × 6 h minus German and diploma), taken at 60-100% because rest and reduced days happen'),'Sunday adds nothing; Class 11 organic and inorganic are not counted until their lecture counts are added']};
+    // hypothetical: the selected capacity kept every day (fast) down to 60% of it (rest and reduced days happen)
+    const pace=planned>0?{weeksLow:Math.round(low/planned),weeksHigh:Math.round(high/(planned*0.6)),weekly:planned}:{weeksLow:null,weeksHigh:null,weekly:0};
+    const actual=histOK&&avg>0?{weeksLow:Math.round(low/Math.max(60,avg*1.15)),weeksHigh:Math.round(high/Math.max(60,avg*0.85)),weekly:Math.round(avg),weeksUsed:Math.min(4,weeks.length)}:null;
+    const head=actual||pace,complete=!absent.length&&!provisional.length;
+    return {per,missing:[...new Set(missing)],absent,provisionalCounts:provisional,complete,parts,capacity:cap,pace,actual,
+      weeksLow:head.weeksLow,weeksHigh:head.weeksHigh,provisional:!histOK,plannedWeekly:planned,actualWeekly:Math.round(avg),
+      minutesLow:Math.round(low),minutesHigh:Math.round(high),aimWeeks:104,
+      uncertainty:'the range runs from every block kept at typical durations (low) to longer lectures, slower homework and more re-attempts (high); '+(actual?'the forecast uses your last '+actual.weeksUsed+' weeks of PCM, ±15%':'there is not enough history yet for a forecast from real study'),
+      assumptions:['durations per lecture: lecture '+SUB3.map(s=>SNAME[s]+' '+lecMin(syl,s)+' min').join(', ')+'; revision Maths 90, Physics 30, Chemistry 30; homework Maths 45-90, Physics 30-45, Chemistry 30-45; re-attempts Maths 20-40, Physics and Chemistry 15-30','plus 10-25% for older-topic practice and tests','capacity: the selected allowance this week allowance ('+[...new Set(cap.days.filter(x=>x.all).map(x=>x.src))].join(', ')+') minus German, astrophysics and '+cap.diploma+' min diploma = '+planned+' min PCM a week','Sunday is 60 min PCM + 30 min German; nothing else is added','Class 11 organic and inorganic are not counted until their lecture counts are added; Class 12 counts are provisional']};
   }
   // default syllabus: Class 11 Arjuna JEE 2027 counts you supplied, Class 12 counts from Lakshya JEE 2027 planners (provisional proxies)
   function seedSyllabus(){
@@ -1329,7 +1367,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const daysLeft=w===0?0:7-w,loggedAny=ss.some(s=>s&&s.date===day&&s.subject!=='Other'&&(+s.minutes||0)>0)||Object.values(((desk.state||desk).days||{})[day]?.completed||{}).some(x=>+x>0)||!!(habit.active&&habit.active.date===day);
     return {actual14:a14,loggedAny,diplomaToday:daysLeft?Math.max(0,Math.ceil((target-dipDone)/daysLeft/5)*5):0,diplomaTarget:target,diplomaDone:dipDone,monday:mon};}
   const nowClock=()=>{const n=new Date();let m=n.getHours()*60+n.getMinutes();if(m<240)m+=1440;return m;};
-  const api={DAY_HOURS,dayHours,reviewOf,reviewSettle,cExam,gentleOf,gentleUsed,astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,forecast:(L,hist)=>forecast(L||labData(),hist||{}),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={DAY_HOURS,dayHours,reviewOf,reviewSettle,cExam,gentleOf,gentleUsed,astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,forecast:(L,hist,from)=>forecast(L||labData(),hist||{},from),pcmCapacity:(L,from)=>pcmCapacity(L||labData(),from||studyDate()),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -8513,6 +8551,13 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     if (!list.length && !cut) return '';
     return `<p class="kl-small"><b>Deferred to the next study day:</b> ${list.map(x => esc(x.title) + ' (' + dur(x.min) + ')').join('; ') || 'nothing'}${cut ? ` · ${dur(cut)} of study gave way to a food break or exam time` : ''}. Nothing is added to today to make up for it.</p>`;
   }
+  // automatic re-plan (§11): one line, with Undo. Undo keeps every minute already logged; it only brings the earlier blocks back.
+  function replanHTML(v) {
+    const r = v.info.replan, u = v.info.replanUndo || [];
+    if (r && r.freed) return `<p class="kl-small" data-kg="replan"><b>Re-planned automatically:</b> study ran ${dur(r.over)} past its planned time, so ${r.trimmed.map(t => clk(t.s) + '–' + clk(t.e)).join(', ')} is now free time and today stays inside its allowance${r.moved.length ? '; what no longer fits moves to the next study day' : ''}. <button type="button" class="kl-ghost" data-a="kgdreplanundo" data-v="${r.over}">Undo</button></p>`;
+    if (r && !r.freed) return `<p class="kl-small" data-kg="replan">Study ran ${dur(r.over)} past its planned time; the blocks left today are already as short as they can be, so nothing else changed.</p>`;
+    return u.length ? `<p class="kl-small" data-kg="replan">You undid the automatic re-plan at ${clk(u[u.length - 1].at)}; study logged since then is kept.</p>` : '';
+  }
   function timelineHTML(v) {
     const li = v.rows.filter(r => r.minutes > 0 && r.kind !== 'sleep').map(r => {
       const pastCls = r.end <= v.now ? ' style="opacity:.55"' : r.start <= v.now ? ' style="font-weight:700"' : '';
@@ -8576,9 +8621,15 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
       const ch = (c.chapters || []).map((x, k) => `<li class="kl-small">${esc(x[0])} <input name="d_${esc(id)}_${k}" type="number" min="0" max="${x[1] ?? 400}" value="${(c.done || [])[k] || 0}" style="width:4.2em" aria-label="lectures done"> / <input name="n_${esc(id)}_${k}" type="number" min="1" max="400" value="${x[1] ?? ''}" placeholder="count?" style="width:4.6em" aria-label="lectures in chapter"></li>`).join('');
       return `<details><summary class="kl-small">${esc(c.name)} · ${esc(c.teacher || '')}${c.provisional ? ' · provisional count' : ''}</summary><ul class="kl-list">${ch}</ul><div class="kl-row"><input name="addname_${esc(id)}" maxlength="80" placeholder="add a chapter"><input name="addn_${esc(id)}" type="number" min="1" max="400" placeholder="lectures" style="width:6em"></div></details>`;
     }).join('');
-    return `<details><summary class="kl-small">Progress and forecast · ${per}</summary>
+    const vsAim = r => !f.complete ? '' : r.weeksHigh <= 104 ? ', inside the aim' : r.weeksLow > 104 ? ', beyond the aim at this pace: the first answer is to adjust priorities and the forecast, not to add hours' : ', overlapping the aim';
+    const span = r => `${r.weeksLow}–${r.weeksHigh} weeks (around ${fmt(r.weeksLow)} to ${fmt(r.weeksHigh)})${vsAim(r)}`;
+    const P = f.parts, pr = k => `${dur(P[k][0])}–${dur(P[k][1])}`;
+    return `<details><summary class="kl-small">Progress and forecast · ${per}${f.complete ? '' : ` · ${f.absent.length} count${f.absent.length === 1 ? '' : 's'} missing, ${f.provisionalCounts.length} provisional`}</summary>
       <p class="kl-small"><b>Provisional aim:</b> complete Class 11–12 PCM within about 24 months (around ${aimTxt}), adjusting the forecast from actual progress while protected commitments stay as they are.</p>
-      <p class="kl-small"><b>Forecast${f.provisional ? ' (provisional: fewer than two weeks of history on this plan)' : ''}:</b> roughly ${f.weeksLow}–${f.weeksHigh} weeks for the counted lectures, around ${fmt(f.weeksLow)} to ${fmt(f.weeksHigh)}${f.weeksHigh <= 104 ? ', inside the aim' : f.weeksLow > 104 ? ', beyond the aim at this pace: the first answer is to adjust priorities and the forecast, not to add hours' : ', overlapping the aim'}. Weekly PCM capacity used: ${f.provisional ? dur(f.plannedWeekly) + ' planned' : dur(f.actualWeekly) + ' actual'}.</p>
+      ${f.complete ? '' : `<p class="kl-small" data-kg="fc-incomplete"><b>Not a completion date.</b> ${f.absent.length ? 'Missing lecture counts: ' + esc(f.absent.join('; ')) + '. ' : ''}${f.provisionalCounts.length ? 'Provisional counts: ' + esc(f.provisionalCounts.join('; ')) + '. ' : ''}The ranges below cover the counted lectures only.</p>`}
+      <p class="kl-small" data-kg="fc-pace"><b>Hypothetical pace</b> (your selected capacity, ${dur(f.pace.weekly)} PCM a week after German, astrophysics and ${dur(f.capacity.diploma)} diploma, if it were kept): ${f.pace.weekly ? span(f.pace) : 'no PCM capacity is selected this week'}.</p>
+      <p class="kl-small" data-kg="fc-actual"><b>Forecast from real study</b>: ${f.actual ? `your last ${f.actual.weeksUsed} weeks averaged ${dur(f.actual.weekly)} PCM, so ${span(f.actual)}` : 'not yet: it needs at least two full weeks of logged PCM study'}.</p>
+      <p class="kl-small">Remaining work for the counted lectures: lectures ${pr('lecture')}, revision ${pr('revision')}, homework ${pr('homework')}, re-attempts ${pr('reattempt')}. Uncertainty: ${esc(f.uncertainty)}.</p>
       <p class="kl-small">Assumptions: ${f.assumptions.map(esc).join('; ')}.</p>
       ${f.missing.length ? `<p class="kl-small"><b>Uncertain or missing:</b> ${f.missing.map(esc).join('; ')}.</p>` : ''}
       <p class="kl-small"><b>Coverage</b> (lectures watched) and <b>understanding</b> are different things. Last 14 days: ${u.indep} independent correct answers, ${u.explained} explanations. Watching and rereading never count as mastery.</p>
@@ -8596,7 +8647,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     if (syncLectureTime()) save();
     const v = view();
     return `<section class="kl-card kg-plan kg-day"><p class="kl-eyebrow">YOUR STUDY DAY · ${esc(planLabel(v))}${v.info.examPrep ? ' · exam period: ' + esc(v.info.examPrep) : ''}</p>
-      ${doNowHTML(v)}${deferredHTML(v)}${changesHTML()}
+      ${doNowHTML(v)}${replanHTML(v)}${deferredHTML(v)}${changesHTML()}
       <details class="kg-more"${ko('more')}><summary>More: today's blocks, this week, homework and German, readiness, settings</summary>
       ${timelineHTML(v)}${weekHTML(v)}${workHTML()}${readyHTML()}
       <p class="kl-small">Six hours is a complete normal day. Late days are shorter by design, not failed. Meals, your commitment, breaks and bedtime come before any task; unfinished work moves on, it is never squeezed in.</p>
@@ -8635,6 +8686,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     kgddip: b => { const v = view(), wk = SP().schedCtx(v.d), m = +b.dataset.v; S().diploma.heavy[wk.monday] = m; audit('diploma week', dur(m)); redo(`diploma this week: ${dur(m)}. it replaces PCM time, the day doesn't get longer 🌙`); },
     kgdexamdel: b => { S().exams = S().exams.filter(x => (x.id || '') !== b.dataset.v); redo(); },
     kgdundo: () => window.__kgDeskUndo?.(),
+    kgdreplanundo: b => { const g = Math.max(0, Math.round(+b.dataset.v || 0)), d = today(), sc = S(); if (!g) return; const ru = sc.replanUndo = sc.replanUndo || {}; (ru[d] = Array.isArray(ru[d]) ? ru[d] : []).push({ at: view().now + 630, grant: g }); audit('re-plan undone', dur(g) + ' of later study back'); redo('the earlier plan is back. everything you logged stays 🌙'); },
     kgdtalk: () => window.__kgTalkToday?.()
   });
   Object.assign(M.FORMS, {
