@@ -16295,4 +16295,75 @@ Rules: a right final answer with invalid reasoning gets method 0 or 1. A minor a
   M.PANELS.cultivation = () => { const h = base(); const st = read(); return st.proof ? h.replace('</section>', `<div class="kl-stack">${window.KgCultProof(st.proof.gu)}</div></section>`) : h; };
 })();
 </script>
+<script id="kg-rank-script">
+/* ---------- Progression (rev 4): fixed rank milestones, permanence, Immortal Gu records and the blessed land. ----------
+   Gates are evaluated from evidence and the catalogue edition. Unknown is never treated as failed, and nothing is awarded
+   from an incomplete catalogue. Earned stages are permanent: later gaps ask for refreshing, never demotion. */
+(function () {
+  const LV = { none: 0, obtained: 1, learning: 2, proof: 3, proven: 4 };
+  const SUBS = ['maths', 'physics', 'chem'];
+  // AGREED fixed milestones. Intermediate thresholds and undergraduate units remain PROVISIONAL and aren't gated here.
+  const GATES = [
+    { id: 'r3-initial', name: 'Rank 3 · initial', needs: 'every Class 11 chapter Gu obtained and at least Learning', cls: [11], min: 'learning' },
+    { id: 'r3-middle', name: 'Rank 3 · middle', needs: 'all Class 12 chapter Gu also obtained', cls: [11, 12], min: 'obtained' },
+    { id: 'r4-initial', name: 'Rank 4 · initial', needs: 'every Class 11–12 chapter at least Learning', cls: [11, 12], min: 'learning' },
+    { id: 'r4-middle', name: 'Rank 4 · middle', needs: 'every Class 11–12 chapter Proven', cls: [11, 12], min: 'proven' },
+    { id: 'r5-initial', name: 'Rank 5 · initial', needs: 'all PCM Proven, the whole agreed valid bank completed independently, and a recognised external German B2 certificate', cls: [11, 12], min: 'proven', external: ['bank', 'b2'] },
+    { id: 'r6-initial', name: 'Rank 6 · initial', needs: 'real first-year undergraduate foundation mastery (not enrolment); units still to be defined', roadmap: true }
+  ];
+  // gates(v, ctx): v = cultivation() output (Class 11). ctx: { class12: null | per-subject Gu, bank, b2, earned }.
+  function gates(v, ctx = {}) {
+    const earned = new Set((ctx.earned || []).map(e => e.gate)), out = []; let prevMet = true;
+    for (const g of GATES) {
+      let status, why = '';
+      if (g.roadmap) { status = 'roadmap'; why = 'academic content not yet defined'; }
+      else if (!v.ed || !v.ed.complete) { status = 'unknown'; why = 'Class 11 catalogue incomplete: ' + (v.ed ? v.ed.missing.join(', ') : 'missing'); }
+      else if (g.cls.includes(12) && !ctx.class12) { status = 'provisional'; why = 'Class 12 catalogue incomplete (Lakshya JEE 2028 not catalogued)'; }
+      else {
+        const per = SUBS.map(s => { const gu = (v.subjects[s] ? v.subjects[s].gu : []).concat(ctx.class12 ? ctx.class12[s] || [] : []); return { s, ok: gu.length > 0 && gu.every(x => LV[x.level] >= LV[g.min]) && gu.every(x => x.acq === 'obtained'), short: gu.filter(x => LV[x.level] < LV[g.min]).length }; });
+        const ext = (g.external || []).filter(x => !(ctx[x] && ctx[x].verified));
+        status = per.every(p => p.ok) && !ext.length ? 'met' : 'not-yet';
+        why = per.filter(p => !p.ok).map(p => `${p.s}: ${p.short} chapter${p.short === 1 ? '' : 's'} below ${g.min}`).concat(ext.map(x => x === 'b2' ? 'external B2 certificate not recorded' : 'valid bank not completed')).join('; ');
+      }
+      if (status === 'met' && !prevMet) { status = 'not-yet'; why = 'an earlier milestone is still a prerequisite'; } // earlier milestones stay binding
+      const kept = earned.has(g.id);
+      out.push({ id: g.id, name: g.name, needs: g.needs, status: kept ? 'earned' : status, now: status, why, refresh: kept && status !== 'met' ? 'earned and kept; some evidence needs refreshing before the next advance' : '' });
+      prevMet = kept || status === 'met';
+    }
+    return out;
+  }
+  // Permanence: recording a stage is append-only and needs your acceptance; re-recording is a no-op; nothing ever removes one.
+  function earn(earned, gate, now, edition) { if ((earned || []).some(e => e.gate === gate)) return earned; return (earned || []).concat({ gate, at: now, edition, by: 'you accepted' }); }
+  // Immortal Gu: separate from chapter Gu. A record only counts when every check below is complete; nothing is generated or awarded here.
+  const IMMORTAL_RUBRIC = ['substantially fresh challenge of comparable reasoning difficulty to your benchmark', 'solution and rubric checked before the attempt, each check’s coverage recorded (script, source, expert where possible)', 'independent attempt without solution-bearing hints', 'a defence of your assumptions and checks', 'a suitable unseen extension'];
+  function immortalValid(r) { return !!(r && r.fresh && Array.isArray(r.checks) && r.checks.length && r.checks.every(c => c.kind !== 'same-model') && r.independent && r.defence && r.extension && r.verifiedBy && !/model|ai/i.test(r.verifiedBy)); }
+  // Blessed land: unlocks at Rank 4 initial OR the first valid Immortal Gu. Prior achievements count when it opens; features develop once.
+  function land(earned, immortals) { const r4 = (earned || []).some(e => ['r4-initial', 'r4-middle', 'r5-initial', 'r6-initial'].includes(e.gate)); const im = (immortals || []).filter(immortalValid); return { unlocked: r4 || im.length > 0, why: r4 ? 'Cultivator Rank 4' : im.length ? 'first Immortal Gu' : 'opens at Rank 4 or with your first Immortal Gu' }; }
+  window.KgRank = { GATES, gates, earn, land, immortalValid, IMMORTAL_RUBRIC, LV };
+
+  const M = window.MoonLab; if (!M || !M.PANELS || !window.KgCult) return;
+  const K = window.KgCult, esc = M.esc, read = () => K.readStore(localStorage);
+  let preview = false;
+  const ST = { met: 'met (accept to record it)', earned: 'earned · permanent', 'not-yet': 'not yet', unknown: 'unknown', provisional: 'provisional', roadmap: 'roadmap only' };
+  function landSvg(gu) {
+    const pts = gu.slice(0, 24).map((g, i) => { const x = 40 + (i * 97) % 520, y = 150 + ((i * 53) % 90); return `<g><title>${esc(g.name)} · ${esc(g.level)}</title><circle cx="${x}" cy="${y}" r="${4 + (K.SHARE[g.level] || 0) / 20}" fill="${g.level === 'proven' ? '#f5d27a' : g.level === 'none' ? '#5b5675' : '#9bd3a6'}"/></g>`; }).join('');
+    return `<svg viewBox="0 0 600 280" role="img" aria-label="Blessed land preview: hills, a river and scattered buildings" style="width:100%;height:auto;border-radius:12px;background:#1c2a3a"><path d="M0 170 Q120 110 240 160 T480 140 T600 150 V280 H0Z" fill="#2f5a46"/><path d="M0 210 Q150 180 300 220 T600 200 V280 H0Z" fill="#3b6e52"/><path d="M60 280 C140 230 260 250 330 205 S520 170 600 185" stroke="#7fb6d9" stroke-width="10" fill="none" opacity=".8"/><rect x="420" y="128" width="18" height="16" fill="#d9c79a"/><path d="M416 128 L429 116 L442 128Z" fill="#a35d4a"/><rect x="150" y="146" width="16" height="13" fill="#d9c79a"/><path d="M146 146 L158 135 L170 146Z" fill="#a35d4a"/>${pts}</svg>`;
+  }
+  M.PANELS.ranks = () => {
+    const st = read(), v = K.cultivation(M.L, null, st), gs = gates(v, { earned: st.earned, bank: st.bankDone, b2: st.b2 }), ld = land(st.earned, st.immortals);
+    const gu = Object.values(v.subjects).flatMap(s => s.gu);
+    return `<section class="kl-card kl-stack"><p class="kl-eyebrow">CULTIVATOR RANK · MILESTONES</p><h3>Fixed milestones, from your evidence</h3>
+      <p class="kl-small">Ranks never limit which Gu you study, and your academic region follows what you study. Earned stages are permanent; a later gap only asks for refreshing before the next advance. No starting rank is shown while the catalogue is incomplete, and missing data never counts as a low rank.</p>
+      ${gs.map(g => `<div class="kl-li"><span><b>${esc(g.name)}</b> · ${esc(g.needs)}<br><span class="kl-small">${ST[g.status]}${g.why ? ' · ' + esc(g.why) : ''}${g.refresh ? ' · ' + esc(g.refresh) : ''}</span></span>${g.status === 'met' ? `<button data-a="rearn" data-g="${g.id}">Accept</button>` : ''}</div>`).join('')}
+      <p class="kl-small">Intermediate thresholds and undergraduate units are provisional and aren't gated yet. Chapter weights stay provisional; changing one never revokes a stage.</p></section>
+      <section class="kl-card kl-stack"><p class="kl-eyebrow">IMMORTAL GU</p><p class="kl-small">Separate from Rank 1–5 chapter Gu, and only for exceptional independent work. A record needs: ${IMMORTAL_RUBRIC.map(esc).join('; ')}. None recorded. Two models agreeing is never a check.</p></section>
+      <section class="kl-card kl-stack"><p class="kl-eyebrow">BLESSED LAND</p>${ld.unlocked ? '<p>Your land is open.</p>' : `<p class="kl-small">Locked: ${esc(ld.why)}. When it opens, everything you've already achieved grows there at once. It has no upkeep, decay, currency or missed-day penalties.</p>`}
+      <button class="kl-ghost" data-a="rpreview" aria-expanded="${preview}">${preview ? 'Hide' : 'Show'} the development preview</button>
+      ${preview ? `<p class="kl-small"><b>Development preview: nothing here is earned or saved.</b> Markers are your chapter Gu as they stand now (gold = Proven).</p>${landSvg(gu)}` : ''}</section>`;
+  };
+  M.SECTIONS.progress.push(['ranks', '⛰ Cultivator rank']);
+  M.ACTIONS.rpreview = () => { preview = !preview; M.render(); };
+  M.ACTIONS.rearn = b => { const st = read(), v = K.cultivation(M.L, null, st), g = gates(v, { earned: st.earned, bank: st.bankDone, b2: st.b2 }).find(x => x.id === b.dataset.g); if (!g || g.status !== 'met') return; if (!confirm(`Record ${g.name}? Earned stages are permanent.`)) return; st.earned = earn(st.earned, g.id, Date.now(), v.ed.id); st.log = (st.log || []).concat({ at: Date.now(), what: 'earned ' + g.id }); localStorage.setItem(K.STORE, JSON.stringify(st)); M.render(); };
+})();
+</script>
 </body></html>
