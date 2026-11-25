@@ -16341,6 +16341,7 @@ Rules: a right final answer with invalid reasoning gets method 0 or 1. A minor a
       let status, why = '';
       if (g.roadmap) { status = 'roadmap'; why = 'academic content not yet defined'; }
       else if (!v.ed || !v.ed.complete) { status = 'unknown'; why = 'Class 11 catalogue incomplete: ' + (v.ed ? v.ed.missing.join(', ') : 'missing'); }
+      else if (v.ed.provisional) { status = 'provisional'; why = 'the catalogue uses published plans you have not confirmed: ' + (v.ed.provisionalWhy || []).join('; '); }
       else if (g.cls.includes(12) && !ctx.class12) { status = 'provisional'; why = 'Class 12 catalogue incomplete (Lakshya JEE 2028 not catalogued)'; }
       else {
         const per = SUBS.map(s => { const gu = (v.subjects[s] ? v.subjects[s].gu : []).concat(ctx.class12 ? ctx.class12[s] || [] : []); return { s, ok: gu.length > 0 && gu.every(x => LV[x.level] >= LV[g.min]) && gu.every(x => x.acq === 'obtained'), short: gu.filter(x => LV[x.level] < LV[g.min]).length }; });

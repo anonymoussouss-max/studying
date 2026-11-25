@@ -57,3 +57,10 @@ test('blessed land unlocks at Rank 4 or a first valid Immortal Gu; the preview w
   assert.ok(!/setItem/.test(pv)); assert.ok(/nothing here is earned or saved/.test(src));
   assert.ok(!/coins?|currency\s*[:=]|harvest|decay\s*[:=]/i.test(src.replace(/no upkeep, decay, currency or missed-day penalties/, '')));
 });
+
+test('a catalogue built from unconfirmed published plans never unlocks a rank: gates stay provisional', () => {
+  const x = v({}); x.ed.provisional = true; x.ed.provisionalWhy = ['oc11: secondary copy'];
+  const gs = R.gates(x);
+  assert.strictEqual(st(gs, 'r3-initial').status, 'provisional'); assert.ok(/not confirmed/.test(st(gs, 'r3-initial').why));
+  assert.ok(!gs.some(g => g.status === 'met'));
+});
