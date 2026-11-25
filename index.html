@@ -5775,7 +5775,7 @@ window.KG_RECALL = {
      practice only), open misses, and medals from a chapter exam (70+) or a timed test (8/10). */
   const PROOF = {
     none: ['Not shown yet', 'No independent evidence yet.'],
-    learning: ['Learning', 'Some practice, not yet enough unaided correct work.'],
+    learning: ['Practising', 'Some practice, not yet enough unaided correct work.'],
     usable: ['Independently usable', '5+ unaided correct answers, 70%+ on your last 10.'],
     retained: ['Retained', 'Still correct on a later day, 3+ days after you first got it.'],
     ready: ['Exam-ready', 'Retained, and passed a chapter exam or timed test.'],
@@ -15789,6 +15789,72 @@ You entered 25</pre></div>
 .kg-cx-bank .shapes{width:100%;max-width:520px;height:auto}.kg-cx-bank .note{font-size:12.5px;opacity:.8}
 .kg-cx-bank .top10{margin:4px 0 0;padding-left:1.4em}.kg-cx-bank .top10 a{color:inherit}.kg-cx-times{margin:6px 0}.kg-cx-brk{opacity:.65}.kg-cx-learn{display:flex;gap:8px;align-items:center;font-size:13px}.kg-cx-rev{color:#ffb38a}`;
   document.head.append(css);
+})();
+</script>
+<script id="kg-cult-script">
+/* ---------- Cultivation preview (Phase 1a, read-only): chapter Gu from existing records. Nothing here writes to your data. ----------
+   Catalogue edition 0. Ranks, weights and links are PROPOSED (CULTIVATION-REVIEW.md); unknowns are labelled, never guessed. */
+(function () {
+  const MULT = { maths: 9, physics: 5.5, chem: 5 };
+  // proposed Gu rank by course chapter (seed names)
+  const RANK = { 'Basic Mathematics': 2, 'Sets': 1, 'Trigonometric Functions': 3, 'Trigonometric Equations': 3, 'Quadratic Equations': 3, 'Sequence and Series': 3, 'Relations and Functions': 2, 'Permutations': 4, 'Binomial Theorem': 3, 'Limits and Derivatives': 2, 'Straight Lines': 3, 'Coordinate Geometry': 1, 'Probability': 1, 'Circles': 3, 'Statistics': 2, 'Parabola': 3, 'Ellipse': 3, 'Hyperbola': 3, 'Complex Numbers': 4, 'Solution of Triangles': 3,
+    'Motion in a Straight Line': 2, 'Errors': 1, 'Motion in a Plane': 3, 'Laws of Motion': 3, 'Circular Motion': 3, 'Work, Power and Energy': 3, 'Centre of Mass': 4, 'Thermal Properties of Matter': 2, 'Mechanical Properties of Solids': 2, 'Rotational Motion': 5, 'Thermodynamics and KTG': 3, 'Oscillations': 4, 'Waves': 4, 'Mechanical Properties of Fluids': 4, 'Gravitation': 3,
+    'Basic Concepts': 2, 'Structure of Atom': 3, 'States of Matter': 2, 'Thermodynamics': 4, 'Chemical Equilibrium': 3, 'Ionic Equilibrium': 5, 'Redox': 2 };
+  // proposed links from a course chapter to the syllabus chapters that hold its proof and evidence. Unlisted = scope not yet mapped.
+  const LINKS = { 'Sets': ['m-sets-relations-functions'], 'Trigonometric Functions': ['m-trigonometric-ratios-identities'], 'Trigonometric Equations': ['m-trigonometric-equations'], 'Quadratic Equations': ['m-quadratic-equations'], 'Sequence and Series': ['m-sequences-series'], 'Permutations': ['m-permutations-combinations'], 'Binomial Theorem': ['m-binomial-theorem'], 'Straight Lines': ['m-straight-lines'], 'Circles': ['m-circles'], 'Statistics': ['m-statistics'], 'Parabola': ['m-parabola'], 'Ellipse': ['m-ellipse'], 'Hyperbola': ['m-hyperbola'], 'Complex Numbers': ['m-complex-numbers'], 'Solution of Triangles': ['m-properties-of-triangles'],
+    'Motion in a Straight Line': ['p-kinematics-1d'], 'Errors': ['p-errors-measurement'], 'Motion in a Plane': ['p-kinematics-2d-projectiles', 'p-relative-motion'], 'Laws of Motion': ['p-newton-s-laws-of-motion', 'p-friction'], 'Circular Motion': ['p-circular-motion'], 'Work, Power and Energy': ['p-work-energy-power'], 'Centre of Mass': ['p-centre-of-mass-collisions'], 'Thermal Properties of Matter': ['p-thermal-expansion-calorimetry', 'p-heat-transfer'], 'Mechanical Properties of Solids': ['p-elasticity'], 'Rotational Motion': ['p-rotational-motion'], 'Thermodynamics and KTG': ['p-thermodynamics', 'p-kinetic-theory-of-gases'], 'Oscillations': ['p-simple-harmonic-motion'], 'Waves': ['p-waves-on-a-string', 'p-sound-waves'], 'Mechanical Properties of Fluids': ['p-fluid-mechanics', 'p-surface-tension-viscosity'], 'Gravitation': ['p-gravitation'],
+    'Basic Concepts': ['c-mole-concept'], 'Structure of Atom': ['c-atomic-structure'], 'States of Matter': ['c-gaseous-state'], 'Thermodynamics': ['c-thermodynamics-thermochemistry'], 'Chemical Equilibrium': ['c-chemical-equilibrium'], 'Ionic Equilibrium': ['c-ionic-equilibrium'], 'Redox': ['c-redox-reactions'] };
+  const ACQ_ROLES = ['tah', 'kcls', 'ktk', 'dpp', 'hw']; // module items are listed apart and never count for acquisition
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+  // cultivation(L, evidenceOf): a pure read of existing records. evidenceOf(chapterId) -> existing evidence label (optional).
+  function cultivation(L, evidenceOf) {
+    const syl = L && L.syl, medals = (L && L.medals) || {}, out = { edition: 0, subjects: {} };
+    if (!syl || !syl.courses) return out;
+    for (const [cid, c] of Object.entries(syl.courses)) {
+      if (c.cls !== 11 || c.provisional) continue;
+      const s = out.subjects[c.subj] = out.subjects[c.subj] || { gu: [], missing: [] };
+      (c.chapters || []).forEach(([name, n], k) => {
+        if (!n) { s.missing.push(name); return; }
+        const done = Math.max(0, Math.min(n, +((c.done || [])[k] || 0))), lecDone = done >= n;
+        const items = (syl.qs || []).filter(q => !q.dupOf && q.subj === c.subj && norm(q.lec).startsWith(norm(name)));
+        const assigned = items.filter(q => (q.roles || []).some(r => ACQ_ROLES.includes(r))), modules = items.filter(q => (q.roles || []).includes('module') && !(q.roles || []).some(r => ACQ_ROLES.includes(r)));
+        const attempted = assigned.filter(q => q.state && q.state !== 'unattempted');
+        const scope = assigned.length ? 'listed' : 'unverified';
+        const acq = !lecDone ? 'not-obtained' : scope === 'unverified' ? 'scope-unverified' : attempted.length === assigned.length ? 'obtained' : 'attempts-open';
+        const links = LINKS[name] || [], medalled = links.filter(id => medals[id]);
+        const legacy = !links.length || !medalled.length ? '' : medalled.length === links.length ? 'recognised' : 'partial';
+        const share = acq === 'obtained' ? (legacy === 'recognised' ? 90 : 40) : 0;
+        s.gu.push({ id: cid + ':' + k, name, rank: RANK[name] || null, lectures: n, done, weight: n * (MULT[c.subj] || 1), scope, assigned: assigned.length, attempted: attempted.length, modules: modules.length, acq, links, legacy, medalled, share,
+          evidence: links.map(id => ({ id, label: evidenceOf ? evidenceOf(id) : '' })) });
+      });
+    }
+    for (const s of Object.values(out.subjects)) {
+      const W = s.gu.reduce((a, g) => a + g.weight, 0), E = s.gu.reduce((a, g) => a + g.weight * g.share / 100, 0);
+      s.pct = W ? Math.round(1000 * E / W) / 10 : 0; s.complete = !s.missing.length;
+    }
+    const subs = ['maths', 'physics', 'chem'];
+    out.placement = subs.every(x => out.subjects[x] && out.subjects[x].complete) ? 'computable' : 'not-computed';
+    out.why = subs.filter(x => !out.subjects[x] || !out.subjects[x].complete);
+    return out;
+  }
+  window.KgCult = { cultivation, RANK, LINKS, MULT };
+
+  const M = window.MoonLab; if (!M || !M.PANELS) return;
+  const esc = M.esc, SN = { maths: 'Maths', physics: 'Physics', chem: 'Chemistry' };
+  const ACQ = { 'not-obtained': 'Not obtained: lectures still to finish', 'scope-unverified': 'Lectures complete · assignment scope unverified', 'attempts-open': 'Lectures complete · assigned items still to attempt', 'obtained': 'Gu obtained' };
+  M.SECTIONS.study.push(['cultivation', '⛰ Cultivation']);
+  M.PANELS.cultivation = () => {
+    const v = cultivation(M.L, id => { try { return M.proof ? M.proof(id) : ''; } catch (e) { return ''; } });
+    const subj = Object.entries(v.subjects).map(([k, s]) => `<section class="kl-card kl-stack"><h3>${SN[k] || esc(k)} · ${s.complete ? `${s.pct}% (provisional)` : `${s.pct}% of the chapters catalogued so far`}</h3>
+      ${s.complete ? '' : `<p class="kl-small">Catalogue incomplete: ${s.missing.map(esc).join(', ')}. This percentage is not used for placement.</p>`}
+      ${s.gu.map(g => `<div class="kl-li"><span><b>${esc(g.name)}</b>${g.rank ? ` · Rank ${g.rank} Gu (proposed)` : ''}<br><span class="kl-small">${ACQ[g.acq]} · lectures ${g.done}/${g.lectures}${g.scope === 'listed' ? ` · assigned items attempted ${g.attempted}/${g.assigned}` : ''}${g.modules ? ` · ${g.modules} module item${g.modules > 1 ? 's' : ''} (not required)` : ''}
+        ${g.legacy === 'recognised' ? ' · <b>Legacy proof recognised — retention pending</b> (skill coverage not yet assessable)' : g.legacy === 'partial' ? ` · Legacy proof on part of this Gu (${g.medalled.length} of ${g.links.length} linked chapters) — scope uncertain` : ''}
+        ${g.links.length ? ` · evidence: ${g.evidence.map(e => esc(e.label || '—')).join(', ')}` : ' · linked chapters not yet mapped'}</span></span><b>${g.share}%</b></div>`).join('')}</section>`).join('');
+    return `<section class="kl-card kl-stack"><p class="kl-eyebrow">CULTIVATION · PREVIEW · READ-ONLY</p><h3>Your chapter Gu, from the records you already have</h3>
+      <p class="kl-small">Nothing here changes your data. A Gu is obtained when all its lectures are done and every course-assigned TAH/KCLS, KTK, homework and DPP item has been attempted. Where no assigned items are listed for a chapter, its scope shows as unverified rather than missing or failed. Shares shown are the verifiable floor: 40% obtained, 90% obtained with a recognised legacy proof. Refinement credit between those is not defined yet, and pre-acquisition work isn't counted here.</p>
+      <p class="kl-small"><b>Placement:</b> ${v.placement === 'computable' ? 'all subjects catalogued; the rank proposal comes in the next step.' : `not computed yet. ${v.why.map(x => SN[x] || x).join(', ')} ${v.why.length > 1 ? 'have' : 'has'} an incomplete catalogue, and placement never uses partial totals. Missing data is not evidence of a low rank.`}</p></section>` + subj;
+  };
 })();
 </script>
 </body></html>
