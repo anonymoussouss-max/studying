@@ -65,3 +65,27 @@ test("Iroha's tutoring rules: assess first, clarify ambiguity, small hint first,
     assert.ok(t.includes(s), s);
   assert.match(html, /window\.__kgTutorNote = \(\) => tutorOn\(\) \? TUTOR_NOTE : ASSESS_NOTE;/, 'assess-first applies outside tutor mode too');
 });
+
+test('forecast: a Sunday under Gentle Return or Done is not forecast as 60 + 30', () => {
+  const SUN = '2027-01-10', days = L => SP.pcmCapacity(L, SUN).days[0];
+  assert.strictEqual(days({ sched: {} }).all, 90, 'plain Sunday: 90');
+  const g = days({ sched: { gentle: { on: true, max: 15 } } });
+  assert.ok(g.all <= 15 && g.pcm <= 15, 'gentle 15-minute maximum caps Sunday: ' + JSON.stringify(g));
+  assert.strictEqual(days({ sched: { gentle: { on: true, max: 180, day: { [SUN]: { stopped: true } } } } }).all, 0, 'Done: nothing');
+});
+
+test('forecast and cycle planner read one shared set of stage estimates', () => {
+  const syl = SP.seedSyllabus(), e = SP.stageEst(syl, 'maths');
+  assert.strictEqual(e.reattempt, SP.revMin(syl, 'maths'), 'class re-attempts as scheduled');
+  assert.strictEqual(e.homework, SP.STAGEMIN.tah + SP.STAGEMIN.ktk, 'Maths homework = TAH/KCLS + KTK');
+  const took = Object.assign({}, syl, { took: { tah: { maths: [80, 90, 100] }, re: { physics: [50, 60, 70] } } });
+  assert.strictEqual(SP.stageEst(took, 'maths').homework, 90 + SP.STAGEMIN.ktk, 'real TAH minutes refine it');
+  assert.strictEqual(SP.stageEst(took, 'physics').reattempt, 60);
+  assert.match(html, /for\(const s of SUB3\)\{const e=stageEst\(syl,s\)/, 'the forecast reads stageEst, not its own numbers');
+});
+
+test('timer minutes from a "Homework · …" block are credited once, and recorded for the stage when done', () => {
+  assert.match(html, /String\(s\.task\)\.startsWith\('Homework · ' \+ x\.title\)/);
+  assert.match(html, /if \(!h \|\| \(h\.sess \|\| \[\]\)\.includes\(s\.id\)\) continue;/, 'once per session');
+  assert.match(html, /k = h\.stage === 'tah' \|\| h\.stage === 'ktk' \? h\.stage : 'hw'/);
+});
