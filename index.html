@@ -4245,11 +4245,12 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
   function downloadCue() { const start=new Date(),[hr,min]=String(settings().cueTime).split(':').map(Number);start.setHours(hr,min,0,0);if(start<=new Date())start.setDate(start.getDate()+1);download('kaguya-daily-cue.ics',C.calendarEvent({title:'Kaguya: five minutes at '+settings().cuePlace,description:'After '+settings().cueAfter+', open your desk. Choose one task, silence phone, press play.',start,minutes:5,repeat:true}),'text/calendar');toast('Import this daily event into your phone calendar to enable its reminder.'); }
   function downloadWeek() {const wk=C.monday(C.add(today(),C.date(today()).getDay()===0?1:0)),plans=h.plans[wk];if(!plans?.length){toast('Save your three planned sessions first.');return;}const events=plans.map(p=>C.calendarEvent({title:'Kaguya study: '+p.task,description:'Small session. Phone away, press play, recall to close.',start:new Date(p.date+'T'+p.time)}));const joined=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Ame Desk//Study//EN',...events.map(x=>x.slice(x.indexOf('BEGIN:VEVENT'),x.indexOf('END:VCALENDAR')).trim()),'END:VCALENDAR'].join('\r\n');download('kaguya-week-plan.ics',joined,'text/calendar'); }
   const backupKeys=[C.KEY,DK,'ame-journal-v1','ame-chat','ame-talk-v1','ame-mute-v1','ame-pos-v1','mp-v2','iroha-chat','iroha-pos-v1','kg-lab-v1'];
-  function backup() { h.lastBackup=Date.now();if(!save())return;const storage={};for(const k of backupKeys){const value=localStorage.getItem(k);if(value!==null)storage[k]=value;}download('kaguya-desk-backup-'+today()+'.json',JSON.stringify({version:1,app:'ame-desk',exportedAt:new Date().toISOString(),storage},null,2),'application/json');toast('Complete backup downloaded. Keep it outside this browser.'); }
+  function backup() { h.lastBackup=Date.now();if(!save())return;if(window.MoonLab?.fullBackup){window.MoonLab.fullBackup().then(()=>toast('Complete backup downloaded: records and attached notes in one file. Keep it outside this browser.')).catch(()=>toast('The backup could not be made here. Try again.'));return;}const storage={};for(const k of backupKeys){const value=localStorage.getItem(k);if(value!==null)storage[k]=value;}download('kaguya-desk-backup-'+today()+'.json',JSON.stringify({version:1,app:'ame-desk',exportedAt:new Date().toISOString(),storage},null,2),'application/json');toast('Complete backup downloaded. Keep it outside this browser.'); }
   async function restoreFile(e) {
     const file=e.target.files[0];if(!file)return;
     const status=$('hb-restore-status');
     try {
+      if(window.MoonLab?.fullRestore){e.target.value='';return window.MoonLab.fullRestore(file);}
       if(file.size>20*1024*1024)throw new Error('Choose a backup smaller than 20 MB.');
       const data=JSON.parse(await file.text());
       if(data.app!=='ame-desk'||data.version!==1||!data.storage||typeof data.storage!=='object')throw new Error('This is not a complete desk backup.');
@@ -11060,9 +11061,9 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
   M.ACTIONS.snapnow = () => snapshot('manual').then(() => (M.notify || M.K)('Recovery copy saved on this device.')).catch(() => M.K("couldn't save a copy here, try a full backup download instead 🌙"));
   const backup = M.PANELS.backup;
   const lastFull = () => { const t = Number(localStorage.getItem('kg-full-backup') || 0); return t ? new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'never'; };
-  if (backup) M.PANELS.backup = () => backup() + `<section class="kl-card kl-stack kg-fullbk"><h3>Full backup, attached notes included</h3>
+  if (backup) M.PANELS.backup = () => backup() + `<section class="kl-card kl-stack kg-fullbk"><h3>Complete backup: records and attached notes in one file</h3>
     <p class="kl-small">Everything above plus the PDFs and photos attached to your lectures, in one file. Keep it somewhere other than this browser (a drive, a USB stick, your email) so it survives cleared data or a lost device. It can be large if you have many notes.</p>
-    <p class="kl-small"><b>Last full backup:</b> ${lastFull()}</p>
+    <p class="kl-small"><b>Last full backup:</b> ${lastFull()}</p>${(() => { try { const m = JSON.parse(localStorage.getItem('kg-restore-missing') || 'null'); return m && m.files.length ? `<p class="kl-small"><b>⚠ Evidence missing:</b> the last restore was a partial recovery. These attached files couldn't be restored: ${m.files.map(x => M.esc(x.name || x.id)).join(', ')}. Anything that relied on them is not fully supported until you restore a sound copy.</p>` : ''; } catch (e) { return ''; } })()}
     <div class="kl-row"><button class="kl-primary" data-a="fullbackup">Download a full backup</button><label class="kl-ghost kg-filebtn">Restore a full backup<input type="file" id="kg-fullrestore" accept="application/json,.json" hidden></label></div></section>` + `<section class="kl-card kl-stack kg-snaps"><h3>Local recovery copies: study records only</h3>
     <p class="kl-small">Once a day the desk keeps a copy of your study records, chats and settings in this browser, for the last 7 days. If something goes wrong, roll back to one; restoring saves what's here now first, so it can be undone.</p>
     <p class="kl-small"><b>What they don't cover:</b> the PDFs and photos attached to lectures aren't included, and the copies stay on this device, so they won't help if browser data is cleared or the device is lost. For that, download a complete backup above and keep it somewhere else.</p>
@@ -11082,28 +11083,64 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
   /* ---------- a full backup: study records plus the PDFs and photos attached to lectures ---------- */
   const toData = b => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => no(r.error); r.readAsDataURL(b); });
   const fromData = async u => (await fetch(u)).blob();
+  // one complete backup (v2): every user-data key plus every attached file, each file with a SHA-256 in a manifest.
+  // It also reads the older formats: the v1 full backup and the habit desk's records-only backup.
+  const BK_KEYS = [...new Set([...KEYS, 'ame-mute-v1', 'kg-bond-v1', 'kg-need-log', 'kg-chat-meta', 'kg-drafts', 'kg-plain'])];
+  const sha = async s => { try { const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(h)].map(x => x.toString(16).padStart(2, '0')).join(''); } catch (e) { return ''; } };
+  // bkCheck: pure archive check. Returns the format, the files that fail their checksum or are absent, and whether records parse.
+  const bkCheck = async b => {
+    if (b && b.app === 'ame-desk' && b.version === 1 && b.storage && typeof b.storage === 'object') return { ok: true, format: 'habit-v1', data: b.storage, files: [], bad: [], partialFormat: true };
+    if (!b || !/^kaguya-desk-full-v[12]$/.test(b.format) || !b.data || typeof b.data !== 'object' || !Array.isArray(b.files)) return { ok: false, why: "That file isn't a Kaguya Desk backup, or it's damaged." };
+    try { if (typeof JSON.parse(b.data['kg-lab-v1']) !== 'object') throw 0; } catch (e) { return { ok: false, why: 'The study record inside this backup is damaged.' }; }
+    const bad = [];
+    if (b.format === 'kaguya-desk-full-v2') {
+      const have = new Map(b.files.map(([k, v]) => [k, v]));
+      for (const m of b.manifest || []) {
+        const v = have.get(m.id), u = v && v.blob && v.blob.dataUrl;
+        if (!v) bad.push({ id: m.id, name: m.name, why: 'missing' });
+        else if (u && m.sha && (await sha(u)) !== m.sha) bad.push({ id: m.id, name: m.name, why: 'damaged' });
+      }
+    }
+    return { ok: true, format: b.format === 'kaguya-desk-full-v2' ? 'full-v2' : 'full-v1', data: b.data, files: b.files, bad, partialFormat: b.format !== 'kaguya-desk-full-v2' };
+  };
+  M.bkCheck = bkCheck;
   async function fullBackup() {
-    const data = {}; for (const k of KEYS) { const v = localStorage.getItem(k); if (v != null) data[k] = v; }
-    const pairs = (await M.notesDB?.dump?.()) || [], files = [];
-    for (const [k, v] of pairs) { const c = Object.assign({}, v); if (c.blob instanceof Blob) { c.blob = { dataUrl: await toData(c.blob), name: c.blob.name || c.name || '' }; } files.push([k, c]); }
-    const text = JSON.stringify({ format: 'kaguya-desk-full-v1', at: Date.now(), data, files });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = 'kaguya-desk-full-' + M.today() + '.json'; document.body.appendChild(a); a.click(); a.remove();
+    const data = {}; for (const k of BK_KEYS) { const v = localStorage.getItem(k); if (v != null) data[k] = v; }
+    const pairs = (await M.notesDB?.dump?.()) || [], files = [], manifest = [];
+    for (const [k, v] of pairs) {
+      const c = Object.assign({}, v);
+      if (c.blob instanceof Blob) { c.blob = { dataUrl: await toData(c.blob), name: c.blob.name || c.name || '' }; manifest.push({ id: k, name: c.blob.name, size: c.blob.dataUrl.length, sha: await sha(c.blob.dataUrl) }); }
+      else manifest.push({ id: k, name: c.name || '', size: 0, sha: '' });
+      files.push([k, c]);
+    }
+    const text = JSON.stringify({ format: 'kaguya-desk-full-v2', at: Date.now(), keys: BK_KEYS, data, files, manifest });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = 'kaguya-desk-complete-' + M.today() + '.json'; document.body.appendChild(a); a.click(); a.remove();
     try { localStorage.setItem('kg-full-backup', String(Date.now())); } catch (e) {}
     M.render(); return text.length;
   }
   async function fullRestore(file) {
     let b; try { b = JSON.parse(await file.text()); } catch (e) { b = null; }
-    const valid = b && b.format === 'kaguya-desk-full-v1' && b.data && (() => { try { return typeof JSON.parse(b.data['kg-lab-v1']) === 'object'; } catch (e) { return false; } })() && Array.isArray(b.files);
-    if (!valid) { alert("That file isn't a full Kaguya Desk backup, or it's damaged, so nothing was changed."); return; }
-    if (!confirm(`Restore the full backup from ${new Date(b.at).toLocaleString()}? It replaces your study records and attached notes on this device. What's here now is saved as a recovery copy first.`)) return;
+    const r = await bkCheck(b);
+    if (!r.ok) { alert(r.why + ' Nothing was changed.'); return; }
+    let partial = false;
+    if (r.bad.length) {
+      const list = r.bad.map(x => `• ${x.name || x.id} (${x.why})`).join('\n');
+      if (!confirm(`This backup failed its integrity check, so a complete restore was refused and nothing has changed:\n${list}\n\nPartial recovery restores everything readable and marks those files as missing evidence. Choose partial recovery?`)) return;
+      partial = true;
+    }
+    const scope = r.format === 'habit-v1' ? 'It holds study records only, no attached notes; the attached notes on this device are kept.' : r.format === 'full-v1' ? 'It is an older backup: records it does not contain are kept as they are on this device.' : 'It replaces your study records and attached notes on this device.';
+    if (!confirm(`Restore the ${partial ? 'readable parts of the ' : ''}backup from ${b.at || b.exportedAt ? new Date(b.at || b.exportedAt).toLocaleString() : 'an unknown date'}? ${scope} What's here now is saved as a recovery copy first.`)) return;
     await snapshot('before-restore');
-    const prev = {}; for (const k of KEYS) prev[k] = localStorage.getItem(k);
+    const prev = {}; for (const k of BK_KEYS) prev[k] = localStorage.getItem(k);
     try {
-      for (const k of KEYS) { if (k in b.data) localStorage.setItem(k, b.data[k]); else localStorage.removeItem(k); }
-      const pairs = []; for (const [k, v] of b.files) { const c = Object.assign({}, v); if (c.blob && c.blob.dataUrl) { const bl = await fromData(c.blob.dataUrl); c.blob = new File([bl], c.blob.name || 'notes.pdf', { type: bl.type }); } pairs.push([k, c]); }
-      if (pairs.length) await M.notesDB?.load?.(pairs);
-    } catch (e) { for (const k of KEYS) { try { if (prev[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, prev[k]); } catch (e2) {} } alert("The restore couldn't finish, so your study records were put back as they were."); return; }
-    const orig = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (KEYS.includes(k)) return; return orig.call(this, k, v); };
+      // only a v2 backup lists every key, so only a v2 restore removes keys it doesn't contain
+      for (const k of BK_KEYS) { if (k in r.data) localStorage.setItem(k, r.data[k]); else if (r.format === 'full-v2') localStorage.removeItem(k); }
+      const skip = new Set(r.bad.map(x => x.id)), pairs = [];
+      for (const [k, v] of r.files) { if (skip.has(k)) continue; const c = Object.assign({}, v); if (c.blob && c.blob.dataUrl) { const bl = await fromData(c.blob.dataUrl); c.blob = new File([bl], c.blob.name || 'notes.pdf', { type: bl.type }); } pairs.push([k, c]); }
+      if (pairs.length) await M.notesDB?.load?.(pairs); // one IndexedDB transaction: all files or none
+      if (partial) localStorage.setItem('kg-restore-missing', JSON.stringify({ at: Date.now(), files: r.bad })); else localStorage.removeItem('kg-restore-missing');
+    } catch (e) { for (const k of BK_KEYS) { try { if (prev[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, prev[k]); } catch (e2) {} } alert("The restore couldn't finish, so your study records were put back as they were."); return; }
+    const orig = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (BK_KEYS.includes(k)) return; return orig.call(this, k, v); };
     location.reload();
   }
   M.fullBackup = fullBackup; M.fullRestore = fullRestore;
