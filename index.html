@@ -9928,7 +9928,64 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   // synthesis: two different skills you've already shown on your own, least recently tested first, different chapters when possible
   const synthPair = (skills, subj) => { const ok = (skills || []).filter(s => (s.last === 'ok' || s.strength === 'solid') && (!subj || subj === 'Mixed' || s.subj === subj)).sort((a, b) => S(a.lastTested).localeCompare(S(b.lastTested)));
     if (ok.length < 2) return []; const a = ok[0], b = ok.slice(1).find(s => s.ch && s.ch !== a.ch) || ok[1]; return [a, b]; };
-  const api = { exSplit, fadeHide, checkKey, methodNote, freshRecord, freshMistake, trimLog, restore, workRecord, stickItem, bankPick, confWrong, mergeSkills, stickStart, skillTrail, synthPair };
+  /* ---------- Iroha assigns ONE activity for the task (design §9) ----------
+     c = { subj, topic, lec, lecDaysAgo, src, novelty: new|seen|unsure, prereq: yes|partly|no|'', ev: {ok,hint,miss}, misses, mins, energy, preset, exclude: [] } */
+  const ASSIGN_ACTS = ['worked', 'recall', 'blurt', 'explain', 'solve', 'diagnose', 'compare', 'represent', 'predict', 'synth'];
+  const isNew = c => c.novelty === 'new' || c.prereq === 'no';
+  // what each activity needs before it can be assigned: a saved mistake, independent evidence, or material already met
+  const assignAllowed = (act, c) => ASSIGN_ACTS.includes(act) && !(c.exclude || []).includes(act)
+    && (act !== 'diagnose' || (c.misses || 0) > 0)
+    && (act !== 'synth' || ((c.ev || {}).ok || 0) >= 1)
+    && (!['recall', 'blurt'].includes(act) || !isNew(c));
+  const assignQuestion = c => !c.preset && c.novelty === 'unsure' && !c.prereq && !(((c.ev || {}).ok || 0) + ((c.ev || {}).hint || 0) + ((c.ev || {}).miss || 0))
+    ? `Quick check before I pick: could you start a problem on ${S(c.topic) || 'this'} right now, without notes?` : '';
+  const assignWords = (act, c) => { const t = S(c.topic) || 'this topic', n = c.misses || 0;
+    return ({
+      worked: [`${t} is new to you, so studying one sourced, solved example comes before solving alone.`, `Open one solved example on ${t}${S(c.src) ? ' in ' + S(c.src) : ''} and note where it comes from.`],
+      recall: ['You met this lecture recently, so pulling it from memory now is what makes it stick.', 'Close your notes and write the definitions, formulas and one example you remember.'],
+      blurt: ['Time or energy is short and the material is familiar, so a fast brain-dump is the right size.', 'Write everything you remember for 5 minutes; fragments are fine.'],
+      explain: ['Saying it in plain words shows exactly where the understanding turns vague.', `Explain ${t} to Kaguya in plain words, with one example.`],
+      solve: ['You can follow it with help, so the next proof is one problem solved on your own.', `Write one problem on ${t}, then every step of your working.`],
+      diagnose: [`You have ${n} unresolved mistake${n === 1 ? '' : 's'} on this, and fixing the cause beats new practice.`, 'Write the question and the first line where your working went wrong.'],
+      compare: ['This topic has ideas that are easy to mix up, so putting them side by side finds the confusion.', 'Name the two ideas, then one way they are alike and one way they differ.'],
+      represent: ['This is about moving between equation, graph and physical meaning, so switching forms finds the gap.', 'Write the governing equation, then describe the graph it gives: intercepts, slope and shape.'],
+      predict: ['There is something to predict and check, so committing to a prediction first shows what you really expect.', 'Before looking anything up, write what you predict will happen and why.'],
+      synth: ['You have already done this on your own, so combining it with a second skill is the next step up.', 'Solve one problem that needs this skill and one other, and say where each comes in.']
+    })[act]; };
+  const assignMake = (act, c, by) => { const [why, first] = assignWords(act, c); return { act, why, first, by: by || 'local' }; };
+  const assignLocal = c => {
+    const t = S(c.topic), ev = c.ev || {}, want = [];
+    if (c.preset) want.push(c.preset);
+    if ((c.misses || 0) > 0) want.push('diagnose');
+    if (isNew(c)) want.push('worked');
+    if (c.lecDaysAgo != null && c.lecDaysAgo <= 2 && !ev.ok) want.push('recall');
+    if (/\bvs\.?\b|versus|differen|confus|compar|mix(ed)? up/i.test(t)) want.push('compare');
+    if (/graph|diagram|plot|curve|sketch|interpret|represent|orbit/i.test(t)) want.push('represent');
+    if (/predict|what happens|effect of|observ|simulat/i.test(t)) want.push('predict');
+    if ((ev.ok || 0) >= 2 && c.energy === 'demanding' && (c.mins || 25) >= 25) want.push('synth');
+    if (c.energy === 'lighter' || (c.mins || 25) <= 10) want.push('blurt');
+    want.push('solve', 'recall', 'explain', 'worked', 'compare', 'predict', 'represent', 'blurt');
+    const act = want.find(a => assignAllowed(a, c)) || 'explain';
+    return assignMake(act, c, c.preset && act === c.preset ? 'you' : 'local');
+  };
+  const EASIER = { synth: 'solve', solve: 'worked', diagnose: 'explain', compare: 'explain', represent: 'explain', predict: 'explain', explain: 'recall', recall: 'blurt', worked: 'worked', blurt: 'blurt' };
+  const assignEasier = (a, c) => { let to = EASIER[a.act] || 'worked'; if (!assignAllowed(to, { ...c, exclude: [] })) to = 'worked';
+    const r = assignMake(to, c, 'easier'); r.why = `A smaller step: ${r.why.charAt(0).toLowerCase()}${r.why.slice(1)}`; r.easier = (a.easier || 0) + 1; return r; };
+  const assignPrompt = c => `[activity choice, not typed by me: choose ONE activity for my next study session. Reply with ONLY a JSON object {"act":"…","why":"one sentence","first":"the first instruction, one sentence"}.
+Allowed act values: ${ASSIGN_ACTS.filter(a => assignAllowed(a, c)).join(', ')}. (worked = a sourced worked example; synth = transfer/synthesis.)
+Rules: unfamiliar material → worked; recently finished lecture → recall; a specific saved mistake → diagnose; can follow but not apply alone → solve; confuses related concepts → compare; equation/graph/physical-meaning gap → represent; a prediction can be checked → predict; independent evidence on prerequisites → synth; brief check of familiar material → blurt or recall.
+Task: ${JSON.stringify({ subject: c.subj, topic: S(c.topic), lectureLinked: !!c.lec, daysSinceLecture: c.lecDaysAgo, source: S(c.src), novelty: c.novelty, prerequisitesAnswer: c.prereq || '', skillEvidence: c.ev || {}, unresolvedMistakes: c.misses || 0, minutes: c.mins, energy: c.energy })}]`;
+  // the model may only pick a supported activity whose requirements are met; anything else is rejected (null → local fallback)
+  const assignParse = (reply, c) => { const m = /\{[\s\S]*\}/.exec(S(reply)); if (!m) return null; let o; try { o = JSON.parse(m[0]); } catch (e) { return null; }
+    const act = S(o && o.act).trim().toLowerCase(); if (!assignAllowed(act, c)) return null;
+    const one = (s, n) => S(s).replace(/\s+/g, ' ').trim().slice(0, n);
+    const base = assignMake(act, c, 'iroha'), why = one(o.why, 220), first = one(o.first, 260);
+    return { act, why: why || base.why, first: first || base.first, by: 'iroha' }; };
+  // a reply only lands on the request it answers, and never once the session has started
+  const assignApply = (f, res, tok) => { if (!f || !res || f.step !== 'goal' || !f.assign || f.assign.status !== 'asking' || f.assign.tok !== tok) return false;
+    f.assign = Object.assign({}, res, { status: 'ready', tok, at: Date.now() }); return true; };
+  const api = { exSplit, fadeHide, checkKey, methodNote, freshRecord, freshMistake, trimLog, restore, workRecord, stickItem, bankPick, confWrong, mergeSkills, stickStart, skillTrail, synthPair,
+    ASSIGN_ACTS, assignAllowed, assignQuestion, assignLocal, assignEasier, assignPrompt, assignParse, assignApply };
   root.FlowKit = api;
 })(globalThis);
 </script>
@@ -10134,12 +10191,28 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
     return `<details class="kg-rec-detail"><summary class="kl-small">Open${x.pinned ? ' · pinned' : ''}</summary>${p.join('')}</details>`; };
   function goalStep(f) {
     const lecs = (L.lectures || []).filter(e => e.topic && !e.astro).sort((a, b) => (a.due && a.due <= today() ? 0 : 1) - (b.due && b.due <= today() ? 0 : 1) || (b.made || '').localeCompare(a.made || '')).slice(0, 20);
+    const a = f.assign;
+    if (a && a.status === 'asking') return `<div class="kl-stack" aria-live="polite"><p class="kl-eyebrow">GUIDED SESSION · ${esc(f.subj)}</p><h2>${esc(f.topic)}</h2><p>Iroha is choosing one activity for this task…</p><div class="kl-row"><button class="kl-ghost" data-a="flowassignedit">Change the task</button></div></div>`;
+    if (a && a.status === 'question') return `<div class="kl-stack"><p class="kl-eyebrow">GUIDED SESSION · ONE QUICK QUESTION</p><h2>${esc(a.q)}</h2>
+      <div class="kl-row"><button data-a="flowprereq" data-v="yes">Yes</button><button data-a="flowprereq" data-v="partly">Partly</button><button data-a="flowprereq" data-v="no">Not yet</button><button class="kl-ghost" data-a="flowassignedit">Change the task</button></div></div>`;
+    if (a && a.status === 'ready' && ACTS[a.act]) { const A = ACTS[a.act];
+      const by = { iroha: 'Chosen by Iroha.', easier: 'A smaller version of the first choice, made on this device.', you: 'From the button you tapped.', refit: 'Next best fit, chosen on this device by the desk\'s own rules.', local: 'Local choice: Iroha couldn\'t be reached, so the desk chose by its own rules.' }[a.by] || '';
+      return `<div class="kl-stack kg-assign" data-assign="${esc(a.act)}"><p class="kl-eyebrow">GUIDED SESSION · ${esc(f.subj)} · ${esc(f.topic)}</p>
+      <h2>${A.icon} ${esc(A.name)}</h2><p class="kg-assign-why">${esc(a.why)}</p><p><b>First:</b> ${esc(a.first)}</p>
+      <p class="kl-small kg-assign-by">${esc(by)} About ${f.mins} minutes.</p>
+      <div class="kl-row"><button class="kl-primary" data-a="flowassignstart">Start</button><button data-a="flowassigneasier">Make this easier</button><button data-a="flowassignnofit">This does not fit</button><button class="kl-ghost" data-a="flowassignedit">Change the task</button></div>
+      <details class="kg-assign-help"><summary class="kl-small">Help: what do the method names mean?</summary>${window.FlowKit.ASSIGN_ACTS.map(k => `<p class="kl-small"><b>${ACTS[k].icon} ${esc(ACTS[k].name)}</b>: ${esc(ACTS[k].what)} Good for ${esc(ACTS[k].best)}.</p>`).join('')}</details></div>`; }
     return `<form data-f="flowgoal" class="kl-stack"><p class="kl-eyebrow">GUIDED SESSION</p><h2>What will you work on?</h2>
-      <fieldset class="kg-acts"><legend class="kl-small">Pick how you'll practise</legend>${Object.entries(ACTS).map(([k, a]) => `<label class="kg-act"><input type="radio" name="act" value="${k}" ${f.act === k ? 'checked' : ''} required><b>${a.icon} ${a.name}</b><span>${esc(a.what)}</span><small>Good for ${esc(a.best)}</small></label>`).join('')}</fieldset>
+      <p class="kl-small kg-flow-hint">Tell Iroha the task. She picks one activity that suits it and explains why.</p>
       <div class="kg-flow-grid"><label>Subject <select name="subj">${SUBJS.map(s => `<option ${s === f.subj ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
       <label>From a lecture (optional) <select name="lec"><option value="">None</option>${lecs.map(e => `<option value="${e.id}" ${e.id === f.lec ? 'selected' : ''}>${esc(lecLabel(e))}${e.due && e.due <= today() ? ' · due' : ''}</option>`).join('')}</select></label></div>
       ${skillPick(f)}
-      <label>Topic <input name="topic" maxlength="120" value="${esc(f.topic)}" placeholder="e.g. Log inequalities with base below 1"></label>
+      <label>Task or topic <input name="topic" maxlength="120" value="${esc(f.topic)}" placeholder="e.g. Log inequalities with base below 1"></label>
+      <fieldset class="kg-flow-open"><legend class="kl-small">How new is it to you?</legend>
+        <label class="kl-check"><input type="radio" name="novelty" value="new" ${f.novelty === 'new' ? 'checked' : ''}> New: I haven't learned it yet</label>
+        <label class="kl-check"><input type="radio" name="novelty" value="seen" ${f.novelty === 'seen' ? 'checked' : ''}> I've learned it before</label>
+        <label class="kl-check"><input type="radio" name="novelty" value="unsure" ${!f.novelty || f.novelty === 'unsure' ? 'checked' : ''}> Not sure</label></fieldset>
+      <label>Source (optional) <input name="src" maxlength="120" value="${esc(f.srcText || '')}" placeholder="e.g. HC Verma ch. 6, p. 102, or the class notes"></label>
       <label>Core goal: what does done look like? <input name="goal" maxlength="200" value="${esc(f.goal)}" placeholder="e.g. Solve two orbital-energy problems and explain the sign convention"></label>
       <p class="kl-small kg-flow-hint">Something you can check at the end: a number of problems, a derivation, or "explain why…". Finishing the core goal is enough; nothing more gets added.</p>
       <label>Stretch goal (optional) <input name="stretch" maxlength="200" value="${esc(f.stretch)}" placeholder="Only if the core goal is done and you want more"></label>
@@ -10155,7 +10228,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
         <label class="kl-check"><input type="radio" name="energy" value="demanding" ${f.energy === 'demanding' ? 'checked' : ''}> Ready for something demanding: an unfamiliar problem or a derivation</label>
         <label class="kl-check"><input type="radio" name="energy" value="ordinary" ${(f.energy || 'ordinary') === 'ordinary' ? 'checked' : ''}> Ordinary pace: practice with feedback</label>
         <label class="kl-check"><input type="radio" name="energy" value="lighter" ${f.energy === 'lighter' ? 'checked' : ''}> Need something lighter: shorter, 15 minutes at most</label></fieldset>
-      <div class="kl-row"><button class="kl-primary">Start</button><span class="kl-small">The desk timer starts too, so the minutes count.</span></div></form>`;
+      <div class="kl-row"><button class="kl-primary">Ask Iroha to choose</button><span class="kl-small">You'll see her pick and why before anything starts.</span></div></form>`;
   }
   function warmupStep(f, A) {
     const predict = f.opener === 'predict';
@@ -10368,7 +10441,7 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
   }
   M.SECTIONS.study.unshift(['session', '✍ Session']);
   M.PANELS.session = () => {
-    const f = L.flow;
+    settleAsking(); const f = L.flow;
     if (M.onBreak?.() && (!f || f.step === 'goal')) return `<section class="kl-card kl-breakcard"><p class="kl-eyebrow">🌙 RESTING</p><h3>Guided sessions are here when you're back.</h3><p>Nothing is waiting, and nothing is piling up.</p></section>`;
     const cur = f || blank(), A = ACTS[cur.act];
     const body = cur.step === 'goal' || !A ? goalStep(cur) : cur.step === 'warmup' ? warmupStep(cur, A) : cur.step === 'example' ? exampleStep(cur) : cur.step === 'recap' ? recapStep(cur) : cur.step === 'attempt' ? attemptStep(cur, A) : cur.step === 'feedback' ? feedbackStep(cur, A) : cur.step === 'repair' ? repairStep(cur) : saveStep(cur, A);
@@ -10382,7 +10455,51 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       + (cur.step === 'goal' && recent.length ? `<section class="kl-card kl-mini"><p class="kl-eyebrow">RECENT SESSIONS</p><p class="kl-small">The newest 30 sessions keep their full working; older ones keep a summary unless pinned. <button type="button" class="kl-ghost" data-a="flowexport">Download full history</button></p>${sureWrong.length ? `<p class="kl-small">Sure, but there was a gap (last 14 days): ${sureWrong.slice(-4).map(r => esc(r.topic)).join('; ')}. Worth another look.</p>` : ''}${recent.map(x => `<div class="kl-li"><span>${esc(ACTS[x.act]?.name || '')}: ${esc(x.topic)}${x.conf === 'sure' && x.gap ? ' <b class="kl-small">· sure, but a gap</b>' : ''}<small>${esc(x.d)} · ${x.gap ? (x.fixed ? 'gap repaired' : 'gap: ' + esc(x.gap.slice(0, 90))) : 'no gaps'}</small></span>${recDetail(x)}</div>`).join('')}</section>` : '');
   };
 
+  /* ---------- Iroha's activity choice: what she knows about the task ---------- */
+  const ctxOf = f => {
+    const e = f.lec && lecture(f.lec), ev = { ok: 0, hint: 0, miss: 0 };
+    for (const x of L.log || []) if (f.skillId && x.sk === f.skillId && ev[x.result] != null) ev[x.result]++;
+    const words = String(f.topic || '').toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 3);
+    const open = (L.attempts || []).filter(x => x.ok === false && x.due && (x.st || 0) < 5 && ((e?.ch && x.ch === e.ch) || (words.length && words.some(w => String(x.q || '').toLowerCase().includes(w)))));
+    const mine = f.miss && (L.attempts || []).find(x => x.id === f.miss);
+    let ago = null; try { if (e?.made) ago = M.gap(today(), e.made); } catch (err) {}
+    return { subj: f.subj, topic: f.topic, lec: !!f.lec, lecDaysAgo: ago, src: f.srcText || '', novelty: f.novelty || 'unsure', prereq: f.prereq || '', ev, misses: (mine ? 1 : 0) + open.filter(x => x !== mine).length, missId: mine ? mine.id : open[0]?.id || '', mins: f.mins, energy: f.energy, preset: ACTS[f.act] ? f.act : '', exclude: f.assignNo || [] };
+  };
+  let inflight = ''; // the one request this page is waiting on; after a reload there is none
+  const ready = (f, r) => { f.assign = Object.assign(r, { status: 'ready', tok: M.uid(), at: Date.now() }); };
+  function decide(f) {
+    const K = window.FlowKit, c = ctxOf(f), q = K.assignQuestion(c);
+    if (q) { f.assign = { status: 'question', q }; save(); return M.render(); }
+    if (c.preset) { ready(f, K.assignLocal(c)); save(); return M.render(); }
+    const tok = M.uid(); f.assign = { status: 'asking', tok }; inflight = tok; save(); M.render();
+    Promise.race([ask('iroha', K.assignPrompt(c)), new Promise(r => setTimeout(() => r(''), 20000))]).then(reply => {
+      const res = K.assignParse(reply, c) || K.assignLocal({ ...c, preset: '' });
+      if (K.assignApply(L.flow, res, tok)) { save(); M.render(); }
+    });
+  }
+  // reloaded while Iroha was choosing: that reply can't arrive any more, so use the labelled local choice instead of asking again
+  const settleAsking = () => { const f = L.flow; if (f && f.step === 'goal' && f.assign?.status === 'asking' && f.assign.tok !== inflight) { ready(f, window.FlowKit.assignLocal({ ...ctxOf(f), preset: '' })); save(); } };
+
   /* ---------- forms and buttons ---------- */
+  Object.assign(M.ACTIONS, {
+    flowassignstart: () => {
+      const f = L.flow, a = f?.assign; if (!f || f.step !== 'goal' || !a || a.status !== 'ready' || !ACTS[a.act]) return;
+      const A = ACTS[a.act]; f.act = a.act; f.assigned = { act: a.act, by: a.by, why: a.why, first: a.first, easier: a.easier || 0, at: Date.now() };
+      if (f.act === 'diagnose' && !f.miss) { const m = ctxOf(f).missId; if (m) f.miss = m; }
+      if (f.act === 'predict') f.opener = 'predict';
+      if (f.act === 'worked') { f.opener = ''; f.supported = true; }
+      f.step = f.act === 'worked' ? 'example' : f.opener ? 'warmup' : 'attempt'; f.started = Date.now();
+      f.desk = habit().active ? false : !!M.startDesk?.({ subject: f.subj === 'Mixed' ? 'Mixed' : f.subj, topic: f.topic, task: `${A.name}: ${f.goal || f.topic}`, kind: A.kind, minutes: f.mins }, true);
+      save(); M.render(); setTimeout(() => document.querySelector('[data-flow="warm"],[data-flow="attempt"]')?.focus(), 60);
+    },
+    flowassigneasier: () => { const f = L.flow, a = f?.assign; if (!f || f.step !== 'goal' || a?.status !== 'ready') return;
+      f.mins = Math.max(10, Math.round((f.mins || 25) * 0.6)); f.assignNo = [...new Set([...(f.assignNo || []), a.act])]; ready(f, window.FlowKit.assignEasier(a, ctxOf(f))); save(); M.render(); },
+    flowassignnofit: () => { const f = L.flow, a = f?.assign; if (!f || f.step !== 'goal' || a?.status !== 'ready') return;
+      f.assignNo = [...new Set([...(f.assignNo || []), a.act])]; if (f.assignNo.length >= window.FlowKit.ASSIGN_ACTS.length) f.assignNo = [a.act];
+      const r = window.FlowKit.assignLocal({ ...ctxOf(f), preset: '' }); r.by = 'refit'; ready(f, r); save(); M.render(); },
+    flowassignedit: () => { const f = L.flow; if (!f || f.step !== 'goal') return; f.assign = null; inflight = ''; save(); M.render(); },
+    flowprereq: b => { const f = L.flow; if (!f || f.step !== 'goal' || f.assign?.status !== 'question') return; f.prereq = ['yes', 'partly', 'no'].includes(b.dataset.v) ? b.dataset.v : 'partly'; if (f.prereq === 'yes') f.novelty = 'seen'; decide(f); }
+  });
   Object.assign(M.FORMS, {
     freesess: v => {
       const m = String(v.minutes || '').trim(); if (m && !(+m >= 5 && +m <= 600)) return M.I('Choose between 5 and 600 minutes, or leave it empty.', { face: 'study' });
@@ -10390,18 +10507,14 @@ body.kg-sec-today.kg-simple:not(.habit-shh):not(.kg-session):not(.kg-own) #hb-se
       catch (e) { M.I(e.message || 'Could not start the timer.', { face: 'stern' }); }
     },
     park: v => { const t = String(v.t || '').trim(); if (!t) return; (L.parked = L.parked || []).push({ id: M.uid(), t: t.slice(0, 200), d: today(), at: Date.now(), done: false }); if (L.flow) L.flow.parking = false; save(); M.render(); },
+    // the task, then ONE activity assigned by Iroha (design §9). Nothing starts until Start is tapped.
     flowgoal: v => {
-      const A = ACTS[v.act]; if (!A) return M.I('Pick an activity first.', { face: 'study' });
       const e = v.lec && lecture(v.lec), topic = String(v.topic || '').trim() || e?.topic || '';
       if (!topic) return M.I('Name the topic, even roughly. It tells me what to check against.', { face: 'study' });
       const sk = (L.skills || []).some(s => s.id === v.sk) ? v.sk : (window.StudyPlan.creditTarget(L.skills || [], { lec: v.lec || '' }) || '');
-      const f = L.flow = Object.assign(L.flow || blank(), { skillId: sk, act: v.act, subj: SUBJS.includes(v.subj) ? v.subj : 'Maths', topic, goal: String(v.goal || '').trim(), lec: v.lec || '', mins: Math.max(5, Math.min(90, parseInt(v.mins) || A.mins)), stretch: String(v.stretch || '').trim(), energy: ['demanding', 'lighter'].includes(v.energy) ? v.energy : 'ordinary', opener: ['recall', 'predict'].includes(v.opener) ? v.opener : '', contract: v.contract === 'finish' ? 'finish' : 'stop' });
+      const f = L.flow = Object.assign(L.flow || blank(), { skillId: sk, subj: SUBJS.includes(v.subj) ? v.subj : 'Maths', topic, goal: String(v.goal || '').trim(), lec: v.lec || '', mins: Math.max(5, Math.min(90, parseInt(v.mins) || 25)), stretch: String(v.stretch || '').trim(), energy: ['demanding', 'lighter'].includes(v.energy) ? v.energy : 'ordinary', opener: ['recall', 'predict'].includes(v.opener) ? v.opener : '', contract: v.contract === 'finish' ? 'finish' : 'stop', novelty: ['new', 'seen'].includes(v.novelty) ? v.novelty : 'unsure', srcText: String(v.src || '').trim().slice(0, 120), prereq: '', assign: null, assignNo: [] });
       if (f.energy === 'lighter') f.mins = Math.min(f.mins, 15);
-      if (f.act === 'predict') f.opener = 'predict';
-      if (f.act === 'worked') { f.opener = ''; f.supported = true; }
-      f.step = f.act === 'worked' ? 'example' : f.opener ? 'warmup' : 'attempt'; f.started = Date.now();
-      f.desk = habit().active ? false : !!M.startDesk?.({ subject: f.subj === 'Mixed' ? 'Mixed' : f.subj, topic: f.topic, task: `${A.name}: ${f.goal || f.topic}`, kind: A.kind, minutes: f.mins }, true);
-      save(); M.render(); setTimeout(() => document.querySelector('[data-flow="warm"],[data-flow="attempt"]')?.focus(), 60);
+      decide(f);
     },
     flowsave: v => {
       const f = L.flow; if (!f) return;
