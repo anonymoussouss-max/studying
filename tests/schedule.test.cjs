@@ -110,13 +110,17 @@ test('10. meals, the personal commitment, getting ready and sleep survive every 
   assert.ok(f.rows.some(r => r.id === 'lunch' && r.s === 960));
 });
 
-test('11. Sunday is a loose guide: up to 2 hours, optional, no mandatory work', () => {
+test('11. Sunday is 90 minutes in total: 60 of the PCM subject furthest below its share, then 30 of German, all optional', () => {
   const P = plan(iso(SUN, 720), seeded());
   assert.strictEqual(P.dayKind(SUN).t, 'normal');
   const d = P.templateDay(seeded(), SUN, 0, 720, CTX);
   assert.strictEqual(d.plan, 'sunday');
-  assert.ok(total(d.rows) >= 60 && total(d.rows) <= 120);
-  assert.ok(study(d.rows).every(r => ['explore', 'german'].includes(r.task?.type)));
+  assert.strictEqual(total(d.rows), 90, 'never a catch-up day');
+  const s = study(d.rows);
+  assert.strictEqual(s.filter(r => r.subj === 'german').reduce((n, r) => n + r.e - r.s, 0), 30);
+  assert.strictEqual(s.filter(r => ['maths', 'physics', 'chem'].includes(r.subj)).reduce((n, r) => n + r.e - r.s, 0), 60);
+  assert.ok(s.every(r => r.optional), 'lowering or stopping stays available');
+  assert.ok(!s.some(r => r.task?.type === 'lecture' && !r.task.cont), 'no new lecture on Sunday');
 });
 
 test('12. a difficult day: 15 minutes of Physics is the whole plan; a lighter day stays small', () => {
@@ -204,7 +208,11 @@ test('the night-meds reminder appears on template days at the set time', () => {
 
 // ---- review fixes (22 Nov 2026) ----
 test('German is exactly the chosen minutes in every template, and the total never changes', () => {
-  const plans = { normal: 720, early: 600, late: 780, later: 840, verylate: 900, sunday: 720 };
+  const plans = { normal: 720, early: 600, late: 780, later: 840, verylate: 900 };
+  // Sunday is fixed at 60 PCM + 30 German (handoff 25 Nov); a lower German choice is kept, a higher one is not added
+  for (const g of [15, 30, 45, 90]) { const s = P0.skeleton(720, 'sunday', { german: g, from: 750 }).filter(x => x.kind === 'study');
+    assert.strictEqual(s.filter(x => x.role === 'G').reduce((n, x) => n + x.e - x.s, 0), Math.min(g, 30), 'Sunday German ' + g);
+    assert.strictEqual(s.filter(x => x.role === 'SUN').reduce((n, x) => n + x.e - x.s, 0), 60, 'Sunday PCM ' + g); }
   for (const [p, W] of Object.entries(plans)) {
     const base = P0.skeleton(W, p, { german: 30, from: W + 30 }).filter(x => x.kind === 'study').reduce((n, x) => n + x.e - x.s, 0);
     for (const g of [15, 30, 45, 60, 75, 90]) {
