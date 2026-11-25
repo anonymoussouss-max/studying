@@ -89,3 +89,11 @@ test('timer minutes from a "Homework · …" block are credited once, and record
   assert.match(html, /if \(!h \|\| \(h\.sess \|\| \[\]\)\.includes\(s\.id\)\) continue;/, 'once per session');
   assert.match(html, /k = h\.stage === 'tah' \|\| h\.stage === 'ktk' \? h\.stage : 'hw'/);
 });
+
+test('feedback names the gap without solving it; the worked solution is offered at Repair and shown only after a yes', () => {
+  assert.match(html, /do not give the corrected result or work the solution: I repair it myself, and the worked solution is offered separately, only if I ask/);
+  assert.match(html, /data-a="flowworkedask">Still stuck\? Offer me the worked solution/);
+  assert.match(html, /Show the full worked solution\? This attempt then counts as "with help"/);
+  assert.match(html, /flowworked: \(\) => hintAsk\(null, 4\)/);
+  assert.match(html, /\$\{f\.fixed \? '' : workedOffer\(f\)\}/);
+});
