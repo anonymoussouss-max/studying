@@ -979,10 +979,10 @@ body.habit-shh #hb-session-card {text-align:center;}
     const study=[],put=(s,e,role,x={})=>{if(e-s>=5)study.push(Object.assign({s,e,role},x));};
     const ext=!!o.extend;
     if(plan==='sunday'){
-      // a loose guide, not a quota: 60-90 min of playful Physics/Maths, plus German
-      if(T_LUNCH[1]+90>start)put(Math.max(T_LUNCH[1],start),T_LUNCH[1]+90,'X',{optional:true});
-      if(1215>start){const s=Math.max(1185,start),g=Math.min(1215-s,Gb);if(G)put(s,s+g,'G');if(1215-s-g>=5)put(s+g,1215,'X',{optional:true});}
-      topUp(study,['X']);
+      // Sunday (handoff 25 Nov): 90 minutes in total, never a catch-up day. 60 min of the PCM subject furthest below its
+      // share (unfinished examples or assigned questions first), then 30 min of German. Lowering or stopping stays available.
+      const from=Math.max(start,T_LUNCH[1]),a=freeAfter(seg,from,60,T_READY);if(a)put(a.s,a.s+60,'SUN',{optional:true});
+      if(G){const b=freeAfter(seg.concat(study.map(x=>({s:x.s,e:x.e}))),a?a.s+75:from,Gb,T_READY);if(b)put(b.s,b.s+Gb,'G',{optional:true});}
       return finish(seg,study,o,W);
     }
     if(plan==='gentle'||plan==='reduced'||plan==='stop'){
@@ -1103,6 +1103,8 @@ body.habit-shh #hb-session-card {text-align:center;}
     const pick=role=>{const open=pool.filter(t=>t.rem>=5&&t.ready!==false&&!(o.examPrep&&t.type==='lecture'&&!t.cont)),owed=s=>open.some(x=>x.subj===s&&(x.type==='revision'||x.type==='homework'||(x.type==='lecture'&&x.cont)));
       const live=open.filter(t=>!(t.type==='lecture'&&!t.cont&&owed(t.subj))),f=t=>t.subj===focus?0:1,by=(fn)=>live.filter(fn).sort((a,b)=>f(a)-f(b))[0];
       if(role==='L')return by(t=>t.type==='lecture'&&t.cont&&t.subj===focus)||by(t=>t.subj===focus&&t.type==='revision')||by(t=>t.subj===focus&&t.type==='homework')||by(t=>t.type==='lecture'&&t.subj===focus)||by(t=>t.type==='lecture'&&t.cont)||pick('P');
+      // Sunday: only unfinished work of the subject most below its share; never a new lecture
+      if(role==='SUN')return by(t=>t.subj===focus&&(t.cont||t.type==='revision'||t.type==='homework'))||null;
       if(role==='R')return by(t=>t.type==='lecture'&&t.cont)||by(t=>t.type==='revision')||pick('P');
       if(role==='H')return live.filter(t=>t.type==='homework').sort((a,b)=>(a.subj==='maths'?0:1)-(b.subj==='maths'?0:1))[0]||pick('P');
       return by(t=>t.type==='lecture'&&t.cont)||by(t=>t.type==='revision')||by(t=>t.type==='homework')||live.filter(t=>t.type==='lecture').sort((a,b)=>deficitOrder.indexOf(a.subj)-deficitOrder.indexOf(b.subj))[0]||null;};
@@ -1117,6 +1119,7 @@ body.habit-shh #hb-session-card {text-align:center;}
       if(g.role==='Gphys'){rows.push(Object.assign({},g,{subj:'physics',title:'Physics · 15 minutes, then decide. Stopping after this is a complete day.',task:{type:'gentle'}}));continue;}
       let t=g.s;
       while(g.e-t>=5){const k=pick(g.role);
+        if(!k&&g.role==='SUN'){rows.push(Object.assign({},g,{s:t,subj:focus,title:'Sunday · '+SNAME[focus]+' (needs more attention) · an unfinished example, an assigned question or one specific gap',task:{type:'practice',subj:focus,sunday:true}}));t=g.e;break;}
         if(!k){rows.push(Object.assign({},g,{s:t,subj:focus,title:SNAME[focus]+' · independent problems (older topics count within today\'s allowance)',task:{type:'practice',subj:focus}}));t=g.e;break;}
         const m=Math.min(k.rem,g.e-t),last=g.e-t-m<5?g.e:t+m;
         rows.push(Object.assign({},g,{s:t,e:last,subj:k.subj,title:k.title,task:{type:k.type,subj:k.subj,cont:!!k.cont,ref:k.ref?{chapter:k.ref.chapter,lec:k.ref.lec,id:k.ref.id}:null}}));
@@ -1216,7 +1219,24 @@ body.habit-shh #hb-session-card {text-align:center;}
     let blk=0;for(const [id,m] of Object.entries(((desk.state||desk).days||{})[day]?.completed||{}))if(/^(maths|physics|chem|german|astro|diploma|explore|study)/.test(id)&&Number.isFinite(+m))blk+=+m;
     // whole minutes: saved sessions keep one decimal (42.9), and an unrounded sum leaked into every plan time (9:52.0999… PM)
     return Math.floor(Math.max(ses,blk)+1e-6);}
-  const dayHours=(S,d)=>{const h=+((S&&S.hours)||{})[d];return DAY_HOURS.includes(h)?h:0;};
+  // A day's own hours choice wins; otherwise a passed weekly review (S.allow8) makes eight hours the normal allowance from
+  // its start day. It is capacity, not a quota; Gentle Return (GR) and Sunday ignore it where dayHours is read.
+  const dayHours=(S,d)=>{const h=+((S&&S.hours)||{})[d];if(DAY_HOURS.includes(h))return h;const a=S&&S.allow8;return a&&a.from&&d>=a.from&&DAY_HOURS.includes(8)?8:0;};
+  // ---- Weekly review for six to eight hours (handoff 25 Nov). R = S.review = {from, reports:{[week]:{feel,ready8,note,at}},
+  // paused, stopped, ack112}. Week k runs from+7k .. from+7k+6; its report can be given only during the following seven
+  // days, so older missing reports stay missing. A pass needs day 28+, four completed weeks, the four most recent all
+  // "yes" and the latest also ready for eight hours. Mixed, No or missing leave it pending: no debt, no forced pass.
+  // It checks Ayan's own reports only; it is not medical clearance and doesn't predict burnout.
+  function reviewOf(R,today){
+    if(!R||!R.from)return null;const rep=R.reports||{},el=Math.round((Date.parse(today+'T12:00:00')-Date.parse(R.from+'T12:00:00'))/864e5);
+    const done=Math.max(0,Math.floor(el/7)),due=done>=1&&!rep[done-1]?done-1:null,last4=done>=4?[done-4,done-3,done-2,done-1]:[];
+    const eligible=el>=28&&done>=4,allYes=last4.length===4&&last4.every(k=>rep[k]&&rep[k].feel==='yes'),ready=!!(done>=1&&rep[done-1]&&rep[done-1].ready8);
+    const pass=!R.paused&&!R.stopped&&eligible&&allYes&&ready;
+    return {day:el+1,elapsed:el,done,due,askReady:due!=null&&due+1>=4,eligible,last4,allYes,ready,pass,paused:!!R.paused,stopped:!!R.stopped,
+      earliest:addDays(R.from,28),at112:el>=112&&!pass,weekStart:k=>addDays(R.from,7*k)};}
+  // record a pass once: eight hours from the next study day. Re-running (reload, retry, sync) changes nothing.
+  function reviewSettle(S,today){const r=reviewOf(S&&S.review,today);if(!r||!r.pass||S.allow8)return false;
+    S.allow8={from:addDays(today,1),passedAt:today,basis:r.last4.map(k=>({week:k+1,feel:S.review.reports[k].feel})),ready8:true};return true;}
   // ---- Astrophysics course ----
   // daily course minutes: your chosen amount, or a deadline adjustment you applied (only until its date)
   function astroMinutes(S,d){const a=(S&&S.astro)||{},b=a.boost;return Math.max(0,Math.min(120,+(b&&b.until&&d<=b.until?b.min:a.min)||0));}
@@ -1309,7 +1329,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const daysLeft=w===0?0:7-w,loggedAny=ss.some(s=>s&&s.date===day&&s.subject!=='Other'&&(+s.minutes||0)>0)||Object.values(((desk.state||desk).days||{})[day]?.completed||{}).some(x=>+x>0)||!!(habit.active&&habit.active.date===day);
     return {actual14:a14,loggedAny,diplomaToday:daysLeft?Math.max(0,Math.ceil((target-dipDone)/daysLeft/5)*5):0,diplomaTarget:target,diplomaDone:dipDone,monday:mon};}
   const nowClock=()=>{const n=new Date();let m=n.getHours()*60+n.getMinutes();if(m<240)m+=1440;return m;};
-  const api={DAY_HOURS,dayHours,cExam,gentleOf,gentleUsed,astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,forecast:(L,hist)=>forecast(L||labData(),hist||{}),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={DAY_HOURS,dayHours,reviewOf,reviewSettle,cExam,gentleOf,gentleUsed,astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,forecast:(L,hist)=>forecast(L||labData(),hist||{}),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -2852,8 +2872,10 @@ window.__KG_BUILTIN = {
   sbtn.onclick = () => { window.__kgOnce = "[I pressed Show solution, not typed by me: give the complete worked solution to the problem we're on now, every step with a one-line reason, then one similar problem for me to try on my own. This overrides tutor mode for this one reply.]"; iSend("show me the full solution"); };
   ichips.prepend(sbtn); ichips.prepend(tbtn); tsync();
   // what Iroha is told while tutor mode is on: the method Claude's learning mode uses, in her voice
-  const TUTOR_NOTE = "\n\n[not typed by me: TUTOR MODE is on. Teach Socratically. 1) Questions are at the level of what I'm studying (my PDF or notes when one is attached): whole problems or real concept questions, not tiny arithmetic steps. Before explaining one, ask what I've tried or what the first step is. 2) Hint ladder, only after a wrong attempt, one rung each: a nudge question, then name the method, then show one step, and the full solution only if I ask or after three wrong tries. 3) Now and then ask me to explain why a step works, not just the result. 4) If I'm right, say Correct first and move straight on. 5) When a problem is done, ask one short follow-up question to check it stuck, then the next problem. 6) One question per message, short and in everyday words, like a teacher saying it out loud; the maths can be hard but the sentence must be easy. 7) Readable maths only: x², √, ≤, ≥, ×, ½, log₀.₅ x; never ^, _ or LaTeX. Never just give the answer while tutor mode is on, unless I press Show solution.]";
-  window.__kgTutorNote = () => tutorOn() ? TUTOR_NOTE : "";
+  const TUTOR_NOTE = "\n\n[not typed by me: TUTOR MODE is on. Teach Socratically. 1) Questions are at the level of what I'm studying (my PDF or notes when one is attached): whole problems or real concept questions, not tiny arithmetic steps. Before explaining one, ask what I've tried or what the first step is. 2) Assess my latest attempt before anything else, and never move to a different question before you have. If my wording is ambiguous in a way that changes the assessment (say \"electrons formed\" versus \"electrons formed atoms\"), ask briefly which I meant. If you can't read an attempt, say so and don't grade it. 3) Familiar or easy question: start with one small hint. Harder question: explain the missing principle if that's what's missing, then guide the next step with small hints, responding to my attempt between hints. 4) If I'm still stuck, OFFER the worked solution and ask before showing it. After I've studied it, offer one similar problem for me to try on my own if the session has time; that fresh attempt counts separately from the first. 5) After a correct answer, say Correct and ask ONE short reasoning check, unless my working already explains it clearly: then say so and move on. 6) One question per message, short and in everyday words, like a teacher saying it out loud; the maths can be hard but the sentence must be easy. 7) Readable maths only: x², √, ≤, ≥, ×, ½, log₀.₅ x; never ^, _ or LaTeX. C code stays exactly as written, inside backticks. Never just give the answer while tutor mode is on, unless I press Show solution or say yes to your offer.]";
+  // outside tutor mode Iroha still assesses an attempt first, never grades what she can't read, and offers before revealing
+  const ASSESS_NOTE = "\n\n[not typed by me: if my message is an attempt at a question, first say plainly whether it's right and what's wrong or missing, before anything new; if my wording could mean two things that change the verdict, ask which. If you can't read an attempt, say so and don't grade it. If I'm stuck, offer a worked solution and ask before showing it. Keep C code exactly, in backticks.]";
+  window.__kgTutorNote = () => tutorOn() ? TUTOR_NOTE : ASSESS_NOTE;
 
   // click = open her chat, double-click = poke, drag = move her
   const IPK = "iroha-pos-v1"; let idg = null, imoved = false;
@@ -9526,6 +9548,8 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   }
   function advice() {
     if (window.__kgOnBreak) return null;
+    // the weekly check-in (reviewCard) replaced the hours ladder: no step-up, step-down or lighter-week advice, here or to the companions
+    if (window.StudyPlan?.reviewOf) return null;
     // gentle return has its own maximum, chosen by Ayan: the hours-ladder advice (step up/down, "lightest plan") stays out of it
     try { if (window.StudyPlan?.gentleOf?.(L.sched, today())) return null; } catch (e) {}
     const s = look(), snoozed = L.stepNo && gap(s.d, L.stepNo) < 3;
@@ -9536,7 +9560,43 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     const left = Math.max(0, 14 - s.at);
     return { s, kind: 'info', text: s.h === 10 ? `Occasional 10-hour day. Keep eight hours as your normal routine, and take breaks whenever needed. ${s.counted} of the last ${s.n} days counted.` : s.h === 8 ? `${s.counted} of the last ${s.n} days counted on your normal day.` : `Day ${Math.min(s.at + 1, 14)} of 14 at ${s.h} hours · ${s.counted} of ${s.n || 0} days counted${left ? '' : ', and the moods decide the rest'}.${s.up ? ` Next step: ${s.up} hours, once 10 of 14 days count with steady moods.` : ''}` };
   }
+  // ---- weekly review for six to eight hours (replaces the step-up suggestions; StudyPlan.reviewOf holds the rule) ----
+  const SC = () => (L.sched = L.sched || {}), audit = (a, d) => window.__kgDeskAudit?.(a, d);
+  const fmtD = d => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  const FEEL = { yes: 'Yes', mixed: 'Mixed', no: 'No' };
+  function reviewCard() {
+    const SP = window.StudyPlan; if (!SP?.reviewOf || window.__kgOnBreak) return '';
+    const S = SC(), R = S.review, d = today(), head = '<p class="kl-eyebrow">✦ WEEKLY CHECK-IN · SIX TO EIGHT HOURS</p>';
+    const what = '<p class="kl-small">What this checks: your own weekly answers only. It is a planning review, not medical clearance, and it can\'t predict whether burnout comes back. Timer totals are context; no hours have to be earned.</p>';
+    if (!R) return `<section class="kl-card kl-mini kg-review">${head}<p>Your normal day is up to six hours of study. After four weeks of check-ins that say the studying felt manageable, eight-hour normal days can become available, if you want them.</p>${what}<div class="kl-row"><button class="kl-primary" data-a="kgrev" data-v="start">Start the weekly check-in</button></div></section>`;
+    if (SP.reviewSettle(S, d)) { save(); audit('weekly review passed', 'eight hours from ' + S.allow8.from); }
+    const r = SP.reviewOf(R, d), gr = SP.gentleOf?.(S, d);
+    const hist = Array.from({ length: r.done }, (_, k) => `Week ${k + 1}: ${R.reports?.[k] ? FEEL[R.reports[k].feel] + (R.reports[k].ready8 ? ' · ready for 8 h' : '') : 'no report'}`).slice(-6).join(' · ');
+    if (S.allow8) return `<section class="kl-card kl-mini kg-review">${head}<p><b>Eight-hour normal days are available from ${esc(fmtD(S.allow8.from))}.</b> The basis: ${S.allow8.basis.map(b => 'week ' + b.week + ' ' + FEEL[b.feel]).join(', ')}, and you said eight hours felt wanted and manageable.</p>${gr ? '<p class="kl-small">Gentle return is on, so its own maximum stays in charge. Eight hours waits for when you go back to the normal planner.</p>' : ''}<p class="kl-small">It's capacity, not a quota. A day's own hours choice, Done for today and exam preparation still come first.</p>${what}</section>`;
+    if (r.stopped) return `<section class="kl-card kl-mini kg-review">${head}<p>You chose to stay at six hours. Your check-in history is kept.</p><div class="kl-row"><button class="kl-ghost" data-a="kgrev" data-v="resume">Start checking in again</button></div></section>`;
+    if (r.paused) return `<section class="kl-card kl-mini kg-review">${head}<p>Check-ins are paused. Nothing progresses and nothing is owed. When you resume, the four most recent weeks count.</p><div class="kl-row"><button class="kl-ghost" data-a="kgrev" data-v="resume">Resume check-ins</button></div></section>`;
+    const form = r.due == null ? '' : `<form data-f="kgrev" class="kl-stack"><input type="hidden" name="week" value="${r.due}"><p><b>Week ${r.due + 1} (from ${esc(fmtD(r.weekStart(r.due)))}): did the week's studying feel manageable?</b></p>
+      <div class="kl-row" role="radiogroup">${Object.entries(FEEL).map(([k, t]) => `<label class="kl-check"><input type="radio" name="feel" value="${k}" required> ${t}</label>`).join(' ')}</div>
+      ${r.askReady ? '<label class="kl-check"><input type="checkbox" name="ready8"> Eight-hour normal days feel wanted and manageable</label>' : ''}
+      <label class="kl-small">Anything to add (optional)<input name="note" maxlength="200"></label><button class="kl-primary">Save this week's answer</button></form>`;
+    const status = r.eligible ? (r.allYes ? 'All four recent weeks say Yes. ' + (r.ready ? '' : 'Eight hours opens once you also say it feels wanted.') : 'Pending: the four most recent weeks need to all say Yes. Mixed, No or a missing week is fine; it just keeps six hours for now.') : `Earliest possible: ${esc(fmtD(r.earliest))} (day 28, after four weekly answers).`;
+    const at112 = r.at112 && !R.ack112 ? `<p class="kl-small">Day 112: four months don't force a change. Keep checking in, pause, or stay at six hours.</p><div class="kl-row"><button class="kl-ghost" data-a="kgrev" data-v="continue">Keep checking in</button><button class="kl-ghost" data-a="kgrev" data-v="pause">Pause</button><button class="kl-ghost" data-a="kgrev" data-v="stay">Stay at six hours</button></div>` : '';
+    return `<section class="kl-card kl-mini kg-review">${head}<p>Day ${r.day} of the review. ${status}</p>${hist ? `<p class="kl-small">${esc(hist)}</p>` : ''}${form}${at112}${what}${at112 ? '' : '<div class="kl-row"><button type="button" class="kl-ghost" data-a="kgrev" data-v="pause">Pause check-ins</button></div>'}</section>`;
+  }
+  M.ACTIONS.kgrev = b => { const S = SC(), v = b.dataset.v, d = today();
+    if (v === 'start' && !S.review) { S.review = { from: d, reports: {} }; audit('weekly review started', d); }
+    else if (!S.review) return;
+    else if (v === 'pause') { S.review.paused = d; audit('weekly review paused', d); }
+    else if (v === 'resume') { delete S.review.paused; delete S.review.stopped; audit('weekly review resumed', d); }
+    else if (v === 'continue') S.review.ack112 = d;
+    else if (v === 'stay') { S.review.stopped = d; audit('weekly review: stay at six hours', d); }
+    save(); M.render(); };
+  M.FORMS.kgrev = v => { const S = SC(), R = S.review, r = R && window.StudyPlan.reviewOf(R, today()); if (!r || r.due == null || String(r.due) !== String(v.week) || !FEEL[v.feel]) return;
+    R.reports = R.reports || {}; if (R.reports[r.due]) return; // one answer per week, never overwritten
+    R.reports[r.due] = Object.assign({ feel: v.feel, at: today() }, r.askReady && v.ready8 ? { ready8: true } : {}, String(v.note || '').trim() ? { note: String(v.note).trim().slice(0, 200) } : {});
+    audit('weekly check-in', 'week ' + (r.due + 1) + ': ' + v.feel); save(); M.render(); };
   function card() {
+    if (window.StudyPlan?.reviewOf) return reviewCard();
     const a = advice(); if (!a) return '';
     const btns = a.kind === 'info' ? '' : `<div class="kl-row"><button class="kl-primary" data-a="kgstep" data-v="${a.kind === 'lighter' ? 'lighter' : a.v}">${esc(a.btn)}</button><button class="kl-ghost" data-a="kgstepno">Not yet</button></div>`;
     return `<section class="kl-card kl-mini kg-stepup kg-step-${a.kind}"><p class="kl-eyebrow">✦ IROHA'S STEP-UP CHECK</p><p>${esc(a.text)}</p>${btns}</section>`;
