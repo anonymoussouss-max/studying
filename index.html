@@ -16496,199 +16496,308 @@ function serpentSVG(o) {
     <g class="scales">${serpentPlates(n, S).map((p, i) => plate(p, sk[i] || 'n', i)).join('')}</g>`;
 }
 
-  // ---- the quarters: places, what each one opens, and the room drawing ----
+  // ---- the quarters: the painted home room, the Gu cabinet, and what each object opens ----
   const M = window.MoonLab, K = window.KgCult, R = window.KgRank;
-  const KEY = 'kg-quarters-v1', DEF = { on: false, home: true, simplify: false, still: false, labels: true, chars: true, gu: true, content: true };
+  const KEY = 'kg-quarters-v1', DEF = { home: true, simplify: false, still: false, showLabels: false, gu: true, shown: [] }; // showLabels: labels otherwise appear on hover or focus
   const prefs = () => { try { return Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { return Object.assign({}, DEF); } };
+  const save = p => localStorage.setItem(KEY, JSON.stringify(p));
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-  // Every place opens existing pages ('page:tab') or existing actions. Nothing here re-implements a rule.
+  const SUBJ = { maths: 'Mathematics', physics: 'Physics', chem: 'Chemistry' };
+  // Simplify lists every place with what it opens (existing pages 'page:tab' or actions). Nothing here re-implements a rule.
   const PLACES = [
-    { id: 'scroll', name: 'Wall scroll', hit: [1080, 112, 124, 370], lab: [1142, 500], about: "Today's plan. Meals, breaks, protected reading and the 1:30 AM bedtime are fixed bands; the scroll never moves them.",
+    { id: 'scroll', name: 'Wall scroll', about: "Today's plan. Meals, breaks, protected reading and the 1:30 AM bedtime are fixed; the scroll only reads them.",
       go: [["Today's plan · Done for today", 'today:today'], ['🌱 Gentle return', 'settings:gentle'], ['🌤 Sunday', 'company:sunday'], ['⏳ Countdown', 'plan:countdown']] },
-    { id: 'table', name: 'Writing table', hit: [300, 684, 1080, 260], lab: [840, 662], about: 'Lecture tablet, notebook and practice stack. Session minutes are logged as before and never count towards rank or mastery.',
+    { id: 'table', name: 'Writing table', about: 'Resume your session, or begin one. Session minutes are logged as before and never count towards rank or mastery.',
       go: [['✍ Study session', 'study:session'], ['Lectures and homework (Today)', 'today:today'], ['🎯 Practice', 'study:practice'], ['🔁 Revision', 'study:revision'], ['🧠 Recall', 'study:recall'], ['🔬 Tools', 'study:tools']] },
-    { id: 'cabinet', name: 'Gu cabinet', hit: [64, 196, 402, 470], lab: [265, 176], about: 'Your chapter Gu, read from the cultivation record. Plates follow each chapter’s approved skill list.',
-      go: [['📖 Chapters', 'study:chapters'], ['✨ Stickers', 'progress:stickers']] },
-    { id: 'shelf', name: 'Shelf', hit: [1054, 494, 162, 150], lab: [1135, 668], about: 'Notes, PDFs and past working.',
+    { id: 'planner', name: 'Planner (the notebook by the lamp)', about: 'The week and its calendar.', go: [['Planner', 'plan:countdown']] },
+    { id: 'cabinet', name: 'Gu cabinet', about: 'Your chapter Gu and the chapters on their way to one.', go: [['⛰ Gu cabinet', 'study:cultivation'], ['📖 Chapters', 'study:chapters'], ['✨ Stickers', 'progress:stickers']] },
+    { id: 'shelf', name: 'Shelf', about: 'Notes, PDFs and past working.',
       go: [['Saved notes', 'library:savednotes'], ['📚 Notes', 'library:notes'], ['🧪 Methods', 'library:methods'], ['❓ Doubts', 'library:doubts'], ['💭 What it remembers', 'library:memory']] },
-    { id: 'chest', name: 'Storage chest', hit: [90, 734, 262, 150], lab: [220, 714], about: 'Backup and restore, and sync.',
-      go: [['💾 Backup', 'settings:backup'], ['🔄 Sync', 'settings:sync']] },
-    { id: 'door', name: 'Doorway', hit: [1262, 122, 266, 576], lab: [1395, 104], about: 'The journey outside: progress, rank, trials and side paths.',
+    { id: 'chest', name: 'Storage chest', about: 'Settings, backup and sync.', go: [['⚙ Settings', 'settings:companions'], ['💾 Backup', 'settings:backup'], ['🔄 Sync', 'settings:sync']] },
+    { id: 'door', name: 'Doorway', about: 'Progress, rank, trials and side paths.',
       go: [['📈 Overview', 'progress:overview'], ['◆ Five skills', 'progress:skills'], ['↻ This week', 'progress:week'], ['🌙 Patterns', 'progress:patterns'], ['Weak links', 'progress:links'], ['🧾 Report', 'progress:report'],
         ['🌌 Syllabus sky', 'progress:sky'], ['🚀 Voyage', 'progress:voyage'], ['◇ Retention trial', 'progress:trial'], ['⛰ Cultivator rank', 'progress:ranks'], ['🏆 Rank', 'progress:rank'],
         ['🎓 Exams', 'study:exams'], ['📝 Full mock', 'study:paper'], ['📊 Mocks', 'progress:mocks'], ['🔭 Astrophysics course', 'study:astro'], ['Rocket project', 'study:project']] },
-    { id: 'iroha', name: 'Iroha', hit: [826, 396, 208, 250], lab: [930, 376], about: 'Iroha, reading at her table: study help and doubts.',
-      act: [['💬 Talk to Iroha', 'kgdtalk']], go: [['🤝 Study buddy', 'company:buddy'], ['❓ Doubts', 'study:doubts']] },
-    { id: 'kaguya', name: 'Kaguya', hit: [1296, 446, 198, 246], lab: [1395, 424], about: 'Kaguya, at the rail: company and comfort.',
+    { id: 'iroha', name: 'Iroha', about: 'Study help and doubts.', act: [['💬 Talk to Iroha', 'kgdtalk']], go: [['🤝 Study buddy', 'company:buddy'], ['❓ Doubts', 'study:doubts']] },
+    { id: 'kaguya', name: 'Kaguya', about: 'Company and comfort.',
       go: [['🌙 Hang out', 'company:hangout'], ['Sit with me', 'company:sit'], ['🫶 Comfort', 'company:comfort'], ['💭 Memories', 'company:memories'], ['💌 Letters', 'company:letters'], ['💞 Bond', 'progress:bond']] }
   ];
-  // the room menu: settings with no object in the scenery (care stays plain and private)
   const MENU = [['✦ Companions', 'settings:companions'], ['📱 App', 'settings:app'], ['🛟 Support', 'settings:support'], ['👋 Opening greeting', 'settings:greeting'], ['Care · doctor summary', 'settings:doctor']];
   const NOOKS = [[175, 360], [355, 360], [175, 556], [355, 556]];
   const LVN = { none: 0, obtained: 1, learning: 2, proof: 3, proven: 4 };
-  const LEVEL = { none: 'not obtained yet', obtained: 'Obtained', learning: 'Learning', proof: 'Proof passed · retention pending', proven: 'Proven' };
+  const LEVEL = { none: 'On its way', obtained: 'Obtained', learning: 'Learning', proof: 'Proof passed · retention pending', proven: 'Proven' };
   const has = target => { const [p, t] = target.split(':'), S = M && M.SECTIONS; return !S || !S[p] || S[p].some(x => x[0] === t); };
+  const allGu = v => Object.entries((v && v.subjects) || {}).flatMap(([k, s]) => (s.gu || []).map(g => Object.assign({}, g, { subj: k })));
   // plates: one per APPROVED skill. 'r' retained (a later check), 'd' shown independently, 'n' not shown. No approved list: no plates.
   function plates(g) {
     if (!g || !g.skills || !g.skills.length) return [];
     const shown = new Set(((g.refine && g.refine.shown) || []).map(s => s.id)), kept = new Set((g.retention && g.retention.covered) || []);
     return g.skills.map(s => kept.has(s.id) ? 'r' : shown.has(s.id) ? 'd' : 'n');
   }
-  // which Gu rest in the four painted nooks: Basic Mathematics (the painted serpent) first, then the most refined
-  function nooks(v) {
-    const gu = Object.values((v && v.subjects) || {}).flatMap(s => s.gu || []);
-    const bm = gu.find(g => g.name === 'Basic Mathematics'), rest = gu.filter(g => g !== bm).sort((a, b) => (LVN[b.level] - LVN[a.level]) || (b.share - a.share));
-    return (bm ? [bm] : []).concat(rest).slice(0, 4);
+  const studying = g => g.acq !== 'obtained' && (g.done > 0 || g.acq !== 'not-obtained');
+  // the four painted nooks: the Gu you chose to display, then other obtained Gu (most refined first), then chapters on their way
+  function nooks(v, chosen) {
+    const all = allGu(v), ok = all.filter(g => g.acq === 'obtained'), pick = [];
+    for (const k of chosen || []) { const g = ok.find(x => x.key === k); if (g && !pick.some(x => x.key === g.key)) pick.push(g); }
+    const rest = ok.filter(g => !pick.some(x => x.key === g.key)).sort((a, b) => (LVN[b.level] - LVN[a.level]) || (b.share - a.share));
+    const way = all.filter(studying).sort((a, b) => (b.done / (b.lectures || 1)) - (a.done / (a.lectures || 1)));
+    return pick.concat(rest, way).slice(0, 4);
   }
-  const look = g => g.level === 'proven' ? 'proven' : g.level === 'proof' ? 'proof' : plates(g).some(s => s !== 'n') || g.level === 'learning' ? 'partial' : 'obtained';
-  let place = '', gu = '', peek = false;
+  // acquisition (lectures and assigned work) is reported apart from refinement (approved skills and later checks)
+  function acqText(g) {
+    if (g.acq === 'obtained') return 'Gu obtained';
+    return `lectures ${g.done}/${g.lectures} · ${g.scope === 'verified' ? `assigned attempts ${g.attempted}/${g.assigned}` : 'assigned-work checklist not verified yet'}`;
+  }
+  function refineText(g) {
+    if (g.acq !== 'obtained') return 'refinement starts once the Gu is obtained';
+    if (!g.skills) return 'skill list not approved yet, so no plates';
+    const pl = plates(g); return `${pl.filter(s => s !== 'n').length} of ${pl.length} skills shown independently · ${pl.filter(s => s === 'r').length} retained`;
+  }
+  // the one next requirement, and the control that takes it
+  function nextStep(g) {
+    const n = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+    if (g.acq === 'not-obtained') return { t: `Finish ${n(g.lectures - g.done, 'more lecture')} (next: lecture ${g.done + 1} of ${g.lectures}). You can verify the assigned-work checklist meanwhile.`, b: ['Open today’s lectures', 'data-qgo="today:today"'] };
+    if (g.acq === 'scope-unverified') return { t: 'Lectures done. Confirm the assigned-work checklist (TAH/KCLS, KTK, homework, DPP) so the Gu can be obtained.', b: ['Verify the checklist', `data-qdetail="${esc(g.key)}"`] };
+    if (g.acq === 'attempts-open') return { t: `Attempt ${n(g.assigned - g.attempted, 'more assigned item')}. Working or a “stuck at” note counts; help counts for acquisition, not mastery.`, b: ['Record attempts', `data-qdetail="${esc(g.key)}"`] };
+    if (!g.skills) return { t: 'Approve this chapter’s skill list to begin refinement.', b: ['Review the skill list', `data-qdetail="${esc(g.key)}"`] };
+    if (g.level === 'proven') return { t: 'Proven. Nothing is owed, and it never fades.', b: null };
+    if (g.level === 'proof') return { t: 'Retention: ' + ((g.retention && g.retention.note) || 'a later check confirms it') + '. Checks sit inside your Mix-in time.', b: ['Open retention and proof', `data-qdetail="${esc(g.key)}"`] };
+    const left = plates(g).filter(s => s === 'n').length;
+    if (left) return { t: `Show ${n(left, 'more skill')} independently in a study session.`, b: ['Begin studying', 'data-qtable="1"'] };
+    return { t: 'Every skill shown. A proof attempt comes next.', b: ['Open proof', `data-qdetail="${esc(g.key)}"`] };
+  }
+  // the chapter you are working on now: furthest-along chapter still on its way to a Gu
+  const current = v => allGu(v).filter(studying).sort((a, b) => (b.acq !== 'not-obtained') - (a.acq !== 'not-obtained') || (b.done / (b.lectures || 1)) - (a.done / (a.lectures || 1)))[0] || null;
+  function identity(data) {
+    const v = data.v, st = data.st, g = current(v);
+    let rank = { t: 'Rank not placed yet', why: '' };
+    if (R) {
+      const gs = R.gates(v, { earned: st.earned, bank: st.bankDone, b2: st.b2 }), earned = gs.filter(x => x.status === 'earned').pop(), met = gs.find(x => x.status === 'met');
+      if (earned) rank = { t: earned.name, why: '' };
+      else if (met) rank = { t: met.name + ' · ready to accept', why: '' };
+      else rank.why = v.placement === 'not-computed' ? `the catalogue is incomplete for ${(v.why || []).map(x => SUBJ[x] || x).join(', ')}` : v.placement === 'provisional' ? 'the lecture counts in use are not confirmed yet' : '';
+    }
+    return { region: g ? (SUBJ[g.subj] || g.subj) + ' region' : 'Region follows what you study', rank, g };
+  }
   const read = () => { const st = K.readStore(localStorage); return { st, v: K.cultivation(M.L, null, st) }; };
   const btns = p => (p.act || []).map(([l, a]) => `<button class="kl-ghost" data-a="${a}">${esc(l)}</button>`).join('') + (p.go || []).filter(x => has(x[1])).map(([l, t]) => `<button class="kl-ghost" data-a="go" data-v="${t}">${esc(l)}</button>`).join('');
-  function today() {
-    try { const t = window.StudyPlan.templateDay(), c = window.StudyPlan.clk || (m => m);
-      return (t.rows || []).map(r => ({ s: r.s, e: r.e, at: c(r.s), title: r.title, fixed: r.kind !== 'study' })); } catch (e) { return []; }
-  }
-  function placeHTML(p, data) {
-    let extra = '';
-    if (p.id === 'scroll') { const rows = today(); extra = rows.length ? `<ul class="kl-list kq-rows">${rows.map(r => `<li class="${r.fixed ? 'kq-fixed' : ''}"><span class="kl-small">${esc(r.at)}</span> ${esc(r.title)}${r.fixed ? ' <span class="kl-small">· fixed</span>' : ''}</li>`).join('')}</ul><p class="kl-small">To change the day, open Today: the scroll only reads the plan.</p>` : ''; }
-    if (p.id === 'cabinet') extra = cabinetHTML(data);
-    if (p.id === 'door' && R) { const ld = R.land(data.st.earned, data.st.immortals); extra = `<p class="kl-small"><b>Blessed Land</b> · ${ld.unlocked ? 'open (' + esc(ld.why) + ')' : 'locked: ' + esc(ld.why) + '. No upkeep, no decay.'}</p>`; }
-    return `<section class="kl-card kl-stack kq-place" id="kq-place-${p.id}" tabindex="-1"><p class="kl-eyebrow">${esc(p.name.toUpperCase())}</p><p class="kl-small">${esc(p.about)}</p>${extra}<div class="kl-row" style="flex-wrap:wrap">${btns(p)}</div></section>`;
-  }
-  function cabinetHTML(data) {
-    const all = Object.values(data.v.subjects || {}).flatMap(s => s.gu || []);
-    if (!all.length) return '<p class="kl-small">No chapter Gu yet: the catalogue is still being filled in.</p>';
-    return `<ul class="kl-list">${all.map(g => { const pl = plates(g);
-      return `<li class="kl-li"><span><b>${esc(g.name)}</b> · ${esc(LEVEL[g.level] || g.level)}<br><span class="kl-small">${g.skills ? `${pl.filter(s => s !== 'n').length} of ${pl.length} plates lit, ${pl.filter(s => s === 'r').length} retained` : 'skill list not approved yet, so no plates'}${g.planned ? ' · lecture count provisional' : ''}</span></span>
-        <button class="kl-ghost" data-a="qgu" data-k="${esc(g.key)}">Open</button></li>`; }).join('')}</ul>`;
-  }
-  function guHTML(data) {
-    const g = Object.values(data.v.subjects || {}).flatMap(s => s.gu || []).find(x => x.key === gu); if (!g) return '';
-    const pl = plates(g), bm = g.name === 'Basic Mathematics' && g.acq === 'obtained';
-    const names = (g.skills || []).map((s, i) => `<li>${pl[i] === 'r' ? '◆ retained' : pl[i] === 'd' ? '◇ shown independently' : '· not shown yet'} · ${esc(s.name)}</li>`).join('');
-    const next = g.retention && g.retention.next && g.retention.next.length ? `<p class="kl-small">Next check (inside your Mix-in time): ${g.retention.next.length} skill${g.retention.next.length > 1 ? 's' : ''}.</p>` : '';
-    return `<section class="kl-card kl-stack kq-place" id="kq-place-gu" tabindex="-1"><p class="kl-eyebrow">GU · ${esc(g.name.toUpperCase())}</p>
+  const placeHTML = p => `<section class="kl-card kl-stack kq-place" id="kq-place-${p.id}"><p class="kl-eyebrow">${esc(p.name.toUpperCase())}</p><p class="kl-small">${esc(p.about)}</p><div class="kl-row" style="flex-wrap:wrap">${btns(p)}</div></section>`;
+  const nookArt = (nk, labels) => nk.map((g, i) => { const [x, y] = NOOKS[i], ok = g.acq === 'obtained';
+    const art = ok && g.name === 'Basic Mathematics' ? `<g transform="translate(${x} ${y}) scale(.74)">${serpentSVG({ id: 'n' + i + (labels ? 'c' : 'h'), state: look(g), sk: plates(g), labels: ['−2', '1'] })}</g>`
+      : ok ? `<ellipse cx="${x}" cy="${y + 6}" rx="44" ry="16" fill="#9bd3a6" opacity=".35" class="kq-breathe"/><circle cx="${x}" cy="${y}" r="13" fill="#2f7a5c" stroke="#cfe8dc" stroke-width="2"/>`
+      : `<ellipse cx="${x}" cy="${y + 6}" rx="60" ry="20" fill="#cfe8dc" opacity=".16" class="kq-breathe"/><path d="M${x - 40} ${y + 26} h80" stroke="#5a4630" stroke-width="4" stroke-linecap="round" opacity=".7"/><path d="M${x - 40} ${y + 26} h${Math.round(80 * g.done / (g.lectures || 1))}" stroke="#e8c77d" stroke-width="4" stroke-linecap="round"/>`;
+    const name = g.name.length > 22 ? g.name.slice(0, 21) + '…' : g.name, sub = ok ? LEVEL[g.level] : `${g.done}/${g.lectures} lectures`;
+    const plaque = labels ? `<g transform="translate(${x} ${y + 46})"><rect x="-80" y="-10" width="160" height="30" rx="3" fill="#1c0c09" opacity=".78"/><text y="2" font-family="Georgia,serif" font-size="11" fill="#e9d6a6" text-anchor="middle">${esc(name)}</text><text y="15" font-family="Georgia,serif" font-size="9.5" fill="#c9b48a" text-anchor="middle">${esc(sub)}</text></g>` : '';
+    return art + plaque; }).join('');
+  const look = g => g.level === 'proven' ? 'proven' : g.level === 'proof' ? 'proof' : plates(g).some(s => s !== 'n') || g.level === 'learning' ? 'partial' : 'obtained';
+
+  // ---- the Gu cabinet (Study → Cultivation): inspect a chapter Gu, see its real state, take the next step ----
+  let sel = '', peek = false;
+  function guPanel(g) {
+    if (!g) return '<p class="kl-small">Choose a Gu or a chapter on its way, in the cabinet or the collection below.</p>';
+    const pl = plates(g), bm = g.name === 'Basic Mathematics' && g.acq === 'obtained', nx = nextStep(g);
+    return `<div class="kl-stack kqc-gu" id="kqc-gu" tabindex="-1"><p class="kl-eyebrow">${esc((SUBJ[g.subj] || '').toUpperCase())} · ${esc(g.name.toUpperCase())}</p>
       ${bm ? `<svg viewBox="-130 -70 260 130" class="kq-gu-art" role="img" aria-label="Wave-Sign Serpent, ${esc(LEVEL[g.level])}">${serpentSVG({ id: 'close', state: look(g), sk: pl, labels: ['−2', '1'] })}</svg>
         <p class="kl-small">An illustrative sign diagram for the sample (x − 1)/(x + 2), not a graph: only the side of the gold line matters. At −2 the expression is undefined (open ring, a gap in the body); at 1 it is zero (filled bead).</p>` : ''}
-      <p><b>${esc(LEVEL[g.level] || g.level)}</b> · ${esc(g.acq === 'obtained' ? 'lectures and checklist done' : g.acq === 'not-obtained' ? `lectures ${g.done}/${g.lectures}` : g.acq === 'scope-unverified' ? 'lectures done · checklist not yet verified' : 'assigned items still to attempt')}</p>
-      ${g.skills ? `<ul class="kl-list">${names}</ul>` : '<p class="kl-small">No plates until you approve this chapter’s skill list.</p>'}${next}
-      <p class="kl-small">Photo checks open in Details and stay labelled Provisional AI assessment (Iroha). Plates turn gold only through the existing later-check rule; nothing fades.</p>
-      <div class="kl-row" style="flex-wrap:wrap"><button data-a="qdetail" data-k="${esc(g.key)}">Checklist, skills and proof</button><button class="kl-ghost" data-a="cpropose" data-k="${esc(g.key)}">Propose from my logged questions</button><button class="kl-ghost" data-a="qgu" data-k="">Back to the cabinet</button></div></section>`;
+      <p><b>${esc(LEVEL[g.level])}</b>${g.planned ? ' <span class="kl-small">· lecture count provisional</span>' : ''}</p>
+      <p class="kl-small"><b>Acquisition</b> · ${esc(acqText(g))}</p><p class="kl-small"><b>Refinement</b> · ${esc(refineText(g))}</p>
+      ${g.skills && g.acq === 'obtained' ? `<ul class="kl-list kqc-sk">${g.skills.map((s, i) => `<li>${pl[i] === 'r' ? '◆ retained' : pl[i] === 'd' ? '◇ shown' : '· not shown yet'} · ${esc(s.name)}</li>`).join('')}</ul>` : ''}
+      <p class="kqc-next"><b>Next:</b> ${esc(nx.t)}</p>
+      <div class="kl-row" style="flex-wrap:wrap">${nx.b ? `<button ${nx.b[1]}>${esc(nx.b[0])}</button>` : ''}<button class="kl-ghost" data-qdetail="${esc(g.key)}">Checklist, skills and proof</button><button class="kl-ghost" data-a="cpropose" data-k="${esc(g.key)}">Propose from my logged questions</button></div>
+      <p class="kl-small">Photo checks stay labelled Provisional AI assessment (Iroha). Plates turn gold only through the later retention check; nothing fades.</p></div>`;
   }
-  const nookArt = (nk, p) => nk.map((g, i) => { const [x, y] = NOOKS[i], ok = g.acq === 'obtained';
-        const art = ok && g.name === 'Basic Mathematics' ? `<g transform="translate(${x} ${y}) scale(.74)">${serpentSVG({ id: 'n' + i, state: look(g), sk: plates(g), labels: ['−2', '1'] })}</g>`
-          : ok ? `<ellipse cx="${x}" cy="${y + 6}" rx="44" ry="16" fill="#9bd3a6" opacity=".35" class="kq-breathe"/><circle cx="${x}" cy="${y}" r="13" fill="#2f7a5c" stroke="#cfe8dc" stroke-width="2"/>`
-          : `<ellipse cx="${x}" cy="${y + 6}" rx="60" ry="20" fill="#cfe8dc" opacity=".18" class="kq-breathe"/>${p.labels ? `<text x="${x}" y="${y - 10}" font-family="Georgia,serif" font-style="italic" font-size="11" fill="#cdbb95" text-anchor="middle" opacity=".8">resting place, waiting</text>` : ''}`;
-        const plaque = p.labels ? `<g transform="translate(${x} ${y + 44})"${ok ? '' : ' opacity=".75"'}><rect x="${-Math.min(80, g.name.length * 3.4 + 10)}" y="-9" width="${Math.min(160, g.name.length * 6.8 + 20)}" height="16" rx="3" fill="#1c0c09" opacity=".72"/><text y="3" font-family="system-ui,sans-serif" font-size="11" fill="#e9d6a6" text-anchor="middle">${esc(g.name.length > 22 ? g.name.slice(0, 21) + '…' : g.name)}</text></g>` : '';
-        return art + plaque; }).join('');
-  function roomSVG(p, data) {
-    const A = 'quarters/', rows = p.content ? today() : [], now = (() => { const n = new Date(); let m = n.getHours() * 60 + n.getMinutes(); return m < 240 ? m + 1440 : m; })();
-    const study = rows.filter(r => !r.fixed), left = study.filter(r => r.e > now).length, done = study.length ? (study.length - left) / study.length : 0;
-    const nk = p.gu ? nooks(data.v) : [];
-    const hot = (id, x, y, w, h, label, name, lab, extra) => `<g class="kq-hot" data-a="${extra ? 'qgu' : 'qplace'}" data-${extra ? 'k' : 'v'}="${esc(id)}" tabindex="0" role="button" aria-label="${esc(label)}">
-      <rect class="kq-hit" x="${x}" y="${y}" width="${w}" height="${h}"/><rect class="kq-ring" x="${x - 5}" y="${y - 5}" width="${w + 10}" height="${h + 10}" rx="6"/>
-      ${p.labels && lab ? `<g transform="translate(${lab[0]} ${lab[1]})"><rect class="kq-lbg" x="${-name.length * 5.4 - 16}" y="-20" width="${name.length * 10.8 + 32}" height="36" rx="18"/><text class="kq-ltx" text-anchor="middle" y="6">${esc(name)}</text></g>` : ''}</g>`;
-    return `<svg class="kq-svg" viewBox="28 120 1464 880" preserveAspectRatio="xMidYMid slice" role="group" aria-label="Your quarters">
-      <image href="${A}room-plate.webp" x="0" y="-120" width="1600" height="1380"/>
-      ${p.chars ? `<image class="kq-breathe" href="${A}iroha-desk.webp" x="861" y="398" width="138" height="230"/><image class="kq-breathe" style="animation-delay:-2s" href="${A}kaguya-still.webp" x="1300" y="450" width="190" height="215"/>` : ''}
-      <image href="${A}front-iroha-table.webp" x="826" y="518" width="216" height="134"/><image href="${A}front-rail.webp" x="1266" y="616" width="260" height="86"/>
-      ${p.content ? `<g font-family="Georgia,serif" text-anchor="middle"><text x="1144" y="176" font-size="13" fill="#5a4630">today</text>
-        <g stroke="#6c5a44" stroke-width="2" opacity=".75">${study.slice(0, 5).map((r, i) => `<line x1="1114" y1="${204 + i * 22}" x2="${1160 + (i * 7) % 16}" y2="${204 + i * 22}"${r.e <= now ? ' opacity=".35"' : ''}/>`).join('')}</g>
-        ${rows.filter(r => r.fixed).slice(0, 3).map((r, i) => `<rect x="1112" y="${318 + i * 22}" width="64" height="12" rx="2" fill="#a2432f" opacity="${.85 - i * .1}"/>`).join('')}</g>
-        <g><path d="M586 724 L616 743 L586 762Z" fill="#e8dcbc" opacity=".9"/><rect x="546" y="776" width="104" height="4" fill="#4f6d70"/><rect x="546" y="776" width="${Math.round(104 * done)}" height="4" fill="#e8c77d"/></g>` : ''}
-      ${nookArt(nk, p)}
-      ${PLACES.map(q => hot(q.id, ...q.hit, q.name + ': ' + q.about, q.name, q.lab)).join('')}
-      ${nk.map((g, i) => hot(g.key, NOOKS[i][0] - 80, NOOKS[i][1] - 50, 160, 90, g.name + ' Gu, ' + (LEVEL[g.level] || ''), '', null, true)).join('')}
-    </svg>`;
+  function cabinetView(p) {
+    const data = read(), all = allGu(data.v), nk = p.gu ? nooks(data.v, p.shown) : [], g = all.find(x => x.key === sel) || null, id = identity(data);
+    const ident = `<div class="kqc-id"><span>${esc(id.region)}</span><span>${esc(id.rank.t)}${id.rank.why ? ': ' + esc(id.rank.why) + ` <button class="kl-ghost kqc-link" data-qsetup="1">Resolve</button>` : ''}</span>${id.g ? `<span>Now: <button class="kl-ghost kqc-link" data-qsel="${esc(id.g.key)}">${esc(id.g.name)}</button> · ${esc(acqText(id.g))}</span>` : ''}</div>`;
+    const art = p.simplify ? '' : `<svg class="kqc-art" viewBox="52 150 430 560" role="group" aria-label="The four display nooks of your Gu cabinet">
+      <image href="quarters/room-plate.webp" x="0" y="-120" width="1600" height="1380"/>${nookArt(nk, true)}
+      ${nk.map((x, i) => `<g class="kq-hot" data-qsel="${esc(x.key)}" tabindex="0" role="button" aria-label="${esc(x.name)}: ${esc(x.acq === 'obtained' ? LEVEL[x.level] : acqText(x))}"><rect class="kq-hit" x="${NOOKS[i][0] - 82}" y="${NOOKS[i][1] - 70}" width="164" height="150"/><rect class="kq-ring" x="${NOOKS[i][0] - 86}" y="${NOOKS[i][1] - 74}" width="172" height="158" rx="6"/></g>`).join('')}</svg>`;
+    const shown = nk.map(x => x.key);
+    const row = x => `<li class="kl-li${x.key === sel ? ' kqc-on' : ''}"><span><b>${esc(x.name)}</b> · ${esc(LEVEL[x.level])}<br><span class="kl-small">${esc(acqText(x))}${x.acq === 'obtained' ? ' · ' + esc(refineText(x)) : ''}</span></span>
+      <span class="kl-row"><button class="kl-ghost" data-qsel="${esc(x.key)}" aria-pressed="${x.key === sel}">Inspect</button>${x.acq === 'obtained' ? `<button class="kl-ghost" data-qshow="${esc(x.key)}" aria-pressed="${shown.includes(x.key)}">${shown.includes(x.key) ? 'On display' : 'Display'}</button>` : ''}</span></li>`;
+    const subjects = Object.keys(SUBJ).filter(k => all.some(x => x.subj === k));
+    return `<section class="kl-card kl-stack kqc"><div class="kl-row" style="justify-content:space-between;flex-wrap:wrap"><p class="kl-eyebrow">⛰ GU CABINET</p><button class="kl-ghost" data-qgo="today:today">← Back to the quarters</button></div>${ident}
+      <div class="kqc-grid">${art}${guPanel(g)}</div></section>
+      <section class="kl-card kl-stack"><p class="kl-eyebrow">THE WHOLE COLLECTION</p><p class="kl-small">Choose up to four obtained Gu to display in the nooks. Chapters on their way fill empty nooks with their progress.</p>
+      ${subjects.map(k => `<details${g && g.subj === k || !g ? ' open' : ''}><summary><b>${SUBJ[k]}</b> · ${all.filter(x => x.subj === k && x.acq === 'obtained').length} obtained of ${all.filter(x => x.subj === k).length}</summary><ul class="kl-list">${all.filter(x => x.subj === k).map(row).join('')}</ul></details>`).join('') || '<p class="kl-small">No chapters catalogued yet.</p>'}</section>
+      <section class="kl-card kl-stack"><details><summary><b>How cultivation works</b></summary><p class="kl-small">A Gu is obtained when all its lectures are done and every item on its verified assigned-work checklist has a genuine attempt (working, or a “stuck at” note; help counts for acquisition, never for mastery). Refinement follows the chapter’s approved skill list: shown independently, then a proof, then a later retention check. Study minutes never count towards rank or mastery. Ranks are fixed milestones and permanent once earned. Blessed Land opens at Rank 4 or with your first Immortal Gu. Nothing has upkeep or decays, and rest days never create debt.</p></details>
+      <div class="kl-row" style="flex-wrap:wrap"><button class="kl-ghost" data-qsetup="1">Records, sources and catalogue setup</button><button class="kl-ghost" data-a="go" data-v="progress:ranks">⛰ Cultivator rank</button></div>
+      <details><summary><b>Room settings</b></summary><div class="kl-row" style="flex-wrap:wrap">${[['home', 'Painted home room'], ['showLabels', 'Always show labels'], ['gu', 'Gu in the room'], ['still', 'Reduced motion'], ['simplify', 'Simplify']].map(([k, l]) => `<button class="kl-ghost" data-qpref="${k}" aria-pressed="${!!p[k]}">${l}</button>`).join('')}</div>
+        <p class="kl-small">Settings with no object in the room:</p><div class="kl-row" style="flex-wrap:wrap">${MENU.filter(x => has(x[1])).map(([l, t]) => `<button class="kl-ghost" data-a="go" data-v="${t}">${esc(l)}</button>`).join('')}</div></details></section>
+      ${p.simplify ? PLACES.map(placeHTML).join('') : ''}`;
   }
-  const toggles = p => [['home', 'Painted home room'], ['labels', 'Labels'], ['chars', 'Characters'], ['gu', 'Gu'], ['content', 'Study content'], ['still', 'Reduced motion'], ['simplify', 'Simplify']]
-    .map(([k, l]) => `<button class="kl-ghost" data-a="qpref" data-v="${k}" aria-pressed="${!!p[k]}">${l}</button>`).join('');
-  function quarters(p) {
-    const data = read(), P = PLACES.find(x => x.id === place);
-    const head = `<section class="kl-card kl-stack"><p class="kl-eyebrow">⛰ YOUR QUARTERS · PREVIEW</p><p class="kl-small">A way into the desk you already have: every place opens the same page or action as the tabs. Nothing here changes your record.</p>
-      <div class="kl-row" style="flex-wrap:wrap">${toggles(p)}<button class="kl-ghost" data-a="qpref" data-v="on">Classic list</button></div>
-      <details class="kl-small"><summary>Menu: settings without a place in the room</summary><div class="kl-row" style="flex-wrap:wrap">${MENU.filter(x => has(x[1])).map(([l, t]) => `<button class="kl-ghost" data-a="go" data-v="${t}">${esc(l)}</button>`).join('')}</div></details></section>`;
-    if (p.simplify) return head + PLACES.map(q => placeHTML(q, data)).join('') + (gu ? guHTML(data) : '');
-    return head + `<div class="kq-wrap${p.still ? ' kq-still' : ''}"><div class="kq-room">${roomSVG(p, data)}</div></div>` + (gu ? guHTML(data) : P ? placeHTML(P, data) : '<p class="kl-small">Tap a place in the room.</p>');
+  // the session the writing table opens: an unfinished timer, an unfinished guided session, or the session entry
+  function sessionState() {
+    let a = null; try { a = (JSON.parse(localStorage.getItem('ame-habit-v1') || '{}') || {}).active || null; } catch (e) {}
+    if (a && a.phase !== 'done') return { kind: 'timer', label: 'Resume session', a };
+    const f = M && M.L && M.L.flow; if (f && f.step && f.step !== 'goal') return { kind: 'flow', label: 'Resume guided session' };
+    return { kind: 'none', label: 'Begin studying' };
   }
-  window.KgQuarters = { PLACES, MENU, plates, nooks, look, prefs, KEY, quarters: () => quarters(prefs()), targets: () => PLACES.flatMap(p => (p.go || []).map(x => x[1])).concat(MENU.map(x => x[1])) };
+  function toTable() { const s = sessionState(); if (s.kind === 'timer' && M.ACTIONS.go) return M.ACTIONS.go({ dataset: { v: 'resume' } }); M.go('study', 'session'); }
+  window.KgQuarters = { PLACES, MENU, plates, nooks, look, prefs, KEY, acqText, refineText, nextStep, identity, current, sessionState, cabinet: () => cabinetView(prefs()),
+    targets: () => PLACES.flatMap(p => (p.go || []).map(x => x[1])).concat(MENU.map(x => x[1])) };
   if (!M || !M.PANELS || !K) return;
   const base = M.PANELS.cultivation;
-  M.PANELS.cultivation = () => { const p = prefs(); if (!p.on || peek) return `<section class="kl-card kl-row"><button class="kl-ghost" data-a="qpref" data-v="${p.on ? 'peek' : 'on'}">${p.on ? '⛰ Back to the quarters' : '⛰ Open the quarters (preview)'}</button></section>` + base(); return quarters(p); };
-  const focus = id => requestAnimationFrame(() => { const el = document.getElementById(id); if (el) { el.scrollIntoView({ block: 'nearest', behavior: prefs().still || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); el.focus({ preventScroll: true }); } });
-  M.ACTIONS.qpref = b => { const p = prefs(), k = b.dataset.v; if (k === 'peek') peek = false; else p[k] = !p[k]; if (k === 'on') { peek = false; place = ''; gu = ''; } localStorage.setItem(KEY, JSON.stringify(p)); M.render(); if (k === 'home') mountHome(); };
-  M.ACTIONS.qplace = b => { place = place === b.dataset.v ? '' : b.dataset.v; gu = ''; M.render(); if (place) focus('kq-place-' + place); };
-  M.ACTIONS.qgu = b => { gu = b.dataset.k || ''; if (!gu) place = 'cabinet'; M.render(); focus(gu ? 'kq-place-gu' : 'kq-place-cabinet'); };
-  M.ACTIONS.qdetail = b => { peek = true; if (K.setOpen) K.setOpen(b.dataset.k); M.render(); };
+  M.PANELS.cultivation = () => peek ? `<section class="kl-card kl-row"><button class="kl-ghost" data-qback="1">← Back to the Gu cabinet</button></section>` + base() : cabinetView(prefs());
+  const focusEl = id => requestAnimationFrame(() => { const el = document.getElementById(id); if (el) { el.scrollIntoView({ block: 'nearest', behavior: prefs().still || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); el.focus({ preventScroll: true }); } });
+  const toCabinet = () => { if (document.body.classList.contains('kg-sec-study') && document.querySelector('.kl-tabs [data-v="cultivation"][aria-current="page"]')) M.render(); else M.go('study', 'cultivation'); };
+  // one listener for every quarters control, inside or outside the lab
+  document.addEventListener('click', e => {
+    const t = e.target.closest && e.target.closest('[data-qgo],[data-qsel],[data-qshow],[data-qdetail],[data-qsetup],[data-qback],[data-qpref],[data-qtable],[data-qpause],[data-qlabels]'); if (!t) return;
+    e.preventDefault(); const d = t.dataset;
+    if (d.qgo) { const [a, b] = d.qgo.split(':'); return M.go(a, b); }
+    if (d.qtable) return toTable();
+    if (d.qsel != null) { sel = d.qsel; peek = false; toCabinet(); return focusEl('kqc-gu'); }
+    if (d.qshow) { const p = prefs(), s = (p.shown || []).filter(k => k !== d.qshow); p.shown = s.length === (p.shown || []).length ? [d.qshow].concat(s).slice(0, 4) : s; save(p); M.render(); return; }
+    if (d.qdetail) { peek = true; if (K.setOpen) K.setOpen(d.qdetail); return toCabinet(); }
+    if (d.qsetup) { peek = true; if (K.setOpen) K.setOpen(''); return toCabinet(); }
+    if (d.qback) { peek = false; return M.render(); }
+    if (d.qpref) { const p = prefs(); p[d.qpref] = !p[d.qpref]; save(p); M.render(); return mountHome(); }
+    if (d.qlabels) { const p = prefs(); p.showLabels = !p.showLabels; save(p); return mountHome(); }
+    if (d.qpause) { const b = document.querySelector('#hb-session-card [data-action="pause"]'); if (b) b.click(); else toTable(); for (const ms of [80, 400, 1200]) setTimeout(() => { actAt = 0; clockTick(); }, ms); }
+  });
   document.addEventListener('keydown', e => { const t = e.target; if ((e.key === 'Enter' || e.key === ' ') && t && t.classList && t.classList.contains('kq-hot')) { e.preventDefault(); t.dispatchEvent(new MouseEvent('click', { bubbles: true })); } });
-  const css = document.createElement('style');
-  css.textContent = `.kq-wrap{overflow-x:auto;border-radius:14px;background:#140b08}.kq-room{min-width:640px}.kq-svg{display:block;width:100%;height:auto;aspect-ratio:1464/880}
-    .kq-hit{fill:transparent;cursor:pointer}.kq-ring{fill:none;stroke:#f5d27a;stroke-width:3;opacity:0}.kq-hot:hover .kq-ring,.kq-hot:focus .kq-ring,.kq-hot:focus-visible .kq-ring{opacity:.9}.kq-hot:focus{outline:none}
-    .kq-lbg{fill:#1c0c09;opacity:.78}.kq-ltx{fill:#f5e9c8;font:600 18px system-ui,sans-serif}.kq-breathe{animation:kq-br 6s ease-in-out infinite}@keyframes kq-br{50%{opacity:.82}}
-    .kq-still .kq-breathe{animation:none}@media (prefers-reduced-motion:reduce){.kq-breathe{animation:none}}.kq-gu-art{width:100%;max-width:420px;height:auto;display:block;margin:auto;background:#1a120d;border-radius:12px}
-    .kq-rows li.kq-fixed{opacity:.8}.kq-rows li{list-style:none}`;
-  document.head.appendChild(css);
-  // ---- home: the desk's room (Today) becomes the painted quarters. The live companions, clock, flight plan, Start button
-  // and room bar stay; only the drawn space-station backdrop, doors and desk are swapped for the painting. ----
+
+  // ---- home: the desk's room is the painted quarters. The live companions, room bar and visor stay. ----
+  // [data attribute, value, name, hit area, label position]; nooks are added from the record
   const HOME = [
-    ['kv', 'today', "Today's schedule", [1080, 112, 124, 370], [1142, 452]], ['kv', 'plan', 'Planner', [600, 150, 330, 230], [765, 300]],
-    ['kv', 'progress', 'Progress', [1262, 122, 266, 320], [1395, 330]], ['kv', 'library', 'Library', [1054, 494, 162, 150], [1135, 580]],
-    ['qgo', 'study:cultivation', 'Gu cabinet', [64, 196, 402, 470], [265, 222]], ['kv', 'study', 'Study', [300, 684, 1080, 260], [700, 700]],
-    ['qgo', 'settings:backup', 'Settings', [90, 734, 262, 150], [220, 820]], ['kv', 'company', 'Company', [1266, 460, 260, 240], [1395, 640]]];
+    ['kv', 'today', "Today's schedule · wall scroll", [1080, 112, 124, 370], [1142, 300]],
+    ['kv', 'progress', 'Progress · doorway', [1262, 122, 266, 320], [1395, 300]], ['kv', 'library', 'Library · shelf', [1054, 494, 162, 150], [1135, 560]],
+    ['qgo', 'study:cultivation', 'Gu cabinet', [64, 196, 402, 470], [265, 222]], ['qtable', '1', 'Begin studying · writing table', [300, 684, 1080, 260], [700, 700]],
+    ['kv', 'plan', 'Planner · notebook', [1062, 802, 132, 82], [1128, 790]],
+    ['qgo', 'settings:companions', 'Settings · storage chest', [90, 734, 262, 150], [220, 820]], ['kv', 'company', 'Company', [1266, 460, 260, 240], [1395, 640]]];
+  const lab = (name, [x, y]) => `<g class="kqp-lab" transform="translate(${x} ${y})"><rect class="kq-lbg" x="${-name.length * 5.2 - 16}" y="-20" width="${name.length * 10.4 + 32}" height="36" rx="18"/><text class="kq-ltx" text-anchor="middle" y="6">${esc(name)}</text></g>`;
   function homeSVG(p, data) {
-    const nk = p.gu ? nooks(data.v) : [];
-    return `<svg class="kqp-home" viewBox="28 92 1464 908" preserveAspectRatio="xMidYMid slice" role="group" aria-label="Your quarters: tap a place to open it">
+    const nk = p.gu ? nooks(data.v, p.shown) : [], ss = sessionState();
+    const hot = (attr, name, [x, y, w, h], l, short) => `<g class="kq-hot" ${attr} tabindex="0" role="button" aria-label="${esc(name)}"><rect class="kq-hit" x="${x}" y="${y}" width="${w}" height="${h}"/><rect class="kq-ring" x="${x - 5}" y="${y - 5}" width="${w + 10}" height="${h + 10}" rx="6"/>${l ? lab(short || name, l) : ''}</g>`;
+    return `<svg class="kqp-home${p.showLabels ? ' kqp-labels' : ''}${p.still ? ' kq-still' : ''}" viewBox="28 92 1464 908" preserveAspectRatio="xMidYMid slice" role="group" aria-label="Your quarters: each object opens part of the desk">
       <image href="quarters/room-plate.webp" x="0" y="-120" width="1600" height="1380"/>
-      ${nookArt(nk, Object.assign({}, p, { labels: false }))}
-      ${HOME.map(([k, v, name, [x, y, w, h], lab]) => `<g class="kq-hot" data-${k}="${v}" tabindex="0" role="button" aria-label="${esc(name)}"><rect class="kq-hit" x="${x}" y="${y}" width="${w}" height="${h}"/><rect class="kq-ring" x="${x - 5}" y="${y - 5}" width="${w + 10}" height="${h + 10}" rx="6"/>
-        ${p.labels ? `<g transform="translate(${lab[0]} ${lab[1]})"><rect class="kq-lbg" x="${-name.length * 5.4 - 16}" y="-20" width="${name.length * 10.8 + 32}" height="36" rx="18"/><text class="kq-ltx" text-anchor="middle" y="6">${esc(name)}</text></g>` : ''}</g>`).join('')}
+      ${nookArt(nk, false)}
+      ${HOME.map(([k, v, name, r, l]) => k === 'qtable' ? hot(`data-qtable="1" id="kqp-table"`, ss.label + ' · writing table', r, l) : hot(`data-${k}="${v}"`, name, r, l)).join('')}
+      ${nk.map((g, i) => hot(`data-qsel="${esc(g.key)}"`, `${g.name}: ${g.acq === 'obtained' ? LEVEL[g.level] : acqText(g)}`, [NOOKS[i][0] - 82, NOOKS[i][1] - 70, 164, 150], [NOOKS[i][0], NOOKS[i][1] - 78], g.name.length > 20 ? g.name.slice(0, 19) + '…' : g.name)).join('')}
     </svg><svg class="kqp-front" viewBox="28 92 1464 908" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       <image href="quarters/front-iroha-table.webp" x="826" y="518" width="216" height="134"/><image href="quarters/front-rail.webp" x="1266" y="616" width="260" height="86"/></svg>`;
   }
+  // a restrained identification plaque: region, rank (or what placement still needs) and the chapter you are on
+  function idHTML(data) {
+    const id = identity(data);
+    return `<div class="kqp-id" aria-label="Your cultivation"><b>${esc(id.region)}</b><span>${esc(id.rank.t)}${id.rank.why ? ` · <button data-qsetup="1" title="${esc(id.rank.why)}">what's missing</button>` : ''}</span>
+      ${id.g ? `<button class="kqp-now" data-qsel="${esc(id.g.key)}">${esc(id.g.name)} · ${esc(id.g.acq === 'not-obtained' ? `${id.g.done}/${id.g.lectures} lectures` : nextStep(id.g).b ? nextStep(id.g).b[0] : LEVEL[id.g.level])}</button>` : ''}</div>`;
+  }
+  const guide = p => `<details class="kqp-guide"><summary>Room guide</summary><div>${HOME.map(([k, v, name]) => k === 'qtable' ? `<button data-qtable="1">${esc(sessionState().label)}</button>` : `<button data-${k}="${v}">${esc(name)}</button>`).join('')}
+    <button data-qlabels="1" aria-pressed="${!!p.showLabels}">${p.showLabels ? 'Hide labels' : 'Show labels'}</button></div></details>`;
   let homeHTML = '';
   function mountHome() {
     const scene = document.getElementById('kg-scene'), stage = scene && scene.querySelector('.kq-stage'); if (!stage) return;
-    const p = prefs(), old = stage.querySelector('.kqp-home'), front = stage.querySelector('.kqp-front');
-    stage.classList.toggle('kqp-painted', !!p.home); scene.classList.toggle('kqp-on', !!p.home);
-    if (!p.home) { if (old) old.remove(); if (front) front.remove(); homeHTML = ''; return; }
-    let h = ''; try { h = homeSVG(p, read()); } catch (e) { return; }
-    if (old && h === homeHTML) return;
-    homeHTML = h; if (old) old.remove(); if (front) front.remove(); stage.insertAdjacentHTML('afterbegin', h);
+    const p = prefs(), on = p.home && !p.simplify, parts = ['.kqp-home', '.kqp-front', '.kqp-id', '.kqp-guide', '.kqp-clock'].map(s => stage.querySelector(s));
+    stage.classList.toggle('kqp-painted', on); scene.classList.toggle('kqp-on', on); document.body.classList.toggle('kqp-theme', on); document.documentElement.classList.toggle('kqp-theme', on);
+    if (!on) { parts.forEach(x => x && x.remove()); homeHTML = ''; return; }
+    let data, h = ''; try { data = read(); h = homeSVG(p, data) + idHTML(data) + guide(p); } catch (e) { return; }
+    if (parts[0] && h === homeHTML) return;
+    const open = parts[3] && parts[3].open;
+    homeHTML = h; parts.forEach(x => x && x.remove()); stage.insertAdjacentHTML('afterbegin', h + '<div class="kqp-clock" role="status" aria-live="off"></div>');
+    if (open) stage.querySelector('.kqp-guide').open = true;
+    clockTick();
+  }
+  // ---- the clock: quiet planner status in free time and reading; an explicit session timer with pause/resume while studying ----
+  let act = null, actAt = 0;
+  const mm = ms => { const s = Math.max(0, Math.round(ms / 1000)), h = Math.floor(s / 3600); return (h ? h + ':' + String(Math.floor(s % 3600 / 60)).padStart(2, '0') : Math.floor(s / 60)) + ':' + String(s % 60).padStart(2, '0'); };
+  const hm = m => { m = ((m % 1440) + 1440) % 1440; const h = Math.floor(m / 60); return `${h % 12 || 12}:${String(m % 60).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
+  function planRow() {
+    try { const n = new Date(); let m = n.getHours() * 60 + n.getMinutes(); if (m < 240) m += 1440;
+      const rows = (window.StudyPlan.templateDay().rows || []); return rows.find(r => r.s <= m && r.e > m) || null; } catch (e) { return null; }
+  }
+  function clockTick() {
+    const el = document.querySelector('.kqp-clock'); if (!el) return;
+    if (Date.now() - actAt > 4000) { const s = sessionState(); act = s.kind === 'timer' ? s.a : null; actAt = Date.now(); }
+    const r = planRow(), plan = r ? `Planner · ${esc(String(r.title).split(' · ')[0])} until ${hm(r.e)}` : 'Planner · nothing scheduled now';
+    let html;
+    if (act) {
+      const a = act, el2 = a.accruedMs + (a.running ? Math.max(0, Date.now() - (a.lastStart || Date.now())) : 0), t = a.open ? el2 : Math.max(0, (a.targetMs || 0) - el2);
+      html = `<div class="kqp-sess"><span class="kqp-k">Session timer · ${esc(a.subject || 'study')}${a.running ? '' : ' · paused'}</span><b>${mm(t)}</b><button data-qpause="1">${a.running ? 'Pause' : 'Resume'}</button></div><span class="kqp-plan">${plan}</span>`;
+    } else if (r && r.kind === 'study') html = `<span class="kqp-plan">${plan}</span><button class="kqp-begin" data-qtable="1">Begin studying</button>`;
+    else html = `<span class="kqp-quiet">${r ? esc(String(r.title).split(' · ')[0]) + ' · until ' + hm(r.e) : 'Free time'}</span>`;
+    if (el.innerHTML !== html) el.innerHTML = html;
+    el.classList.toggle('kqp-live', !!act);
+    const tb = document.getElementById('kqp-table'); if (tb) { const l = sessionState().label + ' · writing table'; if (tb.getAttribute('aria-label') !== l) tb.setAttribute('aria-label', l); }
+  }
+  // ---- speech: shown briefly when a companion says something new, or when you point at them ----
+  const sayTimers = {};
+  function say(w, ms = 9000) { const sc = document.getElementById('kg-scene'); if (!sc) return; sc.classList.add('kqp-say-' + w); clearTimeout(sayTimers[w]); sayTimers[w] = setTimeout(() => sc.classList.remove('kqp-say-' + w), ms); }
+  function wireSpeech() {
+    for (const w of ['i', 'k']) {
+      const b = document.getElementById('kgs-say-' + w), who = document.getElementById('kgs-who-' + w);
+      if (b && !b.__kq) { b.__kq = 1; new MutationObserver(() => say(w)).observe(b, { childList: true, characterData: true, subtree: true }); }
+      if (who && !who.__kq) { who.__kq = 1; for (const ev of ['mouseenter', 'focus']) who.addEventListener(ev, () => say(w, 6000)); }
+    }
   }
   window.KgQuarters.HOME = HOME; window.KgQuarters.homeSVG = p => homeSVG(Object.assign({}, DEF, p), read());
-  document.addEventListener('click', e => { const g = e.target.closest && e.target.closest('[data-qgo]'); if (!g) return; e.preventDefault(); const [a, b] = g.dataset.qgo.split(':'); M.go(a, b); });
-  addEventListener('moonlab:render', () => setTimeout(mountHome, 60));
-  M.ACTIONS.qhome = () => mountHome();
-  const css2 = document.createElement('style');
-  css2.textContent = `.kq-stage.kqp-painted>.kq-bg,.kq-stage.kqp-painted>.kq-port,.kq-stage.kqp-painted>.kq-door,.kq-stage.kqp-painted>.kq-desk,.kq-stage.kqp-painted>.kv-spot{display:none}
+  addEventListener('moonlab:render', () => setTimeout(() => { mountHome(); const kb = document.querySelector('.kv-back'); if (kb && document.body.classList.contains('kqp-theme')) kb.textContent = '← Back to the quarters'; }, 60));
+  setInterval(() => { if (!document.hidden) clockTick(); }, 1000);
+  const css = document.createElement('style');
+  css.textContent = `.kq-hit{fill:transparent;cursor:pointer}.kq-ring{fill:none;stroke:#f5d27a;stroke-width:3;opacity:0}.kq-hot:hover .kq-ring,.kq-hot:focus .kq-ring,.kq-hot:focus-visible .kq-ring{opacity:.9}.kq-hot:focus{outline:none}
+    .kq-lbg{fill:#1c0c09;opacity:.82}.kq-ltx{fill:#f5e9c8;font:600 18px Georgia,serif}.kq-breathe{animation:kq-br 6s ease-in-out infinite}@keyframes kq-br{50%{opacity:.82}}
+    .kq-still .kq-breathe{animation:none}@media (prefers-reduced-motion:reduce){.kq-breathe{animation:none}}
+    .kq-gu-art{width:100%;max-width:420px;height:auto;display:block;margin:auto;background:#1a120d;border-radius:12px}
+    .kqc-grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:16px;align-items:start}.kqc-art{width:100%;height:auto;display:block;border-radius:12px;background:#1a0f0a}
+    @media(max-width:720px){.kqc-grid{grid-template-columns:1fr}}
+    .kqc-id{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;opacity:.92}.kqc-id>span{white-space:normal}.kqc-link{padding:2px 8px!important;min-height:0!important;font-size:12px!important}
+    .kqc-next{padding:8px 10px;border-left:3px solid #e8c77d;background:rgba(232,199,125,.08);border-radius:4px}.kqc-on{outline:1px solid rgba(232,199,125,.5);border-radius:6px}.kqc-sk li{list-style:none}
     .kqp-home{position:absolute;inset:0;width:100%;height:100%;z-index:1;display:block}.kqp-home .kq-ltx{font-size:20px}
+    .kqp-lab{opacity:0;transition:opacity .2s;pointer-events:none}.kq-hot:hover .kqp-lab,.kq-hot:focus .kqp-lab,.kqp-labels .kqp-lab{opacity:1}
     .kqp-front{position:absolute;inset:0;width:100%;height:100%;z-index:4;display:block;pointer-events:none}.kq-stage.kqp-painted{container-type:inline-size}
-    /* the frame, clock, plan, bubbles and buttons in lacquered wood, paper and gold, to sit with the painting */
+    .kq-stage.kqp-painted>.kq-bg,.kq-stage.kqp-painted>.kq-port,.kq-stage.kqp-painted>.kq-door,.kq-stage.kqp-painted>.kq-desk,.kq-stage.kqp-painted>.kv-spot,.kq-stage.kqp-painted>.kq-time,.kq-stage.kqp-painted>.kq-start{display:none!important}
+    .kqp-id,.kqp-clock,.kqp-guide{position:absolute;z-index:8;font-family:Georgia,serif;color:#f3e3bd;background:rgba(32,17,11,.82);border:1px solid rgba(201,161,74,.4);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+    .kqp-id{left:1.6%;top:2.4%;display:grid;gap:2px;padding:7px 11px;font-size:12px;max-width:27%}.kqp-id b{color:#e8c77d;font-weight:600;letter-spacing:.04em}
+    .kqp-id button,.kqp-guide button,.kqp-clock button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:left;text-decoration:underline dotted rgba(232,199,125,.6);text-underline-offset:3px}
+    .kqp-clock{left:50%;top:0;transform:translateX(-50%);border-top:0;border-radius:0 0 12px 12px;padding:5px 14px 6px;font-size:12px;display:flex;gap:10px;align-items:center;opacity:.78}
+    .kqp-clock.kqp-live{opacity:1;flex-direction:column;gap:1px;padding:6px 18px 7px}.kqp-sess{display:flex;align-items:baseline;gap:10px}.kqp-sess b{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+    .kqp-k{color:#e8c77d;font-size:11px;letter-spacing:.08em;text-transform:uppercase}.kqp-plan{font-size:11px;opacity:.85}.kqp-quiet{font-size:12px;opacity:.9}
+    .kqp-clock .kqp-begin,.kqp-sess button{padding:2px 10px;border:1px solid rgba(232,199,125,.6);border-radius:999px;text-decoration:none}
+    .kqp-guide{left:1.6%;bottom:2.4%;font-size:12px}.kqp-guide summary{cursor:pointer;padding:6px 11px;list-style:none}.kqp-guide summary::-webkit-details-marker{display:none}
+    .kqp-guide>div{display:grid;gap:5px;padding:0 11px 9px;max-height:50cqw;overflow:auto}
+    #kg-main #kg-scene.quarters.kqp-on .kq-comms .kgs-say{opacity:0;transition:opacity .45s;pointer-events:none}
+    #kg-main #kg-scene.quarters.kqp-on.kqp-say-i .kq-comms .kgs-say.i,#kg-main #kg-scene.quarters.kqp-on.kqp-say-k .kq-comms .kgs-say.k{opacity:1;pointer-events:auto}
+    @media(max-width:640px){.kqp-id{position:static;max-width:none;margin:8px 10px 0}.kqp-guide{position:static;margin:6px 10px 0;font-size:13px}.kqp-guide>div{max-height:none}.kqp-guide button{padding:4px 0}.kqp-clock{font-size:10.5px;padding:3px 10px}html.kqp-theme #kv-what{display:block;max-width:62vw;margin:0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #kg-main #kg-scene.quarters.kqp-on .kq-comms .kgs-say{opacity:1!important;pointer-events:auto}}
+    /* the frame, bubbles and room bar in lacquered wood, paper and gold */
     #kg-main #kg-scene.quarters.kqp-on{background:#1a0f0a;border-color:#3a2015;box-shadow:inset 0 0 0 1px #8a6a3a,0 12px 40px rgba(0,0,0,.45);font-family:Georgia,"Times New Roman",serif}
     #kg-scene.kqp-on .kq-visor{display:none}
-    #kg-main #kg-scene.quarters.kqp-on .kq-time{background:rgba(32,17,11,.88);border-color:rgba(201,161,74,.5);color:#f3e3bd;font-family:Georgia,serif;box-shadow:0 6px 18px rgba(0,0,0,.35)}
-    #kg-main #kg-scene.quarters.kqp-on .kq-time span{color:#e8c77d}
-    #kg-main #kg-scene.quarters.kqp-on .kq-start{background:#e8c77d;color:#2a160c;font-family:Georgia,serif;box-shadow:0 4px 18px rgba(0,0,0,.4)}
-    #kg-main #kg-scene.quarters.kqp-on .kq-start:hover{background:#f3d996}
     #kg-main #kg-scene.quarters.kqp-on .kq-hud{background:rgba(32,17,11,.84);border-color:rgba(201,161,74,.4);color:#f1e4c6;font-family:Georgia,serif}
     #kg-main #kg-scene.quarters.kqp-on .kq-label{color:#e8c77d}
-    #kg-main #kg-scene.quarters.kqp-on .kq-plan li{color:#d6c3a0;border-top-color:rgba(201,161,74,.2)}
-    #kg-main #kg-scene.quarters.kqp-on .kq-plan li b{color:#f6ead0}
-    #kg-main #kg-scene.quarters.kqp-on .kq-plan li.now span,#kg-main #kg-scene.quarters.kqp-on .kq-plan li.now b{color:#ffd77a}
-    #kg-main #kg-scene.quarters.kqp-on .kq-plan li em{color:#bba57e}
+    #kg-main #kg-scene.quarters.kqp-on .kq-plan li{color:#d6c3a0;border-top-color:rgba(201,161,74,.2)}#kg-main #kg-scene.quarters.kqp-on .kq-plan li b{color:#f6ead0}
     #kg-main #kg-scene.quarters.kqp-on .kq-comms .kgs-say{background:rgba(32,17,11,.9)!important;border-color:rgba(201,161,74,.55)!important;color:#f3e3bd!important;font-family:Georgia,serif;box-shadow:0 6px 18px rgba(0,0,0,.35)}
     #kg-main #kg-scene.quarters.kqp-on .kq-comms .kgs-say.i{left:40%;top:31%;width:15.5%}
     #kg-main #kg-scene.quarters.kqp-on .kq-comms .kgs-say.k{right:1.5%;top:8%;width:15%}
     #kg-main #kg-scene.quarters.kqp-on .kq-doorbar button{background:rgba(32,17,11,.88);border-color:rgba(201,161,74,.45);color:#f3e3bd;font-family:Georgia,serif}
-    /* the companions sit in the room at the painting's scale and light: Iroha behind her reading table, Kaguya behind the rail */
     #kg-main #kg-scene.quarters.kqp-on #kgs-who-i{left:61.6%;right:auto;bottom:41%;transform:translateX(-50%);z-index:3}
     #kg-main #kg-scene.quarters.kqp-on #kgs-who-k{left:93.4%;right:auto;bottom:36.9%;transform:translateX(-50%);z-index:3}
     #kg-main #kg-scene.quarters.kqp-on #kgs-who-i img{height:15.7cqw!important;max-height:none;content:url(quarters/iroha-desk.webp)}
     #kg-main #kg-scene.quarters.kqp-on #kgs-who-k img{height:14.7cqw!important;max-height:none;content:url(quarters/kaguya-still.webp)}
     #kg-main #kg-scene.quarters.kqp-on #kgs-who-i img,#kg-main #kg-scene.quarters.kqp-on #kgs-who-k img{filter:sepia(.18) saturate(.92) brightness(.95) drop-shadow(0 4px 8px rgba(20,8,4,.45))}
-    @media(max-width:640px){#kg-main #kg-scene.quarters.kqp-on .kq-comms .kgs-say.i,#kg-main #kg-scene.quarters.kqp-on .kq-comms .kgs-say.k{width:auto}}`;
-  document.head.appendChild(css2);
-  mountHome();
+    @media(max-width:640px){#kg-main #kg-scene.quarters.kqp-on .kq-comms .kgs-say.i,#kg-main #kg-scene.quarters.kqp-on .kq-comms .kgs-say.k{width:auto}}
+    /* the screens the room opens carry the same palette and type */
+    html.kqp-theme,html.kqp-theme[data-desk-theme]{--desk-bg:#140b07;--desk-panel:#24150e;--desk-text:#f3e9d6;--desk-muted:#cdb894;--desk-accent:#e8c77d;--desk-secondary:#e7a07a;--desk-soft:#33201a;--desk-line:#5a3d26;--desk-control-line:#8a6a3a;--desk-on-accent:#2a160c;--desk-head:Georgia,"Times New Roman",serif}
+    body.kqp-theme{--kg-a1:#f0c878;--kg-a2:#d9a24f;--kg-c1:#2a1710;--kg-c2:#1d110b;--kg-cb:rgba(220,170,90,.28)}
+    body.kqp-theme #moon-lab{--kl-pink:#e8b45a;--kl-ink:#f3e9d6;--kl-dim:#cdb894;--kl-line:#5a3d26;--kl-card:#24150e;--kl-soft:#33201a;--kl-cyan:#e8c77d}
+    body.kqp-theme #moon-lab .kl-card{background:#24150e;border-color:#5a3d26}#kqc-gu:focus{outline:none}
+    body.kqp-theme:not(.kg-light){background:linear-gradient(180deg,#160c08,#2c1912) fixed!important}
+    body.kqp-theme #moon-lab h2,body.kqp-theme #moon-lab h3,body.kqp-theme #moon-lab .kl-eyebrow{font-family:Georgia,"Times New Roman",serif}
+    body.kqp-theme.kv-on .kv-lens{box-shadow:0 0 0 200vmax #120a06,inset 0 0 0 1.5px rgba(201,161,74,.45),inset 0 0 0 10px rgba(18,10,6,.6)}
+    body.kqp-theme .kv-lens::before{border-color:rgba(201,161,74,.18)}
+    body.kqp-theme .kv-fade.t{background:linear-gradient(#120a06 0,rgba(18,10,6,.9) 62%,rgba(18,10,6,0))}body.kqp-theme .kv-fade.b{background:linear-gradient(0deg,rgba(18,10,6,.92) 0,rgba(18,10,6,0))}
+    body.kqp-theme .kv-ticks{color:rgba(201,161,74,.4)}
+    body.kqp-theme .kv-tab,body.kqp-theme .kv-panel{background:rgba(32,17,11,.9);border-color:rgba(201,161,74,.5);font-family:Georgia,serif}
+    body.kqp-theme .kv-tab::before,body.kqp-theme .kv-tab::after{background:linear-gradient(90deg,rgba(201,161,74,0),rgba(201,161,74,.6))}
+    body.kqp-theme .kv-tab b{text-shadow:none;color:#f3e3bd;font-size:22px}body.kqp-theme .kv-tab{opacity:.85}body.kqp-theme .kv-tab span,body.kqp-theme .kv-label{color:#e8c77d}
+    body.kqp-theme .kv-dock button{background:rgba(32,17,11,.9)!important;border-color:rgba(201,161,74,.45)!important;color:#f3e3bd!important;font-family:Georgia,serif}
+    body.kqp-theme .kv-dock button[aria-current="page"]{background:#e8c77d!important;color:#2a160c!important}`;
+  document.head.appendChild(css);
+  // the visor's clock is planner time: say so, and keep it quiet (session time has its own labelled timer)
+  const kvw = document.getElementById('kv-what');
+  if (kvw) new MutationObserver(() => { if (document.body.classList.contains('kqp-theme') && kvw.textContent && !/^Planner/.test(kvw.textContent)) kvw.textContent = 'Planner · ' + kvw.textContent; }).observe(kvw, { childList: true, characterData: true, subtree: true });
+  wireSpeech(); mountHome(); say('i', 9000); say('k', 9000);
+  addEventListener('moonlab:render', () => setTimeout(wireSpeech, 120));
 })();
 </script>
 </body></html>
