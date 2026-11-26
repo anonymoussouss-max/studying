@@ -10318,6 +10318,8 @@ Task: ${JSON.stringify({ subject: c.subj, topic: S(c.topic), lectureLinked: !!c.
     p.push(`<button type="button" class="kl-ghost" data-a="flowpin" data-v="${esc(x.id)}">${x.pinned ? 'Unpin' : 'Pin: keep in full'}</button>`);
     return `<details class="kg-rec-detail"><summary class="kl-small">Open${x.pinned ? ' · pinned' : ''}</summary>${p.join('')}</details>`; };
   function goalStep(f) {
+    const pre = window.__kgGuPre && Date.now() - window.__kgGuPre.at < 600000 && !f.topic ? window.__kgGuPre : null;
+    if (pre) f = Object.assign({}, f, { subj: pre.subj, topic: pre.topic });
     const lecs = (L.lectures || []).filter(e => e.topic && !e.astro).sort((a, b) => (a.due && a.due <= today() ? 0 : 1) - (b.due && b.due <= today() ? 0 : 1) || (b.made || '').localeCompare(a.made || '')).slice(0, 20);
     const a = f.assign;
     if (a && a.status === 'asking') return `<div class="kl-stack" aria-live="polite"><p class="kl-eyebrow">GUIDED SESSION · ${esc(f.subj)}</p><h2>${esc(f.topic)}</h2><p>Iroha is choosing one activity for this task…</p><div class="kl-row"><button class="kl-ghost" data-a="flowassignedit">Change the task</button></div></div>`;
@@ -10330,12 +10332,15 @@ Task: ${JSON.stringify({ subject: c.subj, topic: S(c.topic), lectureLinked: !!c.
       <p class="kl-small kg-assign-by">${esc(by)} About ${f.mins} minutes.</p>
       <div class="kl-row"><button class="kl-primary" data-a="flowassignstart">Start</button><button data-a="flowassigneasier">Make this easier</button><button data-a="flowassignnofit">This does not fit</button><button class="kl-ghost" data-a="flowassignedit">Change the task</button></div>
       <details class="kg-assign-help"><summary class="kl-small">Help: what do the method names mean?</summary>${window.FlowKit.ASSIGN_ACTS.map(k => `<p class="kl-small"><b>${ACTS[k].icon} ${esc(ACTS[k].name)}</b>: ${esc(ACTS[k].what)} Good for ${esc(ACTS[k].best)}.</p>`).join('')}</details></div>`; }
-    return `<form data-f="flowgoal" class="kl-stack"><p class="kl-eyebrow">GUIDED SESSION</p><h2>What will you work on?</h2>
-      <p class="kl-small kg-flow-hint">Tell Iroha the task. She picks one activity that suits it and explains why.</p>
+    return `<form data-f="flowgoal" class="kl-stack"><p class="kl-eyebrow">GUIDED SESSION${pre ? ' · FROM THE GU CABINET' : ''}</p><h2>What will you work on?</h2>
+      <p class="kl-small kg-flow-hint">Name the task and the time. Iroha picks one activity that suits it and explains why before anything starts.</p>
+      <label>Task or topic <input name="topic" maxlength="120" value="${esc(f.topic)}" placeholder="e.g. Log inequalities with base below 1"></label>
       <div class="kg-flow-grid"><label>Subject <select name="subj">${SUBJS.map(s => `<option ${s === f.subj ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+      <label class="kg-flow-mins">Minutes <input name="mins" type="number" min="5" max="90" value="${f.mins || 25}"></label></div>
+      <div class="kl-row"><button class="kl-primary">Ask Iroha to choose</button></div>
+      <details class="kg-flow-more"><summary class="kl-small">Optional: lecture, goals, recall, stopping and energy</summary><div class="kl-stack">
       <label>From a lecture (optional) <select name="lec"><option value="">None</option>${lecs.map(e => `<option value="${e.id}" ${e.id === f.lec ? 'selected' : ''}>${esc(lecLabel(e))}${e.due && e.due <= today() ? ' · due' : ''}</option>`).join('')}</select></label></div>
       ${skillPick(f)}
-      <label>Task or topic <input name="topic" maxlength="120" value="${esc(f.topic)}" placeholder="e.g. Log inequalities with base below 1"></label>
       <fieldset class="kg-flow-open"><legend class="kl-small">How new is it to you?</legend>
         <label class="kl-check"><input type="radio" name="novelty" value="new" ${f.novelty === 'new' ? 'checked' : ''}> New: I haven't learned it yet</label>
         <label class="kl-check"><input type="radio" name="novelty" value="seen" ${f.novelty === 'seen' ? 'checked' : ''}> I've learned it before</label>
@@ -10351,12 +10356,11 @@ Task: ${JSON.stringify({ subject: c.subj, topic: S(c.topic), lectureLinked: !!c.
       <fieldset class="kg-flow-open"><legend class="kl-small">When the minutes run out</legend>
         <label class="kl-check"><input type="radio" name="contract" value="stop" ${f.contract !== 'finish' ? 'checked' : ''}> Stop on time and save the next step (recommended)</label>
         <label class="kl-check"><input type="radio" name="contract" value="finish" ${f.contract === 'finish' ? 'checked' : ''}> Let me finish the step I'm on</label></fieldset>
-      <label class="kg-flow-mins">Minutes on the desk timer <input name="mins" type="number" min="5" max="90" value="${f.mins || 25}"></label>
       <fieldset class="kg-flow-open"><legend class="kl-small">How much is in the tank today?</legend>
         <label class="kl-check"><input type="radio" name="energy" value="demanding" ${f.energy === 'demanding' ? 'checked' : ''}> Ready for something demanding: an unfamiliar problem or a derivation</label>
         <label class="kl-check"><input type="radio" name="energy" value="ordinary" ${(f.energy || 'ordinary') === 'ordinary' ? 'checked' : ''}> Ordinary pace: practice with feedback</label>
         <label class="kl-check"><input type="radio" name="energy" value="lighter" ${f.energy === 'lighter' ? 'checked' : ''}> Need something lighter: shorter, 15 minutes at most</label></fieldset>
-      <div class="kl-row"><button class="kl-primary">Ask Iroha to choose</button><span class="kl-small">You'll see her pick and why before anything starts.</span></div></form>`;
+      <div class="kl-row"><button class="kl-primary">Ask Iroha to choose</button></div></div></details></form>`;
   }
   function warmupStep(f, A) {
     const predict = f.opener === 'predict';
@@ -10583,7 +10587,7 @@ Task: ${JSON.stringify({ subject: c.subj, topic: S(c.topic), lectureLinked: !!c.
       <form data-f="freesess" class="kl-stack"><div class="kl-row" style="flex-wrap:wrap"><select name="subject" aria-label="Subject">${['Maths', 'Physics', 'Chemistry', 'Diploma', 'Mixed', 'German'].map(s => `<option value="${s}">${s === 'Diploma' ? 'Diploma (C exam)' : s}</option>`).join('')}</select>
       <input name="topic" maxlength="80" placeholder="Topic (optional)" aria-label="Topic"><input name="minutes" type="number" min="5" max="600" placeholder="Minutes (empty = until I stop)" aria-label="Minutes"></div>
       <div class="kl-row"><button type="submit" class="kl-primary">Start independent session</button></div></form></section>` : '';
-    return free + `<section class="kl-card kg-flow">${head(cur)}${parkForm(cur)}${body}</section>`
+    return `<section class="kl-card kg-flow">${head(cur)}${parkForm(cur)}${body}</section>` + (free ? free.replace('<section class="kl-card kg-freesess">', '<section class="kl-card kg-freesess kl-mini">') : '')
       + (cur.step === 'goal' && recent.length ? `<section class="kl-card kl-mini"><p class="kl-eyebrow">RECENT SESSIONS</p><p class="kl-small">The newest 30 sessions keep their full working; older ones keep a summary unless pinned. <button type="button" class="kl-ghost" data-a="flowexport">Download full history</button></p>${sureWrong.length ? `<p class="kl-small">Sure, but there was a gap (last 14 days): ${sureWrong.slice(-4).map(r => esc(r.topic)).join('; ')}. Worth another look.</p>` : ''}${recent.map(x => `<div class="kl-li"><span>${esc(ACTS[x.act]?.name || '')}: ${esc(x.topic)}${x.conf === 'sure' && x.gap ? ' <b class="kl-small">· sure, but a gap</b>' : ''}<small>${esc(x.d)} · ${x.gap ? (x.fixed ? 'gap repaired' : 'gap: ' + esc(x.gap.slice(0, 90))) : 'no gaps'}</small></span>${recDetail(x)}</div>`).join('')}</section>` : '');
   };
 
@@ -11097,7 +11101,9 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
   const twin = document.createElement('div'); twin.id = 'kg-twin'; twin.setAttribute('role', 'status');
   twin.innerHTML = 'The desk is open in another tab too. Each tab can overwrite the other\'s changes, so it\'s safest to use one. <button type="button">Reload this tab</button>';
   twin.querySelector('button').onclick = () => location.reload();
-  document.body.appendChild(twin);
+  document.body.appendChild(twin); // moved into the page flow once it exists, so it takes its own space instead of covering controls
+  const placeTwin = () => { const m = document.getElementById('kg-main'); if (m && twin.parentElement !== m) m.prepend(twin); };
+  if (document.readyState === 'loading') addEventListener('DOMContentLoaded', placeTwin); else placeTwin(); setTimeout(placeTwin, 1500);
   const showTwin = () => document.body.classList.add('kg-twin');
   try { const bc = new BroadcastChannel('kaguya-desk'); bc.onmessage = e => { if (e.data === 'hello') bc.postMessage('here'); if (e.data === 'here' || e.data === 'hello') showTwin(); }; bc.postMessage('hello'); } catch (e) {}
   addEventListener('storage', e => { if (['kg-lab-v1', 'ame-habit-v1'].includes(e.key)) showTwin(); });
@@ -16544,6 +16550,49 @@ function serpentSVG(o) {
   const NOOKS = [[175, 360], [355, 360], [175, 556], [355, 556]];
   const LVN = { none: 0, obtained: 1, learning: 2, proof: 3, proven: 4 };
   const LEVEL = { none: 'On its way', obtained: 'Obtained', learning: 'Learning', proof: 'Proof passed · retention pending', proven: 'Proven' };
+  const REGION = 'Southern Border'; // the agreed region for Class 11–12 PCM; the subject is shown separately
+  const STATE_N = { unstarted: 'Unstarted', studying: 'Studying', obtained: 'Obtained', refining: 'Refining', proven: 'Proven' };
+  function stateOf(g) {
+    if (g.acq !== 'obtained') return g.done > 0 || g.attempted > 0 || g.acq !== 'not-obtained' ? 'studying' : 'unstarted';
+    return g.level === 'proven' ? 'proven' : g.level === 'learning' || g.level === 'proof' || plates(g).some(s => s !== 'n') ? 'refining' : 'obtained';
+  }
+  const PAL = { maths: ['#5fc7a8', '#1f6b57', '#d9f5ea'], physics: ['#8fa8ff', '#3a3f8f', '#e3e8ff'], chem: ['#f0a96b', '#8a3f2a', '#ffe9d4'] };
+  const hashOf = s => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const guName = g => g.name === 'Basic Mathematics' && g.acq === 'obtained' ? 'Wave-Sign Serpent' : g.name + ' Gu';
+  // a chapter Gu, drawn around (0,0) in about 140×90 units. Studying: a cocoon that fills with lectures. Obtained: the creature.
+  // Refining adds one glint per approved skill (gold once retained); Proven adds a gold halo. Shape varies by chapter, colour by subject.
+  function guSVG(g, id) {
+    const st = stateOf(g), c = PAL[g.subj] || PAL.maths, h = hashOf(g.key || g.name);
+    if (st === 'unstarted') return `<ellipse cx="0" cy="4" rx="20" ry="27" fill="none" stroke="${c[2]}" stroke-width="1.5" stroke-dasharray="3 5" opacity=".5"/>`;
+    if (st === 'studying') { const p = Math.max(.08, Math.min(1, g.done / (g.lectures || 1))), y0 = 34 - 64 * p;
+      return `<defs><clipPath id="egg-${id}"><ellipse cx="0" cy="2" rx="24" ry="32"/></clipPath><radialGradient id="eg-${id}" cx=".4" cy=".3" r=".9"><stop offset="0" stop-color="${c[2]}"/><stop offset="1" stop-color="${c[0]}" stop-opacity=".6"/></radialGradient></defs>
+        <ellipse cx="0" cy="8" rx="48" ry="30" fill="${c[0]}" opacity=".2" class="kq-breathe"/>
+        <ellipse cx="0" cy="2" rx="24" ry="32" fill="#1c0f0a" opacity=".6" stroke="${c[2]}" stroke-width="1.8"/>
+        <rect x="-26" y="${y0.toFixed(1)}" width="52" height="${(64 * p + 4).toFixed(1)}" fill="url(#eg-${id})" clip-path="url(#egg-${id})"/>
+        <path d="M-14 -8 q14 -10 28 0 M-18 7 q18 -10 36 0 M-15 22 q15 -9 30 0" fill="none" stroke="${c[1]}" stroke-width="1.8" opacity=".75" clip-path="url(#egg-${id})"/>
+        <ellipse cx="-9" cy="-15" rx="5" ry="9" fill="#fff" opacity=".28"/>`; }
+    const n = 4 + h % 3, wing = (h >> 3) % 3, ph = (h % 7) / 3, segs = [];
+    for (let i = 0; i < n; i++) { const t = i / (n - 1); segs.push([-42 + 72 * t, 6 * Math.sin(t * 4 + ph), 7 + 8 * Math.sin(Math.PI * (.2 + .7 * t))]); }
+    const [hx, hy] = segs[n - 1], mid = segs[Math.floor(n / 2)], gold = st === 'proven', body = gold ? '#e8c77d' : c[0], dark = gold ? '#8a5a1a' : c[1];
+    const wings = wing === 2 ? segs.slice(1, -1).map(([x, y, r]) => `<path d="M${(x - 3).toFixed(1)} ${(y - r + 1).toFixed(1)} l3 -7 l3 7" fill="${c[2]}" opacity=".8"/>`).join('')
+      : `<ellipse cx="${(mid[0] - 6).toFixed(1)}" cy="${(mid[1] - 20).toFixed(1)}" rx="${wing ? 15 : 22}" ry="${wing ? 13 : 9}" transform="rotate(-24 ${(mid[0] - 6).toFixed(1)} ${(mid[1] - 20).toFixed(1)})" fill="${c[2]}" opacity=".32" stroke="${c[2]}" stroke-width="1"/>
+         <ellipse cx="${(mid[0] + 8).toFixed(1)}" cy="${(mid[1] - 19).toFixed(1)}" rx="${wing ? 13 : 19}" ry="${wing ? 11 : 8}" transform="rotate(18 ${(mid[0] + 8).toFixed(1)} ${(mid[1] - 19).toFixed(1)})" fill="${c[2]}" opacity=".26" stroke="${c[2]}" stroke-width="1"/>`;
+    const pl = plates(g), glints = st === 'refining' || st === 'proven' ? pl.map((k, i) => { const a = Math.PI * (1.1 + .8 * (i + .5) / pl.length), x = 58 * Math.cos(a), y = -6 + 40 * Math.sin(a);
+      return `<path d="M${x.toFixed(1)} ${(y - 4).toFixed(1)} l3 4 l-3 4 l-3 -4z" fill="${k === 'r' ? '#f5d27a' : k === 'd' ? c[2] : '#5a4630'}"/>`; }).join('') : '';
+    return `<ellipse cx="0" cy="22" rx="52" ry="10" fill="${gold ? '#f5d27a' : c[0]}" opacity=".22" class="kq-breathe"/>
+      ${gold ? `<circle cx="0" cy="-2" r="50" fill="none" stroke="#f5d27a" stroke-width="1.5" opacity=".55" class="kq-breathe"/>` : ''}${wings}
+      ${segs.map(([x, y, r]) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${body}" stroke="${dark}" stroke-width="1.6"/><circle cx="${(x - r / 3).toFixed(1)}" cy="${(y - r / 3).toFixed(1)}" r="${(r / 4).toFixed(1)}" fill="${c[2]}" opacity=".55"/>`).join('')}
+      <path d="M${(hx + 4).toFixed(1)} ${(hy - 10).toFixed(1)} q6 -14 16 -14 M${(hx - 2).toFixed(1)} ${(hy - 11).toFixed(1)} q0 -15 8 -19" fill="none" stroke="${dark}" stroke-width="1.6" stroke-linecap="round"/>
+      <circle cx="${(hx + 4).toFixed(1)}" cy="${(hy - 2).toFixed(1)}" r="2.4" fill="#1c0f0a"/><circle cx="${(hx + 4.7).toFixed(1)}" cy="${(hy - 2.8).toFixed(1)}" r=".8" fill="#fff"/>${glints}`;
+  }
+  // placement is only stated once every finished chapter's record can be read: its checklist verified and its skill list approved
+  function placementNeeds(v) {
+    const fin = allGu(v).filter(g => g.done >= g.lectures), out = [];
+    const unv = fin.filter(g => g.scope !== 'verified'), una = fin.filter(g => !(g.skills && g.skills.length));
+    if (unv.length) out.push({ t: `checklists verified for ${fin.length - unv.length} of ${fin.length} finished chapters`, a: `data-qdetail="${esc(unv[0].key)}"` });
+    if (una.length) out.push({ t: `skill lists approved for ${fin.length - una.length} of ${fin.length} finished chapters`, a: `data-qdetail="${esc(una[0].key)}"` });
+    return out;
+  }
   const has = target => { const [p, t] = target.split(':'), S = M && M.SECTIONS; return !S || !S[p] || S[p].some(x => x[0] === t); };
   const allGu = v => Object.entries((v && v.subjects) || {}).flatMap(([k, s]) => (s.gu || []).map(g => Object.assign({}, g, { subj: k })));
   // plates: one per APPROVED skill. 'r' retained (a later check), 'd' shown independently, 'n' not shown. No approved list: no plates.
@@ -16587,58 +16636,69 @@ function serpentSVG(o) {
   // the chapter you are working on now: furthest-along chapter still on its way to a Gu
   const current = v => allGu(v).filter(studying).sort((a, b) => (b.acq !== 'not-obtained') - (a.acq !== 'not-obtained') || (b.done / (b.lectures || 1)) - (a.done / (a.lectures || 1)))[0] || null;
   function identity(data) {
-    const v = data.v, st = data.st, g = current(v);
-    let rank = { t: 'Rank not placed yet', why: '' };
-    if (R) {
-      const gs = R.gates(v, { earned: st.earned, bank: st.bankDone, b2: st.b2 }), earned = gs.filter(x => x.status === 'earned').pop(), met = gs.find(x => x.status === 'met');
-      if (earned) rank = { t: earned.name, why: '' };
-      else if (met) rank = { t: met.name + ' · ready to accept', why: '' };
-      else if (v.placement === 'computable' && gs.length) rank = { t: 'Rank not placed yet', why: '', next: `next gate: ${gs[0].name}, ${gs[0].needs}` };
-      else rank.why = v.placement === 'not-computed' ? `the catalogue is incomplete for ${(v.why || []).map(x => SUBJ[x] || x).join(', ')}` : v.placement === 'provisional' ? 'the lecture counts in use are not confirmed yet' : '';
-    }
-    return { region: g ? (SUBJ[g.subj] || g.subj) + ' region' : 'Region follows what you study', rank, g };
+    const v = data.v, st = data.st, g = current(v), needs = placementNeeds(v);
+    let rank = { t: 'Placement not established', why: '', needs, a: 'data-qsetup="1"' };
+    const gs = R ? R.gates(v, { earned: st.earned, bank: st.bankDone, b2: st.b2 }) : [], earned = gs.filter(x => x.status === 'earned').pop(), met = gs.find(x => x.status === 'met');
+    if (earned) rank = { t: earned.name, why: '' };
+    else if (met) rank = { t: met.name + ' · ready to accept', why: '' };
+    else if (v.placement === 'not-computed') rank.why = `the catalogue is incomplete for ${(v.why || []).map(x => SUBJ[x] || x).join(', ')}`;
+    else if (v.placement === 'provisional') rank.why = 'the lecture counts in use are not confirmed yet';
+    else if (needs.length) { rank.why = needs.map(x => x.t).join('; '); rank.a = needs[0].a; }
+    else if (gs.length) rank = { t: `Placed below ${gs[0].name}`, why: '', next: `next gate: ${gs[0].name}, ${gs[0].needs}` };
+    return { region: REGION, subject: g ? SUBJ[g.subj] || g.subj : '', rank, g };
   }
   const read = () => { const st = K.readStore(localStorage); return { st, v: K.cultivation(M.L, null, st) }; };
   const btns = p => (p.act || []).map(([l, a]) => `<button class="kl-ghost" data-a="${a}">${esc(l)}</button>`).join('') + (p.go || []).filter(x => has(x[1])).map(([l, t]) => `<button class="kl-ghost" data-a="go" data-v="${t}">${esc(l)}</button>`).join('');
   const placeHTML = p => `<section class="kl-card kl-stack kq-place" id="kq-place-${p.id}"><p class="kl-eyebrow">${esc(p.name.toUpperCase())}</p><p class="kl-small">${esc(p.about)}</p><div class="kl-row" style="flex-wrap:wrap">${btns(p)}</div></section>`;
   const nookArt = (nk, labels) => nk.map((g, i) => { const [x, y] = NOOKS[i], ok = g.acq === 'obtained';
     const art = ok && g.name === 'Basic Mathematics' ? `<g transform="translate(${x} ${y}) scale(.74)">${serpentSVG({ id: 'n' + i + (labels ? 'c' : 'h'), state: look(g), sk: plates(g), labels: ['−2', '1'] })}</g>`
-      : ok ? `<ellipse cx="${x}" cy="${y + 6}" rx="44" ry="16" fill="#9bd3a6" opacity=".35" class="kq-breathe"/><circle cx="${x}" cy="${y}" r="13" fill="#2f7a5c" stroke="#cfe8dc" stroke-width="2"/>`
-      : `<ellipse cx="${x}" cy="${y + 6}" rx="60" ry="20" fill="#cfe8dc" opacity=".16" class="kq-breathe"/><path d="M${x - 40} ${y + 26} h80" stroke="#5a4630" stroke-width="4" stroke-linecap="round" opacity=".7"/><path d="M${x - 40} ${y + 26} h${Math.round(80 * g.done / (g.lectures || 1))}" stroke="#e8c77d" stroke-width="4" stroke-linecap="round"/>`;
+      : `<g transform="translate(${x} ${y - 14})">${guSVG(g, 'n' + i + (labels ? 'c' : 'h'))}</g>`;
     const name = g.name.length > 22 ? g.name.slice(0, 21) + '…' : g.name, sub = ok ? LEVEL[g.level] : `${g.done}/${g.lectures} lectures`;
     const plaque = labels ? `<g transform="translate(${x} ${y + 46})"><rect x="-80" y="-10" width="160" height="30" rx="3" fill="#1c0c09" opacity=".78"/><text y="2" font-family="Georgia,serif" font-size="11" fill="#e9d6a6" text-anchor="middle">${esc(name)}</text><text y="15" font-family="Georgia,serif" font-size="9.5" fill="#c9b48a" text-anchor="middle">${esc(sub)}</text></g>` : '';
     return art + plaque; }).join('');
   const look = g => g.level === 'proven' ? 'proven' : g.level === 'proof' ? 'proof' : plates(g).some(s => s !== 'n') || g.level === 'learning' ? 'partial' : 'obtained';
 
   // ---- the Gu cabinet (Study → Cultivation): inspect a chapter Gu, see its real state, take the next step ----
-  let sel = '', peek = false;
+  let sel = '', peek = false; const filt = { q: '', s: '', st: '' };
+  function applyFilter() {
+    const rows = [...document.querySelectorAll('#moon-lab [data-qrow]')]; if (!rows.length) return; let n = 0;
+    for (const r of rows) { const ok = (!filt.q || r.dataset.name.includes(filt.q.toLowerCase())) && (!filt.s || r.dataset.subj === filt.s) && (!filt.st || r.dataset.st === filt.st); r.hidden = !ok; if (ok) n++; }
+    for (const gr of document.querySelectorAll('#moon-lab [data-qgroup]')) gr.hidden = !gr.querySelector('[data-qrow]:not([hidden])');
+    const c = document.getElementById('kqc-count'); if (c) c.textContent = `${n} of ${rows.length} chapters`;
+  }
   function guPanel(g) {
-    if (!g) return '<p class="kl-small">Choose a Gu or a chapter on its way, in the cabinet or the collection below.</p>';
-    const pl = plates(g), bm = g.name === 'Basic Mathematics' && g.acq === 'obtained', nx = nextStep(g);
-    return `<div class="kl-stack kqc-gu" id="kqc-gu" tabindex="-1"><p class="kl-eyebrow">${esc((SUBJ[g.subj] || '').toUpperCase())} · ${esc(g.name.toUpperCase())}</p>
-      ${bm ? `<svg viewBox="-130 -70 260 130" class="kq-gu-art" role="img" aria-label="Wave-Sign Serpent, ${esc(LEVEL[g.level])}">${serpentSVG({ id: 'close', state: look(g), sk: pl, labels: ['−2', '1'] })}</svg>
-        <p class="kl-small">An illustrative sign diagram for the sample (x − 1)/(x + 2), not a graph: only the side of the gold line matters. At −2 the expression is undefined (open ring, a gap in the body); at 1 it is zero (filled bead).</p>` : ''}
-      <p><b>${esc(LEVEL[g.level])}</b>${g.planned ? ' <span class="kl-small">· lecture count provisional</span>' : ''}</p>
+    if (!g) return '<p class="kl-small">Choose a Gu or a chapter in the cabinet or the collection below.</p>';
+    const pl = plates(g), bm = g.name === 'Basic Mathematics' && g.acq === 'obtained', nx = nextStep(g), st = stateOf(g);
+    const art = bm ? `<svg viewBox="-130 -70 260 130" class="kq-gu-art" role="img" aria-label="Wave-Sign Serpent, ${esc(LEVEL[g.level])}">${serpentSVG({ id: 'close', state: look(g), sk: pl, labels: ['−2', '1'] })}</svg>`
+      : `<svg viewBox="-80 -62 160 100" class="kq-gu-art" role="img" aria-label="${esc(guName(g))}, ${esc(STATE_N[st])}">${guSVG(g, 'close')}</svg>`;
+    return `<div class="kl-stack kqc-gu" id="kqc-gu" tabindex="-1">${art}
+      <p class="kl-eyebrow">${esc((SUBJ[g.subj] || '').toUpperCase())} · ${esc(g.name.toUpperCase())}</p>
+      <h2 class="kqc-name">${esc(guName(g))} <span class="kqc-st kqc-st-${st}">${STATE_N[st]}</span>${g.planned ? ' <span class="kl-small">· lecture count provisional</span>' : ''}</h2>
+      <div class="kqc-next"><p><b>Next:</b> ${esc(nx.t)}</p><div class="kl-row" style="flex-wrap:wrap">${nx.b ? `<button class="kl-primary" ${nx.b[1]}>${esc(nx.b[0])}</button>` : ''}${g.acq !== 'obtained' ? `<button data-qstudy="${esc(g.key)}">Guided session on this chapter</button>` : ''}</div></div>
       <p class="kl-small"><b>Acquisition</b> · ${esc(acqText(g))}</p><p class="kl-small"><b>Refinement</b> · ${esc(refineText(g))}</p>
+      ${bm ? `<p class="kl-small">An illustrative sign diagram for the sample (x − 1)/(x + 2), not a graph: only the side of the gold line matters. At −2 the expression is undefined (open ring, a gap in the body); at 1 it is zero (filled bead).</p>` : ''}
       ${g.skills && g.acq === 'obtained' ? `<ul class="kl-list kqc-sk">${g.skills.map((s, i) => `<li>${pl[i] === 'r' ? '◆ retained' : pl[i] === 'd' ? '◇ shown' : '· not shown yet'} · ${esc(s.name)}</li>`).join('')}</ul>` : ''}
-      <p class="kqc-next"><b>Next:</b> ${esc(nx.t)}</p>
-      <div class="kl-row" style="flex-wrap:wrap">${nx.b ? `<button ${nx.b[1]}>${esc(nx.b[0])}</button>` : ''}<button class="kl-ghost" data-qdetail="${esc(g.key)}">Checklist, skills and proof</button><button class="kl-ghost" data-a="cpropose" data-k="${esc(g.key)}">Propose from my logged questions</button></div>
+      <div class="kl-row" style="flex-wrap:wrap"><button class="kl-ghost" data-qdetail="${esc(g.key)}">Checklist, skills and proof</button><button class="kl-ghost" data-a="cpropose" data-k="${esc(g.key)}">Propose from my logged questions</button></div>
       <p class="kl-small">Photo checks stay labelled Provisional AI assessment (Iroha). Plates turn gold only through the later retention check; nothing fades.</p></div>`;
   }
   function cabinetView(p) {
     const data = read(), all = allGu(data.v), nk = p.gu ? nooks(data.v, p.shown) : [], g = all.find(x => x.key === sel) || null, id = identity(data);
-    const ident = `<div class="kqc-id"><span>${esc(id.region)}</span><span>${esc(id.rank.t)}${id.rank.why ? ': ' + esc(id.rank.why) + ` <button class="kl-ghost kqc-link" data-qsetup="1">Resolve</button>` : id.rank.next ? ' · ' + esc(id.rank.next) : ''}</span>${id.g ? `<span>Now: <button class="kl-ghost kqc-link" data-qsel="${esc(id.g.key)}">${esc(id.g.name)}</button> · ${esc(acqText(id.g))}</span>` : ''}</div>`;
+    const ident = `<div class="kqc-id"><span><b>${esc(id.region)}</b>${id.subject ? ' · studying ' + esc(id.subject) : ''}</span><span>${esc(id.rank.t)}${id.rank.why ? ': ' + esc(id.rank.why) + ` <button class="kl-ghost kqc-link" ${id.rank.a}>Resolve</button>` : id.rank.next ? ' · ' + esc(id.rank.next) : ''}</span>${id.g ? `<span>Now: <button class="kl-ghost kqc-link" data-qsel="${esc(id.g.key)}">${esc(id.g.name)}</button> · ${esc(acqText(id.g))}</span>` : ''}</div>`;
     const art = p.simplify ? '' : `<svg class="kqc-art" viewBox="52 150 430 560" role="group" aria-label="The four display nooks of your Gu cabinet">
       <image href="quarters/room-plate.webp" x="0" y="-120" width="1600" height="1380"/>${nookArt(nk, true)}
       ${nk.map((x, i) => `<g class="kq-hot" data-qsel="${esc(x.key)}" tabindex="0" role="button" aria-label="${esc(x.name)}: ${esc(x.acq === 'obtained' ? LEVEL[x.level] : acqText(x))}"><rect class="kq-hit" x="${NOOKS[i][0] - 82}" y="${NOOKS[i][1] - 70}" width="164" height="150"/><rect class="kq-ring" x="${NOOKS[i][0] - 86}" y="${NOOKS[i][1] - 74}" width="172" height="158" rx="6"/></g>`).join('')}</svg>`;
     const shown = nk.map(x => x.key);
-    const row = x => `<li class="kl-li${x.key === sel ? ' kqc-on' : ''}"><span><b>${esc(x.name)}</b> · ${esc(LEVEL[x.level])}<br><span class="kl-small">${esc(acqText(x))}${x.acq === 'obtained' ? ' · ' + esc(refineText(x)) : ''}</span></span>
-      <span class="kl-row"><button class="kl-ghost" data-qsel="${esc(x.key)}" aria-pressed="${x.key === sel}">Inspect</button>${x.acq === 'obtained' ? `<button class="kl-ghost" data-qshow="${esc(x.key)}" aria-pressed="${shown.includes(x.key)}">${shown.includes(x.key) ? 'On display' : 'Display'}</button>` : ''}</span></li>`;
+    const row = x => { const st = stateOf(x); return `<li class="kl-li${x.key === sel ? ' kqc-on' : ''}" data-qrow="1" data-subj="${x.subj}" data-st="${st}" data-name="${esc(x.name.toLowerCase())}"><span><b>${esc(x.name)}</b> <span class="kqc-st kqc-st-${st}">${STATE_N[st]}</span><br><span class="kl-small">${st === 'unstarted' ? `${x.lectures} lectures · not started` : esc(acqText(x))}${x.acq === 'obtained' ? ' · ' + esc(refineText(x)) : ''}</span></span>
+      <span class="kl-row"><button class="kl-ghost" data-qsel="${esc(x.key)}" aria-pressed="${x.key === sel}">Inspect</button>${x.acq === 'obtained' ? `<button class="kl-ghost" data-qshow="${esc(x.key)}" aria-pressed="${shown.includes(x.key)}">${shown.includes(x.key) ? 'On display' : 'Display'}</button>` : ''}</span></li>`; };
     const subjects = Object.keys(SUBJ).filter(k => all.some(x => x.subj === k));
     return `<section class="kl-card kl-stack kqc"><div class="kl-row" style="justify-content:space-between;flex-wrap:wrap"><p class="kl-eyebrow">⛰ GU CABINET</p><button class="kl-ghost" data-qgo="today:today">← Back to the quarters</button></div>${ident}
       <div class="kqc-grid">${art}${guPanel(g)}</div></section>
-      <section class="kl-card kl-stack"><p class="kl-eyebrow">THE WHOLE COLLECTION</p><p class="kl-small">Choose up to four obtained Gu to display in the nooks. Chapters on their way fill empty nooks with their progress.</p>
-      ${subjects.map(k => `<details${g && g.subj === k || !g ? ' open' : ''}><summary><b>${SUBJ[k]}</b> · ${all.filter(x => x.subj === k && x.acq === 'obtained').length} obtained of ${all.filter(x => x.subj === k).length}</summary><ul class="kl-list">${all.filter(x => x.subj === k).map(row).join('')}</ul></details>`).join('') || '<p class="kl-small">No chapters catalogued yet.</p>'}</section>
+      <section class="kl-card kl-stack"><p class="kl-eyebrow">THE WHOLE COLLECTION</p><p class="kl-small">Choose up to four obtained Gu to display in the nooks. Chapters you are studying fill empty nooks as cocoons that fill with your lectures.</p>
+      <div class="kl-row kqc-filter" style="flex-wrap:wrap"><input type="search" data-qf="q" value="${esc(filt.q)}" placeholder="Search chapters" aria-label="Search chapters">
+        <select data-qf="s" aria-label="Subject"><option value="">All subjects</option>${subjects.map(k => `<option value="${k}"${filt.s === k ? ' selected' : ''}>${SUBJ[k]}</option>`).join('')}</select>
+        <select data-qf="st" aria-label="State"><option value="">All states</option>${Object.entries(STATE_N).map(([k, l]) => `<option value="${k}"${filt.st === k ? ' selected' : ''}>${l} (${all.filter(x => stateOf(x) === k).length})</option>`).join('')}</select>
+        <span class="kl-small" id="kqc-count" aria-live="polite"></span></div>
+      ${subjects.map(k => `<div data-qgroup="${k}"><h3 class="kqc-sub">${SUBJ[k]} <span class="kl-small">· ${all.filter(x => x.subj === k && x.acq === 'obtained').length} obtained of ${all.filter(x => x.subj === k).length}</span></h3><ul class="kl-list">${all.filter(x => x.subj === k).map(row).join('')}</ul></div>`).join('') || '<p class="kl-small">No chapters catalogued yet.</p>'}</section>
       <section class="kl-card kl-stack"><details><summary><b>How cultivation works</b></summary><p class="kl-small">A Gu is obtained when all its lectures are done and every item on its verified assigned-work checklist has a genuine attempt (working, or a “stuck at” note; help counts for acquisition, never for mastery). Refinement follows the chapter’s approved skill list: shown independently, then a proof, then a later retention check. Study minutes never count towards rank or mastery. Ranks are fixed milestones and permanent once earned. Blessed Land opens at Rank 4 or with your first Immortal Gu. Nothing has upkeep or decays, and rest days never create debt.</p></details>
       <div class="kl-row" style="flex-wrap:wrap"><button class="kl-ghost" data-qsetup="1">Records, sources and catalogue setup</button><button class="kl-ghost" data-a="go" data-v="progress:ranks">⛰ Cultivator rank</button></div>
       <details><summary><b>Room settings</b></summary><div class="kl-row" style="flex-wrap:wrap">${[['home', 'Painted home room'], ['showLabels', 'Always show labels'], ['gu', 'Gu in the room'], ['still', 'Reduced motion'], ['simplify', 'Simplify']].map(([k, l]) => `<button class="kl-ghost" data-qpref="${k}" aria-pressed="${!!p[k]}">${l}</button>`).join('')}</div>
@@ -16653,7 +16713,7 @@ function serpentSVG(o) {
     return { kind: 'none', label: 'Begin studying' };
   }
   function toTable() { const s = sessionState(); if (s.kind === 'timer' && M.ACTIONS.go) return M.ACTIONS.go({ dataset: { v: 'resume' } }); M.go('study', 'session'); }
-  window.KgQuarters = { PLACES, MENU, plates, nooks, look, prefs, KEY, acqText, refineText, nextStep, identity, current, sessionState, cabinet: () => cabinetView(prefs()),
+  window.KgQuarters = { PLACES, MENU, plates, nooks, look, prefs, KEY, guSVG, stateOf, REGION, acqText, refineText, nextStep, identity, current, sessionState, cabinet: () => cabinetView(prefs()),
     targets: () => PLACES.flatMap(p => (p.go || []).map(x => x[1])).concat(MENU.map(x => x[1])) };
   if (!M || !M.PANELS || !K) return;
   const base = M.PANELS.cultivation;
@@ -16662,10 +16722,11 @@ function serpentSVG(o) {
   const toCabinet = () => { if (document.body.classList.contains('kg-sec-study') && document.querySelector('.kl-tabs [data-v="cultivation"][aria-current="page"]')) M.render(); else M.go('study', 'cultivation'); };
   // one listener for every quarters control, inside or outside the lab
   document.addEventListener('click', e => {
-    const t = e.target.closest && e.target.closest('[data-qgo],[data-qsel],[data-qshow],[data-qdetail],[data-qsetup],[data-qback],[data-qpref],[data-qtable],[data-qpause],[data-qlabels]'); if (!t) return;
+    const t = e.target.closest && e.target.closest('[data-qgo],[data-qsel],[data-qshow],[data-qdetail],[data-qsetup],[data-qback],[data-qpref],[data-qtable],[data-qpause],[data-qlabels],[data-qstudy]'); if (!t) return;
     e.preventDefault(); const d = t.dataset;
     if (d.qgo) { const [a, b] = d.qgo.split(':'); return M.go(a, b); }
     if (d.qtable) return toTable();
+    if (d.qstudy) { const g = allGu(read().v).find(x => x.key === d.qstudy); if (g) window.__kgGuPre = { subj: { maths: 'Maths', physics: 'Physics', chem: 'Chemistry' }[g.subj] || 'Maths', topic: g.acq === 'not-obtained' ? `${g.name} · lecture ${g.done + 1} of ${g.lectures}` : g.name, at: Date.now() }; return M.go('study', 'session'); }
     if (d.qsel != null) { sel = d.qsel; peek = false; toCabinet(); return focusEl('kqc-gu'); }
     if (d.qshow) { const p = prefs(), s = (p.shown || []).filter(k => k !== d.qshow); p.shown = s.length === (p.shown || []).length ? [d.qshow].concat(s).slice(0, 4) : s; save(p); M.render(); return; }
     if (d.qdetail) { peek = true; if (K.setOpen) K.setOpen(d.qdetail); return toCabinet(); }
@@ -16675,6 +16736,7 @@ function serpentSVG(o) {
     if (d.qlabels) { const p = prefs(); p.showLabels = !p.showLabels; save(p); return mountHome(); }
     if (d.qpause) { const b = document.querySelector('#hb-session-card [data-action="pause"]'); if (b) b.click(); else toTable(); for (const ms of [80, 400, 1200]) setTimeout(() => { actAt = 0; clockTick(); }, ms); }
   });
+  for (const ev of ['input', 'change']) document.addEventListener(ev, e => { const t = e.target; if (!t || !t.dataset || !t.dataset.qf) return; filt[t.dataset.qf] = t.value; applyFilter(); });
   document.addEventListener('keydown', e => { const t = e.target; if ((e.key === 'Enter' || e.key === ' ') && t && t.classList && t.classList.contains('kq-hot')) { e.preventDefault(); t.dispatchEvent(new MouseEvent('click', { bubbles: true })); } });
 
   // ---- home: the desk's room is the painted quarters. The live companions, room bar and visor stay. ----
@@ -16700,7 +16762,7 @@ function serpentSVG(o) {
   // a restrained identification plaque: region, rank (or what placement still needs) and the chapter you are on
   function idHTML(data) {
     const id = identity(data);
-    return `<div class="kqp-id" aria-label="Your cultivation"><b>${esc(id.region)}</b><span>${esc(id.rank.t)}${id.rank.why ? ` · <button data-qsetup="1" title="${esc(id.rank.why)}">what's missing</button>` : id.rank.next ? ` · <button data-qgo="progress:ranks" title="${esc(id.rank.next)}">next gate</button>` : ''}</span>
+    return `<div class="kqp-id" aria-label="Your cultivation"><b>${esc(id.region)}</b>${id.subject ? `<span>Studying ${esc(id.subject)}</span>` : ''}<span>${esc(id.rank.t)}${id.rank.why ? ` · <button ${id.rank.a} title="${esc(id.rank.why)}">what's needed</button>` : id.rank.next ? ` · <button data-qgo="progress:ranks" title="${esc(id.rank.next)}">next gate</button>` : ''}</span>
       ${id.g ? `<button class="kqp-now" data-qsel="${esc(id.g.key)}">${esc(id.g.name)} · ${esc(id.g.acq === 'not-obtained' ? `${id.g.done}/${id.g.lectures} lectures` : nextStep(id.g).b ? nextStep(id.g).b[0] : LEVEL[id.g.level])}</button>` : ''}</div>`;
   }
   const guide = p => `<details class="kqp-guide"><summary>Room guide</summary><div>${HOME.map(([k, v, name]) => k === 'qtable' ? `<button data-qtable="1">${esc(sessionState().label)}</button>` : `<button data-${k}="${v}">${esc(name)}</button>`).join('')}
@@ -16751,7 +16813,7 @@ function serpentSVG(o) {
     }
   }
   window.KgQuarters.HOME = HOME; window.KgQuarters.homeSVG = p => homeSVG(Object.assign({}, DEF, p), read());
-  addEventListener('moonlab:render', () => setTimeout(() => { mountHome(); const kb = document.querySelector('.kv-back'); if (kb && document.body.classList.contains('kqp-theme')) kb.textContent = '← Back to the quarters'; }, 60));
+  addEventListener('moonlab:render', () => setTimeout(() => { const full = !!document.querySelector('#moon-lab .kqc'); if (full && !document.body.classList.contains('kqc-full')) scrollTo(0, 0); document.body.classList.toggle('kqc-full', full); applyFilter(); mountHome(); const kb = document.querySelector('.kv-back'); if (kb && document.body.classList.contains('kqp-theme')) kb.textContent = '← Back to the quarters'; }, 60));
   setInterval(() => { if (!document.hidden) clockTick(); }, 1000);
   const css = document.createElement('style');
   css.textContent = `.kq-hit{fill:transparent;cursor:pointer}.kq-ring{fill:none;stroke:#f5d27a;stroke-width:3;opacity:0}.kq-hot:hover .kq-ring,.kq-hot:focus .kq-ring,.kq-hot:focus-visible .kq-ring{opacity:.9}.kq-hot:focus{outline:none}
@@ -16761,7 +16823,15 @@ function serpentSVG(o) {
     .kqc-grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:16px;align-items:start}.kqc-art{width:100%;height:auto;display:block;border-radius:12px;background:#1a0f0a}
     @media(max-width:720px){.kqc-grid{grid-template-columns:1fr}}
     .kqc-id{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;opacity:.92}.kqc-id>span{white-space:normal}.kqc-link{padding:2px 8px!important;min-height:0!important;font-size:12px!important}
-    .kqc-next{padding:8px 10px;border-left:3px solid #e8c77d;background:rgba(232,199,125,.08);border-radius:4px}.kqc-on{outline:1px solid rgba(232,199,125,.5);border-radius:6px}.kqc-sk li{list-style:none}
+    .kqc-next{padding:10px 12px;border-left:3px solid #e8c77d;background:rgba(232,199,125,.1);border-radius:6px;display:grid;gap:8px}.kqc-next p{margin:0}
+    .kqc-name{margin:0;font-family:Georgia,serif;font-size:24px}.kqc-sub{margin:14px 0 4px;font-size:15px}
+    .kqc-st{display:inline-block;font:600 11px/1 Georgia,serif;letter-spacing:.06em;text-transform:uppercase;padding:4px 8px;border-radius:999px;border:1px solid currentColor;vertical-align:middle}
+    .kqc-st-unstarted{color:#9c8a6e}.kqc-st-studying{color:#9fd8c4}.kqc-st-obtained{color:#cfe8dc}.kqc-st-refining{color:#e8c77d}.kqc-st-proven{color:#f5d27a;background:rgba(245,210,122,.12)}
+    .kqc-filter input,.kqc-filter select{min-width:0;flex:1 1 150px}[data-qrow][hidden],[data-qgroup][hidden]{display:none}
+    body.kqc-full #kg-strip,body.kqc-full #moon-lab>.kl-tabs,body.kqc-full .kv-tab,body.kqc-full .kv-panel,body.kqc-full .kv-ecg,body.kqc-full .kv-fade.t{display:none!important}
+    body.kqc-full.kqc-full #kg-main{margin-top:14px!important}
+    body.kqp-quietv #kv-clock{display:none}body.kqp-quietv .kv-tab{opacity:.8}
+    #kg-main>#kg-twin{position:relative;left:auto;bottom:auto;transform:none;margin:0 auto 12px;width:fit-content;z-index:5}body.kqc-full .kqc-grid{grid-template-columns:minmax(0,4fr) minmax(0,6fr)}.kqc-on{outline:1px solid rgba(232,199,125,.5);border-radius:6px}.kqc-sk li{list-style:none}
     .kqp-home{position:absolute;inset:0;width:100%;height:100%;z-index:1;display:block}.kqp-home .kq-ltx{font-size:20px}
     .kqp-lab{opacity:0;transition:opacity .2s;pointer-events:none}.kq-hot:hover .kqp-lab,.kq-hot:focus .kqp-lab,.kqp-labels .kqp-lab{opacity:1}
     .kqp-front{position:absolute;inset:0;width:100%;height:100%;z-index:4;display:block;pointer-events:none}.kq-stage.kqp-painted{container-type:inline-size}
@@ -16814,7 +16884,12 @@ function serpentSVG(o) {
   document.head.appendChild(css);
   // the visor's clock is planner time: say so, and keep it quiet (session time has its own labelled timer)
   const kvw = document.getElementById('kv-what');
-  if (kvw) new MutationObserver(() => { if (document.body.classList.contains('kqp-theme') && kvw.textContent && !/^Planner/.test(kvw.textContent)) kvw.textContent = 'Planner · ' + kvw.textContent; }).observe(kvw, { childList: true, characterData: true, subtree: true });
+  // outside study blocks (free time, meals, reading) the visor drops its countdown for a quiet "Free until …" line, as in the room
+  const quietLabel = () => { if (sessionState().kind === 'timer') return ''; const r = planRow(); if (r && r.kind === 'study') return '';
+    const t = r ? String(r.title).split(' · ')[0] : ''; return !r ? 'Free time' : /free/i.test(t) ? `Free until ${hm(r.e)}` : `${t} until ${hm(r.e)}`; };
+  if (kvw) new MutationObserver(() => { if (!document.body.classList.contains('kqp-theme') || !kvw.textContent) return document.body.classList.remove('kqp-quietv');
+    const q = quietLabel(); document.body.classList.toggle('kqp-quietv', !!q);
+    if (q) { if (kvw.textContent !== q) kvw.textContent = q; } else if (!/^Planner/.test(kvw.textContent)) kvw.textContent = 'Planner · ' + kvw.textContent; }).observe(kvw, { childList: true, characterData: true, subtree: true });
   wireSpeech(); mountHome(); say('i', 9000); say('k', 9000);
   addEventListener('moonlab:render', () => setTimeout(wireSpeech, 120));
 })();
