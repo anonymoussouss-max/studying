@@ -7300,7 +7300,7 @@ window.KG_RECALL = {
 
   /* ---------- 1. phone + laptop sync (through the backend's /api/sync and a free Upstash database) ---------- */
   const SYNC_URL = 'https://ame-bkend321.vercel.app/api/sync';
-  const KEYS = ['ame-habit-v1', 'desk-needy-v1', 'ame-journal-v1', 'ame-chat', 'ame-talk-v1', 'ame-mute-v1', 'ame-pos-v1', 'mp-v2', 'iroha-chat', 'iroha-pos-v1', 'kg-lab-v1', 'kg-look', 'kg-quarters-v1', 'kg-cult-v1', 'kg-tomb-v1'];
+  const KEYS = ['ame-habit-v1', 'desk-needy-v1', 'ame-journal-v1', 'ame-chat', 'ame-talk-v1', 'ame-mute-v1', 'ame-pos-v1', 'mp-v2', 'iroha-chat', 'iroha-pos-v1', 'kg-lab-v1', 'kg-look', 'kg-quarters-v1', 'kg-library-v1', 'kg-cult-v1', 'kg-tomb-v1'];
   const sync = () => M.read('kg-sync', {}) || {}, setSync = o => { try { localStorage.setItem('kg-sync', JSON.stringify(Object.assign(sync(), o))); } catch (e) {} };
   if (!localStorage.getItem('kg-device')) try { localStorage.setItem('kg-device', Math.random().toString(36).slice(2, 10)); } catch (e) {}
   const device = () => localStorage.getItem('kg-device') || '';
@@ -11050,7 +11050,7 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
   M.offline = () => !navigator.onLine;
 
   /* ---------- daily safety copies: the last 7 days, kept in this browser, one click to roll back ---------- */
-  const KEYS = ['kg-lab-v1', 'ame-habit-v1', 'desk-needy-v1', 'ame-journal-v1', 'ame-chat', 'iroha-chat', 'ame-talk-v1', 'ame-pos-v1', 'iroha-pos-v1', 'mp-v2', 'kg-look', 'kg-quarters-v1'];
+  const KEYS = ['kg-lab-v1', 'ame-habit-v1', 'desk-needy-v1', 'ame-journal-v1', 'ame-chat', 'iroha-chat', 'ame-talk-v1', 'ame-pos-v1', 'iroha-pos-v1', 'mp-v2', 'kg-look', 'kg-quarters-v1', 'kg-library-v1'];
   const db = () => new Promise((ok, no) => { const r = indexedDB.open('kg-safety', 1); r.onupgradeneeded = () => r.result.createObjectStore('snaps', { keyPath: 'id' }); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
   const tx = async (mode, fn) => { const d = await db(); return new Promise((ok, no) => { const t = d.transaction('snaps', mode), q = fn(t.objectStore('snaps')); t.oncomplete = () => { d.close(); ok(q && q.result); }; t.onerror = t.onabort = () => { d.close(); no(t.error); }; }); };
   let snaps = [];
@@ -16535,8 +16535,8 @@ function serpentSVG(o) {
       go: [['✍ Study session', 'study:session'], ['Lectures and homework (Today)', 'today:today'], ['🎯 Practice', 'study:practice'], ['🔁 Revision', 'study:revision'], ['🧠 Recall', 'study:recall'], ['🔬 Tools', 'study:tools']] },
     { id: 'planner', name: 'Planner (the notebook by the lamp)', about: 'The week and its calendar.', go: [['Planner', 'plan:countdown']] },
     { id: 'cabinet', name: 'Gu cabinet', about: 'Your chapter Gu and the chapters on their way to one.', go: [['⛰ Gu cabinet', 'study:cultivation'], ['📖 Chapters', 'study:chapters'], ['✨ Stickers', 'progress:stickers']] },
-    { id: 'shelf', name: 'Shelf', about: 'Notes, PDFs and past working.',
-      go: [['Saved notes', 'library:savednotes'], ['📚 Notes', 'library:notes'], ['🧪 Methods', 'library:methods'], ['❓ Doubts', 'library:doubts'], ['💭 What it remembers', 'library:memory']] },
+    { id: 'shelf', name: 'Shelf', about: 'Your offline courses, notes, PDFs and past working.',
+      go: [['📜 Course library', 'library:courses'], ['Saved notes', 'library:savednotes'], ['📚 Notes', 'library:notes'], ['🧪 Methods', 'library:methods'], ['❓ Doubts', 'library:doubts'], ['💭 What it remembers', 'library:memory']] },
     { id: 'chest', name: 'Storage chest', about: 'Settings, backup and sync.', go: [['⚙ Settings', 'settings:companions'], ['💾 Backup', 'settings:backup'], ['🔄 Sync', 'settings:sync']] },
     { id: 'door', name: 'Doorway', about: 'Progress, rank, trials and side paths.',
       go: [['📈 Overview', 'progress:overview'], ['◆ Five skills', 'progress:skills'], ['↻ This week', 'progress:week'], ['🌙 Patterns', 'progress:patterns'], ['Weak links', 'progress:links'], ['🧾 Report', 'progress:report'],
@@ -16743,7 +16743,7 @@ function serpentSVG(o) {
   // [data attribute, value, name, hit area, label position]; nooks are added from the record
   const HOME = [
     ['kv', 'today', "Today's schedule · wall scroll", [1080, 112, 124, 370], [1142, 300]],
-    ['kv', 'progress', 'Progress · doorway', [1262, 122, 266, 320], [1395, 300]], ['kv', 'library', 'Library · shelf', [1054, 494, 162, 150], [1135, 560]],
+    ['kv', 'progress', 'Progress · doorway', [1262, 122, 266, 320], [1395, 300]], ['qgo', 'library:courses', 'Course library · shelf', [1054, 494, 162, 150], [1135, 560]],
     ['qgo', 'study:cultivation', 'Gu cabinet', [64, 196, 402, 470], [265, 222]], ['qtable', '1', 'Begin studying · writing table', [300, 684, 1080, 260], [700, 700]],
     ['kv', 'plan', 'Planner · notebook', [1062, 802, 132, 82], [1128, 790]],
     ['qgo', 'settings:companions', 'Settings · storage chest', [90, 734, 262, 150], [220, 820]], ['kv', 'company', 'Company', [1266, 460, 260, 240], [1395, 640]]];
@@ -16813,7 +16813,7 @@ function serpentSVG(o) {
     }
   }
   window.KgQuarters.HOME = HOME; window.KgQuarters.homeSVG = p => homeSVG(Object.assign({}, DEF, p), read());
-  addEventListener('moonlab:render', () => setTimeout(() => { const full = !!document.querySelector('#moon-lab .kqc'); if (full && !document.body.classList.contains('kqc-full')) scrollTo(0, 0); document.body.classList.toggle('kqc-full', full); applyFilter(); mountHome(); const kb = document.querySelector('.kv-back'); if (kb && document.body.classList.contains('kqp-theme')) kb.textContent = '← Back to the quarters'; }, 60));
+  addEventListener('moonlab:render', () => setTimeout(() => { const full = !!document.querySelector('#moon-lab .kqc, #moon-lab .klib-full'); if (full && !document.body.classList.contains('kqc-full')) scrollTo(0, 0); document.body.classList.toggle('kqc-full', full); applyFilter(); mountHome(); const kb = document.querySelector('.kv-back'); if (kb && document.body.classList.contains('kqp-theme')) kb.textContent = '← Back to the quarters'; }, 60));
   setInterval(() => { if (!document.hidden) clockTick(); }, 1000);
   const css = document.createElement('style');
   css.textContent = `.kq-hit{fill:transparent;cursor:pointer}.kq-ring{fill:none;stroke:#f5d27a;stroke-width:3;opacity:0}.kq-hot:hover .kq-ring,.kq-hot:focus .kq-ring,.kq-hot:focus-visible .kq-ring{opacity:.9}.kq-hot:focus{outline:none}
@@ -16892,6 +16892,215 @@ function serpentSVG(o) {
     if (q) { if (kvw.textContent !== q) kvw.textContent = q; } else if (!/^Planner/.test(kvw.textContent)) kvw.textContent = 'Planner · ' + kvw.textContent; }).observe(kvw, { childList: true, characterData: true, subtree: true });
   wireSpeech(); mountHome(); say('i', 9000); say('k', 9000);
   addEventListener('moonlab:render', () => setTimeout(wireSpeech, 120));
+})();
+</script>
+<script id="kg-courses-script">
+/* ---------- Course library: your offline courses, played from your own disk inside the desk. ----------
+   Media never enters this site or its repository. The desk reads kaguya-library.json (built by tools/library-index.cjs) and the
+   files it lists, either from a folder you choose in the browser or from the read-only local server (tools/library-server.cjs).
+   Progress, positions and notes live in 'kg-library-v1' like the desk's other records. Watching is course progress only:
+   it never obtains or refines a Chapter Gu, passes a proof or counts as retention. */
+(function () {
+  const M = window.MoonLab, KEY = 'kg-library-v1';
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const blank = () => ({ v: 1, src: null, lec: {}, last: null, notes: [] });
+  const store = () => { try { return Object.assign(blank(), JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { return blank(); } };
+  const put = s => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} };
+  const lk = (c, l) => c + '/' + l;
+  // ---- pure rules (tested) ----
+  const srtToVtt = t => 'WEBVTT\n\n' + String(t || '').replace(/^\uFEFF/, '').replace(/\r/g, '').replace(/^\d+\n(?=\d{2}:\d{2})/gm, '').replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+  const lecturesOf = c => (c.modules || []).flatMap(m => m.lectures || []);
+  const lecState = p => !p ? 'unstarted' : p.done ? 'completed' : (p.pos || 0) > 5 ? 'in-progress' : 'unstarted';
+  function courseState(c, s) { const L = lecturesOf(c); if (!L.length) return 'unstarted'; const st = L.map(l => lecState(s.lec[lk(c.id, l.id)]));
+    return st.every(x => x === 'completed') ? 'completed' : st.some(x => x !== 'unstarted') ? 'in-progress' : 'unstarted'; }
+  // availability is about files, never about learning: available, partial (some lectures usable) or WIP (planned, unverified)
+  const availOf = c => c.status === 'wip' ? 'wip' : c.status === 'available' ? 'available' : 'partial';
+  const AV = { available: 'Available offline', partial: 'Partly available', wip: 'WIP — download pending verification' };
+  const ST = { unstarted: 'Unstarted', 'in-progress': 'In progress', completed: 'Completed' };
+  function resumeOf(c, s) { const L = lecturesOf(c).filter(l => l.ok);
+    return L.find(l => lecState(s.lec[lk(c.id, l.id)]) === 'in-progress') || L.find(l => lecState(s.lec[lk(c.id, l.id)]) !== 'completed') || L[0] || null; }
+  // a position is saved as it plays; 92% watched marks the lecture complete. Completion is never mastery.
+  function record(s, c, l, pos, dur) { const k = lk(c, l), p = s.lec[k] || {}; p.pos = Math.max(0, Math.round(pos || 0)); if (dur) p.dur = Math.round(dur);
+    p.at = Date.now(); if (p.dur && p.pos / p.dur >= 0.92) p.done = true; s.lec[k] = p; s.last = { c, l }; return p; }
+  window.KgCourses = { KEY, srtToVtt, lecState, courseState, availOf, resumeOf, record, lecturesOf };
+  if (!M || !M.PANELS) return;
+
+  // ---- where the files come from: a folder you chose (File System Access) or the local server ----
+  const idb = (mode, fn) => new Promise((ok, no) => { const r = indexedDB.open('kg-library', 1); r.onupgradeneeded = () => r.result.createObjectStore('h');
+    r.onsuccess = () => { const t = r.result.transaction('h', mode), q = fn(t.objectStore('h')); t.oncomplete = () => { r.result.close(); ok(q && q.result); }; t.onerror = () => no(t.error); }; r.onerror = () => no(r.error); });
+  let index = null, phase = 'idle', err = '', handle = null, view = { c: '', l: '' }, made = [];
+  const segs = p => String(p).split('/').filter(Boolean);
+  async function fileOf(p) { let d = handle; const s = segs(p); for (const x of s.slice(0, -1)) d = await d.getDirectoryHandle(x); return (await d.getFileHandle(s[s.length - 1])).getFile(); }
+  const base = () => { const s = store().src; return s && s.kind === 'url' ? s.base.replace(/\/+$/, '') + '/' : ''; };
+  const urlOf = p => base() + segs(p).map(encodeURIComponent).join('/');
+  async function textOf(p) { if (handle) return (await fileOf(p)).text(); const r = await fetch(urlOf(p)); if (!r.ok) throw new Error(r.status === 404 ? 'file missing' : 'HTTP ' + r.status); return r.text(); }
+  async function mediaURL(p) { if (!handle) return urlOf(p); const u = URL.createObjectURL(await fileOf(p)); made.push(u); return u; }
+  const freeURLs = () => { made.forEach(u => URL.revokeObjectURL(u)); made = []; };
+  const onCourses = () => document.body.classList.contains('kg-sec-library') && !!document.querySelector('#moon-lab .klib');
+  async function load(interactive) {
+    const s = store(); if (!s.src) { phase = 'none'; return; }
+    phase = 'loading'; err = '';
+    try {
+      if (s.src.kind === 'folder') {
+        handle = handle || await idb('readonly', st => st.get('root'));
+        if (!handle) throw new Error('the chosen folder is no longer remembered; choose it again');
+        let perm = await handle.queryPermission({ mode: 'read' }); if (perm !== 'granted' && interactive) perm = await handle.requestPermission({ mode: 'read' });
+        if (perm !== 'granted') { phase = 'reconnect'; return; }
+      } else handle = null;
+      index = JSON.parse(await textOf('kaguya-library.json')); phase = 'ready';
+    } catch (e) { index = null; phase = 'error'; err = /fetch|network/i.test(String(e)) ? 'the local library server is not reachable' : /missing|NotFound/i.test(String(e)) ? 'kaguya-library.json was not found in that folder (run tools/library-index.cjs on it first)' : String(e.message || e); }
+    if (onCourses()) M.render();
+  }
+
+  // ---- views ----
+  const course = id => index && index.courses.find(c => c.id === id);
+  const chip = (cls, t) => `<span class="klib-chip klib-${cls}">${esc(t)}</span>`;
+  const pct = p => p && p.dur ? Math.min(100, Math.round(100 * p.pos / p.dur)) : 0;
+  const mins = s => s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round(s % 3600 / 60)} min` : `${Math.round(s / 60)} min`;
+  function sourceCard(open) {
+    const s = store(), fsOK = typeof window.showDirectoryPicker === 'function';
+    return `<details class="klib-src"${open ? ' open' : ''}><summary class="kl-small">Library source · ${s.src ? (s.src.kind === 'folder' ? 'a folder on this computer' : esc(s.src.base)) : 'not connected'}</summary><div class="kl-stack">
+      <p class="kl-small">The 61 GB library stays on your disk; nothing is uploaded. First build its index once: <code>node tools/library-index.cjs "C:\\Users\\…\\Downloads\\Coursera"</code>.</p>
+      <div class="kl-row" style="flex-wrap:wrap">${fsOK ? '<button data-lib="pick">Choose the course folder…</button>' : '<span class="kl-small">This browser cannot open a folder directly; use the local server below.</span>'}</div>
+      <form data-libf="url" class="kl-row" style="flex-wrap:wrap"><input name="base" value="${esc(s.src && s.src.kind === 'url' ? s.src.base : 'http://127.0.0.1:8770/')}" aria-label="Local library server address"><button>Use the local server</button></form>
+      <p class="kl-small">Server: <code>node tools/library-server.cjs "C:\\Users\\…\\Downloads\\Coursera"</code>. It listens on this computer only and serves just the files in the index.</p>
+      ${s.src ? '<button class="kl-ghost" data-lib="forget">Disconnect the library</button>' : ''}</div></details>`;
+  }
+  function collection() {
+    const s = store(), last = s.last && course(s.last.c), lastL = last && lecturesOf(last).find(l => l.id === s.last.l);
+    const card = c => { const av = availOf(c), st = courseState(c, s), L = lecturesOf(c), done = L.filter(l => lecState(s.lec[lk(c.id, l.id)]) === 'completed').length, usable = L.filter(l => l.ok).length;
+      return `<button class="klib-card" data-lib="course" data-c="${esc(c.id)}"><b>${esc(c.title)}</b>${c.by ? `<span class="kl-small">${esc(c.by)}</span>` : ''}
+        <span class="klib-chips">${chip(st, ST[st])}${chip(av, AV[av])}</span>
+        <span class="kl-small">${L.length ? `${done} of ${L.length} lectures completed` : 'No lectures on disk yet'}${av !== 'available' ? ` · ${usable} usable${c.expected ? ` of ${c.expected} expected` : ''}` : ''}</span>
+        <span class="klib-bar"><i style="width:${L.length ? Math.round(100 * done / L.length) : 0}%"></i></span></button>`; };
+    const ver = index.courses.filter(c => c.kind !== 'planned' || c.status === 'available'), wip = index.courses.filter(c => c.kind === 'planned' && c.status !== 'available');
+    return `<section class="kl-card kl-stack klib"><p class="kl-eyebrow">📜 COURSE LIBRARY · SOUTHERN BORDER</p><h2>Your offline courses</h2>
+      <p class="kl-small">Course progress is kept here only. Watching never obtains or refines a Chapter Gu, passes a proof or counts as retention. Scheduling stays optional, inside your existing study allowance.</p>
+      ${last && lastL ? `<div class="klib-resume"><span>Continue <b>${esc(last.title)}</b> · ${esc(lastL.name)}</span><button class="kl-primary" data-lib="play" data-c="${esc(last.id)}" data-l="${esc(lastL.id)}">Resume</button></div>` : ''}
+      <div class="kl-row klib-filter" style="flex-wrap:wrap"><input type="search" data-libq="1" placeholder="Search courses" aria-label="Search courses"></div>
+      <div class="klib-grid">${ver.map(card).join('')}</div>
+      <h3 class="klib-h3">Planned additions</h3><p class="kl-small">Shown as WIP until every expected lecture has a valid video. Usable lectures can already be watched.</p>
+      <div class="klib-grid">${wip.map(card).join('')}</div>${sourceCard(false)}</section>`;
+  }
+  function courseView(c) {
+    const s = store(), r = resumeOf(c, s), av = availOf(c), st = courseState(c, s);
+    const row = (l, i) => { const p = s.lec[lk(c.id, l.id)], ls = lecState(p);
+      return `<li class="klib-lec klib-l-${ls}"><button data-lib="play" data-c="${esc(c.id)}" data-l="${esc(l.id)}"${l.ok ? '' : ' aria-disabled="true"'}><span class="klib-n">${i + 1}</span><span class="klib-t">${esc(l.name)}</span>
+        <span class="kl-small">${!l.ok ? 'File missing or invalid' : ls === 'completed' ? '✓ Completed' : ls === 'in-progress' ? `${pct(p)}% watched` : ''}${l.subs.length ? ' · CC' : ''}${l.transcripts.length ? ' · transcript' : ''}${l.pdfs.length ? ` · ${l.pdfs.length} PDF` : ''}</span></button></li>`; };
+    let n = 0;
+    return `<section class="kl-card kl-stack klib klib-full"><div class="kl-row" style="justify-content:space-between;flex-wrap:wrap"><button class="kl-ghost" data-lib="home">← All courses</button><button class="kl-ghost" data-qgo="today:today">← Back to the quarters</button></div>
+      <p class="kl-eyebrow">📜 COURSE${c.by ? ' · ' + esc(c.by.toUpperCase()) : ''}</p><h2>${esc(c.title)}</h2>
+      <p class="klib-chips">${chip(st, ST[st])}${chip(av, AV[av])}</p>${c.note ? `<p class="kl-small">${esc(c.note)}</p>` : ''}
+      <p class="kl-small">Chapter Gu link: none. No reliable mapping to your syllabus chapters, so this course is left unassigned.</p>
+      ${r ? `<div class="klib-resume"><span>${lecState(s.lec[lk(c.id, r.id)]) === 'in-progress' ? 'Resume' : 'Next'}: <b>${esc(r.name)}</b></span><button class="kl-primary" data-lib="play" data-c="${esc(c.id)}" data-l="${esc(r.id)}">${lecState(s.lec[lk(c.id, r.id)]) === 'in-progress' ? 'Resume' : 'Play'}</button></div>` : '<p class="kl-small">No playable lecture is on disk yet.</p>'}
+      ${c.modules.map((m, mi) => { const open = r && m.lectures.some(l => l.id === r.id) || (!r && mi === 0), start = n; n += m.lectures.length;
+        const done = m.lectures.filter(l => lecState(s.lec[lk(c.id, l.id)]) === 'completed').length;
+        return `<details class="klib-mod"${open ? ' open' : ''}><summary><b>${esc(m.name)}</b> <span class="kl-small">· ${done}/${m.lectures.length} completed</span></summary><ol class="klib-lecs">${m.lectures.map((l, i) => row(l, start + i)).join('')}</ol>
+          ${(m.resources || []).length ? `<p class="kl-small">Module files: ${m.resources.map(x => `<button class="kl-ghost klib-res" data-lib="file" data-p="${esc(x.path)}">${esc(x.name)}</button>`).join(' ')}</p>` : ''}</details>`; }).join('')}</section>`;
+  }
+  function playerView(c, l) {
+    const s = store(), L = lecturesOf(c), i = L.findIndex(x => x.id === l.id), prev = L[i - 1], next = L[i + 1], p = s.lec[lk(c.id, l.id)], ls = lecState(p);
+    const mine = s.notes.filter(n => n.c === c.id && n.l === l.id);
+    return `<section class="kl-card kl-stack klib klib-full klib-player"><div class="kl-row" style="justify-content:space-between;flex-wrap:wrap">
+        <button class="kl-ghost" data-lib="course" data-c="${esc(c.id)}">← ${esc(c.title)}</button><span class="kl-small">${esc(l.module)} · lecture ${i + 1} of ${L.length}</span></div>
+      <h2 class="klib-title">${esc(l.name)}</h2>
+      <div id="klib-stage" class="klib-stage">${l.ok ? '' : `<p class="klib-miss">This lecture's video is missing or invalid on disk (${esc(l.why || 'missing')}). Its other files are still listed below.</p>`}</div>
+      <div class="kl-row klib-ctrl" style="flex-wrap:wrap">${prev ? `<button class="kl-ghost" data-lib="play" data-c="${esc(c.id)}" data-l="${esc(prev.id)}">← Previous</button>` : ''}${next ? `<button class="kl-ghost" data-lib="play" data-c="${esc(c.id)}" data-l="${esc(next.id)}">Next →</button>` : ''}
+        ${l.subs.length ? `<label class="kl-small">Subtitles <select data-libsub="1"><option value="">Off</option>${l.subs.map((x, k) => `<option value="${k}"${k === 0 && x.lang === 'en' ? ' selected' : ''}>${esc(x.lang)}</option>`).join('')}</select></label>` : '<span class="kl-small">No subtitles on disk</span>'}
+        <button class="kl-ghost" data-lib="done" data-c="${esc(c.id)}" data-l="${esc(l.id)}" aria-pressed="${ls === 'completed'}">${ls === 'completed' ? '✓ Completed' : 'Mark completed'}</button></div>
+      <div class="kl-row" style="flex-wrap:wrap">${l.transcripts.map((x, k) => `<button class="kl-ghost" data-lib="transcript" data-k="${k}">Transcript (${esc(x.lang)})</button>`).slice(0, 3).join('')}${l.pdfs.map(x => `<button class="kl-ghost" data-lib="file" data-p="${esc(x.path)}">PDF · ${esc(x.name)}</button>`).join('')}</div>
+      <div id="klib-trans" class="klib-trans" hidden></div>
+      <form data-libf="note" class="kl-stack klib-note"><label>Note on this lecture <textarea name="t" rows="3" maxlength="4000" placeholder="A question, a formula, where to rewatch…"></textarea></label><div class="kl-row"><button>Save note</button><span class="kl-small">Kept with your notes in Library → Notes.</span></div></form>
+      ${mine.length ? `<ul class="kl-list">${mine.map(n => `<li class="kl-li"><span>${esc(n.t)}<small>${new Date(n.at).toLocaleString()}${n.pos != null ? ' · at ' + Math.floor(n.pos / 60) + ':' + String(n.pos % 60).padStart(2, '0') : ''}</small></span><button class="kl-ghost" data-lib="delnote" data-id="${esc(n.id)}">Delete</button></li>`).join('')}</ul>` : ''}
+      <p class="kl-small">Course progress only: completing videos never obtains or refines a Chapter Gu, passes a proof or counts as retention.</p></section>`;
+  }
+  M.PANELS.courses = () => {
+    if (!index && phase === 'idle') { phase = 'loading'; setTimeout(() => load(false), 0); }
+    const s = store(); if (!s.src || phase === 'none') return `<section class="kl-card kl-stack klib"><p class="kl-eyebrow">📜 COURSE LIBRARY · SOUTHERN BORDER</p><h2>Connect your offline courses</h2><p>Your courses stay on your disk. Connect the folder once and the desk remembers it.</p>${sourceCard(true)}</section>`;
+    if (phase === 'loading') return `<section class="kl-card klib"><p class="kl-eyebrow">📜 COURSE LIBRARY</p><p>Opening the library…</p></section>`;
+    if (phase === 'reconnect') return `<section class="kl-card kl-stack klib"><p class="kl-eyebrow">📜 COURSE LIBRARY</p><p>The browser needs your permission again to read the course folder.</p><div class="kl-row"><button class="kl-primary" data-lib="reconnect">Reconnect the folder</button></div>${sourceCard(false)}</section>`;
+    if (phase === 'error' || !index) return `<section class="kl-card kl-stack klib"><p class="kl-eyebrow">📜 COURSE LIBRARY</p><p>Couldn't open the library: ${esc(err || 'unknown reason')}.</p><div class="kl-row"><button data-lib="retry">Try again</button></div>${sourceCard(true)}</section>`;
+    const c = view.c && course(view.c), l = c && view.l && lecturesOf(c).find(x => x.id === view.l);
+    return l ? playerView(c, l) : c ? courseView(c) : collection();
+  };
+
+  // ---- the player: one <video>, kept outside re-renders so playback survives them ----
+  const vid = document.createElement('video'); vid.className = 'klib-video'; vid.controls = true; vid.preload = 'metadata'; vid.playsInline = true;
+  let cur = null, want = false, lastSave = 0;
+  const save = force => { if (!cur || !vid.duration || vid.seeking) return; if (!force && Date.now() - lastSave < 5000) return; lastSave = Date.now(); const s = store(); record(s, cur.c, cur.l, vid.currentTime, vid.duration); put(s); };
+  vid.addEventListener('timeupdate', () => save(false)); vid.addEventListener('seeked', () => save(true)); vid.addEventListener('ended', () => save(true));
+  vid.addEventListener('pause', () => { if (vid.isConnected) { want = false; save(true); } });
+  vid.addEventListener('play', () => { want = true; });
+  vid.addEventListener('error', () => { const st = document.getElementById('klib-stage'); if (st && cur) st.insertAdjacentHTML('beforeend', '<p class="klib-miss">This video could not be played: the file is missing, unreadable or the library is disconnected.</p>'); });
+  addEventListener('visibilitychange', () => document.hidden && save(true)); addEventListener('pagehide', () => save(true));
+  async function setTrack(k) { [...vid.querySelectorAll('track')].forEach(t => t.remove()); const c = course(cur.c), l = c && lecturesOf(c).find(x => x.id === cur.l); const x = l && l.subs[k]; if (!x) return;
+    try { const raw = await textOf(x.path), u = URL.createObjectURL(new Blob([/\.vtt$/i.test(x.path) ? raw : srtToVtt(raw)], { type: 'text/vtt' })); made.push(u);
+      const t = document.createElement('track'); t.kind = 'subtitles'; t.srclang = x.lang; t.label = x.lang; t.src = u; t.default = true; vid.appendChild(t); t.addEventListener('load', () => { t.track.mode = 'showing'; }); t.track.mode = 'showing';
+    } catch (e) { const st = document.getElementById('klib-stage'); if (st) st.insertAdjacentHTML('beforeend', '<p class="kl-small">Subtitles unavailable for this lecture.</p>'); } }
+  async function mountPlayer() {
+    const stage = document.getElementById('klib-stage'), c = view.c && course(view.c), l = c && view.l && lecturesOf(c).find(x => x.id === view.l);
+    if (!stage || !l || !l.ok) { if (!l && cur) { save(true); vid.pause(); } return; }
+    if (vid.parentElement !== stage) stage.prepend(vid);
+    if (cur && cur.c === c.id && cur.l === l.id) { if (want && vid.paused) vid.play().catch(() => {}); return; }
+    save(true); freeURLs(); cur = { c: c.id, l: l.id }; want = false;
+    const p = store().lec[lk(c.id, l.id)];
+    vid.removeAttribute('src'); [...vid.querySelectorAll('track')].forEach(t => t.remove());
+    try { vid.src = await mediaURL(l.video); } catch (e) { stage.insertAdjacentHTML('beforeend', '<p class="klib-miss">The video file could not be opened from the library.</p>'); return; }
+    vid.addEventListener('loadedmetadata', function once() { vid.removeEventListener('loadedmetadata', once); if (p && !p.done && p.pos > 5 && p.pos < vid.duration - 5) vid.currentTime = p.pos; }, { once: true });
+    const s = store(); s.last = { c: c.id, l: l.id }; put(s);
+    if (l.subs.length && l.subs[0].lang === 'en') setTrack(0);
+  }
+  addEventListener('moonlab:render', () => setTimeout(() => { if (document.getElementById('klib-stage')) mountPlayer(); else if (cur && !vid.isConnected) { save(true); want = false; } }, 30));
+
+  // ---- controls ----
+  const go = () => { if (onCourses()) M.render(); else M.go('library', 'courses'); };
+  document.addEventListener('click', async e => {
+    const t = e.target.closest && e.target.closest('[data-lib]'); if (!t) return; e.preventDefault(); const d = t.dataset;
+    if (d.lib === 'home') { view = { c: '', l: '' }; return go(); }
+    if (d.lib === 'course') { view = { c: d.c, l: '' }; return go(); }
+    if (d.lib === 'play') { if (t.getAttribute('aria-disabled') === 'true') return; view = { c: d.c, l: d.l }; go(); return requestAnimationFrame(() => scrollTo(0, 0)); }
+    if (d.lib === 'done') { const s = store(), p = s.lec[lk(d.c, d.l)] || { pos: 0 }; p.done = !p.done; p.at = Date.now(); s.lec[lk(d.c, d.l)] = p; put(s); return M.render(); }
+    if (d.lib === 'file') { const w = window.open('', '_blank'); try { const u = await mediaURL(d.p); if (w) w.location = u; else location.assign(u); } catch (x) { if (w) w.close(); alert('That file is missing from the library folder.'); } return; }
+    if (d.lib === 'transcript') { const box = document.getElementById('klib-trans'), c = course(cur ? cur.c : view.c), l = c && lecturesOf(c).find(x => x.id === view.l), x = l && l.transcripts[+d.k]; if (!box || !x) return;
+      box.hidden = false; box.textContent = 'Loading transcript…'; try { box.textContent = await textOf(x.path); } catch (y) { box.textContent = 'This transcript is not available on disk.'; } return; }
+    if (d.lib === 'delnote') { const s = store(); s.notes = s.notes.filter(n => n.id !== d.id); put(s); return M.render(); }
+    if (d.lib === 'pick') { try { const h = await window.showDirectoryPicker({ id: 'kg-courses', mode: 'read' }); await idb('readwrite', st => st.put(h, 'root')); handle = h; const s = store(); s.src = { kind: 'folder' }; put(s); index = null; await load(true); } catch (x) { if (x && x.name !== 'AbortError') { err = String(x.message || x); phase = 'error'; M.render(); } } return; }
+    if (d.lib === 'reconnect' || d.lib === 'retry') { phase = 'loading'; M.render(); return load(true); }
+    if (d.lib === 'forget') { const s = store(); s.src = null; put(s); handle = null; index = null; phase = 'none'; try { await idb('readwrite', st => st.delete('root')); } catch (x) {} return M.render(); }
+  });
+  document.addEventListener('submit', e => {
+    const f = e.target.closest && e.target.closest('form[data-libf]'); if (!f) return; e.preventDefault();
+    if (f.dataset.libf === 'url') { const b = String(f.base.value || '').trim(); if (!/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?\/?$/.test(b)) return alert('Use a server on this computer, e.g. http://127.0.0.1:8770/'); const s = store(); s.src = { kind: 'url', base: b }; put(s); handle = null; index = null; phase = 'loading'; M.render(); return load(false); }
+    if (f.dataset.libf === 'note') { const t = String(f.t.value || '').trim(); if (!t || !view.c) return; const s = store(); s.notes.push({ id: 'cn' + Date.now().toString(36), c: view.c, l: view.l, t: t.slice(0, 4000), at: Date.now(), pos: cur && cur.l === view.l ? Math.round(vid.currentTime) : null }); put(s); M.render(); }
+  });
+  document.addEventListener('change', e => { const t = e.target; if (t && t.dataset && t.dataset.libsub != null && cur) { t.value === '' ? [...vid.querySelectorAll('track')].forEach(x => x.remove()) : setTrack(+t.value); } });
+  document.addEventListener('input', e => { const t = e.target; if (!t || !t.dataset || !t.dataset.libq) return; const q = t.value.toLowerCase(); for (const b of document.querySelectorAll('#moon-lab .klib-card')) b.hidden = !!q && !b.textContent.toLowerCase().includes(q); });
+
+  // ---- notes: course notes appear in Library → Notes, beside the lecture notes ----
+  const notesPanel = M.PANELS.notes;
+  if (notesPanel) M.PANELS.notes = () => { const s = store(), list = s.notes.slice(-12).reverse(), name = n => { const c = course(n.c), l = c && lecturesOf(c).find(x => x.id === n.l); return (c ? c.title : n.c) + (l ? ' · ' + l.name : ''); };
+    return (list.length ? `<section class="kl-card kl-stack"><p class="kl-eyebrow">COURSE NOTES</p>${list.map(n => `<div class="kl-li"><span>${esc(n.t)}<small>${esc(name(n))} · ${new Date(n.at).toLocaleDateString()}</small></span><button class="kl-ghost" data-lib="play" data-c="${esc(n.c)}" data-l="${esc(n.l)}">Open lecture</button></div>`).join('')}<p class="kl-small">Course notes are separate from lecture revisions: they never schedule a spaced check.</p></section>` : '') + notesPanel(); };
+
+  // ---- the Library opens on the courses ----
+  if (M.SECTIONS && M.SECTIONS.library && !M.SECTIONS.library.some(t => t[0] === 'courses')) M.SECTIONS.library.unshift(['courses', '📜 Courses']);
+  const css = document.createElement('style');
+  css.textContent = `.klib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+    .klib-card{display:grid;gap:6px;text-align:left;padding:14px;border-radius:12px;border:1px solid var(--desk-line,#5a3d26);background:var(--desk-soft,#33201a);color:inherit;cursor:pointer;font:inherit}
+    .klib-card:hover,.klib-card:focus-visible{border-color:var(--desk-accent,#e8c77d)}.klib-card[hidden]{display:none}
+    .klib-chips{display:flex;flex-wrap:wrap;gap:6px}.klib-chip{font:600 11px/1 Georgia,serif;letter-spacing:.05em;padding:4px 8px;border-radius:999px;border:1px solid currentColor}
+    .klib-unstarted{color:#9c8a6e}.klib-in-progress{color:#9fd8c4}.klib-completed{color:#f5d27a}.klib-available{color:#cfe8dc}.klib-partial{color:#e7a07a}.klib-wip{color:#ffb4a0;background:rgba(255,140,110,.1)}
+    .klib-bar{height:4px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}.klib-bar i{display:block;height:100%;background:var(--desk-accent,#e8c77d)}
+    .klib-resume{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;border-left:3px solid var(--desk-accent,#e8c77d);background:rgba(232,199,125,.08);border-radius:6px}
+    .klib-h3{margin:18px 0 0}.klib-mod summary{cursor:pointer;padding:8px 0}.klib-lecs{list-style:none;padding:0;margin:0;display:grid;gap:4px}
+    .klib-lec button{width:100%;display:grid;grid-template-columns:2.2em 1fr auto;gap:10px;align-items:center;text-align:left;padding:8px 10px;border-radius:8px;border:1px solid transparent;background:none;color:inherit;font:inherit;cursor:pointer}
+    .klib-lec button:hover,.klib-lec button:focus-visible{border-color:var(--desk-line,#5a3d26);background:rgba(255,255,255,.03)}.klib-lec button[aria-disabled=true]{opacity:.5;cursor:not-allowed}
+    .klib-n{opacity:.6;font-variant-numeric:tabular-nums}.klib-l-completed .klib-t{opacity:.75}.klib-l-in-progress .klib-n{color:#9fd8c4;opacity:1}
+    .klib-player{max-width:1320px;margin-inline:auto}.klib-title{margin:0;font-family:Georgia,serif}
+    .klib-stage{background:#000;border-radius:12px;overflow:hidden;min-height:120px}.klib-video{display:block;width:100%;max-height:78vh;background:#000}
+    .klib-video::cue{font-size:1.05em;background:rgba(0,0,0,.6)}.klib-miss{padding:18px;color:#ffd0c0}
+    .klib-trans{max-height:40vh;overflow:auto;white-space:pre-wrap;padding:12px;border-radius:8px;background:rgba(0,0,0,.25);line-height:1.6}
+    .klib-src{margin-top:12px}.klib-src code{font-size:12px;word-break:break-all}`;
+  document.head.appendChild(css);
 })();
 </script>
 </body></html>
