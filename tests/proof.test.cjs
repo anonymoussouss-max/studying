@@ -132,3 +132,9 @@ test('the desk never awards from seed data, never writes the study record from h
   assert.ok(src.includes("not an authoritative verdict")); assert.ok(src.includes('closed-book declaration'));
   assert.ok(html.includes("window.__kgPurpose ? { purpose: window.__kgPurpose } : {}"));
 });
+test('real-model test fixes: transcription requests carry no persona note; marking only flags spots the transcription marks unclear', () => {
+  assert.ok(html.includes('content: window.__kgPurpose === "proof-read" ? text : text + "\\n\\n" + (who === "iroha" ? IROHA_NOTE : KAGUYA_NOTE)'));
+  assert.ok(html.includes('Only flag spots the transcription itself marks [?] or notes as ambiguous in brackets; never suggest that clearly transcribed characters were misread'));
+  const set = html.indexOf("window.__kgPurpose = 'proof-read';"), ask = html.indexOf("window.__kgAsk('iroha', `[proof transcription", set);
+  assert.ok(set > 0 && ask > set && ask - set < 200, 'purpose is set right before the transcription request');
+});

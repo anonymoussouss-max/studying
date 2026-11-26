@@ -3191,7 +3191,8 @@ window.__KG_BUILTIN = {
     else { iconv.length = 0; saveI(); imsgs.textContent = ""; }
   };
   window.__kaguyaAsk = text => { if (!isOpen) openChat(); input.value = text; sendMessage(); };
-  window.__kgAsk = (who, text, image, long) => postChat([{ role: "user", content: text + "\n\n" + (who === "iroha" ? IROHA_NOTE : KAGUYA_NOTE) }], ameContext(), who, long ? 55000 : image ? 30000 : 25000, image, long);
+  // photo-proof transcriptions get no persona note: the backend's faithful-transcription brief is the whole instruction
+  window.__kgAsk = (who, text, image, long) => postChat([{ role: "user", content: window.__kgPurpose === "proof-read" ? text : text + "\n\n" + (who === "iroha" ? IROHA_NOTE : KAGUYA_NOTE) }], ameContext(), who, long ? 55000 : image ? 30000 : 25000, image, long);
 
   // ---------- the timed session on the desk: both of them can see it ----------
   const activeSession = () => { try { const a = JSON.parse(localStorage.getItem("ame-habit-v1") || "null")?.active; return a && a.targetMs ? a : null; } catch (e) { return null; } };
@@ -16299,7 +16300,7 @@ Questions: ${s.qs.map(q => `${q.id}: ${q.t} (reference answer: ${q.a})`).join(' 
 My transcribed working: ${reads.join('\n---\n').slice(0, 12000)}
 ${Object.entries(s.reads).filter(([, r]) => r.fix).map(([q, r]) => `My correction for ${q}: ${r.fix}`).join('\n')}
 Reply with JSON only: {"questions":[{"id":"q0","transcription":"...","readable":true,"unclear":[{"where":"...","changesVerdict":false}],"rubric":{"method":0-2,"concept":0-2,"execution":0-2,"checks":0-2},"finalMatches":true,"validAlternative":false,"skills":["skill ids shown"],"rationale":"..."}]}
-Rules: a right final answer with invalid reasoning gets method 0 or 1. A minor arithmetic slip with sound reasoning gets execution 1. A valid method different from the reference is validAlternative true. If notation or handwriting could change the result, list it in unclear with changesVerdict true rather than guessing. The reference answer may itself be wrong: say so in rationale.`;
+Rules: a right final answer with invalid reasoning gets method 0 or 1. A minor arithmetic slip with sound reasoning gets execution 1. A valid method different from the reference is validAlternative true. If notation or handwriting could change the result, list it in unclear with changesVerdict true rather than guessing. Only flag spots the transcription itself marks [?] or notes as ambiguous in brackets; never suggest that clearly transcribed characters were misread: I check the transcription myself. The reference answer may itself be wrong: say so in rationale.`;
       const r = await window.__kgAsk('iroha', prompt, null, true);
       if (!r || r.error || !r.reply) throw new Error(r && r.error || 'no reply');
       const pm = parseMarks(r.reply, s.qs);
