@@ -21,7 +21,7 @@ function load({ withM = true, prefs = null, today = null, stage = null } = {}) {
   const store = { 'kg-lab-v1': '{}' }, writes = [];
   if (prefs) store['kg-quarters-v1'] = JSON.stringify(prefs);
   const ls = { getItem: k => store[k] ?? null, setItem: (k, v) => { writes.push(k); store[k] = String(v); } };
-  const doc = { createElement: () => ({}), head: { appendChild() {} }, addEventListener() {}, getElementById: id => id === 'kg-scene' && stage ? { querySelector: () => stage } : null };
+  const doc = { createElement: () => ({}), head: { appendChild() {} }, addEventListener() {}, getElementById: id => id === 'kg-scene' && stage ? { querySelector: () => stage, classList: stage.sceneClass } : null };
   const ctx = { Math, JSON, Number, String, Object, Array, Set, Map, Date, console, localStorage: ls, document: doc, requestAnimationFrame: f => f(), matchMedia: () => ({ matches: false }), MouseEvent: function () {}, addEventListener() {}, setTimeout: f => f() };
   ctx.window = ctx; ctx.globalThis = ctx;
   vm.runInNewContext(CULT, ctx); vm.runInNewContext(RANK, ctx);
@@ -114,7 +114,7 @@ test('no decay, no upkeep, and no story content past the agreed boundary', () =>
 });
 
 // a stand-in for the desk's home stage (.kq-stage) with just what mountHome touches
-const fakeStage = () => { const st = { cls: new Set(), html: '', el: null, classList: { toggle: (c, on) => on ? st.cls.add(c) : st.cls.delete(c) },
+const fakeStage = () => { const st = { cls: new Set(), html: '', el: null, sceneClass: { toggle() {} }, classList: { toggle: (c, on) => on ? st.cls.add(c) : st.cls.delete(c) },
   querySelector: () => st.el, insertAdjacentHTML: (w, h) => { st.html = h; st.el = { remove: () => { st.el = null; st.html = ''; } }; } }; return st; };
 
 test('home: the painted quarters replace the drawn backdrop by default, and every old door has a painted place', () => {
