@@ -13,7 +13,7 @@ function load(lab = {}) {
 }
 const SP = load(), MON = '2026-11-23', C0 = { actual14: {}, loggedAny: false, diplomaToday: 0 };
 const COURSE = () => ({ lectures: [{ id: 'a', day: 1, title: 'Light', watch: 'watched' }, { id: 'b', day: 2, title: 'Spectra', watch: 'none' }], tasks: [] });
-const lab = (astro, sched = {}) => ({ syl: SP.seedSyllabus(), astro: COURSE(), sched: Object.assign({ astro, wake: { [MON]: 720 } }, sched) });
+const lab = (astro, sched = {}) => ({ syl: SP.seedSyllabus(), astro: COURSE(), sched: Object.assign({ reading: false, astro, wake: { [MON]: 720 } }, sched) });
 const study = t => t.rows.filter(r => r.kind === 'study'), sum = (rs, f = () => true) => rs.filter(f).reduce((n, r) => n + r.e - r.s, 0);
 
 test('course time replaces PCM time: the day total and German never change', () => {
@@ -89,12 +89,12 @@ test('kept apart from PCM: course practice adds no PCM skill credit, misses or s
 });
 
 test("hours targets: the day's study matches 4-7 h, 8 h stops at what fits before bedtime, Sunday ignores it", () => {
-  const D = '2026-11-24', day = (h, extra = {}) => sum(study(SP.templateDay(Object.assign({ syl: SP.seedSyllabus(), sched: Object.assign({ wake: { [D]: 720 }, hours: { [D]: h } }, extra) }), D, 2, -1, C0)));
+  const D = '2026-11-24', day = (h, extra = {}) => sum(study(SP.templateDay(Object.assign({ syl: SP.seedSyllabus(), sched: Object.assign({ reading: false, wake: { [D]: 720 }, hours: { [D]: h } }, extra) }), D, 2, -1, C0)));
   assert.deepStrictEqual([4, 5, 6, 7].map(h => day(h)), [240, 300, 360, 420]);
   assert.strictEqual(day(8), 470, '7 h 50 is the most a normal day holds');
   assert.strictEqual(day(9), 360, 'an unknown target is ignored');
-  const t8 = SP.templateDay({ syl: SP.seedSyllabus(), sched: { wake: { [D]: 720 }, hours: { [D]: 8 } } }, D, 2, -1, C0);
+  const t8 = SP.templateDay({ syl: SP.seedSyllabus(), sched: { reading: false, wake: { [D]: 720 }, hours: { [D]: 8 } } }, D, 2, -1, C0);
   assert.ok(study(t8).every(r => r.e <= 1530), 'no study after 1:30 AM');
-  assert.strictEqual(sum(study(SP.templateDay({ syl: SP.seedSyllabus(), sched: { wake: { '2026-11-29': 720 }, hours: { '2026-11-29': 8 } } }, '2026-11-29', 0, -1, C0)), r => r.subj !== 'german' && !r.optional), sum(study(SP.templateDay({ syl: SP.seedSyllabus(), sched: { wake: { '2026-11-29': 720 } } }, '2026-11-29', 0, -1, C0)), r => r.subj !== 'german' && !r.optional), 'Sunday stays light');
+  assert.strictEqual(sum(study(SP.templateDay({ syl: SP.seedSyllabus(), sched: { reading: false, wake: { '2026-11-29': 720 }, hours: { '2026-11-29': 8 } } }, '2026-11-29', 0, -1, C0)), r => r.subj !== 'german' && !r.optional), sum(study(SP.templateDay({ syl: SP.seedSyllabus(), sched: { reading: false, wake: { '2026-11-29': 720 } } }, '2026-11-29', 0, -1, C0)), r => r.subj !== 'german' && !r.optional), 'Sunday stays light');
   assert.strictEqual(sum(study(SP.templateDay(lab({ min: 30 }, { hours: { [MON]: 4 } }), MON, 1, -1, C0)), r => r.subj === 'astro'), 30, 'course time still fits inside a 4 h day');
 });

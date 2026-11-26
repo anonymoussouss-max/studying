@@ -6,7 +6,7 @@ const src = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).f
 const ctx = { Date, Math, JSON, Number, String, Object, Array, Set, Map, console, localStorage: { getItem: () => null, setItem() {} } };
 ctx.globalThis = ctx; vm.runInNewContext(src, ctx); const SP = ctx.StudyPlan;
 const C0 = { actual14: {}, loggedAny: false, diplomaToday: 0 };
-const day = (d, gentle) => SP.templateDay({ syl: SP.seedSyllabus(), sched: { wake: { [d]: 720 }, gentle } }, d, new Date(d + 'T12:00:00').getDay(), -1, Object.assign({}, C0));
+const day = (d, gentle) => SP.templateDay({ syl: SP.seedSyllabus(), sched: { reading: false, wake: { [d]: 720 }, gentle } }, d, new Date(d + 'T12:00:00').getDay(), -1, Object.assign({}, C0));
 const study = t => t.rows.filter(r => r.kind === 'study'), sum = rs => rs.reduce((n, r) => n + r.e - r.s, 0);
 const cx = t => study(t).filter(r => /^C exam/.test(r.title || ''));
 

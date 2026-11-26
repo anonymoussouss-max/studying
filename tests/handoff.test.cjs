@@ -8,7 +8,7 @@ ctx.globalThis = ctx; vm.runInNewContext(src, ctx); const SP = ctx.StudyPlan;
 const FROM = '2026-12-01', add = (d, k) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + k); return x.toISOString().slice(0, 10); };
 const R = (reports, o = {}) => Object.assign({ from: FROM, reports }, o), yes = { feel: 'yes' }, ready = { feel: 'yes', ready8: true };
 const C0 = { actual14: {}, loggedAny: false, diplomaToday: 0 };
-const studyMin = (S, d) => SP.templateDay({ syl: SP.seedSyllabus(), sched: Object.assign({ wake: { [d]: 720 } }, S) }, d, new Date(d + 'T12:00:00').getDay(), -1, C0)
+const studyMin = (S, d) => SP.templateDay({ syl: SP.seedSyllabus(), sched: Object.assign({ reading: false, wake: { [d]: 720 } }, S) }, d, new Date(d + 'T12:00:00').getDay(), -1, C0)
   .rows.filter(r => r.kind === 'study').reduce((n, r) => n + r.e - r.s, 0);
 
 test('no pass before day 28, or with a Mixed, No or missing week; a correct pass after four Yes and readiness', () => {
@@ -68,10 +68,10 @@ test("Iroha's tutoring rules: assess first, clarify ambiguity, small hint first,
 
 test('forecast: a Sunday under Gentle Return or Done is not forecast as 60 + 30', () => {
   const SUN = '2027-01-10', days = L => SP.pcmCapacity(L, SUN).days[0];
-  assert.strictEqual(days({ sched: {} }).all, 90, 'plain Sunday: 90');
-  const g = days({ sched: { gentle: { on: true, max: 15 } } });
+  assert.strictEqual(days({ sched: { reading: false } }).all, 90, 'plain Sunday: 90');
+  const g = days({ sched: { reading: false, gentle: { on: true, max: 15 } } });
   assert.ok(g.all <= 15 && g.pcm <= 15, 'gentle 15-minute maximum caps Sunday: ' + JSON.stringify(g));
-  assert.strictEqual(days({ sched: { gentle: { on: true, max: 180, day: { [SUN]: { stopped: true } } } } }).all, 0, 'Done: nothing');
+  assert.strictEqual(days({ sched: { reading: false, gentle: { on: true, max: 180, day: { [SUN]: { stopped: true } } } } }).all, 0, 'Done: nothing');
 });
 
 test('forecast and cycle planner read one shared set of stage estimates', () => {

@@ -11,7 +11,7 @@ function plan(isoNow) {
 }
 const MON = '2026-12-07', SP = plan(MON + 'T12:00:00');
 const CTX = { actual14: {}, loggedAny: true, diplomaToday: 0, noCExam: true };
-const lab = (sched = {}) => ({ syl: SP.seedSyllabus(), sched: Object.assign({ wake: { [MON]: 720 } }, sched) });
+const lab = (sched = {}) => ({ syl: SP.seedSyllabus(), sched: Object.assign({ reading: false, wake: { [MON]: 720 } }, sched) });
 const day = (L, now, used, d = MON) => SP.templateDay(L, d, new Date(d + 'T12:00:00').getDay(), now, Object.assign({}, CTX, { used }));
 const study = rows => rows.filter(r => r.kind === 'study');
 const elapsed = (rows, now) => study(rows).reduce((n, r) => n + Math.max(0, Math.min(r.e, now) - r.s), 0);
