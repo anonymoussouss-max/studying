@@ -51,7 +51,7 @@ test('unreadable photos, verdict-changing ambiguity and malformed replies stay P
   const pm = P.parseMarks('sorry, I could not do that', qs);
   assert.strictEqual(pm.ok, false); assert.ok(qs.every(q => P.decide(pm.marks[q.id]) === 'pending'));
   const good = P.parseMarks('Here: {"questions":[{"id":"q0","transcription":"x=2","readable":true,"unclear":[],"rubric":{"method":2,"concept":2,"execution":2,"checks":1},"skills":["a"],"rationale":"ok"}]}', qs);
-  assert.strictEqual(P.decide(good.marks.q0), 'pass'); assert.strictEqual(good.marks.q0.by, 'Iroha (AI, provisional)'); assert.strictEqual(P.decide(good.marks.q1), 'pending');
+  assert.strictEqual(P.decide(good.marks.q0), 'pass'); assert.strictEqual(good.marks.q0.by, 'Provisional AI assessment (Iroha)'); assert.strictEqual(P.decide(good.marks.q1), 'pending');
 });
 test('chapter result: every approved skill shown; no approved list means pending; pending questions keep it pending', () => {
   const pass = marked({ q0: mk(R(2, 2, 2), { skills: ['a'] }), q1: mk(R(2, 2, 1), { skills: ['b'] }) });
@@ -132,9 +132,15 @@ test('the desk never awards from seed data, never writes the study record from h
   assert.ok(src.includes("not an authoritative verdict")); assert.ok(src.includes('closed-book declaration'));
   assert.ok(html.includes("window.__kgPurpose ? { purpose: window.__kgPurpose } : {}"));
 });
-test('real-model test fixes: transcription requests carry no persona note; marking only flags spots the transcription marks unclear', () => {
-  assert.ok(html.includes('content: window.__kgPurpose === "proof-read" ? text : text + "\\n\\n" + (who === "iroha" ? IROHA_NOTE : KAGUYA_NOTE)'));
-  assert.ok(html.includes('Only flag spots the transcription itself marks [?] or notes as ambiguous in brackets; never suggest that clearly transcribed characters were misread'));
-  const set = html.indexOf("window.__kgPurpose = 'proof-read';"), ask = html.indexOf("window.__kgAsk('iroha', `[proof transcription", set);
-  assert.ok(set > 0 && ask > set && ask - set < 200, 'purpose is set right before the transcription request');
+test('proof grading: photos reach the grader; no invented doubt, but real photo/transcription discrepancies stay pending', () => {
+  assert.ok(html.includes('content: /^proof-(read|mark)$/.test(window.__kgPurpose || "") ? text : text + "\\n\\n" + (who === "iroha" ? IROHA_NOTE : KAGUYA_NOTE)'));
+  assert.ok(html.includes("Don't invent doubt: where the photo clearly shows what the transcription says, grade it as written"));
+  assert.ok(html.includes('Where a photo and the transcription differ at a specific sign, digit, exponent, subscript or diagram'));
+  assert.ok(!html.includes('Only flag spots the transcription itself marks [?]'), 'the narrower rule is gone');
+  const call = html.slice(html.indexOf("await ask('proof-mark', proofMarkPrompt("), html.indexOf("const pm = parseMarks(reply, qs);"));
+  assert.ok(call.length > 0 && call.includes('group.slice(0, 3).map(asImg))'), 'marking sends the group photos');
+  const g = /\n  const proofGroups = [\s\S]*?\n  };\n/.exec(html)[0], groups = vm.runInNewContext('(' + g.replace('const proofGroups =', '').trim().replace(/;$/, '') + ')');
+  const ph = (q, n) => Array.from({ length: n }, (_, i) => ({ q, url: q + i }));
+  const r = groups([...ph('a', 1), ...ph('b', 2), ...ph('c', 1), ...ph('d', 4), ...ph('e', 1)]);
+  assert.deepStrictEqual(J(r.map(x => x.map(y => y.url))), [['a0', 'b0', 'b1'], ['c0'], ['d0', 'd1', 'd2', 'd3'], ['e0']], 'whole questions per group, never more than 3 unless one question has more');
 });
