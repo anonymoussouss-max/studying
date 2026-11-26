@@ -99,13 +99,33 @@ test('a hypothetical pace and a forecast from real PCM study are shown separatel
   assert.ok(/range/.test(real.uncertainty) && /±15%/.test(real.uncertainty));
 });
 
-test('missing Class 11 Organic/Inorganic and provisional Class 12 counts stay visible; no completion date from them', () => {
+test('Class 11 counts are complete once you confirmed them; provisional Class 12 counts stay visible; no completion date from them', () => {
   const f = SP.forecast(lab(), {}, MON);
   assert.strictEqual(f.complete, false);
-  assert.ok(f.absent.some(m => /Organic/.test(m)) && f.absent.some(m => /Inorganic/.test(m)));
+  assert.deepStrictEqual([...f.absent], [], 'Organic (43) and Inorganic (44) counts were confirmed on 26 Nov 2026');
   assert.ok(f.provisionalCounts.length >= 5 && f.provisionalCounts.every(n => /Class 12/.test(n)));
   const L = lab(); for (const c of Object.values(L.syl.courses)) { c.provisional = false; c.chapters = c.chapters.map(x => [x[0], x[1] == null ? 20 : x[1]]); }
   const full = SP.forecast(L, {}, MON);
   assert.strictEqual(full.complete, true, 'only complete, confirmed counts allow a completion comparison');
-  assert.ok(full.minutesLow > f.minutesLow, 'added counts add work, never hide it');
+  assert.ok(full.minutesLow >= f.minutesLow, 'confirming counts never hides work');
+});
+
+test('confirmed counts: Physics gains Units and Dimensions (10) and Vectors (14) after Errors; Organic 43, Inorganic 44; saved progress keeps its place', () => {
+  const seed = SP.seedSyllabus(), sum = id => seed.courses[id].chapters.reduce((a, x) => a + x[1], 0);
+  assert.strictEqual(sum('oc11'), 43); assert.strictEqual(sum('ic11'), 44);
+  const names = seed.courses.p11.chapters.map(x => x[0]);
+  assert.deepStrictEqual([...names.slice(1, 5)], ['Errors', 'Units and Dimensions', 'Vectors', 'Motion in a Plane']);
+  assert.strictEqual(SP.applyConfirmed11(seed), false, 'a new syllabus is already up to date');
+  // an older saved syllabus: placeholders, progress on Motion in a Plane, current position there
+  const old = { courses: {
+    p11: { chapters: [['Motion in a Straight Line', 15], ['Errors', 3], ['Motion in a Plane', 13], ['Laws of Motion', 15]], done: [15, 3, 4] },
+    oc11: { chapters: [['Class 11 organic (lecture count missing)', null]], done: [] },
+    ic11: { chapters: [['My own inorganic list', 40]], done: [2] } }, pos: { physics: { course: 'p11', ci: 2, chapter: 'Motion in a Plane', lec: 5 } } };
+  assert.strictEqual(SP.applyConfirmed11(old), true);
+  assert.deepStrictEqual([...old.courses.p11.chapters.map(x => x[0])], ['Motion in a Straight Line', 'Errors', 'Units and Dimensions', 'Vectors', 'Motion in a Plane', 'Laws of Motion']);
+  assert.deepStrictEqual([...old.courses.p11.done], [15, 3, 0, 0, 4]);
+  assert.strictEqual(old.pos.physics.ci, 4); assert.strictEqual(old.courses.p11.chapters[old.pos.physics.ci][0], 'Motion in a Plane');
+  assert.strictEqual(old.courses.oc11.chapters.length, 6); assert.ok(old.courses.oc11.confirmed);
+  assert.deepStrictEqual([...old.courses.ic11.chapters.map(x => x[0])], ['My own inorganic list'], 'a list you edited yourself is never replaced');
+  assert.strictEqual(SP.applyConfirmed11(old), false, 'runs once');
 });

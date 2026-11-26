@@ -113,6 +113,10 @@ test('rank: unresolved placement says what is missing and links to resolve it; c
   const h = M.PANELS.cultivation();
   assert.match(h, /Rank not placed yet: the catalogue is incomplete for Physics, Chemistry <button class="kl-ghost kqc-link" data-qsetup="1">Resolve<\/button>/);
   assert.match(h, /Now: <button[^>]*data-qsel="bm:Basic Mathematics">Basic Mathematics<\/button> · lectures 20\/23/);
+  // once every count is in, an unmet first gate is progress, not a setup gap: name the next gate, offer no "Resolve"
+  const r = load(), id = r.Kq.identity({ v: { placement: 'computable', why: [], subjects: { maths: { gu: [] }, physics: { gu: [] }, chem: { gu: [] } } }, st: {} });
+  assert.strictEqual(id.rank.t, 'Rank not placed yet'); assert.strictEqual(id.rank.why, '');
+  assert.match(id.rank.next, /^next gate: Rank 3 · initial, every Class 11 chapter Gu obtained/);
 });
 
 test('rules, sources and setup sit behind labelled controls; the classic records open from there and come back', () => {
