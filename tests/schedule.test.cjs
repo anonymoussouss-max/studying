@@ -20,7 +20,7 @@ const study = rows => rows.filter(r => r.kind === 'study');
 const total = rows => study(rows).reduce((n, r) => n + (r.e != null ? r.e - r.s : r.minutes), 0);
 const day = (lab, now, ctx = CTX, d = MON, dow = 1) => plan(iso(d, now), lab).templateDay(lab, d, dow, now, ctx);
 // whole desk rows (offsets from 10:30 AM) for a wake time, seen at the wake time
-const deskRows = (W, more = {}) => { const lab = seeded(Object.assign({ sched: Object.assign({ wake: { [MON]: W } }, more) })); return plan(iso(MON, W), lab).fallback(1); };
+const deskRows = (W, more = {}) => { const lab = seeded(Object.assign({ sched: Object.assign({ reading: false, wake: { [MON]: W } }, more) })); return plan(iso(MON, W), lab).fallback(1); };
 const TEMPLATES = { normal: [720, 360], early: [600, 360], late: [780, 340], later: [840, 300], verylate: [900, 240] };
 
 test('1. every template has its checked study total, German included', () => {
@@ -55,7 +55,7 @@ test('4. more German replaces PCM time; the total and bedtime stay', () => {
 });
 
 test('5. a 2½-hour Maths lecture spans blocks, and an unfinished one continues from its timestamp', () => {
-  const d = day(seeded({ sched: { wake: { [MON]: 720 }, focus: { [MON]: 'maths' } } }), 720);
+  const d = day(seeded({ sched: { reading: false, wake: { [MON]: 720 }, focus: { [MON]: 'maths' } } }), 720);
   const lec = study(d.rows).filter(r => r.task?.type === 'lecture' && r.subj === 'maths' && !r.task.cont);
   assert.ok(lec.length >= 2, 'one lecture over several blocks');
   assert.strictEqual(new Set(lec.map(r => r.title)).size, 1);
@@ -67,7 +67,7 @@ test('5. a 2½-hour Maths lecture spans blocks, and an unfinished one continues 
 
 test('6. a lecture is revised only after the whole lecture, never before', () => {
   for (const f of ['maths', 'physics', 'chem']) {
-    const rows = study(day(seeded({ sched: { wake: { [MON]: 720 }, focus: { [MON]: f } } }), 720).rows);
+    const rows = study(day(seeded({ sched: { reading: false, wake: { [MON]: 720 }, focus: { [MON]: f } } }), 720).rows);
     rows.forEach((r, i) => { if (r.task?.type !== 'revision') return; const watched = rows.slice(0, i).filter(x => x.task?.type === 'lecture' && x.subj === r.subj).reduce((n, x) => n + x.e - x.s, 0);
       assert.ok(watched >= { maths: 150, physics: 105, chem: 95 }[r.subj] - 5, `${f}: revision before the lecture ended`); });
   }
@@ -76,15 +76,15 @@ test('6. a lecture is revised only after the whole lecture, never before', () =>
 test('7. homework carries over: what does not fit is deferred, not squeezed in', () => {
   const syl = P0.seedSyllabus(); for (let i = 0; i < 8; i++) syl.hw.push({ id: 'h' + i, subj: 'physics', title: 'Exercise ' + i, mins: 60, essential: true, status: 'open' });
   syl.hw.push({ id: 'x', subj: 'chem', title: 'Extra', mins: 30, essential: false, status: 'open' });
-  const d = day({ syl, sched: { wake: { [MON]: 840 } } }, 840);
+  const d = day({ syl, sched: { reading: false, wake: { [MON]: 840 } } }, 840);
   assert.ok(d.deferred.some(x => x.type === 'homework'));
   assert.ok(!study(d.rows).some(r => /Extra/.test(r.title)), 'additional homework is not scheduled');
   assert.ok(d.rows.every(r => r.kind !== 'study' || r.e <= 1520));
 });
 
 test('8. switching mid-day keeps everything before the switch and re-plans only the rest', () => {
-  const base = day(seeded({ sched: { wake: { [MON]: 720 } } }), 1000);
-  const sw = day(seeded({ sched: { wake: { [MON]: 720 }, plan: { [MON]: 'reduced' }, switches: { [MON]: [{ at: 1000, from: 'auto', plan: 'reduced' }] } } }), 1000);
+  const base = day(seeded({ sched: { reading: false, wake: { [MON]: 720 } } }), 1000);
+  const sw = day(seeded({ sched: { reading: false, wake: { [MON]: 720 }, plan: { [MON]: 'reduced' }, switches: { [MON]: [{ at: 1000, from: 'auto', plan: 'reduced' }] } } }), 1000);
   const before = rows => rows.filter(r => r.e <= 1000).map(r => [r.s, r.e, r.kind].join()).join('|');
   assert.strictEqual(before(sw.rows), before(base.rows));
   assert.ok(total(sw.rows.filter(r => r.s >= 1000)) <= 90 && total(sw.rows.filter(r => r.s >= 1000)) < total(base.rows.filter(r => r.s >= 1000)));
@@ -92,9 +92,9 @@ test('8. switching mid-day keeps everything before the switch and re-plans only 
 });
 
 test('9. waking late recalculates from the real time; expired blocks are never replayed', () => {
-  const d = day(seeded({ sched: { wake: { [MON]: 860 } } }), 860);
+  const d = day(seeded({ sched: { reading: false, wake: { [MON]: 860 } } }), 860);
   assert.ok(study(d.rows).every(r => r.s >= 890), 'study before tea finished');
-  const later = day(seeded({ sched: { wake: { [MON]: 720 } } }), 1100);
+  const later = day(seeded({ sched: { reading: false, wake: { [MON]: 720 } } }), 1100);
   for (const r of study(later.rows).filter(r => r.e <= 1100)) { assert.strictEqual(r.title, 'Earlier study block'); assert.ok(!r.task); }
 });
 
@@ -104,7 +104,7 @@ test('10. meals, the personal commitment, getting ready and sleep survive every 
     const rows = deskRows(W, ext ? { extend: { [MON]: true } } : {}), c = id => at(rows, id) && 630 + at(rows, id).start;
     assert.deepStrictEqual([c('lunch'), c('snacks'), c('personal'), c('dinner'), c('ready'), c('sleep')], [960, 1170, 1230, 1400, 1520, 1530], `${W} ${ext}`);
   }
-  const f = day(seeded({ sched: { wake: { [MON]: 720 }, food: { [MON]: [{ at: 1050, len: 20 }] } } }), 720);
+  const f = day(seeded({ sched: { reading: false, wake: { [MON]: 720 }, food: { [MON]: [{ at: 1050, len: 20 }] } } }), 720);
   assert.ok(f.rows.some(r => r.id === 'food-0' && r.s === 1050 && r.e === 1070));
   assert.ok(f.cutMinutes === 20 && total(f.rows) === 340);
   assert.ok(f.rows.some(r => r.id === 'lunch' && r.s === 960));
@@ -124,16 +124,16 @@ test('11. Sunday is 90 minutes in total: 60 of the PCM subject furthest below it
 });
 
 test('12. a difficult day: 15 minutes of Physics is the whole plan; a lighter day stays small', () => {
-  const g = day(seeded({ sched: { wake: { [MON]: 720 }, plan: { [MON]: 'gentle' } } }), 900);
+  const g = day(seeded({ sched: { reading: false, wake: { [MON]: 720 }, plan: { [MON]: 'gentle' } } }), 900);
   assert.strictEqual(study(g.rows).length, 1);
   assert.strictEqual(total(g.rows), 15);
   assert.strictEqual(study(g.rows)[0].task.type, 'gentle');
-  const r = day(seeded({ sched: { wake: { [MON]: 720 }, plan: { [MON]: 'reduced' } } }), 900);
+  const r = day(seeded({ sched: { reading: false, wake: { [MON]: 720 }, plan: { [MON]: 'reduced' } } }), 900);
   assert.ok(total(r.rows) <= 90 && total(r.rows) >= 45);
 });
 
 test('13. stopping needs no conversation: after Stop nothing is planned, and nothing is owed', () => {
-  const d = day(seeded({ sched: { wake: { [MON]: 720 }, plan: { [MON]: 'stop' }, switches: { [MON]: [{ at: 1000, from: 'auto', plan: 'stop' }] } } }), 1000);
+  const d = day(seeded({ sched: { reading: false, wake: { [MON]: 720 }, plan: { [MON]: 'stop' }, switches: { [MON]: [{ at: 1000, from: 'auto', plan: 'stop' }] } } }), 1000);
   assert.strictEqual(total(d.rows.filter(r => r.s >= 1000)), 0);
   const off = plan(iso(MON, 720), seeded({ dayTypes: { [MON]: { t: 'rest' } } })).fallback(1);
   assert.strictEqual(total(off), 0);
@@ -141,14 +141,14 @@ test('13. stopping needs no conversation: after Stop nothing is planned, and not
 });
 
 test('14. diploma hours replace PCM time inside the same day', () => {
-  const d = day(seeded({ sched: { wake: { [MON]: 720 } } }), 720, Object.assign({}, CTX, { diplomaToday: 60 }));
+  const d = day(seeded({ sched: { reading: false, wake: { [MON]: 720 } } }), 720, Object.assign({}, CTX, { diplomaToday: 60 }));
   assert.strictEqual(total(d.rows), 360);
   assert.strictEqual(study(d.rows).filter(r => r.subj === 'diploma').reduce((n, r) => n + r.e - r.s, 0), 60);
 });
 
 test('15. exam mode: diploma first, no new lectures, exam time reserved with travel, German lighter', () => {
   const ex = [{ id: 'e', name: 'Winter exams', from: '2026-11-20', end: '2026-12-02', days: [{ d: MON, at: 780, len: 180, travel: 45 }] }];
-  const d = day(seeded({ sched: { wake: { [MON]: 600 }, exams: ex, germanExam: 'light' } }), 600);
+  const d = day(seeded({ sched: { reading: false, wake: { [MON]: 600 }, exams: ex, germanExam: 'light' } }), 600);
   assert.ok(d.examPrep && d.examDays === 1);
   const exam = d.rows.find(r => r.id === "exam-780"); assert.ok(exam && exam.s === 735 && exam.e === 1005);
   const lunch = d.rows.find(r => r.id === "lunch"); assert.ok(lunch && lunch.s === 1005 && lunch.e - lunch.s === 60, "lunch moves whole to after the exam");
@@ -156,7 +156,7 @@ test('15. exam mode: diploma first, no new lectures, exam time reserved with tra
   assert.ok(!study(d.rows).some(r => r.s < 1005 && r.e > 735), 'study during the exam');
   const g = rows => study(rows).filter(r => r.subj === 'german').reduce((n, r) => n + r.e - r.s, 0);
   assert.ok(g(d.rows) <= 15, 'German lighter or paused on an exam day');
-  const prepDay = day(seeded({ sched: { wake: { [MON]: 720 }, exams: [{ id: 'e', name: 'W', from: '2026-11-20', end: '2026-12-02', days: [] }], germanExam: 'light' } }), 720);
+  const prepDay = day(seeded({ sched: { reading: false, wake: { [MON]: 720 }, exams: [{ id: 'e', name: 'W', from: '2026-11-20', end: '2026-12-02', days: [] }], germanExam: 'light' } }), 720);
   assert.strictEqual(g(prepDay.rows), 15);
   assert.ok(study(prepDay.rows).some(r => r.subj === 'diploma') && !study(prepDay.rows).some(r => r.task?.type === 'lecture' && !r.task.cont));
   assert.ok(study(d.rows).some(r => r.subj === 'diploma'));
@@ -173,20 +173,20 @@ test('17. planned minutes never count as study; the forecast says when it is pro
   assert.ok(f.missing.some(m => /Organic/.test(m)) && f.missing.some(m => /Inorganic/.test(m)), 'missing counts are named, not zero');
   const real = P0.forecast(seeded(), { weeks: [900, 1100] });
   assert.ok(!real.provisional && real.actualWeekly === 1000);
-  const P = plan(iso(MON, 1300), seeded({ sched: { wake: { [MON]: 720 } } }));
+  const P = plan(iso(MON, 1300), seeded({ sched: { reading: false, wake: { [MON]: 720 } } }));
   assert.strictEqual(P.schedCtx(MON).loggedAny, false);
   assert.strictEqual(P.loggedToday ? Object.values(P.loggedToday()).reduce((a, b) => a + b, 0) : 0, 0);
 });
 
 test('18. the first block of the day starts with an easy entry inside the block', () => {
-  const d = day(seeded({ sched: { wake: { [MON]: 720 } } }), 720);
+  const d = day(seeded({ sched: { reading: false, wake: { [MON]: 720 } } }), 720);
   const first = study(d.rows).find(r => r.entry); assert.ok(first && first.s === 750);
-  const later = day(seeded({ sched: { wake: { [MON]: 720 } } }), 720, Object.assign({}, CTX, { loggedAny: true }));
+  const later = day(seeded({ sched: { reading: false, wake: { [MON]: 720 } } }), 720, Object.assign({}, CTX, { loggedAny: true }));
   assert.ok(!study(later.rows).some(r => r.entry));
 });
 
 test('19. saved data is kept: schedule defaults fill in without overwriting', () => {
-  const s = P0.schedOf({ sched: { german: 45, wake: { '2026-11-01': 700 }, custom: 1 } });
+  const s = P0.schedOf({ sched: { reading: false, german: 45, wake: { '2026-11-01': 700 }, custom: 1 } });
   assert.strictEqual(s.german, 45); assert.strictEqual(s.wake['2026-11-01'], 700); assert.strictEqual(s.custom, 1);
   assert.deepStrictEqual(Object.keys(s.split), ['maths', 'physics', 'chem']);
   const old = plan(iso(MON, 720), { dayTypes: { [MON]: { t: 'college', end: 900 } }, mathsNext: { [MON]: 155 } }).fallback(1);
@@ -202,7 +202,7 @@ test('20. bedtime is fixed: nothing after 1:20 AM but getting ready, and sleep f
 });
 
 test('the night-meds reminder appears on template days at the set time', () => {
-  const rows = plan(iso(MON, 720), seeded({ sched: { wake: { [MON]: 720 } }, medsAt: 840 })).fallback(1);
+  const rows = plan(iso(MON, 720), seeded({ sched: { reading: false, wake: { [MON]: 720 } }, medsAt: 840 })).fallback(1);
   assert.strictEqual(rows.find(r => r.id === 'meds').start, 840);
 });
 
@@ -234,13 +234,13 @@ test('a subject\'s next lecture waits for its unfinished revision and essential 
   const syl = P0.seedSyllabus();
   syl.revs.push({ id: 'r1', subj: 'maths', title: 'Basic Mathematics · lecture 20', done: false });
   syl.hw.push({ id: 'h1', subj: 'maths', title: 'Ex 3', mins: 45, essential: true, status: 'open' });
-  const rows = study(day({ syl, sched: { wake: { [MON]: 720 }, focus: { [MON]: 'maths' } } }, 720).rows).filter(r => r.subj === 'maths');
+  const rows = study(day({ syl, sched: { reading: false, wake: { [MON]: 720 }, focus: { [MON]: 'maths' } } }, 720).rows).filter(r => r.subj === 'maths');
   const first = type => rows.findIndex(r => r.task?.type === type && (type !== 'lecture' || !r.task.cont));
   assert.ok(first('revision') >= 0 && first('homework') > first('revision'), 'revision, then homework');
   assert.ok(first('lecture') > first('homework'), 'the next lecture comes after both');
   const syl2 = P0.seedSyllabus(); syl2.pos.maths = { course: 'm11', ci: 0, chapter: 'Basic Mathematics', lec: 21, active: true, spent: 30 };
   syl2.revs.push({ id: 'r2', subj: 'maths', title: 'Basic Mathematics · lecture 20', done: false });
-  const r2 = study(day({ syl: syl2, sched: { wake: { [MON]: 720 }, focus: { [MON]: 'maths' } } }, 720).rows).filter(r => r.subj === 'maths');
+  const r2 = study(day({ syl: syl2, sched: { reading: false, wake: { [MON]: 720 }, focus: { [MON]: 'maths' } } }, 720).rows).filter(r => r.subj === 'maths');
   assert.ok(r2[0].task.type === 'lecture' && r2[0].task.cont, 'an interrupted lecture is finished first');
 });
 
@@ -253,5 +253,5 @@ test('progress wording is shared, and zero minutes never "counts" on a study day
   }
   const off = plan(iso(MON, 720), seeded({ dayTypes: { [MON]: { t: 'rest' } } })).dayProgress(0);
   assert.ok(off.rest && !off.counts);
-  function plan_(now, sched = {}) { return plan(iso(MON, now), seeded({ sched: Object.assign({ wake: { [MON]: 720 } }, sched), planLog: { [MON]: sched.plan ? 0 : 6 } })); }
+  function plan_(now, sched = {}) { return plan(iso(MON, now), seeded({ sched: Object.assign({ reading: false, wake: { [MON]: 720 } }, sched), planLog: { [MON]: sched.plan ? 0 : 6 } })); }
 });

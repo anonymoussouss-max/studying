@@ -81,7 +81,7 @@ test('no separate spaced-revision blocks: older material lives inside practice, 
   const plain = plan(at(MON, '07:00'), { dayTypes: { [MON]: { t: 'college', end: 900 } }, mathsNext: { [MON]: 155 } }).fallback(1);
   const sum = rows => rows.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0);
   assert.strictEqual(sum(college), sum(plain));
-  assert.strictEqual(holiday.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0), 360);
+  assert.strictEqual(holiday.filter(r => r.kind === 'study').reduce((n, r) => n + r.minutes, 0), 330, 'protected reading 9:20-11:20 PM trims the 9:00 PM block to 20 min');
 });
 
 test('subject practice blocks carry a "mix in older material" note', () => {

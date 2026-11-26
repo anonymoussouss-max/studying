@@ -848,7 +848,7 @@ body.habit-shh #hb-session-card {text-align:center;}
   }
   // what to do in a template block, in plain words
   function howFor(m,kind,id,minutes){
-    if(kind!=='study'){if(id==='piano')return 'Piano, after studying. Not study time.';if(id==='lunch'||id==='dinner'||id==='snacks')return 'Eat away from the desk. Meals come before any task.';if(id==='personal')return 'Your personal commitment. Protected.';if(id==='ready')return 'Getting ready for bed. Bedtime is 1:30 AM and never moves.';if(id==='sleep')return 'Sleep. Protected.';if(/^brk/.test(id))return 'Leave the desk: water, a stretch, a window. If a lecture is still running, pause it and save the timestamp first.';if(/^food/.test(id))return 'The food break you asked for.';if(/^exam/.test(id))return 'Exam time, travel and breaks. Nothing else is planned here.';return 'Free time. Nothing is owed.';}
+    if(kind!=='study'){if(id==='reading')return 'Reading, 9:20–11:20 PM. Protected personal time, not study and not a reward to earn.';if(id==='piano')return 'Piano, after studying. Not study time.';if(id==='lunch'||id==='dinner'||id==='snacks')return 'Eat away from the desk. Meals come before any task.';if(id==='personal')return 'Your personal commitment. Protected.';if(id==='ready')return 'Getting ready for bed. Bedtime is 1:30 AM and never moves.';if(id==='sleep')return 'Sleep. Protected.';if(/^brk/.test(id))return 'Leave the desk: water, a stretch, a window. If a lecture is still running, pause it and save the timestamp first.';if(/^food/.test(id))return 'The food break you asked for.';if(/^exam/.test(id))return 'Exam time, travel and breaks. Nothing else is planned here.';return 'Free time. Nothing is owed.';}
     const t=m.task||{},entry=m.entry?'Easy start (first 10-15 minutes, part of this block): recall where you stopped, open the saved timestamp or a familiar example, and name the next small step. Then: ':'';
     const what=t.type==='lecture'?(t.cont?'Continue the lecture from the saved timestamp. If a break or bedtime comes first, save the timestamp and stop; it continues next time.':'Watch the lecture and take notes as you go. Finish the whole lecture before revising it. If you have to stop, save the timestamp.')
       :t.type==='revision'?'Whole-lecture revision: first rebuild the main ideas from memory, then check your notes for missing or wrong parts, then rework a few examples on your own.'
@@ -954,7 +954,8 @@ body.habit-shh #hb-session-card {text-align:center;}
   const PLAN_IDS=['auto','normal','early','late','later','verylate','sunday','gentle','reduced','stop'];
   const PLAN_NAME={normal:'Normal day',early:'Early day',late:'Late day',later:'Later day',verylate:'Very late day',sunday:'Sunday · light exploration',gentle:'Difficult day · 15 minutes of Physics',reduced:'Reduced day',stop:'Stopped for today'};
   const PLAN_WAKE={normal:720,early:600,late:780,later:840,verylate:900};
-  function schedOf(L){const s=Object.assign({wake:{},plan:{},extend:{},piano:{},pianoLen:45,food:{},switches:{},edits:{},german:30,germanExam:'light',diploma:{week:120,heavy:{}},exams:[],split:{maths:45,physics:30,chem:25},focus:{}},(L&&L.sched)||{});
+  const T_RD=[1280,1400]; // protected reading, 9:20-11:20 PM
+  function schedOf(L){const s=Object.assign({reading:true,wake:{},plan:{},extend:{},piano:{},pianoLen:45,food:{},switches:{},edits:{},german:30,germanExam:'light',diploma:{week:120,heavy:{}},exams:[],split:{maths:45,physics:30,chem:25},focus:{}},(L&&L.sched)||{});
     for(const k of ['wake','plan','extend','piano','food','switches','edits','focus','weekSize'])if(!s[k]||typeof s[k]!=='object')s[k]={};
     if(!s.diploma||typeof s.diploma!=='object')s.diploma={week:120,heavy:{}};if(!s.diploma.heavy)s.diploma.heavy={};if(!Array.isArray(s.exams))s.exams=[];
     s.german=Math.max(15,Math.min(90,Math.round((+s.german||30)/5)*5));return s;}
@@ -976,19 +977,22 @@ body.habit-shh #hb-session-card {text-align:center;}
     for(const [a,id,title] of [[T_LUNCH,'lunch','Lunch · away from the desk'],[T_SNACK,'snacks','Snacks'],[T_PERSONAL,'personal','Personal commitment'],[T_DINNER,'dinner','Dinner']])
       if(a[1]>start)add(Math.max(a[0],start),a[1],'life',id,title);
     add(T_READY,T_BED,'life','ready','Getting ready for bed');
+    // reading arrangement (26 Nov): 9:20-11:20 PM is protected reading; study ends by 9:20 PM, the extended evening and piano are off,
+    // and study the block displaces is simply not scheduled (no catch-up, no squeezed breaks, gaps stay free)
+    const RD=!!o.reading,END=RD?T_RD[0]:T_READY;if(RD)add(Math.max(T_RD[0],start),T_RD[1],'life','reading','Reading · protected personal time');
     const study=[],put=(s,e,role,x={})=>{if(e-s>=5)study.push(Object.assign({s,e,role},x));};
-    const ext=!!o.extend;
+    const ext=!!o.extend&&!RD;
     if(plan==='sunday'){
       // Sunday (handoff 25 Nov): 90 minutes in total, never a catch-up day. 60 min of the PCM subject furthest below its
       // share (unfinished examples or assigned questions first), then 30 min of German. Lowering or stopping stays available.
-      const from=Math.max(start,T_LUNCH[1]),a=freeAfter(seg,from,60,T_READY);if(a)put(a.s,a.s+60,'SUN',{optional:true});
-      if(G){const b=freeAfter(seg.concat(study.map(x=>({s:x.s,e:x.e}))),a?a.s+75:from,Gb,T_READY);if(b)put(b.s,b.s+Gb,'G',{optional:true});}
+      const from=Math.max(start,T_LUNCH[1]),a=freeAfter(seg,from,60,END);if(a)put(a.s,a.s+60,'SUN',{optional:true});
+      if(G){const b=freeAfter(seg.concat(study.map(x=>({s:x.s,e:x.e}))),a?a.s+75:from,Gb,END);if(b)put(b.s,b.s+Gb,'G',{optional:true});}
       return finish(seg,study,o,W);
     }
     if(plan==='gentle'||plan==='reduced'||plan==='stop'){
       const from=Math.max(start,o.from||start);
-      if(plan!=='stop'){const gap=freeAfter(seg,from,plan==='gentle'?15:60,T_READY);if(gap!=null)put(gap.s,gap.s+(plan==='gentle'?15:Math.min(60,gap.len)),plan==='gentle'?'Gphys':'P',{gentle:plan==='gentle'});
-        if(plan==='reduced'&&G){const last=study[study.length-1];let g2=freeAfter(seg.concat(study.map(x=>({s:x.s,e:x.e}))),last?last.e+15:from,G,T_READY);if(g2)put(g2.s,g2.s+G,'G');else{g2=freeAfter(seg.concat(study.map(x=>({s:x.s,e:x.e}))),last?last.e+15:from,Gb,T_READY);if(g2)put(g2.s,g2.s+Gb,'G');}}}
+      if(plan!=='stop'){const gap=freeAfter(seg,from,plan==='gentle'?15:60,END);if(gap!=null)put(gap.s,gap.s+(plan==='gentle'?15:Math.min(60,gap.len)),plan==='gentle'?'Gphys':'P',{gentle:plan==='gentle'});
+        if(plan==='reduced'&&G){const last=study[study.length-1];let g2=freeAfter(seg.concat(study.map(x=>({s:x.s,e:x.e}))),last?last.e+15:from,G,END);if(g2)put(g2.s,g2.s+G,'G');else{g2=freeAfter(seg.concat(study.map(x=>({s:x.s,e:x.e}))),last?last.e+15:from,Gb,END);if(g2)put(g2.s,g2.s+Gb,'G');}}}
       return finish(seg,study,o,W);
     }
     // before lunch: 90 + 60 minutes of lecture (an early day also fits revision and homework), 20-minute breaks between
@@ -1001,7 +1005,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     }
     // after lunch: fixed slots, filled until the day's study budget (6 hours) is used
     const budget=budget0;let left=budget-used,gDone=G===0,reached3=false;
-    const slots=[[1020,1110,sizes.slice(0,i).some(x=>x[1]==='R')?'P':'R'],[1130,1170,'H'],[1185,1215,'G'],[1260,1310,'P']].filter(x=>x[1]>start);
+    const slots=[[1020,1110,sizes.slice(0,i).some(x=>x[1]==='R')?'P':'R'],[1130,1170,'H'],[1185,1215,'G'],[1260,RD?T_RD[0]:1310,'P']].filter(x=>x[1]>start);
     for(const [s0,e0,role] of slots){const s=Math.max(s0,start);if(left<5)break;
       if(s0===1260){reached3=true;if(ext)break;}
       if(role==='G'){if(G===0){put(s,e0,'P');left-=e0-s;continue;}const g=Math.min(Gb,e0-s);put(s,s+g,'G');if(e0-s-g>=5)put(s+g,e0,'P');gDone=true;left-=e0-s;continue;}
@@ -1048,11 +1052,11 @@ body.habit-shh #hb-session-card {text-align:center;}
       for(let k=seg.length-1;k>=0;k--){const x=seg[k];if(x.kind==='life'&&!x.brk)continue;if(x.e<=s||x.s>=e)continue;if(x.s<s&&x.e>e){seg.splice(k+1,0,Object.assign({},x,{s:e,id:x.id+'b'}));x.e=s;}else if(x.s<s)x.e=s;else if(x.e>e)x.s=e;else seg.splice(k,1);}
       seg.push({s,e,kind:'life',id:b.id,title:b.title,blocker:!b.meal});}
     // today's edits to a block's times, only when they don't collide with anything else
-    for(const ed of o.edits||[]){const x=study.find(y=>y.s===ed.from)||seg.find(y=>y.s===ed.from&&y.kind!=='sleep');if(!x)continue;const len=ed.e-ed.s;if(!(len>=5)||ed.s<W+30||ed.e>T_BED)continue;
+    for(const ed of o.edits||[]){const x=study.find(y=>y.s===ed.from)||seg.find(y=>y.s===ed.from&&y.kind!=='sleep');if(!x)continue;const len=ed.e-ed.s;if(!(len>=5)||ed.s<W+30||ed.e>T_BED||(o.reading&&study.includes(x)&&ed.e>T_RD[0]))continue;
       const others=seg.concat(study).filter(y=>y!==x&&!(y.kind==='rest'));if(others.some(y=>y.s<ed.e&&y.e>ed.s))continue;x.s=ed.s;x.e=ed.e;x.edited=true;}
     study.sort((a,b)=>a.s-b.s);
     const lastStudy=study.length?study[study.length-1].e:W+30;
-    if(!seg.some(x=>x.id==='piano')){const len=o.pianoLen===30?30:45;let at=o.pianoAt;
+    if(!o.reading&&!seg.some(x=>x.id==='piano')){const len=o.pianoLen===30?30:45;let at=o.pianoAt;
       const all=seg.concat(study),fits=s=>s>=W+30&&s+len<=T_READY&&!all.some(y=>y.kind!=='rest'&&y.s<s+len&&y.e>s);
       if(!(at!=null&&fits(at))){const g=freeAfter(all.filter(y=>y.kind!=='rest'),lastStudy,len,T_READY);at=g?g.s:null;}
       if(at!=null)seg.push({s:at,e:at+len,kind:'life',id:'piano',title:'Piano'});}
@@ -1197,7 +1201,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const examDays=[],prep=S.exams.find(x=>x&&x.from&&x.end&&x.from<=dayIso&&dayIso<=x.end);
     for(const x of S.exams)for(const d of (x&&x.days)||[])if(d&&d.d===dayIso){const at=+d.at,len=Math.max(180,+d.len||180),tr=Math.max(0,+d.travel||45);if(at>0)examDays.push({s:at-tr,e:at+len+tr,id:'exam-'+at,title:`${x.name||'Diploma exam'} · travel, exam and breaks`});}
     const food=((S.food||{})[dayIso]||[]).filter(f=>f&&+f.at>0).map((f,i)=>({s:+f.at,e:+f.at+Math.max(10,Math.min(45,+f.len||20)),id:'food-'+i,title:'Food break'}));
-    const GR=gentleOf(S,dayIso),hrs=GR?0:dayHours(S,dayIso),opt=p=>({astro:astroMinutes(S,dayIso),extend:(GR?true:hrs?hrs>=7:!!(S.extend||{})[dayIso])&&!['sunday','gentle','reduced','stop'].includes(p),german:GR&&!(GR.cap&&GR.picks.includes('german'))?0:prep?(S.germanExam==='pause'?0:S.germanExam==='light'?15:S.german):S.german,pianoAt:(S.piano||{})[dayIso],pianoLen:S.pianoLen,budget:hrs?(hrs<6?hrs*60:undefined):WEEK_BUDGET[(S.weekSize||{})[mondayOf(dayIso)]]||undefined,blockers:examDays.concat(food),edits:((S.edits||{})[dayIso]||[])});
+    const GR=gentleOf(S,dayIso),hrs=GR?0:dayHours(S,dayIso),rd=S.reading!==false,opt=p=>({astro:astroMinutes(S,dayIso),reading:rd,extend:!rd&&(GR?true:hrs?hrs>=7:!!(S.extend||{})[dayIso])&&!['sunday','gentle','reduced','stop'].includes(p),german:GR&&!(GR.cap&&GR.picks.includes('german'))?0:prep?(S.germanExam==='pause'?0:S.germanExam==='light'?15:S.german):S.german,pianoAt:(S.piano||{})[dayIso],pianoLen:S.pianoLen,budget:hrs?(hrs<6?hrs*60:undefined):WEEK_BUDGET[(S.weekSize||{})[mondayOf(dayIso)]]||undefined,blockers:examDays.concat(food),edits:((S.edits||{})[dayIso]||[])});
     // switching plan mid-day keeps everything before the switch as it was and re-plans only what is left
     const sw=((S.switches||{})[dayIso]||[]).filter(x=>x&&x.at>W).sort((a,b)=>a.at-b.at);let segs;
     if(!sw.length){segs=skeleton(W,plan,Object.assign(opt(plan),{from:nowClock}));}
@@ -8644,7 +8648,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   function pickerHTML(v) {
     const sc = S(), chosen = sc.plan[v.d] || 'auto', woke = sc.wake[v.d];
     const btn = ([id, label]) => `<button type="button" data-a="kgdplan" data-v="${id}" aria-pressed="${chosen === id && v.kind !== 'rest'}"><b>${label}</b><small>${esc(optionInfo(id, v))}</small></button>`;
-    const ext = !['sunday', 'gentle', 'reduced', 'stop'].includes(v.info.plan) ? `<button type="button" data-a="kgdext" aria-pressed="${!!sc.extend[v.d]}"><b>${sc.extend[v.d] ? '✓ ' : '+ '}Extended evening</b><small>${v.info.plan === 'early' ? '+50 min, 9:00–9:50 PM' : 'whole day 7 h 50 min · voluntary'}</small></button>` : '';
+    const ext = sc.reading !== false ? '' : !['sunday', 'gentle', 'reduced', 'stop'].includes(v.info.plan) ? `<button type="button" data-a="kgdext" aria-pressed="${!!sc.extend[v.d]}"><b>${sc.extend[v.d] ? '✓ ' : '+ '}Extended evening</b><small>${v.info.plan === 'early' ? '+50 min, 9:00–9:50 PM' : 'whole day 7 h 50 min · voluntary'}</small></button>` : '';
     const quick = [[600, '10:00'], [690, '11:30'], [720, '12:00'], [780, '1 PM'], [840, '2 PM'], [900, '3 PM']].map(([c, t]) => `<button type="button" class="kl-ghost" data-a="kgdwake" data-v="${c}">${t}</button>`).join('');
     const foc = sc.focus[v.d] || 'auto';
     return `<div class="kg-plan-row" role="group" aria-label="Today's plan">${PRESETS.map(btn).join('')}${ext}<button type="button" data-a="kgdoff" aria-pressed="${v.kind === 'rest'}"><b>Day off</b><small>no study credit, no catch-up</small></button></div>
@@ -8684,7 +8688,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     const exam = sc.exams.filter(x => x && x.end >= v.d).map((x, i) => `<li>${esc(x.name || 'Diploma exams')} · preparation ${esc(x.from)} to ${esc(x.end)}${(x.days || []).map(dd => ` · exam ${esc(dd.d)} ${clk(+dd.at)} (${dd.len} min + ${dd.travel} min travel each way)`).join('')} <button type="button" class="kl-ghost" data-a="kgdexamdel" data-v="${esc(x.id || '')}">Remove</button></li>`).join('');
     return `<details><summary class="kl-small">German, piano, night meds, diploma and exams</summary>
       <form data-f="kgdgerman" class="kl-row"><label class="kl-small">German each day <select name="min">${[15, 30, 45, 60, 75, 90].map(m => `<option ${m === sc.german ? 'selected' : ''}>${m}</option>`).join('')}</select> min</label><button>Save</button><span class="kl-small">Included in the study total. More German replaces PCM time; it never extends the day or moves bedtime. It doesn't rise by itself.</span></form>
-      <form data-f="kgdpiano" class="kl-row"><label class="kl-small">Piano at <input type="time" name="at" value="${sc.piano[v.d] != null ? timeVal(+sc.piano[v.d]) : ''}"></label><label class="kl-small">for <select name="len"><option ${sc.pianoLen === 30 ? 'selected' : ''}>30</option><option ${sc.pianoLen !== 30 ? 'selected' : ''}>45</option></select> min</label><button>Save</button><span class="kl-small">Empty = straight after your last study block.</span></form>
+      ${sc.reading !== false ? '<p class="kl-small">Reading 9:20–11:20 PM is protected. Study ends by 9:20 PM; extended evening and piano are off while this is on.</p>' : ''}<form data-f="kgdpiano" class="kl-row"${sc.reading !== false ? ' hidden' : ''}><label class="kl-small">Piano at <input type="time" name="at" value="${sc.piano[v.d] != null ? timeVal(+sc.piano[v.d]) : ''}"></label><label class="kl-small">for <select name="len"><option ${sc.pianoLen === 30 ? 'selected' : ''}>30</option><option ${sc.pianoLen !== 30 ? 'selected' : ''}>45</option></select> min</label><button>Save</button><span class="kl-small">Empty = straight after your last study block.</span></form>
       <form data-f="kgmeds" class="kl-row"><label class="kl-small">Night meds reminder at <input type="time" name="at" value="${L.medsAt != null ? timeVal(630 + L.medsAt) : ''}"></label><button>${L.medsAt != null ? 'Change' : 'Set'}</button><span class="kl-small">A reminder only.</span></form>
       <p class="kl-small"><b>Diploma this week:</b> ${dur(wk.diplomaDone)} of ${dur(wk.diplomaTarget)} logged before today${wk.diplomaToday ? ` · ${dur(wk.diplomaToday)} planned today, replacing PCM` : ''}. Week type: <span role="group">${[[60, 'Light 1 h'], [120, 'Usual 2 h'], [180, 'Heavy 3 h'], [240, '4 h'], [300, '5 h']].map(([m, t]) => `<button type="button" class="kl-ghost" data-a="kgddip" data-v="${m}" aria-pressed="${(heavy || sc.diploma.week) === m}">${t}</button>`).join(' ')}</span></p>
       <form data-f="kgdexam" class="kl-stack"><p class="kl-small"><b>Diploma exam period.</b> From the start date, diploma preparation takes the lecture and priority blocks, new PCM lectures pause, German goes ${sc.germanExam === 'pause' ? 'on pause' : sc.germanExam === 'light' ? 'down to 15 min' : 'on as usual'}. Afterwards everything resumes from where you stopped, with no catch-up marathon.</p>
