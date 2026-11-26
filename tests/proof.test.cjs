@@ -144,3 +144,14 @@ test('proof grading: photos reach the grader; no invented doubt, but real photo/
   const r = groups([...ph('a', 1), ...ph('b', 2), ...ph('c', 1), ...ph('d', 4), ...ph('e', 1)]);
   assert.deepStrictEqual(J(r.map(x => x.map(y => y.url))), [['a0', 'b0', 'b1'], ['c0'], ['d0', 'd1', 'd2', 'd3'], ['e0']], 'whole questions per group, never more than 3 unless one question has more');
 });
+test('a photo/transcription discrepancy holds the question pending even when the rubric says pass, and is shown as a verdict-changing spot', () => {
+  const qs1 = [{ id: 'q4', t: 'Solve 2x + 5 = -3', a: 'x = -4' }];
+  const reply = JSON.stringify({ questions: [{ id: 'q4', readable: true, unclear: [], discrepancies: [{ line: 'line 3', transcription: 'x = 4', photo: 'x = -4' }], rubric: { method: 2, concept: 2, execution: 2, checks: 0 }, finalMatches: true, skills: ['s5'], rationale: 'photo shows -4' }] });
+  const pm = P.parseMarks(reply, qs1);
+  assert.strictEqual(P.decide(pm.marks.q4), 'pending');
+  assert.ok(pm.reads.q4.unclear.some(u => u.discrepancy && u.changesVerdict && /x = 4/.test(u.where) && /x = -4/.test(u.where)));
+  assert.strictEqual(P.decide(Object.assign({}, pm.marks.q4, { unclear: [] })), 'pending', 'the discrepancies field alone is enough');
+  const clean = P.parseMarks(JSON.stringify({ questions: [{ id: 'q4', readable: true, unclear: [], discrepancies: [], rubric: { method: 2, concept: 2, execution: 2, checks: 0 }, finalMatches: true }] }), qs1);
+  assert.strictEqual(P.decide(clean.marks.q4), 'pass', 'an empty list changes nothing');
+  assert.ok(html.includes('"discrepancies":[{"line":"...","transcription":"...","photo":"..."}]') && html.includes("Any place where the photo and the transcription differ goes in discrepancies"));
+});
