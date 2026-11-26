@@ -17,12 +17,12 @@ function tabs() {
   add('library', 'memory');
   return t;
 }
-function load({ withM = true, prefs = null, today = null } = {}) {
+function load({ withM = true, prefs = null, today = null, stage = null } = {}) {
   const store = { 'kg-lab-v1': '{}' }, writes = [];
   if (prefs) store['kg-quarters-v1'] = JSON.stringify(prefs);
   const ls = { getItem: k => store[k] ?? null, setItem: (k, v) => { writes.push(k); store[k] = String(v); } };
-  const doc = { createElement: () => ({}), head: { appendChild() {} }, addEventListener() {}, getElementById: () => null };
-  const ctx = { Math, JSON, Number, String, Object, Array, Set, Map, Date, console, localStorage: ls, document: doc, requestAnimationFrame: f => f(), matchMedia: () => ({ matches: false }), MouseEvent: function () {} };
+  const doc = { createElement: () => ({}), head: { appendChild() {} }, addEventListener() {}, getElementById: id => id === 'kg-scene' && stage ? { querySelector: () => stage } : null };
+  const ctx = { Math, JSON, Number, String, Object, Array, Set, Map, Date, console, localStorage: ls, document: doc, requestAnimationFrame: f => f(), matchMedia: () => ({ matches: false }), MouseEvent: function () {}, addEventListener() {}, setTimeout: f => f() };
   ctx.window = ctx; ctx.globalThis = ctx;
   vm.runInNewContext(CULT, ctx); vm.runInNewContext(RANK, ctx);
   if (today) ctx.StudyPlan = { templateDay: () => ({ rows: today }), clk: m => String(m) };
@@ -111,4 +111,24 @@ test('no decay, no upkeep, and no story content past the agreed boundary', () =>
   assert.ok(!/decay\s*\(|upkeep\s*\(|setInterval/.test(Q), 'nothing ticks down');
   // the room's story vocabulary is limited to Gu, Immortal Gu, Blessed Land and Rank 1–5; later-arc names are a guard
   assert.ok(!/Venerable|Heavenly Court|Lang Ya|Rank [6-9]|Fang Yuan/.test(Q));
+});
+
+// a stand-in for the desk's home stage (.kq-stage) with just what mountHome touches
+const fakeStage = () => { const st = { cls: new Set(), html: '', el: null, classList: { toggle: (c, on) => on ? st.cls.add(c) : st.cls.delete(c) },
+  querySelector: () => st.el, insertAdjacentHTML: (w, h) => { st.html = h; st.el = { remove: () => { st.el = null; st.html = ''; } }; } }; return st; };
+
+test('home: the painted quarters replace the drawn backdrop by default, and every old door has a painted place', () => {
+  const st = fakeStage(), { Kq, writes } = load({ stage: st });
+  assert.ok(st.cls.has('kqp-painted'), 'painted by default');
+  assert.match(st.html, /quarters\/room-plate\.webp/);
+  const T = tabs(), targets = [...Kq.HOME.map(h => h[1])];
+  for (const sec of ['today', 'study', 'library', 'plan', 'progress', 'company', 'settings']) assert.ok(targets.some(t => t.split(':')[0] === sec), 'no place for ' + sec);
+  for (const t of targets.filter(t => t.includes(':'))) { const [p, id] = t.split(':'); assert.ok(T[p] && T[p].has(id), 'missing tab ' + t); }
+  assert.ok(!/iroha-desk|kaguya-still/.test(st.html), 'the live companions stay; no painted duplicates');
+  assert.deepStrictEqual(writes, [], 'mounting writes nothing');
+});
+
+test('home: switching the painted room off restores the original scene', () => {
+  const st = fakeStage(); load({ stage: st, prefs: { home: false } });
+  assert.ok(!st.cls.has('kqp-painted')); assert.strictEqual(st.html, '');
 });
