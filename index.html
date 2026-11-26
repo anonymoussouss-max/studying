@@ -3191,8 +3191,8 @@ window.__KG_BUILTIN = {
     else { iconv.length = 0; saveI(); imsgs.textContent = ""; }
   };
   window.__kaguyaAsk = text => { if (!isOpen) openChat(); input.value = text; sendMessage(); };
-  // photo-proof transcriptions get no persona note: the backend's faithful-transcription brief is the whole instruction
-  window.__kgAsk = (who, text, image, long) => postChat([{ role: "user", content: window.__kgPurpose === "proof-read" ? text : text + "\n\n" + (who === "iroha" ? IROHA_NOTE : KAGUYA_NOTE) }], ameContext(), who, long ? 55000 : image ? 30000 : 25000, image, long);
+  // photo-proof reading and marking get no persona note: the backend's proof briefs are the whole instruction
+  window.__kgAsk = (who, text, image, long) => postChat([{ role: "user", content: /^proof-(read|mark)$/.test(window.__kgPurpose || "") ? text : text + "\n\n" + (who === "iroha" ? IROHA_NOTE : KAGUYA_NOTE) }], ameContext(), who, long ? 55000 : image ? 30000 : 25000, image, long);
 
   // ---------- the timed session on the desk: both of them can see it ----------
   const activeSession = () => { try { const a = JSON.parse(localStorage.getItem("ame-habit-v1") || "null")?.active; return a && a.targetMs ? a : null; } catch (e) { return null; } };
@@ -16174,7 +16174,7 @@ You entered 25</pre></div>
     for (const q of qs) {
       const x = j && Array.isArray(j.questions) ? j.questions.find(y => String(y.id) === String(q.id)) : null;
       reads[q.id] = { text: x && typeof x.transcription === 'string' ? x.transcription : '', unclear: x && Array.isArray(x.unclear) ? x.unclear : [] };
-      marks[q.id] = x ? { readable: x.readable !== false, unclear: reads[q.id].unclear, rubric: x.rubric || {}, finalMatches: !!x.finalMatches, validAlternative: !!x.validAlternative, skills: Array.isArray(x.skills) ? x.skills : [], why: String(x.rationale || '').slice(0, 1200), by: 'Iroha (AI, provisional)' } : { readable: false, why: 'no reading returned', by: 'Iroha (AI, provisional)' };
+      marks[q.id] = x ? { readable: x.readable !== false, unclear: reads[q.id].unclear, rubric: x.rubric || {}, finalMatches: !!x.finalMatches, validAlternative: !!x.validAlternative, skills: Array.isArray(x.skills) ? x.skills : [], why: String(x.rationale || '').slice(0, 1200), by: 'Provisional AI assessment (Iroha)' } : { readable: false, why: 'no reading returned', by: 'Provisional AI assessment (Iroha)' };
     }
     return { reads, marks, ok: !!j };
   }
@@ -16281,30 +16281,45 @@ You entered 25</pre></div>
   F.psettle = (v, f) => upd(s => { const r = resolve(s, f.dataset.ap, { basis: v.basis, ref: v.ref, reasoning: v.reasoning, outcome: v.outcome }, Date.now()); if (!r.ok) alert(r.why); return r.s; }, 'appeal settled');
   F.pappeal = (v, f) => upd(s => appeal(s, f.dataset.q, v.kind, v.text, Date.now()), 'appeal');
   const toData = blob => new Promise(ok => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.readAsDataURL(blob); });
+  // Photos go in groups of whole questions (at most 3 photos per request). Each group is transcribed first, then marked
+  // with its photos attached, so the grader can catch a reading that differs from the page instead of trusting it blindly.
+  const proofGroups = imgs => {
+    const byQ = []; for (const x of imgs) { let g = byQ.find(y => y.q === x.q); if (!g) byQ.push(g = { q: x.q, imgs: [] }); g.imgs.push(x); }
+    const out = []; let cur = [];
+    for (const g of byQ) {
+      if (g.imgs.length > 3) { if (cur.length) out.push(cur), cur = []; out.push(g.imgs); continue; }
+      if (cur.length + g.imgs.length > 3) out.push(cur), cur = [];
+      cur = cur.concat(g.imgs);
+    }
+    if (cur.length) out.push(cur); return out;
+  };
+  if (window.KgProof) window.KgProof.proofGroups = proofGroups;
+  const proofMarkPrompt = (need, qs, read, fixes, extra) => `[proof marking request, not typed by me] Closed-book chapter proof. Mark each question from my working. Skills to identify (ids): ${need.map(k => k.id + ' = ' + k.name).join('; ')}.
+Questions: ${qs.map(q => `${q.id}: ${q.t} (reference answer: ${q.a})`).join(' | ')}
+The photos of this working are attached${extra ? ` (${extra})` : ''}. Its transcription: ${read.slice(0, 12000)}
+${fixes}
+Reply with JSON only: {"questions":[{"id":"q0","transcription":"...","readable":true,"unclear":[{"where":"...","changesVerdict":false}],"rubric":{"method":0-2,"concept":0-2,"execution":0-2,"checks":0-2},"finalMatches":true,"validAlternative":false,"skills":["skill ids shown"],"rationale":"..."}]}
+Rules: a right final answer with invalid reasoning gets method 0 or 1. A minor arithmetic slip with sound reasoning gets execution 1. A valid method different from the reference is validAlternative true. Check the transcription against the photos. Don't invent doubt: where the photo clearly shows what the transcription says, grade it as written, so a clearly written wrong digit is my slip, not an unclear spot. Where a photo and the transcription differ at a specific sign, digit, exponent, subscript or diagram, or neither can settle what was written, list it in unclear: in where, give the line, what the transcription says and what the photo shows, with changesVerdict true if it could change the result. Never guess past it. The reference answer may itself be wrong: say so in rationale.`;
   A.psend = async () => {
     let s = upd(x => step(x, 'reading', Date.now()), 'reading'); if (!s || s.state !== 'reading') return;
     try {
       const imgs = []; for (const p of s.photos.filter(x => x.saved)) { const rec = await evidence.get(p.id); if (rec && rec.blob) imgs.push({ q: p.q, url: await toData(rec.blob) }); }
       if (!imgs.length) throw new Error('no saved photos found on this device');
-      const st = read(), need = st.skills[s.gu].list, reads = [];
-      for (let i = 0; i < imgs.length; i += 3) { // the backend takes up to 3 images per request
-        const batch = imgs.slice(i, i + 3), images = batch.map(x => ({ media_type: x.url.slice(5, x.url.indexOf(';')), data: x.url.slice(x.url.indexOf(',') + 1) }));
-        window.__kgPurpose = 'proof-read';
-        const r = await window.__kgAsk('iroha', `[proof transcription, not typed by me] Transcribe these photos of my handwritten working exactly, line by line, for question ids ${batch.map(x => x.q).join(', ')} (in photo order). Mark anything you can't read as [?]. Don't solve, judge or add anything. Plain text only.`, images, true);
-        window.__kgPurpose = '';
-        if (!r || r.error || !r.reply) throw new Error(r && r.error || 'no reply');
-        reads.push(batch.map(x => x.q).join(',') + ':\n' + r.reply);
+      const st = read(), need = st.skills[s.gu].list, all = { reads: {}, marks: {}, ok: true };
+      const asImg = x => ({ media_type: x.url.slice(5, x.url.indexOf(';')), data: x.url.slice(x.url.indexOf(',') + 1) });
+      const ask = async (purpose, text, images) => { window.__kgPurpose = purpose; try { const r = await window.__kgAsk('iroha', text, images, true); if (!r || r.error || !r.reply) throw new Error(r && r.error || 'no reply'); return r.reply; } finally { window.__kgPurpose = ''; } };
+      for (const group of proofGroups(imgs)) {
+        const ids = [...new Set(group.map(x => x.q))], reads = [];
+        for (let i = 0; i < group.length; i += 3) { // the backend takes up to 3 images per request
+          const batch = group.slice(i, i + 3);
+          reads.push(batch.map(x => x.q).join(',') + ':\n' + await ask('proof-read', `[proof transcription, not typed by me] Transcribe these photos of my handwritten working exactly, line by line, for question ids ${batch.map(x => x.q).join(', ')} (in photo order). Mark anything you can't read as [?]. Don't solve, judge or add anything. Plain text only.`, batch.map(asImg)));
+        }
+        const qs = s.qs.filter(q => ids.includes(q.id));
+        const fixes = Object.entries(s.reads).filter(([q, r]) => r.fix && ids.includes(q)).map(([q, r]) => `My correction for ${q}: ${r.fix}`).join('\n');
+        const reply = await ask('proof-mark', proofMarkPrompt(need, qs, reads.join('\n---\n'), fixes, group.length > 3 ? `the first 3 of ${group.length}; for the rest, rely on the transcription` : ''), group.slice(0, 3).map(asImg));
+        const pm = parseMarks(reply, qs); Object.assign(all.reads, pm.reads); Object.assign(all.marks, pm.marks); all.ok = all.ok && pm.ok;
       }
-      const prompt = `[proof marking request, not typed by me] Closed-book chapter proof. Mark each question from my transcribed working only. Skills to identify (ids): ${need.map(k => k.id + ' = ' + k.name).join('; ')}.
-Questions: ${s.qs.map(q => `${q.id}: ${q.t} (reference answer: ${q.a})`).join(' | ')}
-My transcribed working: ${reads.join('\n---\n').slice(0, 12000)}
-${Object.entries(s.reads).filter(([, r]) => r.fix).map(([q, r]) => `My correction for ${q}: ${r.fix}`).join('\n')}
-Reply with JSON only: {"questions":[{"id":"q0","transcription":"...","readable":true,"unclear":[{"where":"...","changesVerdict":false}],"rubric":{"method":0-2,"concept":0-2,"execution":0-2,"checks":0-2},"finalMatches":true,"validAlternative":false,"skills":["skill ids shown"],"rationale":"..."}]}
-Rules: a right final answer with invalid reasoning gets method 0 or 1. A minor arithmetic slip with sound reasoning gets execution 1. A valid method different from the reference is validAlternative true. If notation or handwriting could change the result, list it in unclear with changesVerdict true rather than guessing. Only flag spots the transcription itself marks [?] or notes as ambiguous in brackets; never suggest that clearly transcribed characters were misread: I check the transcription myself. The reference answer may itself be wrong: say so in rationale.`;
-      const r = await window.__kgAsk('iroha', prompt, null, true);
-      if (!r || r.error || !r.reply) throw new Error(r && r.error || 'no reply');
-      const pm = parseMarks(r.reply, s.qs);
-      upd(x => step(x, 'marked', Date.now(), pm), 'marked');
+      upd(x => step(x, 'marked', Date.now(), all), 'marked');
     } catch (e) { window.__kgPurpose = ''; upd(x => step(x, 'read-failed', Date.now(), String(e.message || e).slice(0, 120)), 'read failed'); }
   };
   document.addEventListener('change', async e => {
