@@ -16556,7 +16556,7 @@ function serpentSVG(o) {
   // the one next requirement, and the control that takes it
   function nextStep(g) {
     const n = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
-    if (g.acq === 'not-obtained') return { t: `Finish ${n(g.lectures - g.done, 'more lecture')} (next: lecture ${g.done + 1} of ${g.lectures}). You can verify the assigned-work checklist meanwhile.`, b: ['Open today’s lectures', 'data-qgo="today:today"'] };
+    if (g.acq === 'not-obtained') return { t: `Finish ${n(g.lectures - g.done, 'more lecture')} (next: lecture ${g.done + 1} of ${g.lectures}).${g.scope === 'verified' ? (g.attempted < g.assigned ? ` Meanwhile, ${n(g.assigned - g.attempted, 'assigned item')} still to attempt.` : ' Assigned work is all attempted.') : ' You can verify the assigned-work checklist meanwhile.'}`, b: ['Open today’s lectures', 'data-qgo="today:today"'] };
     if (g.acq === 'scope-unverified') return { t: 'Lectures done. Confirm the assigned-work checklist (TAH/KCLS, KTK, homework, DPP) so the Gu can be obtained.', b: ['Verify the checklist', `data-qdetail="${esc(g.key)}"`] };
     if (g.acq === 'attempts-open') return { t: `Attempt ${n(g.assigned - g.attempted, 'more assigned item')}. Working or a “stuck at” note counts; help counts for acquisition, not mastery.`, b: ['Record attempts', `data-qdetail="${esc(g.key)}"`] };
     if (!g.skills) return { t: 'Approve this chapter’s skill list to begin refinement.', b: ['Review the skill list', `data-qdetail="${esc(g.key)}"`] };
