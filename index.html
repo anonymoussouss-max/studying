@@ -16150,7 +16150,7 @@ You entered 25</pre></div>
   function decide(m) {
     if (!m || m.void) return m && m.void ? 'void' : 'pending';
     if (m.appealOpen) return 'pending';
-    if (m.readable === false || (m.unclear || []).some(u => u.changesVerdict)) return 'pending';
+    if (m.readable === false || (m.unclear || []).some(u => u.changesVerdict) || (m.discrepancies || []).length) return 'pending';
     const r = m.rubric || {}; if (!RUBRIC.every(k => [0, 1, 2].includes(r[k]))) return 'pending';
     const method = m.validAlternative && r.method >= 1 ? 2 : r.method;
     if (method < 2 || r.concept < 2) return 'not-yet';            // a matching final answer never rescues invalid reasoning
@@ -16173,8 +16173,9 @@ You entered 25</pre></div>
     const reads = {}, marks = {};
     for (const q of qs) {
       const x = j && Array.isArray(j.questions) ? j.questions.find(y => String(y.id) === String(q.id)) : null;
-      reads[q.id] = { text: x && typeof x.transcription === 'string' ? x.transcription : '', unclear: x && Array.isArray(x.unclear) ? x.unclear : [] };
-      marks[q.id] = x ? { readable: x.readable !== false, unclear: reads[q.id].unclear, rubric: x.rubric || {}, finalMatches: !!x.finalMatches, validAlternative: !!x.validAlternative, skills: Array.isArray(x.skills) ? x.skills : [], why: String(x.rationale || '').slice(0, 1200), by: 'Provisional AI assessment (Iroha)' } : { readable: false, why: 'no reading returned', by: 'Provisional AI assessment (Iroha)' };
+      const disc = x && Array.isArray(x.discrepancies) ? x.discrepancies.filter(d => d && (d.line || d.transcription || d.photo)) : [];
+      reads[q.id] = { text: x && typeof x.transcription === 'string' ? x.transcription : '', unclear: (x && Array.isArray(x.unclear) ? x.unclear : []).concat(disc.map(d => ({ where: `${d.line || 'somewhere'}: transcription says "${d.transcription || '?'}", photo shows "${d.photo || '?'}"`, changesVerdict: true, discrepancy: true }))) };
+      marks[q.id] = x ? { readable: x.readable !== false, unclear: reads[q.id].unclear, discrepancies: disc, rubric: x.rubric || {}, finalMatches: !!x.finalMatches, validAlternative: !!x.validAlternative, skills: Array.isArray(x.skills) ? x.skills : [], why: String(x.rationale || '').slice(0, 1200), by: 'Provisional AI assessment (Iroha)' } : { readable: false, why: 'no reading returned', by: 'Provisional AI assessment (Iroha)' };
     }
     return { reads, marks, ok: !!j };
   }
@@ -16298,8 +16299,8 @@ You entered 25</pre></div>
 Questions: ${qs.map(q => `${q.id}: ${q.t} (reference answer: ${q.a})`).join(' | ')}
 The photos of this working are attached${extra ? ` (${extra})` : ''}. Its transcription: ${read.slice(0, 12000)}
 ${fixes}
-Reply with JSON only: {"questions":[{"id":"q0","transcription":"...","readable":true,"unclear":[{"where":"...","changesVerdict":false}],"rubric":{"method":0-2,"concept":0-2,"execution":0-2,"checks":0-2},"finalMatches":true,"validAlternative":false,"skills":["skill ids shown"],"rationale":"..."}]}
-Rules: a right final answer with invalid reasoning gets method 0 or 1. A minor arithmetic slip with sound reasoning gets execution 1. A valid method different from the reference is validAlternative true. Check the transcription against the photos. Don't invent doubt: where the photo clearly shows what the transcription says, grade it as written, so a clearly written wrong digit is my slip, not an unclear spot. Where a photo and the transcription differ at a specific sign, digit, exponent, subscript or diagram, or neither can settle what was written, list it in unclear: in where, give the line, what the transcription says and what the photo shows, with changesVerdict true if it could change the result. Never guess past it. The reference answer may itself be wrong: say so in rationale.`;
+Reply with JSON only: {"questions":[{"id":"q0","transcription":"...","readable":true,"unclear":[{"where":"...","changesVerdict":false}],"rubric":{"method":0-2,"concept":0-2,"execution":0-2,"checks":0-2},"discrepancies":[{"line":"...","transcription":"...","photo":"..."}],"finalMatches":true,"validAlternative":false,"skills":["skill ids shown"],"rationale":"..."}]}
+Rules: a right final answer with invalid reasoning gets method 0 or 1. A minor arithmetic slip with sound reasoning gets execution 1. A valid method different from the reference is validAlternative true. Check the transcription against the photos. Don't invent doubt: where the photo clearly shows what the transcription says, grade it as written, so a clearly written wrong digit is my slip, not an unclear spot. Where a photo and the transcription differ at a specific sign, digit, exponent, subscript or diagram, or neither can settle what was written, list it in unclear: in where, give the line, what the transcription says and what the photo shows, with changesVerdict true if it could change the result. Never guess past it. Any place where the photo and the transcription differ goes in discrepancies, even if the photo looks clear: don't grade past it, I'll correct the transcription and resubmit. Leave discrepancies empty when they agree. The reference answer may itself be wrong: say so in rationale.`;
   A.psend = async () => {
     let s = upd(x => step(x, 'reading', Date.now()), 'reading'); if (!s || s.state !== 'reading') return;
     try {
