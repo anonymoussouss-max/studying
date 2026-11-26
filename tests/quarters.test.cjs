@@ -76,6 +76,12 @@ test('journey on derived records: lectures → checklist → attempts → obtain
   let r = load({ done: 20 }); r.click({ qsel: KEYB }); h = r.M.PANELS.cultivation();
   assert.match(h, /Next:<\/b> Finish 3 more lectures \(next: lecture 21 of 23\)/);
   assert.match(h, /Refinement<\/b> · refinement starts once the Gu is obtained/);
+  // the lecture-stage hint follows the checklist: never asks to verify one that is already verified
+  const ns = g => r.Kq.nextStep(Object.assign({ key: KEYB, acq: 'not-obtained', done: 20, lectures: 23, scope: 'unverified', attempted: 0, assigned: 0 }, g)).t;
+  assert.match(ns({}), /You can verify the assigned-work checklist meanwhile/);
+  assert.match(ns({ scope: 'verified', attempted: 1, assigned: 3 }), /Meanwhile, 2 assigned items still to attempt\./);
+  assert.match(ns({ scope: 'verified', attempted: 1, assigned: 1 }), /Assigned work is all attempted\./);
+  assert.doesNotMatch(ns({ scope: 'verified', attempted: 1, assigned: 1 }), /verify the assigned-work checklist/);
   // 2. lectures done, checklist not yet verified
   r = load({ done: 23 }); r.click({ qsel: KEYB }); assert.match(r.M.PANELS.cultivation(), /Next:<\/b> Lectures done\. Confirm the assigned-work checklist/);
   // 3. verified checklist with one assigned item, not attempted
