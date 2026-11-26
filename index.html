@@ -16922,7 +16922,26 @@ function serpentSVG(o) {
   // a position is saved as it plays; 92% watched marks the lecture complete. Completion is never mastery.
   function record(s, c, l, pos, dur) { const k = lk(c, l), p = s.lec[k] || {}; p.pos = Math.max(0, Math.round(pos || 0)); if (dur) p.dur = Math.round(dur);
     p.at = Date.now(); if (p.dur && p.pos / p.dur >= 0.92) p.done = true; s.lec[k] = p; s.last = { c, l }; return p; }
-  window.KgCourses = { KEY, srtToVtt, lecState, courseState, availOf, resumeOf, record, lecturesOf };
+  // Suggested learning path: explicit stage and course order, matched by the index's stable course ids. Nothing is locked;
+  // any stage can be opened at any time. Labels are display names only; progress, notes and links stay keyed by id.
+  const ARRANGE = [
+    { h: 'Stage 1 — Start all three interests', c: [['an-introduction-to-astronomy', 'An Introduction to Astronomy'], ['basics-of-rocket-science', 'Basics of Rocket Science'], ['understanding-modern-physics-2-quantum-mechanics-and-atoms', 'Understanding Modern Physics II: Quantum Mechanics and Atoms']] },
+    { h: 'Stage 2 — Broaden your understanding', c: [['astro', 'Astronomy: Exploring Time and Space'], ['basis-flight-mechanics', 'Flight Mechanics'], ['foundations-quantum-mechanics', 'Foundations of Quantum Mechanics']] },
+    { h: 'Stage 3 — Apply the foundations', c: [['exoplanets', 'Exoplanets'], ['spacecraft-dynamics-kinematics', 'Spacecraft Dynamics: Kinematics'], ['quantum-mechanics', 'Quantum Mechanics — University of Colorado Boulder']] },
+    { h: 'Stage 4 — Expand into larger systems', c: [['einstein-relativity', 'Einstein and Relativity'], ['extra-galactic-astronomy', 'Extra-Galactic Astronomy'], ['quantum-physics', 'Exploring Quantum Physics'], ['robotic-methodologies', 'Robotic Methodologies']] },
+    { h: 'Stage 5 — Move toward your longer-term interests', c: [['cosmology-our-universe', 'Cosmology: Our Universe'], ['phases-of-matter-solid-liquid-gas-and-beyond', 'Phases of Matter: Solid, Liquid, Gas and Beyond'], ['particle-physics', 'Particle Physics'], ['black-holes-astro-101', 'Black Holes: Astro 101'], ['physique-deux-infinis-liens', 'D’un infini à l’autre']] },
+    { h: 'Optional branches', note: 'Take these alongside the main path when they help; neither is required.', c: [['our-place-in-the-cosmos', 'Our Place in the Cosmos', 'Alternative perspective alongside Stages 1–2'], ['astrobiology', 'Astrobiology', 'Optional branch after introductory astronomy or Exoplanets']] },
+    { h: 'Supporting shelf', note: 'Maths, programming and physics support. WIP courses stay in place; their usable lectures can already be watched.', c: [['physics-101-forces-kinematics', 'Physics 101: Forces and Kinematics'], ['introduction-to-calculus', 'Introduction to Calculus'], ['python', 'Programming for Everybody — Python'], ['mit-18-06sc-linear-algebra', 'Linear Algebra — MIT / Gilbert Strang'], ['differential-equations-engineers', 'Differential Equations for Engineers'], ['vector-calculus-engineers', 'Vector Calculus for Engineers'], ['mit-8-02-electricity-magnetism', 'Electricity and Magnetism — MIT'], ['mit-8-03sc-vibrations-waves', 'Vibrations and Waves — MIT'], ['numerical-methods-engineers', 'Numerical Methods for Engineers']] }
+  ];
+  // groups the indexed courses into the arrangement; a course the arrangement does not name goes to a trailing "Other courses" group
+  function arrange(courses) {
+    const byId = new Map(courses.map(c => [String(c.id).toLowerCase(), c])), used = new Set();
+    const groups = ARRANGE.map(g => ({ h: g.h, note: g.note, items: g.c.map(([id, label, why]) => { const c = byId.get(id); if (!c || used.has(c)) return null; used.add(c); return { c, label, why }; }).filter(Boolean) }));
+    const rest = courses.filter(c => !used.has(c)).map(c => ({ c, label: c.title }));
+    if (rest.length) groups.push({ h: 'Other courses', items: rest });
+    return groups.filter(g => g.items.length);
+  }
+  window.KgCourses = { ARRANGE, arrange, KEY, srtToVtt, lecState, courseState, availOf, resumeOf, record, lecturesOf };
   if (!M || !M.PANELS) return;
 
   // ---- where the files come from: a folder you chose (File System Access) or the local server ----
@@ -16968,19 +16987,18 @@ function serpentSVG(o) {
   }
   function collection() {
     const s = store(), last = s.last && course(s.last.c), lastL = last && lecturesOf(last).find(l => l.id === s.last.l);
-    const card = c => { const av = availOf(c), st = courseState(c, s), L = lecturesOf(c), done = L.filter(l => lecState(s.lec[lk(c.id, l.id)]) === 'completed').length, usable = L.filter(l => l.ok).length;
-      return `<button class="klib-card" data-lib="course" data-c="${esc(c.id)}"><b>${esc(c.title)}</b>${c.by ? `<span class="kl-small">${esc(c.by)}</span>` : ''}
+    const card = (c, label, why) => { const av = availOf(c), st = courseState(c, s), L = lecturesOf(c), done = L.filter(l => lecState(s.lec[lk(c.id, l.id)]) === 'completed').length, usable = L.filter(l => l.ok).length;
+      return `<button class="klib-card" data-lib="course" data-c="${esc(c.id)}"><b>${esc(label || c.title)}</b>${c.by ? `<span class="kl-small">${esc(c.by)}</span>` : ''}${why ? `<span class="kl-small klib-why">${esc(why)}</span>` : ''}
         <span class="klib-chips">${chip(st, ST[st])}${chip(av, AV[av])}</span>
         <span class="kl-small">${L.length ? `${done} of ${L.length} lectures completed` : 'No lectures on disk yet'}${av !== 'available' ? ` · ${usable} usable${c.expected ? ` of ${c.expected} expected` : ''}` : ''}</span>
         <span class="klib-bar"><i style="width:${L.length ? Math.round(100 * done / L.length) : 0}%"></i></span></button>`; };
-    const ver = index.courses.filter(c => c.kind !== 'planned' || c.status === 'available'), wip = index.courses.filter(c => c.kind === 'planned' && c.status !== 'available');
     return `<section class="kl-card kl-stack klib"><p class="kl-eyebrow">📜 COURSE LIBRARY · SOUTHERN BORDER</p><h2>Your offline courses</h2>
       <p class="kl-small">Course progress is kept here only. Watching never obtains or refines a Chapter Gu, passes a proof or counts as retention. Scheduling stays optional, inside your existing study allowance.</p>
-      ${last && lastL ? `<div class="klib-resume"><span>Continue <b>${esc(last.title)}</b> · ${esc(lastL.name)}</span><button class="kl-primary" data-lib="play" data-c="${esc(last.id)}" data-l="${esc(lastL.id)}">Resume</button></div>` : ''}
+      ${last && lastL ? `<div class="klib-resume"><span>Continue <b>${esc((ARRANGE.flatMap(g => g.c).find(x => x[0] === String(last.id).toLowerCase()) || [0, last.title])[1])}</b> · ${esc(lastL.name)}</span><button class="kl-primary" data-lib="play" data-c="${esc(last.id)}" data-l="${esc(lastL.id)}">Resume</button></div>` : ''}
       <div class="kl-row klib-filter" style="flex-wrap:wrap"><input type="search" data-libq="1" placeholder="Search courses" aria-label="Search courses"></div>
-      <div class="klib-grid">${ver.map(card).join('')}</div>
-      <h3 class="klib-h3">Planned additions</h3><p class="kl-small">Shown as WIP until every expected lecture has a valid video. Usable lectures can already be watched.</p>
-      <div class="klib-grid">${wip.map(card).join('')}</div>${sourceCard(false)}</section>`;
+      <p class="kl-small">A suggested order, not a gate: every course stays open. WIP marks a course still downloading; its place on the path does not change.</p>
+      ${arrange(index.courses).map(g => `<div class="klib-group" data-libg="1"><h3 class="klib-h3">${esc(g.h)}</h3>${g.note ? `<p class="kl-small">${esc(g.note)}</p>` : ''}
+      <div class="klib-grid">${g.items.map(x => card(x.c, x.label, x.why)).join('')}</div></div>`).join('')}${sourceCard(false)}</section>`;
   }
   function courseView(c) {
     const s = store(), r = resumeOf(c, s), av = availOf(c), st = courseState(c, s);
@@ -17074,7 +17092,7 @@ function serpentSVG(o) {
     if (f.dataset.libf === 'note') { const t = String(f.t.value || '').trim(); if (!t || !view.c) return; const s = store(); s.notes.push({ id: 'cn' + Date.now().toString(36), c: view.c, l: view.l, t: t.slice(0, 4000), at: Date.now(), pos: cur && cur.l === view.l ? Math.round(vid.currentTime) : null }); put(s); M.render(); }
   });
   document.addEventListener('change', e => { const t = e.target; if (t && t.dataset && t.dataset.libsub != null && cur) { t.value === '' ? [...vid.querySelectorAll('track')].forEach(x => x.remove()) : setTrack(+t.value); } });
-  document.addEventListener('input', e => { const t = e.target; if (!t || !t.dataset || !t.dataset.libq) return; const q = t.value.toLowerCase(); for (const b of document.querySelectorAll('#moon-lab .klib-card')) b.hidden = !!q && !b.textContent.toLowerCase().includes(q); });
+  document.addEventListener('input', e => { const t = e.target; if (!t || !t.dataset || !t.dataset.libq) return; const q = t.value.toLowerCase(); for (const b of document.querySelectorAll('#moon-lab .klib-card')) b.hidden = !!q && !b.textContent.toLowerCase().includes(q); for (const g of document.querySelectorAll('#moon-lab .klib-group')) g.hidden = !![...g.querySelectorAll('.klib-card')].every(b => b.hidden); });
 
   // ---- notes: course notes appear in Library → Notes, beside the lecture notes ----
   const notesPanel = M.PANELS.notes;
