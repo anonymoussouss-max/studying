@@ -71,8 +71,8 @@ test('journey on derived records: lectures → checklist → attempts → obtain
   // 1. lectures still running: acquisition progress, no refinement yet
   let { M } = load({ done: 20 });
   let h = M.PANELS.cultivation();
-  assert.match(h, /GU CABINET/); assert.match(h, /Mathematics region/);
-  assert.match(h, /Basic Mathematics<\/b> · On its way<br><span class="kl-small">lectures 20\/23 · assigned-work checklist not verified yet/);
+  assert.match(h, /GU CABINET/); assert.match(h, /<b>Southern Border<\/b> · studying Mathematics/); assert.doesNotMatch(h, /Mathematics region/);
+  assert.match(h, /Basic Mathematics<\/b> <span class="kqc-st kqc-st-studying">Studying<\/span><br><span class="kl-small">lectures 20\/23 · assigned-work checklist not verified yet/);
   let r = load({ done: 20 }); r.click({ qsel: KEYB }); h = r.M.PANELS.cultivation();
   assert.match(h, /Next:<\/b> Finish 3 more lectures \(next: lecture 21 of 23\)/);
   assert.match(h, /Refinement<\/b> · refinement starts once the Gu is obtained/);
@@ -91,7 +91,7 @@ test('journey on derived records: lectures → checklist → attempts → obtain
   // 4. the attempt is saved as evidence of acquisition: the Gu is obtained; refinement waits for an approved skill list
   inv[KEYB].items[0].attempt = { how: 'independent', note: 'factorised, then a sign scheme', at: 1 };
   r = load({ done: 23, cult: { inv } }); r.click({ qsel: KEYB }); h = r.M.PANELS.cultivation();
-  assert.match(h, /<b>Obtained<\/b>/); assert.match(h, /Acquisition<\/b> · Gu obtained/); assert.match(h, /Next:<\/b> Approve this chapter’s skill list/);
+  assert.match(h, /<h2 class="kqc-name">Wave-Sign Serpent <span class="kqc-st kqc-st-obtained">Obtained<\/span>/); assert.match(h, /data-qrow="1" data-subj="maths" data-st="obtained"/); assert.match(h, /Acquisition<\/b> · Gu obtained/); assert.match(h, /Next:<\/b> Approve this chapter’s skill list/);
   // 5. an approved list gives plates; the next step is a study session (the table's destination)
   const skills = { [KEYB]: { status: 'approved', list: [{ id: 's1', name: 'sign scheme', depth: 'developed' }, { id: 's2', name: 'excluded points', depth: 'developed' }] } };
   r = load({ done: 23, cult: { inv, skills } }); r.click({ qsel: KEYB }); h = r.M.PANELS.cultivation();
@@ -111,12 +111,18 @@ test('the writing table resumes an unfinished session, else opens the session en
 test('rank: unresolved placement says what is missing and links to resolve it; chapter progress still shows', () => {
   const { M } = load();
   const h = M.PANELS.cultivation();
-  assert.match(h, /Rank not placed yet: the catalogue is incomplete for Physics, Chemistry <button class="kl-ghost kqc-link" data-qsetup="1">Resolve<\/button>/);
+  assert.match(h, /Placement not established: the catalogue is incomplete for Physics, Chemistry <button class="kl-ghost kqc-link" data-qsetup="1">Resolve<\/button>/);
   assert.match(h, /Now: <button[^>]*data-qsel="bm:Basic Mathematics">Basic Mathematics<\/button> · lectures 20\/23/);
   // once every count is in, an unmet first gate is progress, not a setup gap: name the next gate, offer no "Resolve"
   const r = load(), id = r.Kq.identity({ v: { placement: 'computable', why: [], subjects: { maths: { gu: [] }, physics: { gu: [] }, chem: { gu: [] } } }, st: {} });
-  assert.strictEqual(id.rank.t, 'Rank not placed yet'); assert.strictEqual(id.rank.why, '');
+  assert.strictEqual(id.rank.t, 'Placed below Rank 3 · initial'); assert.strictEqual(id.rank.why, '');
   assert.match(id.rank.next, /^next gate: Rank 3 · initial, every Class 11 chapter Gu obtained/);
+  // a finished chapter whose checklist and skill list aren't settled: placement first, no distant gate
+  const fin = { key: 'bm:Basic Mathematics', name: 'Basic Mathematics', done: 23, lectures: 23, scope: 'unverified', skills: null, acq: 'scope-unverified', level: 'none' };
+  const id2 = r.Kq.identity({ v: { placement: 'computable', why: [], subjects: { maths: { gu: [fin] }, physics: { gu: [] }, chem: { gu: [] } } }, st: {} });
+  assert.strictEqual(id2.rank.t, 'Placement not established'); assert.ok(!id2.rank.next);
+  assert.match(id2.rank.why, /checklists verified for 0 of 1 finished chapters; skill lists approved for 0 of 1 finished chapters/);
+  assert.match(id2.rank.a, /data-qdetail="bm:Basic Mathematics"/);
 });
 
 test('rules, sources and setup sit behind labelled controls; the classic records open from there and come back', () => {
@@ -150,7 +156,7 @@ test('home: painted by default, every old door has an object, labels appear on h
   assert.match(st.html, /id="kqp-table" tabindex="0" role="button" aria-label="Begin studying · writing table"/);
   assert.match(st.html, /data-kv="plan" tabindex="0" role="button" aria-label="Planner · notebook"/);
   assert.match(st.html, /<details class="kqp-guide"><summary>Room guide<\/summary>/);
-  assert.match(st.html, /class="kqp-id"[\s\S]*Mathematics region/);
+  assert.match(st.html, /class="kqp-id"[\s\S]*<b>Southern Border<\/b><span>Studying Mathematics<\/span>/);
   assert.ok(!/iroha-desk|kaguya-still/.test(st.html), 'the live companions stay; no painted duplicates');
   assert.deepStrictEqual(writes, []);
   const on = fakeStage(); load({ stage: on, prefs: { showLabels: true } }); assert.match(on.html, /<svg class="kqp-home kqp-labels"/);
@@ -175,4 +181,20 @@ test('the serpent stays an illustrative sign diagram; no decay, upkeep or later-
   assert.ok(!/graph of/i.test(Q));
   assert.ok(!/decay\s*\(|upkeep\s*\(/.test(Q));
   assert.ok(!/Venerable|Heavenly Court|Lang Ya|Rank [6-9]|Fang Yuan/.test(Q));
+});
+
+test('chapter states, filters and the drawn Gu: untouched chapters are Unstarted, never "On its way"', () => {
+  const r = load({ done: 20 }), h = r.M.PANELS.cultivation(), K = r.Kq;
+  assert.match(h, /data-st="studying" data-name="basic mathematics"/); assert.match(h, /data-st="studying" data-name="sets"/);
+  assert.match(h, /data-qf="q"/); assert.match(h, /<option value="studying">Studying \(2\)<\/option>/);
+  const u = load({ done: 0 }).M.PANELS.cultivation();
+  assert.match(u, /data-st="unstarted" data-name="basic mathematics"><span><b>Basic Mathematics<\/b> <span class="kqc-st kqc-st-unstarted">Unstarted<\/span><br><span class="kl-small">23 lectures · not started/);
+  assert.match(u, /<option value="unstarted">Unstarted \(1\)<\/option>/);
+  assert.doesNotMatch(h, /On its way/);
+  // the nook shows a cocoon for a chapter being studied, and inspection brings it forward with name, state and next action
+  assert.match(h, /clipPath id="egg-n0c"/);
+  r.click({ qsel: KEYB }); const g = r.M.PANELS.cultivation();
+  assert.match(g, /<h2 class="kqc-name">Basic Mathematics Gu <span class="kqc-st kqc-st-studying">Studying<\/span>/);
+  assert.match(g, /<button class="kl-primary" data-qgo="today:today">Open today’s lectures<\/button><button data-qstudy="bm:Basic Mathematics">Guided session on this chapter<\/button>/);
+  // obtained chapters are creatures, not cocoons
 });
