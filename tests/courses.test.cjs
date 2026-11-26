@@ -91,3 +91,46 @@ test('arrangement: 29 courses exactly once in stage order, by id, whatever their
   assert.deepStrictEqual([...g.flatMap(x => x.items.map(i => i.c.id))], [...ids, 'new-course']);
   assert.strictEqual(g[7].h, 'Other courses'); assert.strictEqual(g[0].items[0].c.modules[0].lectures[0].id, 'b');
 });
+
+function assessK() {
+  const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1];
+  const ctx = { window: {}, localStorage: { getItem: () => null, setItem() {} } }; ctx.globalThis = ctx; vm.runInNewContext(src, ctx); return ctx.window.KgCourses;
+}
+const C2 = (status = 'available') => ({ id: 'stars', status, modules: [{ name: 'The Sun', lectures: [{ id: 'a', ok: true }, { id: 'b', ok: true }] }, { name: 'Later', lectures: [{ id: 'c', ok: true }] }] });
+
+test('module assessment: only a fully completed module becomes due, once; a single lecture never triggers it', () => {
+  const K = assessK(), c = C2(), s = { lec: {}, notes: [] };
+  K.record(s, 'stars', 'a', 600, 600); assert.strictEqual(K.ensureDue(s, c).length, 0, 'one lecture of two completed: no assessment');
+  K.record(s, 'stars', 'b', 100, 600); assert.strictEqual(K.ensureDue(s, c).length, 0, 'opening / partly watching is not completion');
+  K.record(s, 'stars', 'b', 560, 600); assert.deepStrictEqual([...K.ensureDue(s, c)], [0]);
+  assert.strictEqual(K.ensureDue(s, c).length, 0, 'never created twice');
+  const a = s.asm[K.mkey(c, 0)]; assert.strictEqual(a.tier, 'hard'); assert.strictEqual(a.fails, 0); assert.strictEqual(a.pending, true);
+  assert.match(K.asmLabel(a), /^Assessment pending/); assert.strictEqual(K.asmLabel(undefined), 'Not yet due');
+  // invalid or missing files never let a module count; a WIP course's last module on disk may still be downloading
+  const bad = C2(); bad.modules[0].lectures[1].ok = false; const s2 = { lec: { 'stars/a': { done: true }, 'stars/b': { done: true } }, notes: [] };
+  assert.strictEqual(K.ensureDue(s2, bad).length, 0);
+  const w = C2('wip'), s3 = { lec: { 'stars/a': { done: true }, 'stars/b': { done: true }, 'stars/c': { done: true } }, notes: [] };
+  assert.deepStrictEqual([...K.ensureDue(s3, w)], [0], 'earlier WIP modules count once a later module has arrived; the last one does not');
+});
+
+test('module assessment: HARD → MEDIUM → EASY after three graded misses each; Easy floor; errors, deferral and duplicates count nothing', () => {
+  const K = assessK(), a = K.asmBlank(); let n = 0;
+  const ask = () => { a.cur = { id: 'q' + (++n), state: 'ready' }; return a.cur.id; };
+  // an error, then leaving and coming back (a JSON round trip, like a refresh) change nothing
+  let q = ask(); assert.strictEqual(K.applyGrade(a, q, 'error'), false); assert.strictEqual(a.fails, 0); assert.strictEqual(a.cur.state, 'error');
+  const back = JSON.parse(JSON.stringify(a)); assert.strictEqual(back.tier, 'hard'); assert.strictEqual(back.fails, 0);
+  assert.strictEqual(K.applyGrade(a, q, 'fail'), true); assert.strictEqual(K.applyGrade(a, q, 'fail'), false, 'the same submission is graded once');
+  q = ask(); K.applyGrade(a, q, 'fail'); assert.strictEqual(a.tier, 'hard'); assert.strictEqual(a.fails, 2);
+  const saved = JSON.parse(JSON.stringify(a)); assert.strictEqual(saved.fails, 2, 'the counter survives a refresh');
+  q = ask(); K.applyGrade(a, q, 'fail'); assert.strictEqual(a.tier, 'medium'); assert.strictEqual(a.fails, 0, 'reset on tier change');
+  for (let i = 0; i < 3; i++) { q = ask(); K.applyGrade(a, q, 'fail'); } assert.strictEqual(a.tier, 'easy'); assert.strictEqual(a.fails, 0);
+  for (let i = 0; i < 3; i++) { q = ask(); K.applyGrade(a, q, 'fail'); } assert.strictEqual(a.tier, 'easy', 'Easy is the floor'); assert.strictEqual(a.revise, true, 'targeted revision is offered');
+  assert.strictEqual(K.applyGrade(a, 'stale-id', 'pass'), false, 'an old question cannot be submitted');
+  q = ask(); K.applyGrade(a, q, 'pass'); assert.strictEqual(a.passed, 'easy'); assert.strictEqual(K.asmLabel(a), 'Passed — Easy');
+  assert.strictEqual(a.hist.length, 10, "3 Hard + 3 Medium + 3 Easy misses + the pass; the error is not in the history"); assert.ok(a.hist.every(h => h.v === 'pass' || h.v === 'fail'));
+  assert.strictEqual(K.applyGrade(a, q, 'pass'), false, 'nothing after a pass');
+  // a pass at Hard is labelled Hard; a new module always starts at Hard
+  const h = K.asmBlank(); h.cur = { id: 'x' }; K.applyGrade(h, 'x', 'pass'); assert.strictEqual(K.asmLabel(h), 'Passed — Hard');
+  assert.strictEqual(K.asmBlank().tier, 'hard');
+  assert.deepStrictEqual({ ...K.parseJSON('noise {"verdict":"fail"} tail') }, { verdict: 'fail' }); assert.strictEqual(K.parseJSON('no json'), null);
+});

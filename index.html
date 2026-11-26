@@ -16907,6 +16907,7 @@ function serpentSVG(o) {
   const store = () => { try { return Object.assign(blank(), JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { return blank(); } };
   const put = s => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} };
   const lk = (c, l) => c + '/' + l;
+  const parseJ = t => { const x = String(t || ''), i = x.indexOf('{'), j = x.lastIndexOf('}'); if (i < 0 || j <= i) return null; try { return JSON.parse(x.slice(i, j + 1)); } catch (e) { return null; } };
   // ---- pure rules (tested) ----
   const srtToVtt = t => 'WEBVTT\n\n' + String(t || '').replace(/^\uFEFF/, '').replace(/\r/g, '').replace(/^\d+\n(?=\d{2}:\d{2})/gm, '').replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
   const lecturesOf = c => (c.modules || []).flatMap(m => m.lectures || []);
@@ -16922,6 +16923,33 @@ function serpentSVG(o) {
   // a position is saved as it plays; 92% watched marks the lecture complete. Completion is never mastery.
   function record(s, c, l, pos, dur) { const k = lk(c, l), p = s.lec[k] || {}; p.pos = Math.max(0, Math.round(pos || 0)); if (dur) p.dur = Math.round(dur);
     p.at = Date.now(); if (p.dur && p.pos / p.dur >= 0.92) p.done = true; s.lec[k] = p; s.last = { c, l }; return p; }
+  // ---- module assessments (Iroha): one question per attempt, HARD → MEDIUM → EASY after three graded misses per tier ----
+  // State lives in s.asm[moduleKey] = { tier, fails, hist:[{qid,tier,v,at,...}], passed: null|tier, pending, cur, revise }.
+  // Watching (lec), understanding (asm) and later retention stay separate; nothing here touches a Chapter Gu.
+  const TIERS = ['hard', 'medium', 'easy'], TIER_N = { hard: 'Hard', medium: 'Medium', easy: 'Easy' };
+  const mkey = (c, mi) => c.id + '#' + mi + ':' + ((c.modules[mi] || {}).name || '');
+  // complete = every lecture of the syllabus module has a valid file and was completed. A WIP course's last module on disk
+  // may still be downloading, so it never counts until the course is verified or a later module has arrived.
+  function moduleDone(c, mi, s) { const m = (c.modules || [])[mi]; if (!m || !m.lectures.length) return false;
+    if (c.status === 'wip' && mi === c.modules.length - 1) return false;
+    return m.lectures.every(l => l.ok && lecState(s.lec[lk(c.id, l.id)]) === 'completed'); }
+  const asmBlank = () => ({ tier: 'hard', fails: 0, hist: [], passed: null, pending: true, cur: null, revise: false, at: Date.now() });
+  // creates the assessment for each module that has just become complete; returns their indexes (empty when nothing new)
+  function ensureDue(s, c) { s.asm = s.asm || {}; const out = [];
+    (c.modules || []).forEach((m, mi) => { const k = mkey(c, mi); if (!s.asm[k] && moduleDone(c, mi, s)) { s.asm[k] = asmBlank(); out.push(mi); } }); return out; }
+  // applies one grading outcome. Only 'pass' and 'fail' count; errors change nothing. A question is graded once.
+  function applyGrade(a, qid, verdict, info) {
+    if (!a || a.passed || !a.cur || a.cur.id !== qid || a.hist.some(h => h.qid === qid)) return false;
+    if (verdict !== 'pass' && verdict !== 'fail') { a.cur.state = 'error'; return false; }
+    a.hist.push(Object.assign({ qid, tier: a.tier, v: verdict, at: Date.now() }, info || {}));
+    a.cur = null;
+    if (verdict === 'pass') { a.passed = a.tier; a.pending = false; a.revise = false; return true; }
+    a.fails++;
+    if (a.fails >= 3 && a.tier !== 'easy') { a.tier = TIERS[TIERS.indexOf(a.tier) + 1]; a.fails = 0; }
+    else if (a.fails >= 3) a.revise = true;
+    return true;
+  }
+  const asmLabel = a => !a ? 'Not yet due' : a.passed ? 'Passed — ' + TIER_N[a.passed] : `Assessment pending · ${TIER_N[a.tier]}${a.hist.length ? ` · ${a.fails} ${a.tier === 'easy' && a.fails >= 3 ? '' : 'of 3 '}miss${a.fails === 1 ? '' : 'es'} at this tier` : ''}`;
   // Suggested learning path: explicit stage and course order, matched by the index's stable course ids. Nothing is locked;
   // any stage can be opened at any time. Labels are display names only; progress, notes and links stay keyed by id.
   const ARRANGE = [
@@ -16941,7 +16969,7 @@ function serpentSVG(o) {
     if (rest.length) groups.push({ h: 'Other courses', items: rest });
     return groups.filter(g => g.items.length);
   }
-  window.KgCourses = { ARRANGE, arrange, KEY, srtToVtt, lecState, courseState, availOf, resumeOf, record, lecturesOf };
+  window.KgCourses = { ARRANGE, arrange, TIERS, mkey, moduleDone, ensureDue, applyGrade, asmLabel, asmBlank, parseJSON: t => parseJ(t), KEY, srtToVtt, lecState, courseState, availOf, resumeOf, record, lecturesOf };
   if (!M || !M.PANELS) return;
 
   // ---- where the files come from: a folder you chose (File System Access) or the local server ----
@@ -16989,7 +17017,7 @@ function serpentSVG(o) {
     const s = store(), last = s.last && course(s.last.c), lastL = last && lecturesOf(last).find(l => l.id === s.last.l);
     const card = (c, label, why) => { const av = availOf(c), st = courseState(c, s), L = lecturesOf(c), done = L.filter(l => lecState(s.lec[lk(c.id, l.id)]) === 'completed').length, usable = L.filter(l => l.ok).length;
       return `<button class="klib-card" data-lib="course" data-c="${esc(c.id)}"><b>${esc(label || c.title)}</b>${c.by ? `<span class="kl-small">${esc(c.by)}</span>` : ''}${why ? `<span class="kl-small klib-why">${esc(why)}</span>` : ''}
-        <span class="klib-chips">${chip(st, ST[st])}${chip(av, AV[av])}</span>
+        <span class="klib-chips">${chip(st, ST[st])}${chip(av, AV[av])}${(() => { const n = (c.modules || []).filter((m, mi) => { const a = s.asm && s.asm[mkey(c, mi)]; return a && !a.passed; }).length; return n ? chip('wip', n + ' assessment' + (n > 1 ? 's' : '') + ' pending') : ''; })()}</span>
         <span class="kl-small">${L.length ? `${done} of ${L.length} lectures completed` : 'No lectures on disk yet'}${av !== 'available' ? ` · ${usable} usable${c.expected ? ` of ${c.expected} expected` : ''}` : ''}</span>
         <span class="klib-bar"><i style="width:${L.length ? Math.round(100 * done / L.length) : 0}%"></i></span></button>`; };
     return `<section class="kl-card kl-stack klib"><p class="kl-eyebrow">📜 COURSE LIBRARY · SOUTHERN BORDER</p><h2>Your offline courses</h2>
@@ -17013,7 +17041,8 @@ function serpentSVG(o) {
       ${r ? `<div class="klib-resume"><span>${lecState(s.lec[lk(c.id, r.id)]) === 'in-progress' ? 'Resume' : 'Next'}: <b>${esc(r.name)}</b></span><button class="kl-primary" data-lib="play" data-c="${esc(c.id)}" data-l="${esc(r.id)}">${lecState(s.lec[lk(c.id, r.id)]) === 'in-progress' ? 'Resume' : 'Play'}</button></div>` : '<p class="kl-small">No playable lecture is on disk yet.</p>'}
       ${c.modules.map((m, mi) => { const open = r && m.lectures.some(l => l.id === r.id) || (!r && mi === 0), start = n; n += m.lectures.length;
         const done = m.lectures.filter(l => lecState(s.lec[lk(c.id, l.id)]) === 'completed').length;
-        return `<details class="klib-mod"${open ? ' open' : ''}><summary><b>${esc(m.name)}</b> <span class="kl-small">· ${done}/${m.lectures.length} completed</span></summary><ol class="klib-lecs">${m.lectures.map((l, i) => row(l, start + i)).join('')}</ol>
+        const a = s.asm && s.asm[mkey(c, mi)], wipLast = c.status === 'wip' && mi === c.modules.length - 1;
+        return `<details class="klib-mod"${open ? ' open' : ''}><summary><b>${esc(m.name)}</b> <span class="kl-small">· ${done}/${m.lectures.length} completed</span> ${a ? asmChip(a) : wipLast ? '<span class="kl-small">· may still be downloading</span>' : ''}${a && !a.passed ? ` <button class="kl-ghost klib-take" data-lib="asm" data-c="${esc(c.id)}" data-m="${mi}">Take test</button>` : a && a.passed ? ` <button class="kl-ghost klib-take" data-lib="asm" data-c="${esc(c.id)}" data-m="${mi}">Review</button>` : ''}</summary><ol class="klib-lecs">${m.lectures.map((l, i) => row(l, start + i)).join('')}</ol>
           ${(m.resources || []).length ? `<p class="kl-small">Module files: ${m.resources.map(x => `<button class="kl-ghost klib-res" data-lib="file" data-p="${esc(x.path)}">${esc(x.name)}</button>`).join(' ')}</p>` : ''}</details>`; }).join('')}</section>`;
   }
   function playerView(c, l) {
@@ -17032,6 +17061,101 @@ function serpentSVG(o) {
       ${mine.length ? `<ul class="kl-list">${mine.map(n => `<li class="kl-li"><span>${esc(n.t)}<small>${new Date(n.at).toLocaleString()}${n.pos != null ? ' · at ' + Math.floor(n.pos / 60) + ':' + String(n.pos % 60).padStart(2, '0') : ''}</small></span><button class="kl-ghost" data-lib="delnote" data-id="${esc(n.id)}">Delete</button></li>`).join('')}</ul>` : ''}
       <p class="kl-small">Course progress only: completing videos never obtains or refines a Chapter Gu, passes a proof or counts as retention.</p></section>`;
   }
+  // ---- module assessment views ----
+  let invite = null; const busy = new Set();
+  const modName = (c, mi) => (c.modules[mi] || {}).name || 'this module';
+  function inviteCard() { if (!invite) return ''; const c = course(invite.c); if (!c) return '';
+    const a = (store().asm || {})[mkey(c, invite.mi)]; if (!a || a.passed) return '';
+    return `<div class="klib-invite" role="status"><span><b>Iroha</b> · “${esc(modName(c, invite.mi))}” is complete. One question, ${TIER_N[a.tier]} tier. Show me what you understood.</span>
+      <span class="kl-row"><button class="kl-primary" data-lib="asm" data-c="${esc(c.id)}" data-m="${invite.mi}">Take test</button><button class="kl-ghost" data-lib="later">Later</button></span></div>`; }
+  const asmChip = a => !a ? '' : chip(a.passed ? 'completed' : 'wip', asmLabel(a));
+  // the module's own material: English transcripts first, else subtitles as text, plus the learner's notes on its lectures
+  async function material(c, mi) {
+    const m = c.modules[mi], s = store(), parts = [], used = [];
+    for (const l of m.lectures) { let t = '';
+      const tx = l.transcripts.find(x => x.lang === 'en') || l.transcripts[0], sb = l.subs.find(x => x.lang === 'en') || l.subs[0];
+      try { if (tx) t = await textOf(tx.path); else if (sb) t = (await textOf(sb.path)).replace(/\r/g, '').replace(/^\d+\n/gm, '').replace(/^[\d:.,]+ --> [\d:.,]+.*\n/gm, '').replace(/<[^>]+>/g, ''); } catch (e) { t = ''; }
+      const notes = s.notes.filter(n => n.c === c.id && n.l === l.id).map(n => '- ' + n.t).join('\n');
+      t = t.replace(/\s+/g, ' ').trim(); if (t) used.push(l.name);
+      parts.push({ name: l.name, t, notes }); }
+    const cap = Math.max(1500, Math.floor(28000 / Math.max(1, parts.length)));
+    const text = parts.filter(x => x.t || x.notes).map(x => `### Lecture: ${x.name}\n${x.t.slice(0, cap)}${x.notes ? '\nLearner notes:\n' + x.notes : ''}`).join('\n\n');
+    return { text, used, enough: parts.reduce((n, x) => n + x.t.length, 0) >= 600 };
+  }
+  const TIER_MEAN = { hard: 'HARD: apply, connect or explain ideas across the module in a multi-step task. Demanding, never obscure: no trivia, no trick wording, nothing the module did not teach.',
+    medium: 'MEDIUM: apply one main idea of the module in a guided task with a clear path.',
+    easy: 'EASY: explain or directly apply one core idea of the module.' };
+  async function generate(c, mi) {
+    const k = mkey(c, mi); if (busy.has(k)) return; busy.add(k);
+    try { let s = store(), a = s.asm && s.asm[k]; if (!a || a.passed || (a.cur && a.cur.state !== 'gen-error')) return;
+      a.cur = { state: 'generating' }; put(s); if (onCourses()) M.render();
+      const src = await material(c, mi);
+      s = store(); a = s.asm[k];
+      if (!src.enough) { a.cur = { state: 'no-source' }; put(s); return; }
+      const prev = a.hist.map(h => h.q).filter(Boolean).slice(-6);
+      const r = await window.__kgAsk?.('iroha', `[module assessment, not typed by me] Write ONE assessment question for a learner who has just finished this module.
+Course: ${c.title}. Module: ${modName(c, mi)}. Difficulty tier: ${TIER_MEAN[a.tier]}
+Choose the format the subject calls for: a calculation, a derivation, physical reasoning, code, debugging, or an evidence-based explanation. Connected subparts are allowed. One question only.
+Use ONLY the module material below; do not test anything it does not teach.${prev.length ? `\nEarlier questions for this module (write a fresh question of equal scope, not a reworded copy):\n${prev.map(q => '- ' + q.slice(0, 300)).join('\n')}` : ''}
+Reply with JSON only: {"question":"...","reference":"a complete model answer","rubric":["3 to 5 essential criteria"],"lectures":["names of the lectures it draws on"]}
+If the material cannot support a fair question at this tier, reply {"insufficient":"reason"}.
+
+MODULE MATERIAL:
+${src.text}`, null, true).catch(() => null);
+      const o = r && r.reply ? parseJ(r.reply) : null; s = store(); a = s.asm[k]; if (!a || a.passed) return;
+      if (o && o.insufficient) a.cur = { state: 'no-source', why: String(o.insufficient).slice(0, 300) };
+      else if (o && o.question && o.reference && Array.isArray(o.rubric) && o.rubric.length) a.cur = { id: 'q' + Date.now().toString(36), state: 'ready', tier: a.tier, q: String(o.question), ref: String(o.reference), rubric: o.rubric.map(String).slice(0, 6), lectures: (o.lectures || []).map(String).slice(0, 6), draft: '' };
+      else a.cur = { state: 'gen-error', why: r && r.reply ? 'the question came back unreadable' : navigator.onLine ? "Iroha's line dropped" : 'you are offline' };
+      put(s);
+    } finally { busy.delete(k); if (onCourses()) M.render(); }
+  }
+  async function grade(c, mi) {
+    const k = mkey(c, mi); if (busy.has(k)) return; busy.add(k);
+    try { let s = store(), a = s.asm && s.asm[k]; const q = a && a.cur; if (!q || !q.id || !q.answer || (q.state !== 'grading' && q.state !== 'error')) return;
+      q.state = 'grading'; put(s); if (onCourses()) M.render();
+      const src = await material(c, mi).catch(() => ({ text: '' }));
+      const r = await window.__kgAsk?.('iroha', `[module assessment grading, not typed by me] Grade the learner's answer to this ${TIER_N[q.tier]} module question strictly but fairly against the rubric and reference.
+Pass only if every essential rubric criterion is met; a slip that does not change the reasoning is fine, and a correct answer by a different valid route passes. Never invent mistakes. Judge only against what the module taught.
+QUESTION:\n${q.q}\nREFERENCE ANSWER:\n${q.ref}\nRUBRIC:\n${q.rubric.map((x, i) => (i + 1) + '. ' + x).join('\n')}
+LEARNER'S ANSWER:\n${q.answer}
+Reply with JSON only: {"verdict":"pass" or "fail","met":[true/false per rubric criterion],"why":"one or two sentences on how the answer meets or misses the rubric","misconception":"the specific misunderstanding if it fails, else empty","revisit":["lecture names from this module to revisit"]}
+
+MODULE MATERIAL (for reference):
+${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
+      const o = r && r.reply ? parseJ(r.reply) : null; s = store(); a = s.asm[k];
+      const v = o && (o.verdict === 'pass' || o.verdict === 'fail') ? o.verdict : null;
+      if (!v) { if (a && a.cur && a.cur.id === q.id) { a.cur.state = 'error'; a.cur.why = r && r.reply ? 'the grade came back unreadable' : navigator.onLine ? "Iroha's line dropped" : 'you are offline'; put(s); } return; }
+      const tier = a.tier;
+      if (applyGrade(a, q.id, v, { q: q.q, ref: q.ref, rubric: q.rubric, answer: q.answer, met: (o.met || []).map(Boolean), why: String(o.why || ''), mis: String(o.misconception || ''), revisit: (o.revisit || []).map(String).slice(0, 5), by: r.model || '' })) {
+        put(s); window.__irohaSay?.(v === 'pass' ? `Passed — ${TIER_N[tier]}. ${String(o.why || '').slice(0, 140)}` : `Not yet. ${String(o.misconception || o.why || '').slice(0, 160)}`, { force: 1, delay: 0, face: v === 'pass' ? 'approve' : 'stern' }); }
+    } finally { busy.delete(k); if (onCourses()) M.render(); }
+  }
+  function asmView(c, mi) {
+    const s = store(), m = c.modules[mi], a = s.asm && s.asm[mkey(c, mi)];
+    const head = `<section class="kl-card kl-stack klib klib-full klib-asm"><div class="kl-row" style="justify-content:space-between;flex-wrap:wrap"><button class="kl-ghost" data-lib="course" data-c="${esc(c.id)}">← ${esc(c.title)}</button><span class="kl-small">Other courses and modules stay open while this is pending.</span></div>
+      <p class="kl-eyebrow">MODULE ASSESSMENT · IROHA</p><h2>${esc(m ? m.name : 'Module')}</h2>`;
+    const foot = `<p class="kl-small">Provisional AI assessment (Iroha). A pass shows understanding of this module only: it never obtains or refines a Chapter Gu and never counts as retention. Skipping, leaving, connection errors and grading failures are not misses.</p></section>`;
+    if (!a) return head + `<p>This module's assessment is not due yet: every lecture in it has to be completed first.</p>` + foot;
+    const last = a.hist[a.hist.length - 1];
+    const fb = h => h ? `<div class="klib-fb klib-fb-${h.v}"><p><b>${h.v === 'pass' ? `Passed — ${TIER_N[h.tier]}` : `Not yet — ${TIER_N[h.tier]}`}</b></p>
+      ${h.v === 'fail' && h.mis ? `<p>${esc(h.mis)}</p>` : ''}<p class="kl-small">${esc(h.why)}</p>
+      ${h.v === 'fail' && h.revisit && h.revisit.length ? `<p class="kl-small">Revisit: ${h.revisit.map(esc).join(' · ')}</p>` : ''}
+      <details><summary class="kl-small">Question, rubric and reference answer</summary><p class="kl-small">${esc(h.q)}</p><ol class="kl-small">${(h.rubric || []).map((x, i) => `<li>${(h.met || [])[i] ? '✓' : '✗'} ${esc(x)}</li>`).join('')}</ol><p class="kl-small">${esc(h.ref)}</p></details></div>` : '';
+    const status = `<p class="klib-chips">${chip('available', 'Content: ' + m.lectures.length + ' of ' + m.lectures.length + ' lectures completed')}${asmChip(a)}</p>`;
+    if (a.passed) return head + status + fb(a.hist.filter(h => h.v === 'pass').pop()) + foot;
+    let cur = a.cur; if (cur && cur.state === 'generating' && !busy.has(mkey(c, mi))) cur = { state: 'gen-error', why: 'it was interrupted' };
+    const misses = `<p class="kl-small">Tier ${TIER_N[a.tier]} · ${a.fails} graded miss${a.fails === 1 ? '' : 'es'} at this tier${a.tier !== 'easy' ? ` (three lower it to ${TIER_N[TIERS[TIERS.indexOf(a.tier) + 1]]})` : ' (the lowest tier)'}.</p>`;
+    const revise = a.revise ? `<div class="klib-invite"><span><b>Targeted revision</b> · Rewatch ${[...new Set(a.hist.slice(-3).flatMap(h => h.revisit || []))].map(esc).join(' · ') || 'the lectures of this module'} and reread your notes, then try again at Easy.</span></div>` : '';
+    let body;
+    if (!cur) body = `${last ? fb(last) : `<p>Iroha · One question. ${TIER_N[a.tier]}. Answer from understanding, not from memory of the wording.</p>`}<div class="kl-row"><button class="kl-primary" data-lib="asmgen" data-c="${esc(c.id)}" data-m="${mi}">${last ? 'Next question' : 'Begin'}</button><button class="kl-ghost" data-lib="course" data-c="${esc(c.id)}">Later</button></div>`;
+    else if (cur.state === 'generating' || cur.state === 'grading' && busy.has(mkey(c, mi))) body = `<p>${cur.state === 'grading' ? 'Iroha is grading your answer against the rubric…' : 'Iroha is preparing a question from this module’s material…'}</p>`;
+    else if (cur.state === 'no-source') body = `<p>This assessment can't be generated yet: there isn't enough of this module's material on disk (transcripts or subtitles)${cur.why ? ' — ' + esc(cur.why) : ''}. It stays pending; nothing was counted.</p><div class="kl-row"><button data-lib="asmgen" data-c="${esc(c.id)}" data-m="${mi}">Check again</button></div>`;
+    else if (cur.state === 'gen-error') body = `<p>No question this time: ${esc(cur.why || 'something went wrong')}. Nothing was counted.</p><div class="kl-row"><button data-lib="asmgen" data-c="${esc(c.id)}" data-m="${mi}">Try again</button></div>`;
+    else body = `<div class="klib-q"><p class="kl-small">Question · ${TIER_N[cur.tier]}</p><p class="klib-qt">${esc(cur.q)}</p></div>
+      ${cur.state === 'error' || cur.state === 'grading' ? `<p>Your answer is saved. ${cur.state === 'error' ? `Grading didn't finish (${esc(cur.why || 'error')}); this is not a miss.` : 'Grading was interrupted; this is not a miss.'}</p><div class="kl-row"><button class="kl-primary" data-lib="asmgrade" data-c="${esc(c.id)}" data-m="${mi}">Grade it again</button></div><p class="kl-small">${esc(cur.answer)}</p>`
+      : `<form data-libf="asm" data-c="${esc(c.id)}" data-m="${mi}" data-q="${esc(cur.id)}" class="kl-stack"><label>Your answer <textarea name="t" rows="9" maxlength="8000" data-libans="${esc(mkey(c, mi))}" placeholder="Show the reasoning, working or code.">${esc(cur.draft || '')}</textarea></label><div class="kl-row"><button class="kl-primary">Submit for grading</button><button type="button" class="kl-ghost" data-lib="course" data-c="${esc(c.id)}">Later</button></div></form>`}`;
+    return head + status + misses + revise + body + foot;
+  }
   M.PANELS.courses = () => {
     if (!index && phase === 'idle') { phase = 'loading'; setTimeout(() => load(false), 0); }
     const s = store(); if (!s.src || phase === 'none') return `<section class="kl-card kl-stack klib"><p class="kl-eyebrow">📜 COURSE LIBRARY · SOUTHERN BORDER</p><h2>Connect your offline courses</h2><p>Your courses stay on your disk. Connect the folder once and the desk remembers it.</p>${sourceCard(true)}</section>`;
@@ -17039,13 +17163,17 @@ function serpentSVG(o) {
     if (phase === 'reconnect') return `<section class="kl-card kl-stack klib"><p class="kl-eyebrow">📜 COURSE LIBRARY</p><p>The browser needs your permission again to read the course folder.</p><div class="kl-row"><button class="kl-primary" data-lib="reconnect">Reconnect the folder</button></div>${sourceCard(false)}</section>`;
     if (phase === 'error' || !index) return `<section class="kl-card kl-stack klib"><p class="kl-eyebrow">📜 COURSE LIBRARY</p><p>Couldn't open the library: ${esc(err || 'unknown reason')}.</p><div class="kl-row"><button data-lib="retry">Try again</button></div>${sourceCard(true)}</section>`;
     const c = view.c && course(view.c), l = c && view.l && lecturesOf(c).find(x => x.id === view.l);
-    return l ? playerView(c, l) : c ? courseView(c) : collection();
+    if (c && view.m != null) { const s = store(), a = s.asm && s.asm[mkey(c, view.m)]; if (a && !a.passed && !a.cur) setTimeout(() => !a.hist.length && generate(c, view.m), 0); return asmView(c, view.m); }
+    return inviteCard() + (l ? playerView(c, l) : c ? courseView(c) : collection());
   };
 
   // ---- the player: one <video>, kept outside re-renders so playback survives them ----
   const vid = document.createElement('video'); vid.className = 'klib-video'; vid.controls = true; vid.preload = 'metadata'; vid.playsInline = true;
   let cur = null, want = false, lastSave = 0;
-  const save = force => { if (!cur || !vid.duration || vid.seeking) return; if (!force && Date.now() - lastSave < 5000) return; lastSave = Date.now(); const s = store(); record(s, cur.c, cur.l, vid.currentTime, vid.duration); put(s); };
+  const save = force => { if (!cur || !vid.duration || vid.seeking) return; if (!force && Date.now() - lastSave < 5000) return; lastSave = Date.now(); const s = store(); record(s, cur.c, cur.l, vid.currentTime, vid.duration); const due = checkDue(s, cur.c); put(s); if (due) announce(due); };
+  // a module that has just become complete gets its assessment and Iroha's invitation, once
+  function checkDue(s, cid) { const c = course(cid); if (!c) return null; const d = ensureDue(s, c); return d.length ? { c: c.id, mi: d[d.length - 1] } : null; }
+  function announce(d) { invite = d; const c = course(d.c); window.__irohaSay?.(`Module complete: ${modName(c, d.mi)}. One Hard question when you're ready. Take it now or later; it stays pending.`, { force: 1, delay: 0, face: 'study' }); if (onCourses()) M.render(); }
   vid.addEventListener('timeupdate', () => save(false)); vid.addEventListener('seeked', () => save(true)); vid.addEventListener('ended', () => save(true));
   vid.addEventListener('pause', () => { if (vid.isConnected) { want = false; save(true); } });
   vid.addEventListener('play', () => { want = true; });
@@ -17075,9 +17203,13 @@ function serpentSVG(o) {
   document.addEventListener('click', async e => {
     const t = e.target.closest && e.target.closest('[data-lib]'); if (!t) return; e.preventDefault(); const d = t.dataset;
     if (d.lib === 'home') { view = { c: '', l: '' }; return go(); }
+    if (d.lib === 'later') { invite = null; return M.render(); }
+    if (d.lib === 'asm') { invite = null; view = { c: d.c, l: '', m: +d.m }; go(); return requestAnimationFrame(() => scrollTo(0, 0)); }
+    if (d.lib === 'asmgen') { const c = course(d.c), s = store(), a = c && s.asm && s.asm[mkey(c, +d.m)]; if (!a || a.passed) return; if (a.cur && a.cur.state !== 'ready') { a.cur = null; put(s); } else if (a.cur) return; return generate(c, +d.m); }
+    if (d.lib === 'asmgrade') { const c = course(d.c); return c && grade(c, +d.m); }
     if (d.lib === 'course') { view = { c: d.c, l: '' }; return go(); }
     if (d.lib === 'play') { if (t.getAttribute('aria-disabled') === 'true') return; view = { c: d.c, l: d.l }; go(); return requestAnimationFrame(() => scrollTo(0, 0)); }
-    if (d.lib === 'done') { const s = store(), p = s.lec[lk(d.c, d.l)] || { pos: 0 }; p.done = !p.done; p.at = Date.now(); s.lec[lk(d.c, d.l)] = p; put(s); return M.render(); }
+    if (d.lib === 'done') { const s = store(), p = s.lec[lk(d.c, d.l)] || { pos: 0 }; p.done = !p.done; p.at = Date.now(); s.lec[lk(d.c, d.l)] = p; const due = p.done ? checkDue(s, d.c) : null; put(s); if (due) announce(due); return M.render(); }
     if (d.lib === 'file') { const w = window.open('', '_blank'); try { const u = await mediaURL(d.p); if (w) w.location = u; else location.assign(u); } catch (x) { if (w) w.close(); alert('That file is missing from the library folder.'); } return; }
     if (d.lib === 'transcript') { const box = document.getElementById('klib-trans'), c = course(cur ? cur.c : view.c), l = c && lecturesOf(c).find(x => x.id === view.l), x = l && l.transcripts[+d.k]; if (!box || !x) return;
       box.hidden = false; box.textContent = 'Loading transcript…'; try { box.textContent = await textOf(x.path); } catch (y) { box.textContent = 'This transcript is not available on disk.'; } return; }
@@ -17089,9 +17221,14 @@ function serpentSVG(o) {
   document.addEventListener('submit', e => {
     const f = e.target.closest && e.target.closest('form[data-libf]'); if (!f) return; e.preventDefault();
     if (f.dataset.libf === 'url') { const b = String(f.base.value || '').trim(); if (!/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?\/?$/.test(b)) return alert('Use a server on this computer, e.g. http://127.0.0.1:8770/'); const s = store(); s.src = { kind: 'url', base: b }; put(s); handle = null; index = null; phase = 'loading'; M.render(); return load(false); }
+    if (f.dataset.libf === 'asm') { const c = course(f.dataset.c), mi = +f.dataset.m, s = store(), a = c && s.asm && s.asm[mkey(c, mi)], t = String(f.t.value || '').trim();
+      if (!a || !a.cur || a.cur.id !== f.dataset.q || a.cur.state !== 'ready' || busy.has(mkey(c, mi))) return; // a second click or an old form never submits twice
+      if (!t) return alert('Write an answer first. Leaving it for later is fine; that is not a miss.');
+      a.cur.answer = t.slice(0, 8000); a.cur.state = 'grading'; put(s); return grade(c, mi); }
     if (f.dataset.libf === 'note') { const t = String(f.t.value || '').trim(); if (!t || !view.c) return; const s = store(); s.notes.push({ id: 'cn' + Date.now().toString(36), c: view.c, l: view.l, t: t.slice(0, 4000), at: Date.now(), pos: cur && cur.l === view.l ? Math.round(vid.currentTime) : null }); put(s); M.render(); }
   });
   document.addEventListener('change', e => { const t = e.target; if (t && t.dataset && t.dataset.libsub != null && cur) { t.value === '' ? [...vid.querySelectorAll('track')].forEach(x => x.remove()) : setTrack(+t.value); } });
+  document.addEventListener('input', e => { const t = e.target; if (t && t.dataset && t.dataset.libans) { const s = store(), a = s.asm && s.asm[t.dataset.libans]; if (a && a.cur && a.cur.state === 'ready') { a.cur.draft = t.value.slice(0, 8000); put(s); } } });
   document.addEventListener('input', e => { const t = e.target; if (!t || !t.dataset || !t.dataset.libq) return; const q = t.value.toLowerCase(); for (const b of document.querySelectorAll('#moon-lab .klib-card')) b.hidden = !!q && !b.textContent.toLowerCase().includes(q); for (const g of document.querySelectorAll('#moon-lab .klib-group')) g.hidden = !![...g.querySelectorAll('.klib-card')].every(b => b.hidden); });
 
   // ---- notes: course notes appear in Library → Notes, beside the lecture notes ----
@@ -17109,6 +17246,9 @@ function serpentSVG(o) {
     .klib-unstarted{color:#9c8a6e}.klib-in-progress{color:#9fd8c4}.klib-completed{color:#f5d27a}.klib-available{color:#cfe8dc}.klib-partial{color:#e7a07a}.klib-wip{color:#ffb4a0;background:rgba(255,140,110,.1)}
     .klib-bar{height:4px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}.klib-bar i{display:block;height:100%;background:var(--desk-accent,#e8c77d)}
     .klib-resume{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;border-left:3px solid var(--desk-accent,#e8c77d);background:rgba(232,199,125,.08);border-radius:6px}
+    .klib-invite{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:12px;border:1px solid var(--desk-accent,#e8c77d);background:rgba(232,199,125,.08);margin-bottom:12px}
+    .klib-take{margin-left:8px;padding:2px 10px;font-size:12px}.klib-q{padding:14px;border-radius:12px;border:1px solid var(--desk-line,#5a3d26);background:var(--desk-soft,#33201a)}.klib-qt{white-space:pre-wrap;line-height:1.6}
+    .klib-fb{padding:12px 14px;border-radius:12px;border:1px solid var(--desk-line,#5a3d26)}.klib-fb-pass{border-color:#f5d27a}.klib-fb-fail{border-color:#e7a07a}.klib-asm textarea{width:100%;font:inherit}
     .klib-h3{margin:18px 0 0}.klib-mod summary{cursor:pointer;padding:8px 0}.klib-lecs{list-style:none;padding:0;margin:0;display:grid;gap:4px}
     .klib-lec button{width:100%;display:grid;grid-template-columns:2.2em 1fr auto;gap:10px;align-items:center;text-align:left;padding:8px 10px;border-radius:8px;border:1px solid transparent;background:none;color:inherit;font:inherit;cursor:pointer}
     .klib-lec button:hover,.klib-lec button:focus-visible{border-color:var(--desk-line,#5a3d26);background:rgba(255,255,255,.03)}.klib-lec button[aria-disabled=true]{opacity:.5;cursor:not-allowed}
