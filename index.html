@@ -16416,7 +16416,7 @@ Rules: a right final answer with invalid reasoning gets method 0 or 1. A minor a
   M.ACTIONS.rearn = b => { const st = read(), v = K.cultivation(M.L, null, st), g = gates(v, { earned: st.earned, bank: st.bankDone, b2: st.b2 }).find(x => x.id === b.dataset.g); if (!g || g.status !== 'met') return; if (!confirm(`Record ${g.name}? Earned stages are permanent.`)) return; st.earned = earn(st.earned, g.id, Date.now(), v.ed.id); st.log = (st.log || []).concat({ at: Date.now(), what: 'earned ' + g.id }); localStorage.setItem(K.STORE, JSON.stringify(st)); M.render(); };
 })();
 </script>
-<script id="kg-quarters-script">
+<script id="kg-cult-quarters-script">
 /* ---------- The quarters: an opt-in, painted way into the desk (Study → ⛰ Cultivation). ----------
    Each place opens an existing page or action; rank gates, evidence rules, chapter mappings and the planner are only read here.
    Its own storage is view preferences only (kg-quarters-v1). No upkeep, no decay. */
@@ -16498,7 +16498,7 @@ function serpentSVG(o) {
 
   // ---- the quarters: places, what each one opens, and the room drawing ----
   const M = window.MoonLab, K = window.KgCult, R = window.KgRank;
-  const KEY = 'kg-quarters-v1', DEF = { on: false, simplify: false, still: false, labels: true, chars: true, gu: true, content: true };
+  const KEY = 'kg-quarters-v1', DEF = { on: false, home: true, simplify: false, still: false, labels: true, chars: true, gu: true, content: true };
   const prefs = () => { try { return Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { return Object.assign({}, DEF); } };
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   // Every place opens existing pages ('page:tab') or existing actions. Nothing here re-implements a rule.
@@ -16575,6 +16575,12 @@ function serpentSVG(o) {
       <p class="kl-small">Photo checks open in Details and stay labelled Provisional AI assessment (Iroha). Plates turn gold only through the existing later-check rule; nothing fades.</p>
       <div class="kl-row" style="flex-wrap:wrap"><button data-a="qdetail" data-k="${esc(g.key)}">Checklist, skills and proof</button><button class="kl-ghost" data-a="cpropose" data-k="${esc(g.key)}">Propose from my logged questions</button><button class="kl-ghost" data-a="qgu" data-k="">Back to the cabinet</button></div></section>`;
   }
+  const nookArt = (nk, p) => nk.map((g, i) => { const [x, y] = NOOKS[i], ok = g.acq === 'obtained';
+        const art = ok && g.name === 'Basic Mathematics' ? `<g transform="translate(${x} ${y}) scale(.74)">${serpentSVG({ id: 'n' + i, state: look(g), sk: plates(g), labels: ['−2', '1'] })}</g>`
+          : ok ? `<ellipse cx="${x}" cy="${y + 6}" rx="44" ry="16" fill="#9bd3a6" opacity=".35" class="kq-breathe"/><circle cx="${x}" cy="${y}" r="13" fill="#2f7a5c" stroke="#cfe8dc" stroke-width="2"/>`
+          : `<ellipse cx="${x}" cy="${y + 6}" rx="60" ry="20" fill="#cfe8dc" opacity=".18" class="kq-breathe"/>${p.labels ? `<text x="${x}" y="${y - 10}" font-family="Georgia,serif" font-style="italic" font-size="11" fill="#cdbb95" text-anchor="middle" opacity=".8">resting place, waiting</text>` : ''}`;
+        const plaque = p.labels ? `<g transform="translate(${x} ${y + 44})"${ok ? '' : ' opacity=".75"'}><rect x="${-Math.min(80, g.name.length * 3.4 + 10)}" y="-9" width="${Math.min(160, g.name.length * 6.8 + 20)}" height="16" rx="3" fill="#1c0c09" opacity=".72"/><text y="3" font-family="system-ui,sans-serif" font-size="11" fill="#e9d6a6" text-anchor="middle">${esc(g.name.length > 22 ? g.name.slice(0, 21) + '…' : g.name)}</text></g>` : '';
+        return art + plaque; }).join('');
   function roomSVG(p, data) {
     const A = 'quarters/', rows = p.content ? today() : [], now = (() => { const n = new Date(); let m = n.getHours() * 60 + n.getMinutes(); return m < 240 ? m + 1440 : m; })();
     const study = rows.filter(r => !r.fixed), left = study.filter(r => r.e > now).length, done = study.length ? (study.length - left) / study.length : 0;
@@ -16590,17 +16596,12 @@ function serpentSVG(o) {
         <g stroke="#6c5a44" stroke-width="2" opacity=".75">${study.slice(0, 5).map((r, i) => `<line x1="1114" y1="${204 + i * 22}" x2="${1160 + (i * 7) % 16}" y2="${204 + i * 22}"${r.e <= now ? ' opacity=".35"' : ''}/>`).join('')}</g>
         ${rows.filter(r => r.fixed).slice(0, 3).map((r, i) => `<rect x="1112" y="${318 + i * 22}" width="64" height="12" rx="2" fill="#a2432f" opacity="${.85 - i * .1}"/>`).join('')}</g>
         <g><path d="M586 724 L616 743 L586 762Z" fill="#e8dcbc" opacity=".9"/><rect x="546" y="776" width="104" height="4" fill="#4f6d70"/><rect x="546" y="776" width="${Math.round(104 * done)}" height="4" fill="#e8c77d"/></g>` : ''}
-      ${nk.map((g, i) => { const [x, y] = NOOKS[i], ok = g.acq === 'obtained';
-        const art = ok && g.name === 'Basic Mathematics' ? `<g transform="translate(${x} ${y}) scale(.74)">${serpentSVG({ id: 'n' + i, state: look(g), sk: plates(g), labels: ['−2', '1'] })}</g>`
-          : ok ? `<ellipse cx="${x}" cy="${y + 6}" rx="44" ry="16" fill="#9bd3a6" opacity=".35" class="kq-breathe"/><circle cx="${x}" cy="${y}" r="13" fill="#2f7a5c" stroke="#cfe8dc" stroke-width="2"/>`
-          : `<ellipse cx="${x}" cy="${y + 6}" rx="60" ry="20" fill="#cfe8dc" opacity=".18" class="kq-breathe"/>${p.labels ? `<text x="${x}" y="${y - 10}" font-family="Georgia,serif" font-style="italic" font-size="11" fill="#cdbb95" text-anchor="middle" opacity=".8">resting place, waiting</text>` : ''}`;
-        const plaque = p.labels ? `<g transform="translate(${x} ${y + 44})"${ok ? '' : ' opacity=".75"'}><rect x="${-Math.min(80, g.name.length * 3.4 + 10)}" y="-9" width="${Math.min(160, g.name.length * 6.8 + 20)}" height="16" rx="3" fill="#1c0c09" opacity=".72"/><text y="3" font-family="system-ui,sans-serif" font-size="11" fill="#e9d6a6" text-anchor="middle">${esc(g.name.length > 22 ? g.name.slice(0, 21) + '…' : g.name)}</text></g>` : '';
-        return art + plaque; }).join('')}
+      ${nookArt(nk, p)}
       ${PLACES.map(q => hot(q.id, ...q.hit, q.name + ': ' + q.about, q.name, q.lab)).join('')}
       ${nk.map((g, i) => hot(g.key, NOOKS[i][0] - 80, NOOKS[i][1] - 50, 160, 90, g.name + ' Gu, ' + (LEVEL[g.level] || ''), '', null, true)).join('')}
     </svg>`;
   }
-  const toggles = p => [['labels', 'Labels'], ['chars', 'Characters'], ['gu', 'Gu'], ['content', 'Study content'], ['still', 'Reduced motion'], ['simplify', 'Simplify']]
+  const toggles = p => [['home', 'Painted home room'], ['labels', 'Labels'], ['chars', 'Characters'], ['gu', 'Gu'], ['content', 'Study content'], ['still', 'Reduced motion'], ['simplify', 'Simplify']]
     .map(([k, l]) => `<button class="kl-ghost" data-a="qpref" data-v="${k}" aria-pressed="${!!p[k]}">${l}</button>`).join('');
   function quarters(p) {
     const data = read(), P = PLACES.find(x => x.id === place);
@@ -16615,7 +16616,7 @@ function serpentSVG(o) {
   const base = M.PANELS.cultivation;
   M.PANELS.cultivation = () => { const p = prefs(); if (!p.on || peek) return `<section class="kl-card kl-row"><button class="kl-ghost" data-a="qpref" data-v="${p.on ? 'peek' : 'on'}">${p.on ? '⛰ Back to the quarters' : '⛰ Open the quarters (preview)'}</button></section>` + base(); return quarters(p); };
   const focus = id => requestAnimationFrame(() => { const el = document.getElementById(id); if (el) { el.scrollIntoView({ block: 'nearest', behavior: prefs().still || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); el.focus({ preventScroll: true }); } });
-  M.ACTIONS.qpref = b => { const p = prefs(), k = b.dataset.v; if (k === 'peek') peek = false; else p[k] = !p[k]; if (k === 'on') { peek = false; place = ''; gu = ''; } localStorage.setItem(KEY, JSON.stringify(p)); M.render(); };
+  M.ACTIONS.qpref = b => { const p = prefs(), k = b.dataset.v; if (k === 'peek') peek = false; else p[k] = !p[k]; if (k === 'on') { peek = false; place = ''; gu = ''; } localStorage.setItem(KEY, JSON.stringify(p)); M.render(); if (k === 'home') mountHome(); };
   M.ACTIONS.qplace = b => { place = place === b.dataset.v ? '' : b.dataset.v; gu = ''; M.render(); if (place) focus('kq-place-' + place); };
   M.ACTIONS.qgu = b => { gu = b.dataset.k || ''; if (!gu) place = 'cabinet'; M.render(); focus(gu ? 'kq-place-gu' : 'kq-place-cabinet'); };
   M.ACTIONS.qdetail = b => { peek = true; if (K.setOpen) K.setOpen(b.dataset.k); M.render(); };
@@ -16627,6 +16628,42 @@ function serpentSVG(o) {
     .kq-still .kq-breathe{animation:none}@media (prefers-reduced-motion:reduce){.kq-breathe{animation:none}}.kq-gu-art{width:100%;max-width:420px;height:auto;display:block;margin:auto;background:#1a120d;border-radius:12px}
     .kq-rows li.kq-fixed{opacity:.8}.kq-rows li{list-style:none}`;
   document.head.appendChild(css);
+  // ---- home: the desk's room (Today) becomes the painted quarters. The live companions, clock, flight plan, Start button
+  // and room bar stay; only the drawn space-station backdrop, doors and desk are swapped for the painting. ----
+  const HOME = [
+    ['kv', 'today', "Today's schedule", [1080, 112, 124, 370], [1142, 452]], ['kv', 'plan', 'Planner', [600, 150, 330, 230], [765, 300]],
+    ['kv', 'progress', 'Progress', [1262, 122, 266, 320], [1395, 330]], ['kv', 'library', 'Library', [1054, 494, 162, 150], [1135, 580]],
+    ['qgo', 'study:cultivation', 'Gu cabinet', [64, 196, 402, 470], [265, 222]], ['kv', 'study', 'Study', [300, 684, 1080, 260], [700, 700]],
+    ['qgo', 'settings:backup', 'Settings', [90, 734, 262, 150], [220, 820]], ['kv', 'company', 'Company', [1266, 460, 260, 240], [1395, 640]]];
+  function homeSVG(p, data) {
+    const nk = p.gu ? nooks(data.v) : [];
+    return `<svg class="kqp-home" viewBox="28 92 1464 908" preserveAspectRatio="xMidYMid slice" role="group" aria-label="Your quarters: tap a place to open it">
+      <image href="quarters/room-plate.webp" x="0" y="-120" width="1600" height="1380"/>
+      <image href="quarters/front-iroha-table.webp" x="826" y="518" width="216" height="134"/><image href="quarters/front-rail.webp" x="1266" y="616" width="260" height="86"/>
+      ${nookArt(nk, Object.assign({}, p, { labels: false }))}
+      ${HOME.map(([k, v, name, [x, y, w, h], lab]) => `<g class="kq-hot" data-${k}="${v}" tabindex="0" role="button" aria-label="${esc(name)}"><rect class="kq-hit" x="${x}" y="${y}" width="${w}" height="${h}"/><rect class="kq-ring" x="${x - 5}" y="${y - 5}" width="${w + 10}" height="${h + 10}" rx="6"/>
+        ${p.labels ? `<g transform="translate(${lab[0]} ${lab[1]})"><rect class="kq-lbg" x="${-name.length * 5.4 - 16}" y="-20" width="${name.length * 10.8 + 32}" height="36" rx="18"/><text class="kq-ltx" text-anchor="middle" y="6">${esc(name)}</text></g>` : ''}</g>`).join('')}
+    </svg>`;
+  }
+  let homeHTML = '';
+  function mountHome() {
+    const scene = document.getElementById('kg-scene'), stage = scene && scene.querySelector('.kq-stage'); if (!stage) return;
+    const p = prefs(), old = stage.querySelector('.kqp-home');
+    stage.classList.toggle('kqp-painted', !!p.home);
+    if (!p.home) { if (old) old.remove(); homeHTML = ''; return; }
+    let h = ''; try { h = homeSVG(p, read()); } catch (e) { return; }
+    if (old && h === homeHTML) return;
+    homeHTML = h; if (old) old.remove(); stage.insertAdjacentHTML('afterbegin', h);
+  }
+  window.KgQuarters.HOME = HOME; window.KgQuarters.homeSVG = p => homeSVG(Object.assign({}, DEF, p), read());
+  document.addEventListener('click', e => { const g = e.target.closest && e.target.closest('[data-qgo]'); if (!g) return; e.preventDefault(); const [a, b] = g.dataset.qgo.split(':'); M.go(a, b); });
+  addEventListener('moonlab:render', () => setTimeout(mountHome, 60));
+  M.ACTIONS.qhome = () => mountHome();
+  const css2 = document.createElement('style');
+  css2.textContent = `.kq-stage.kqp-painted>.kq-bg,.kq-stage.kqp-painted>.kq-port,.kq-stage.kqp-painted>.kq-door,.kq-stage.kqp-painted>.kq-desk,.kq-stage.kqp-painted>.kv-spot{display:none}
+    .kqp-home{position:absolute;inset:0;width:100%;height:100%;z-index:1;display:block}.kqp-home .kq-ltx{font-size:20px}`;
+  document.head.appendChild(css2);
+  mountHome();
 })();
 </script>
 </body></html>
