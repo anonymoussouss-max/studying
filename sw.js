@@ -1,6 +1,6 @@
 // Keeps the desk opening without internet. The page checks for a new version first; the art rarely changes.
-const CACHE = 'kaguya-desk-2784369';
-const FILES = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'].concat(["duo-pet.webp","iroha-desk.webp","iroha-idle.webp","iroha-stern.webp","iroha-stern2.webp","iroha-study.webp","kaguya-annoyed.webp","kaguya-idle.webp","kaguya-late.webp","kaguya-look.webp","kaguya-p-idle.webp","kaguya-p-look.webp","kaguya-p-talk.webp"]);
+const CACHE = 'kaguya-desk-q1';
+const FILES = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'].concat(["duo-pet.webp","iroha-desk.webp","iroha-idle.webp","iroha-stern.webp","iroha-stern2.webp","iroha-study.webp","kaguya-annoyed.webp","kaguya-idle.webp","kaguya-late.webp","kaguya-look.webp","kaguya-p-idle.webp","kaguya-p-look.webp","kaguya-p-talk.webp","quarters/room-plate.webp","quarters/front-iroha-table.webp","quarters/front-rail.webp","quarters/iroha-desk.webp","quarters/kaguya-still.webp","quarters/serpent-obtained.webp","quarters/serpent-proven.webp"]);
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

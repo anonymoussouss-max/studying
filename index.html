@@ -7284,7 +7284,7 @@ window.KG_RECALL = {
 
   /* ---------- 1. phone + laptop sync (through the backend's /api/sync and a free Upstash database) ---------- */
   const SYNC_URL = 'https://ame-bkend321.vercel.app/api/sync';
-  const KEYS = ['ame-habit-v1', 'desk-needy-v1', 'ame-journal-v1', 'ame-chat', 'ame-talk-v1', 'ame-mute-v1', 'ame-pos-v1', 'mp-v2', 'iroha-chat', 'iroha-pos-v1', 'kg-lab-v1', 'kg-look', 'kg-cult-v1', 'kg-tomb-v1'];
+  const KEYS = ['ame-habit-v1', 'desk-needy-v1', 'ame-journal-v1', 'ame-chat', 'ame-talk-v1', 'ame-mute-v1', 'ame-pos-v1', 'mp-v2', 'iroha-chat', 'iroha-pos-v1', 'kg-lab-v1', 'kg-look', 'kg-quarters-v1', 'kg-cult-v1', 'kg-tomb-v1'];
   const sync = () => M.read('kg-sync', {}) || {}, setSync = o => { try { localStorage.setItem('kg-sync', JSON.stringify(Object.assign(sync(), o))); } catch (e) {} };
   if (!localStorage.getItem('kg-device')) try { localStorage.setItem('kg-device', Math.random().toString(36).slice(2, 10)); } catch (e) {}
   const device = () => localStorage.getItem('kg-device') || '';
@@ -11029,7 +11029,7 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
   M.offline = () => !navigator.onLine;
 
   /* ---------- daily safety copies: the last 7 days, kept in this browser, one click to roll back ---------- */
-  const KEYS = ['kg-lab-v1', 'ame-habit-v1', 'desk-needy-v1', 'ame-journal-v1', 'ame-chat', 'iroha-chat', 'ame-talk-v1', 'ame-pos-v1', 'iroha-pos-v1', 'mp-v2', 'kg-look'];
+  const KEYS = ['kg-lab-v1', 'ame-habit-v1', 'desk-needy-v1', 'ame-journal-v1', 'ame-chat', 'iroha-chat', 'ame-talk-v1', 'ame-pos-v1', 'iroha-pos-v1', 'mp-v2', 'kg-look', 'kg-quarters-v1'];
   const db = () => new Promise((ok, no) => { const r = indexedDB.open('kg-safety', 1); r.onupgradeneeded = () => r.result.createObjectStore('snaps', { keyPath: 'id' }); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
   const tx = async (mode, fn) => { const d = await db(); return new Promise((ok, no) => { const t = d.transaction('snaps', mode), q = fn(t.objectStore('snaps')); t.oncomplete = () => { d.close(); ok(q && q.result); }; t.onerror = t.onabort = () => { d.close(); no(t.error); }; }); };
   let snaps = [];
@@ -16036,6 +16036,7 @@ You entered 25</pre></div>
   const inv = (s, k) => (s.inv[k] = s.inv[k] || { status: 'incomplete', items: [] });
   const addItems = (s, k, items) => { const i = inv(s, k), have = new Set(i.items.map(x => x.id)), fps = new Set(i.items.map(x => x.fp).filter(x => x && x.length > 20)); const dk = x => x.src && x.src.file ? norm(x.src.file).replace(/ pdf$/, '') + '|' + x.label : '', dks = new Set(i.items.map(dk).filter(Boolean)); const fresh = items.filter(x => { if (have.has(x.id) || (x.fp && x.fp.length > 20 && fps.has(x.fp)) || (dk(x) && dks.has(dk(x)))) return false; have.add(x.id); if (x.fp) fps.add(x.fp); if (dk(x)) dks.add(dk(x)); return true; }); i.items.push(...fresh); if (fresh.length && i.status === 'verified') i.status = 'incomplete'; return fresh.length; };
   A.copen = b => { open = open === b.dataset.k ? '' : b.dataset.k; M.render(); };
+  window.KgCult.setOpen = k => { open = k || ''; }; // the quarters open a Gu's Details here
   A.cinv = b => { const s = store(), it = inv(s, b.dataset.k).items[+b.dataset.i]; if (!it) return; it.status = b.dataset.s; it.by = 'you'; put(s, `item ${it.id} -> ${it.status}`); };
   A.cinvstat = b => { const s = store(), i = inv(s, b.dataset.k); if (b.dataset.s === 'verified' && i.items.some(x => x.status === 'proposed' && ACQ_KINDS.includes(x.kind))) return alert('Check the proposed items first: mark each one Assigned or Not assigned.'); i.status = b.dataset.s; put(s, `checklist ${b.dataset.k} -> ${i.status}`); };
   A.cpropose = b => { const s = store(), [cid, ...rest] = b.dataset.k.split(':'), c = M.L.syl.courses[cid]; const n = addItems(s, b.dataset.k, proposeFromLogged(M.L.syl, c.subj, rest.join(':'))); put(s, `proposed ${n} from logged questions`); };
@@ -16413,6 +16414,219 @@ Rules: a right final answer with invalid reasoning gets method 0 or 1. A minor a
   M.SECTIONS.progress.push(['ranks', '⛰ Cultivator rank']);
   M.ACTIONS.rpreview = () => { preview = !preview; M.render(); };
   M.ACTIONS.rearn = b => { const st = read(), v = K.cultivation(M.L, null, st), g = gates(v, { earned: st.earned, bank: st.bankDone, b2: st.b2 }).find(x => x.id === b.dataset.g); if (!g || g.status !== 'met') return; if (!confirm(`Record ${g.name}? Earned stages are permanent.`)) return; st.earned = earn(st.earned, g.id, Date.now(), v.ed.id); st.log = (st.log || []).concat({ at: Date.now(), what: 'earned ' + g.id }); localStorage.setItem(K.STORE, JSON.stringify(st)); M.render(); };
+})();
+</script>
+<script id="kg-quarters-script">
+/* ---------- The quarters: an opt-in, painted way into the desk (Study → ⛰ Cultivation). ----------
+   Each place opens an existing page or action; rank gates, evidence rules, chapter mappings and the planner are only read here.
+   Its own storage is view preferences only (kg-quarters-v1). No upkeep, no decay. */
+(function () {
+/* The Wave-Sign Serpent Gu (Basic Mathematics), drawn for one refinement state.
+   Shared by the room (index.html) and the design sheet (gu-serpent.html); each page inlines a copy at build time.
+   It is an ILLUSTRATIVE SIGN DIAGRAM, not a graph: only which side of the gold line the body is on carries meaning
+   (above = positive, below = negative). Its height, curve and length are decoration and stand for no values.
+   Layers: the painted body (art/serpent-obtained.webp, Ayan's approved Obtained form) is artwork; the line, the excluded
+   point (a real hole through the body plus an open ring), the zero bead, the sign row, the evidence plates and the seals
+   are all drawn here by the app.
+   Local coordinates: the line is y = 0; the painted body crosses it at x = A (excluded) and x = B (zero).
+   o.state: 'obtained' | 'partial' | 'proof' | 'proven'
+   o.sk: one entry per APPROVED SKILL of the chapter ('n' not shown · 'd' demonstrated · 'r' retained); plates follow its length.
+   o.labels: [left point label, right point label] for the sign row, e.g. ['−2', '1'] */
+const SERPENT_ART = {
+  href: 'quarters/serpent-obtained.webp', x: -99.71, y: -40.5, w: 216, h: 72.54, A: -26.11, B: 26.11, neck: [80, -21],
+  // the painted body's centre line, tail to neck (measured from the image)
+  line: [[-91.1, -2.8], [-87.8, -5], [-84.6, -8.2], [-81.4, -11.3], [-78.1, -14.6], [-74.9, -17.9], [-71.6, -21.1], [-68.4, -24.2], [-65.2, -26.6], [-61.9, -28.4],
+    [-58.7, -29.7], [-55.4, -30.2], [-52.2, -30.1], [-49, -29.3], [-45.7, -27.8], [-42.5, -25], [-39.2, -21.1], [-36, -16.1], [-32.8, -11], [-29.5, -5.7], [-26.3, -.3],
+    [-23, 5], [-19.8, 10], [-16.6, 13.9], [-13.3, 17], [-10.1, 19.3], [-6.8, 21], [-3.6, 22], [-.4, 22.4], [2.9, 22.2], [6.1, 21.2], [9.4, 19.8], [12.6, 17.6], [15.8, 14.6],
+    [19.1, 10.7], [22.3, 6], [25.6, .9], [28.8, -4.2], [32, -9.3], [35.3, -14.1], [38.5, -18.7], [41.8, -22.4], [45, -25.1], [48.2, -27.1], [51.5, -28.3], [54.7, -29.1],
+    [58, -29], [61.2, -28.3], [64.4, -26.9], [67.7, -25], [70.9, -23]]
+};
+// the Proven form: its own painting, generated from the Obtained reference; measured the same way
+const SERPENT_ART_PROVEN = {
+  href: 'quarters/serpent-proven.webp', x: -88.49, y: -32.89, w: 190.65, h: 63.23, A: -19.71, B: 19.71, neck: [74, -22],
+  line: [[-61.7,-11.5],[-60.9,-12.2],[-59.5,-13.3],[-57.0,-15.1],[-53.8,-17.1],[-50.0,-18.7],[-45.8,-19.7],[-41.5,-19.8],[-37.1,-18.7],[-32.8,-16.5],[-28.9,-13.2],[-25.4,-9.1],[-22.4,-4.6],[-19.7,-0.3],[-17.4,3.5],[-15.3,6.6],[-13.2,9.0],[-11.2,11.0],[-9.3,12.6],[-7.5,13.9],[-5.8,14.8],[-4.1,15.5],[-2.5,16.0],[-0.9,16.2],[0.7,16.2],[2.2,16.0],[3.8,15.5],[5.4,14.8],[7.1,13.9],[9.0,12.6],[10.9,11.0],[13.0,9.0],[15.0,6.5],[17.2,3.5],[19.5,-0.1],[22.1,-4.1],[25.1,-8.3],[28.4,-12.2],[32.1,-15.5],[36.1,-17.9],[40.2,-19.3],[44.3,-19.9],[48.2,-19.7],[51.7,-19.0],[54.5,-18.2],[56.7,-17.5],[58.4,-16.9],[59.7,-16.7],[60.7,-16.6],[61.2,-16.7],[61.6,-16.7]]
+};
+// n evidence plates spread evenly along the body, clear of the two marked points
+function serpentPlates(n, S = SERPENT_ART) {
+  const L = S.line, cum = [0];
+  for (let i = 1; i < L.length; i++) cum.push(cum[i - 1] + Math.hypot(L[i][0] - L[i - 1][0], L[i][1] - L[i - 1][1]));
+  const tot = cum[cum.length - 1], at = d => { let i = 1; while (i < L.length - 1 && cum[i] < d) i++; const t = (d - cum[i - 1]) / (cum[i] - cum[i - 1] || 1);
+    return [L[i - 1][0] + (L[i][0] - L[i - 1][0]) * t, L[i - 1][1] + (L[i][1] - L[i - 1][1]) * t]; };
+  // only the stretches of body clear of the two marked points (and of the tail tip) carry plates; spread evenly over them
+  const clear = p => Math.abs(p[0] - S.A) >= 12 && Math.abs(p[0] - S.B) >= 12, ok = [];
+  for (let d = tot * .12; d <= tot; d += .5) if (clear(at(d))) ok.push(d);
+  return Array.from({ length: n }, (_, i) => at(ok[Math.round((ok.length - 1) * (n === 1 ? .5 : .04 + .92 * i / (n - 1)))]));
+}
+function serpentSVG(o) {
+  const st = o.state;
+  const P = 'sp-' + (o.id || 'x'), proven = st === 'proven', sealed = st === 'proof' || proven, S = proven ? SERPENT_ART_PROVEN : SERPENT_ART;
+  const n = o.sk ? o.sk.length : 6;
+  const sk = o.sk || (st === 'obtained' ? 'nnnnnn' : st === 'partial' ? 'rrdnnn' : st === 'proof' ? 'rrdddd' : 'rrrrrr').split('');
+  const G = '#e8c77d', SIL = '#dfe8f2', lab = o.labels || ['', ''];
+  const sc = n <= 6 ? 1 : Math.max(.6, 6 / n); // more skills: smaller plates, same spacing rule
+  const plate = ([x, y], s, i) => {
+    const f = s === 'r' ? '#ffd77a' : s === 'd' ? '#e6f8ee' : '#143e2f', k = s === 'r' ? '#fff6d6' : s === 'd' ? '#ffffff' : '#6cc29c';
+    return `<g data-scale="${i}" data-state="${s}" transform="translate(${x.toFixed(1)} ${(y - 1).toFixed(1)}) scale(${sc})">${s === 'r' ? `<circle r="9" fill="url(#${P}-gl)" opacity=".8"/>` : ''}
+      <path d="M0 -6 L5 -1.5 L3.2 5 L-3.2 5 L-5 -1.5Z" fill="${f}" stroke="${k}" stroke-width="1.1"${s === 'n' ? ' opacity=".85"' : ''}/>
+      <path d="M-2 -2.5 L0 -4.2 L2 -2.5" stroke="${s === 'n' ? '#6cc29c' : '#ffffff'}" stroke-width=".8" fill="none" opacity=".8"/></g>`;
+  };
+  return `<defs>
+      <radialGradient id="${P}-au"><stop offset="0" stop-color="${proven ? '#fff3cf' : '#d9ffe9'}" stop-opacity=".7"/><stop offset="1" stop-color="${proven ? '#e8b44a' : '#4bc9a8'}" stop-opacity="0"/></radialGradient>
+      <radialGradient id="${P}-gl"><stop offset="0" stop-color="#fff3c9"/><stop offset="1" stop-color="#ffd77a" stop-opacity="0"/></radialGradient>
+      <mask id="${P}-hole" maskUnits="userSpaceOnUse" x="-130" y="-60" width="260" height="120"><rect x="-130" y="-60" width="260" height="120" fill="#fff"/><circle cx="${S.A}" cy="0" r="5.2" fill="#000"/></mask>
+    </defs>
+    ${st === 'obtained' ? '' : `<ellipse rx="${proven ? 110 : 104}" ry="${sealed ? 80 : 62}" fill="url(#${P}-au)" opacity="${proven ? .62 : sealed ? .42 : .26}"/>`}
+    ${sealed ? `<g class="seal"><circle r="104" fill="none" stroke="${SIL}" stroke-width="2.6"/><circle r="97" fill="none" stroke="#9fb4cc" stroke-width="1" stroke-dasharray="3 5"/>
+      <path d="M0 -112 l6 9 h-12z M0 112 l6 -9 h-12z M-112 0 l9 6 v-12z M112 0 l-9 6 v-12z" fill="${SIL}"/></g>` : ''}
+    <!-- contact shadow, then the gold line the diagram is read against (it passes behind the body) -->
+    <ellipse cx="0" cy="31" rx="62" ry="4" fill="#000" opacity=".3"/>
+    <g class="axis"><line x1="-106" y1="0" x2="106" y2="0" stroke="${G}" stroke-width="${proven ? 2.2 : 1.6}" opacity="${st === 'obtained' ? .7 : .95}"/>${proven ? `<path d="M110 0 l-8 -4 v8z M-110 0 l8 -4 v8z" fill="${G}"/>` : ''}</g>
+    <!-- the painted body, with a real gap where the expression is undefined -->
+    <image href="${S.href}" x="${S.x}" y="${S.y}" width="${S.w}" height="${S.h}" mask="url(#${P}-hole)" preserveAspectRatio="none"/>
+    ${st === 'proof' ? `<g transform="translate(${S.neck[0]} ${S.neck[1]}) rotate(-60)"><ellipse rx="3.2" ry="9.6" fill="none" stroke="${SIL}" stroke-width="2.2"/></g>` : ''}
+    <!-- the two marked points: open ring = excluded (undefined), filled bead = zero -->
+    <circle class="pt-excluded" cx="${S.A}" cy="0" r="5.2" fill="none" stroke="${G}" stroke-width="1.8"/>
+    <circle class="pt-zero" cx="${S.B}" cy="0" r="4.2" fill="${G}" stroke="#3a2a10" stroke-width=".8"/>
+    <!-- sign row above the diagram: an illustrative sign chart, read left to right (thin ticks tie each point label to its mark) -->
+    <g class="signs" font-family="Georgia,serif" fill="${G}" text-anchor="middle" opacity="${st === 'obtained' ? .6 : .85}">
+      <text x="-66" y="-46" font-size="13">+</text><text x="0" y="-46" font-size="13">−</text><text x="66" y="-46" font-size="13">+</text><path d="M${S.A} -42 V-7 M${S.B} -42 V-6" stroke="${G}" stroke-width=".6" stroke-dasharray="1.5 2" fill="none" opacity=".55"/>
+      ${lab[0] ? `<text x="${S.A}" y="-47" font-size="8.5" font-style="italic">${lab[0]}</text>` : ''}${lab[1] ? `<text x="${S.B}" y="-47" font-size="8.5" font-style="italic">${lab[1]}</text>` : ''}
+    </g>
+    <!-- evidence plates: one per approved skill of this chapter -->
+    <g class="scales">${serpentPlates(n, S).map((p, i) => plate(p, sk[i] || 'n', i)).join('')}</g>`;
+}
+
+  // ---- the quarters: places, what each one opens, and the room drawing ----
+  const M = window.MoonLab, K = window.KgCult, R = window.KgRank;
+  const KEY = 'kg-quarters-v1', DEF = { on: false, simplify: false, still: false, labels: true, chars: true, gu: true, content: true };
+  const prefs = () => { try { return Object.assign({}, DEF, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { return Object.assign({}, DEF); } };
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  // Every place opens existing pages ('page:tab') or existing actions. Nothing here re-implements a rule.
+  const PLACES = [
+    { id: 'scroll', name: 'Wall scroll', hit: [1080, 112, 124, 370], lab: [1142, 500], about: "Today's plan. Meals, breaks, protected reading and the 1:30 AM bedtime are fixed bands; the scroll never moves them.",
+      go: [["Today's plan · Done for today", 'today:today'], ['🌱 Gentle return', 'settings:gentle'], ['🌤 Sunday', 'company:sunday'], ['⏳ Countdown', 'plan:countdown']] },
+    { id: 'table', name: 'Writing table', hit: [300, 684, 1080, 260], lab: [840, 662], about: 'Lecture tablet, notebook and practice stack. Session minutes are logged as before and never count towards rank or mastery.',
+      go: [['✍ Study session', 'study:session'], ['Lectures and homework (Today)', 'today:today'], ['🎯 Practice', 'study:practice'], ['🔁 Revision', 'study:revision'], ['🧠 Recall', 'study:recall'], ['🔬 Tools', 'study:tools']] },
+    { id: 'cabinet', name: 'Gu cabinet', hit: [64, 196, 402, 470], lab: [265, 176], about: 'Your chapter Gu, read from the cultivation record. Plates follow each chapter’s approved skill list.',
+      go: [['📖 Chapters', 'study:chapters'], ['✨ Stickers', 'progress:stickers']] },
+    { id: 'shelf', name: 'Shelf', hit: [1054, 494, 162, 150], lab: [1135, 668], about: 'Notes, PDFs and past working.',
+      go: [['Saved notes', 'library:savednotes'], ['📚 Notes', 'library:notes'], ['🧪 Methods', 'library:methods'], ['❓ Doubts', 'library:doubts'], ['💭 What it remembers', 'library:memory']] },
+    { id: 'chest', name: 'Storage chest', hit: [90, 734, 262, 150], lab: [220, 714], about: 'Backup and restore, and sync.',
+      go: [['💾 Backup', 'settings:backup'], ['🔄 Sync', 'settings:sync']] },
+    { id: 'door', name: 'Doorway', hit: [1262, 122, 266, 576], lab: [1395, 104], about: 'The journey outside: progress, rank, trials and side paths.',
+      go: [['📈 Overview', 'progress:overview'], ['◆ Five skills', 'progress:skills'], ['↻ This week', 'progress:week'], ['🌙 Patterns', 'progress:patterns'], ['Weak links', 'progress:links'], ['🧾 Report', 'progress:report'],
+        ['🌌 Syllabus sky', 'progress:sky'], ['🚀 Voyage', 'progress:voyage'], ['◇ Retention trial', 'progress:trial'], ['⛰ Cultivator rank', 'progress:ranks'], ['🏆 Rank', 'progress:rank'],
+        ['🎓 Exams', 'study:exams'], ['📝 Full mock', 'study:paper'], ['📊 Mocks', 'progress:mocks'], ['🔭 Astrophysics course', 'study:astro'], ['Rocket project', 'study:project']] },
+    { id: 'iroha', name: 'Iroha', hit: [826, 396, 208, 250], lab: [930, 376], about: 'Iroha, reading at her table: study help and doubts.',
+      act: [['💬 Talk to Iroha', 'kgdtalk']], go: [['🤝 Study buddy', 'company:buddy'], ['❓ Doubts', 'study:doubts']] },
+    { id: 'kaguya', name: 'Kaguya', hit: [1296, 446, 198, 246], lab: [1395, 424], about: 'Kaguya, at the rail: company and comfort.',
+      go: [['🌙 Hang out', 'company:hangout'], ['Sit with me', 'company:sit'], ['🫶 Comfort', 'company:comfort'], ['💭 Memories', 'company:memories'], ['💌 Letters', 'company:letters'], ['💞 Bond', 'progress:bond']] }
+  ];
+  // the room menu: settings with no object in the scenery (care stays plain and private)
+  const MENU = [['✦ Companions', 'settings:companions'], ['📱 App', 'settings:app'], ['🛟 Support', 'settings:support'], ['👋 Opening greeting', 'settings:greeting'], ['Care · doctor summary', 'settings:doctor']];
+  const NOOKS = [[175, 360], [355, 360], [175, 556], [355, 556]];
+  const LVN = { none: 0, obtained: 1, learning: 2, proof: 3, proven: 4 };
+  const LEVEL = { none: 'not obtained yet', obtained: 'Obtained', learning: 'Learning', proof: 'Proof passed · retention pending', proven: 'Proven' };
+  const has = target => { const [p, t] = target.split(':'), S = M && M.SECTIONS; return !S || !S[p] || S[p].some(x => x[0] === t); };
+  // plates: one per APPROVED skill. 'r' retained (a later check), 'd' shown independently, 'n' not shown. No approved list: no plates.
+  function plates(g) {
+    if (!g || !g.skills || !g.skills.length) return [];
+    const shown = new Set(((g.refine && g.refine.shown) || []).map(s => s.id)), kept = new Set((g.retention && g.retention.covered) || []);
+    return g.skills.map(s => kept.has(s.id) ? 'r' : shown.has(s.id) ? 'd' : 'n');
+  }
+  // which Gu rest in the four painted nooks: Basic Mathematics (the painted serpent) first, then the most refined
+  function nooks(v) {
+    const gu = Object.values((v && v.subjects) || {}).flatMap(s => s.gu || []);
+    const bm = gu.find(g => g.name === 'Basic Mathematics'), rest = gu.filter(g => g !== bm).sort((a, b) => (LVN[b.level] - LVN[a.level]) || (b.share - a.share));
+    return (bm ? [bm] : []).concat(rest).slice(0, 4);
+  }
+  const look = g => g.level === 'proven' ? 'proven' : g.level === 'proof' ? 'proof' : plates(g).some(s => s !== 'n') || g.level === 'learning' ? 'partial' : 'obtained';
+  let place = '', gu = '', peek = false;
+  const read = () => { const st = K.readStore(localStorage); return { st, v: K.cultivation(M.L, null, st) }; };
+  const btns = p => (p.act || []).map(([l, a]) => `<button class="kl-ghost" data-a="${a}">${esc(l)}</button>`).join('') + (p.go || []).filter(x => has(x[1])).map(([l, t]) => `<button class="kl-ghost" data-a="go" data-v="${t}">${esc(l)}</button>`).join('');
+  function today() {
+    try { const t = window.StudyPlan.templateDay(), c = window.StudyPlan.clk || (m => m);
+      return (t.rows || []).map(r => ({ s: r.s, e: r.e, at: c(r.s), title: r.title, fixed: r.kind !== 'study' })); } catch (e) { return []; }
+  }
+  function placeHTML(p, data) {
+    let extra = '';
+    if (p.id === 'scroll') { const rows = today(); extra = rows.length ? `<ul class="kl-list kq-rows">${rows.map(r => `<li class="${r.fixed ? 'kq-fixed' : ''}"><span class="kl-small">${esc(r.at)}</span> ${esc(r.title)}${r.fixed ? ' <span class="kl-small">· fixed</span>' : ''}</li>`).join('')}</ul><p class="kl-small">To change the day, open Today: the scroll only reads the plan.</p>` : ''; }
+    if (p.id === 'cabinet') extra = cabinetHTML(data);
+    if (p.id === 'door' && R) { const ld = R.land(data.st.earned, data.st.immortals); extra = `<p class="kl-small"><b>Blessed Land</b> · ${ld.unlocked ? 'open (' + esc(ld.why) + ')' : 'locked: ' + esc(ld.why) + '. No upkeep, no decay.'}</p>`; }
+    return `<section class="kl-card kl-stack kq-place" id="kq-place-${p.id}" tabindex="-1"><p class="kl-eyebrow">${esc(p.name.toUpperCase())}</p><p class="kl-small">${esc(p.about)}</p>${extra}<div class="kl-row" style="flex-wrap:wrap">${btns(p)}</div></section>`;
+  }
+  function cabinetHTML(data) {
+    const all = Object.values(data.v.subjects || {}).flatMap(s => s.gu || []);
+    if (!all.length) return '<p class="kl-small">No chapter Gu yet: the catalogue is still being filled in.</p>';
+    return `<ul class="kl-list">${all.map(g => { const pl = plates(g);
+      return `<li class="kl-li"><span><b>${esc(g.name)}</b> · ${esc(LEVEL[g.level] || g.level)}<br><span class="kl-small">${g.skills ? `${pl.filter(s => s !== 'n').length} of ${pl.length} plates lit, ${pl.filter(s => s === 'r').length} retained` : 'skill list not approved yet, so no plates'}${g.planned ? ' · lecture count provisional' : ''}</span></span>
+        <button class="kl-ghost" data-a="qgu" data-k="${esc(g.key)}">Open</button></li>`; }).join('')}</ul>`;
+  }
+  function guHTML(data) {
+    const g = Object.values(data.v.subjects || {}).flatMap(s => s.gu || []).find(x => x.key === gu); if (!g) return '';
+    const pl = plates(g), bm = g.name === 'Basic Mathematics' && g.acq === 'obtained';
+    const names = (g.skills || []).map((s, i) => `<li>${pl[i] === 'r' ? '◆ retained' : pl[i] === 'd' ? '◇ shown independently' : '· not shown yet'} · ${esc(s.name)}</li>`).join('');
+    const next = g.retention && g.retention.next && g.retention.next.length ? `<p class="kl-small">Next check (inside your Mix-in time): ${g.retention.next.length} skill${g.retention.next.length > 1 ? 's' : ''}.</p>` : '';
+    return `<section class="kl-card kl-stack kq-place" id="kq-place-gu" tabindex="-1"><p class="kl-eyebrow">GU · ${esc(g.name.toUpperCase())}</p>
+      ${bm ? `<svg viewBox="-130 -70 260 130" class="kq-gu-art" role="img" aria-label="Wave-Sign Serpent, ${esc(LEVEL[g.level])}">${serpentSVG({ id: 'close', state: look(g), sk: pl, labels: ['−2', '1'] })}</svg>
+        <p class="kl-small">An illustrative sign diagram for the sample (x − 1)/(x + 2), not a graph: only the side of the gold line matters. At −2 the expression is undefined (open ring, a gap in the body); at 1 it is zero (filled bead).</p>` : ''}
+      <p><b>${esc(LEVEL[g.level] || g.level)}</b> · ${esc(g.acq === 'obtained' ? 'lectures and checklist done' : g.acq === 'not-obtained' ? `lectures ${g.done}/${g.lectures}` : g.acq === 'scope-unverified' ? 'lectures done · checklist not yet verified' : 'assigned items still to attempt')}</p>
+      ${g.skills ? `<ul class="kl-list">${names}</ul>` : '<p class="kl-small">No plates until you approve this chapter’s skill list.</p>'}${next}
+      <p class="kl-small">Photo checks open in Details and stay labelled Provisional AI assessment (Iroha). Plates turn gold only through the existing later-check rule; nothing fades.</p>
+      <div class="kl-row" style="flex-wrap:wrap"><button data-a="qdetail" data-k="${esc(g.key)}">Checklist, skills and proof</button><button class="kl-ghost" data-a="cpropose" data-k="${esc(g.key)}">Propose from my logged questions</button><button class="kl-ghost" data-a="qgu" data-k="">Back to the cabinet</button></div></section>`;
+  }
+  function roomSVG(p, data) {
+    const A = 'quarters/', rows = p.content ? today() : [], now = (() => { const n = new Date(); let m = n.getHours() * 60 + n.getMinutes(); return m < 240 ? m + 1440 : m; })();
+    const study = rows.filter(r => !r.fixed), left = study.filter(r => r.e > now).length, done = study.length ? (study.length - left) / study.length : 0;
+    const nk = p.gu ? nooks(data.v) : [];
+    const hot = (id, x, y, w, h, label, name, lab, extra) => `<g class="kq-hot" data-a="${extra ? 'qgu' : 'qplace'}" data-${extra ? 'k' : 'v'}="${esc(id)}" tabindex="0" role="button" aria-label="${esc(label)}">
+      <rect class="kq-hit" x="${x}" y="${y}" width="${w}" height="${h}"/><rect class="kq-ring" x="${x - 5}" y="${y - 5}" width="${w + 10}" height="${h + 10}" rx="6"/>
+      ${p.labels && lab ? `<g transform="translate(${lab[0]} ${lab[1]})"><rect class="kq-lbg" x="${-name.length * 5.4 - 16}" y="-20" width="${name.length * 10.8 + 32}" height="36" rx="18"/><text class="kq-ltx" text-anchor="middle" y="6">${esc(name)}</text></g>` : ''}</g>`;
+    return `<svg class="kq-svg" viewBox="28 120 1464 880" preserveAspectRatio="xMidYMid slice" role="group" aria-label="Your quarters">
+      <image href="${A}room-plate.webp" x="0" y="-120" width="1600" height="1380"/>
+      ${p.chars ? `<image class="kq-breathe" href="${A}iroha-desk.webp" x="861" y="398" width="138" height="230"/><image class="kq-breathe" style="animation-delay:-2s" href="${A}kaguya-still.webp" x="1300" y="450" width="190" height="215"/>` : ''}
+      <image href="${A}front-iroha-table.webp" x="826" y="518" width="216" height="134"/><image href="${A}front-rail.webp" x="1266" y="616" width="260" height="86"/>
+      ${p.content ? `<g font-family="Georgia,serif" text-anchor="middle"><text x="1144" y="176" font-size="13" fill="#5a4630">today</text>
+        <g stroke="#6c5a44" stroke-width="2" opacity=".75">${study.slice(0, 5).map((r, i) => `<line x1="1114" y1="${204 + i * 22}" x2="${1160 + (i * 7) % 16}" y2="${204 + i * 22}"${r.e <= now ? ' opacity=".35"' : ''}/>`).join('')}</g>
+        ${rows.filter(r => r.fixed).slice(0, 3).map((r, i) => `<rect x="1112" y="${318 + i * 22}" width="64" height="12" rx="2" fill="#a2432f" opacity="${.85 - i * .1}"/>`).join('')}</g>
+        <g><path d="M586 724 L616 743 L586 762Z" fill="#e8dcbc" opacity=".9"/><rect x="546" y="776" width="104" height="4" fill="#4f6d70"/><rect x="546" y="776" width="${Math.round(104 * done)}" height="4" fill="#e8c77d"/></g>` : ''}
+      ${nk.map((g, i) => { const [x, y] = NOOKS[i], ok = g.acq === 'obtained';
+        const art = ok && g.name === 'Basic Mathematics' ? `<g transform="translate(${x} ${y}) scale(.74)">${serpentSVG({ id: 'n' + i, state: look(g), sk: plates(g), labels: ['−2', '1'] })}</g>`
+          : ok ? `<ellipse cx="${x}" cy="${y + 6}" rx="44" ry="16" fill="#9bd3a6" opacity=".35" class="kq-breathe"/><circle cx="${x}" cy="${y}" r="13" fill="#2f7a5c" stroke="#cfe8dc" stroke-width="2"/>`
+          : `<ellipse cx="${x}" cy="${y + 6}" rx="60" ry="20" fill="#cfe8dc" opacity=".18" class="kq-breathe"/>${p.labels ? `<text x="${x}" y="${y - 10}" font-family="Georgia,serif" font-style="italic" font-size="11" fill="#cdbb95" text-anchor="middle" opacity=".8">resting place, waiting</text>` : ''}`;
+        const plaque = p.labels ? `<g transform="translate(${x} ${y + 44})"${ok ? '' : ' opacity=".75"'}><rect x="${-Math.min(80, g.name.length * 3.4 + 10)}" y="-9" width="${Math.min(160, g.name.length * 6.8 + 20)}" height="16" rx="3" fill="#1c0c09" opacity=".72"/><text y="3" font-family="system-ui,sans-serif" font-size="11" fill="#e9d6a6" text-anchor="middle">${esc(g.name.length > 22 ? g.name.slice(0, 21) + '…' : g.name)}</text></g>` : '';
+        return art + plaque; }).join('')}
+      ${PLACES.map(q => hot(q.id, ...q.hit, q.name + ': ' + q.about, q.name, q.lab)).join('')}
+      ${nk.map((g, i) => hot(g.key, NOOKS[i][0] - 80, NOOKS[i][1] - 50, 160, 90, g.name + ' Gu, ' + (LEVEL[g.level] || ''), '', null, true)).join('')}
+    </svg>`;
+  }
+  const toggles = p => [['labels', 'Labels'], ['chars', 'Characters'], ['gu', 'Gu'], ['content', 'Study content'], ['still', 'Reduced motion'], ['simplify', 'Simplify']]
+    .map(([k, l]) => `<button class="kl-ghost" data-a="qpref" data-v="${k}" aria-pressed="${!!p[k]}">${l}</button>`).join('');
+  function quarters(p) {
+    const data = read(), P = PLACES.find(x => x.id === place);
+    const head = `<section class="kl-card kl-stack"><p class="kl-eyebrow">⛰ YOUR QUARTERS · PREVIEW</p><p class="kl-small">A way into the desk you already have: every place opens the same page or action as the tabs. Nothing here changes your record.</p>
+      <div class="kl-row" style="flex-wrap:wrap">${toggles(p)}<button class="kl-ghost" data-a="qpref" data-v="on">Classic list</button></div>
+      <details class="kl-small"><summary>Menu: settings without a place in the room</summary><div class="kl-row" style="flex-wrap:wrap">${MENU.filter(x => has(x[1])).map(([l, t]) => `<button class="kl-ghost" data-a="go" data-v="${t}">${esc(l)}</button>`).join('')}</div></details></section>`;
+    if (p.simplify) return head + PLACES.map(q => placeHTML(q, data)).join('') + (gu ? guHTML(data) : '');
+    return head + `<div class="kq-wrap${p.still ? ' kq-still' : ''}"><div class="kq-room">${roomSVG(p, data)}</div></div>` + (gu ? guHTML(data) : P ? placeHTML(P, data) : '<p class="kl-small">Tap a place in the room.</p>');
+  }
+  window.KgQuarters = { PLACES, MENU, plates, nooks, look, prefs, KEY, quarters: () => quarters(prefs()), targets: () => PLACES.flatMap(p => (p.go || []).map(x => x[1])).concat(MENU.map(x => x[1])) };
+  if (!M || !M.PANELS || !K) return;
+  const base = M.PANELS.cultivation;
+  M.PANELS.cultivation = () => { const p = prefs(); if (!p.on || peek) return `<section class="kl-card kl-row"><button class="kl-ghost" data-a="qpref" data-v="${p.on ? 'peek' : 'on'}">${p.on ? '⛰ Back to the quarters' : '⛰ Open the quarters (preview)'}</button></section>` + base(); return quarters(p); };
+  const focus = id => requestAnimationFrame(() => { const el = document.getElementById(id); if (el) { el.scrollIntoView({ block: 'nearest', behavior: prefs().still || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); el.focus({ preventScroll: true }); } });
+  M.ACTIONS.qpref = b => { const p = prefs(), k = b.dataset.v; if (k === 'peek') peek = false; else p[k] = !p[k]; if (k === 'on') { peek = false; place = ''; gu = ''; } localStorage.setItem(KEY, JSON.stringify(p)); M.render(); };
+  M.ACTIONS.qplace = b => { place = place === b.dataset.v ? '' : b.dataset.v; gu = ''; M.render(); if (place) focus('kq-place-' + place); };
+  M.ACTIONS.qgu = b => { gu = b.dataset.k || ''; if (!gu) place = 'cabinet'; M.render(); focus(gu ? 'kq-place-gu' : 'kq-place-cabinet'); };
+  M.ACTIONS.qdetail = b => { peek = true; if (K.setOpen) K.setOpen(b.dataset.k); M.render(); };
+  document.addEventListener('keydown', e => { const t = e.target; if ((e.key === 'Enter' || e.key === ' ') && t && t.classList && t.classList.contains('kq-hot')) { e.preventDefault(); t.dispatchEvent(new MouseEvent('click', { bubbles: true })); } });
+  const css = document.createElement('style');
+  css.textContent = `.kq-wrap{overflow-x:auto;border-radius:14px;background:#140b08}.kq-room{min-width:640px}.kq-svg{display:block;width:100%;height:auto;aspect-ratio:1464/880}
+    .kq-hit{fill:transparent;cursor:pointer}.kq-ring{fill:none;stroke:#f5d27a;stroke-width:3;opacity:0}.kq-hot:hover .kq-ring,.kq-hot:focus .kq-ring,.kq-hot:focus-visible .kq-ring{opacity:.9}.kq-hot:focus{outline:none}
+    .kq-lbg{fill:#1c0c09;opacity:.78}.kq-ltx{fill:#f5e9c8;font:600 18px system-ui,sans-serif}.kq-breathe{animation:kq-br 6s ease-in-out infinite}@keyframes kq-br{50%{opacity:.82}}
+    .kq-still .kq-breathe{animation:none}@media (prefers-reduced-motion:reduce){.kq-breathe{animation:none}}.kq-gu-art{width:100%;max-width:420px;height:auto;display:block;margin:auto;background:#1a120d;border-radius:12px}
+    .kq-rows li.kq-fixed{opacity:.8}.kq-rows li{list-style:none}`;
+  document.head.appendChild(css);
 })();
 </script>
 </body></html>
