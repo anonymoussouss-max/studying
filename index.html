@@ -14358,6 +14358,22 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
     try { return SP().templateDay(L, d, dowOf(d), -1); }
     finally { if (h != null) { if (had) s.hours[d] = old; else if (s.hours) delete s.hours[d]; } }
   }
+  let tv = 'day';
+  const span = r => `<time>${SP().clk(r.s)}</time><time>${SP().clk(r.e)}</time>`;
+  function dayLedger(t) {
+    return `<ol class="kt-ledger">${t.rows.slice().sort((a, b) => a.s - b.s).map(r => `<li data-k="${esc(r.kind || '')}"${/read/i.test(r.title || r.id || '') ? ' data-read="1"' : ''}>${span(r)}<span class="kt-l-t">${esc(r.title || '')}${r.optional ? ' <i>(optional)</i>' : ''}</span><span class="kt-l-d">${hmLen(r.e - r.s)}</span></li>`).join('')}</ol>`;
+  }
+  function weekView(d0) {
+    const days = Array.from({ length: 7 }, (_, i) => M.add(d0, i)), A = 360, Z = 1560, pc = m => Math.max(0, Math.min(100, (m - A) / (Z - A) * 100));
+    return `<div class="kt-week" role="table" aria-label="Seven days on one time axis"><div class="kt-wk-axis" role="row" aria-hidden="true"><span></span><span class="kt-wk-bar">${[6, 10, 14, 18, 22, 26].map(h => `<i style="left:${pc(h * 60)}%">${SP().clk(h * 60)}</i>`).join('')}</span><span></span></div>${days.map(dd => { const t = preview(dd), st = studyOf(t);
+      return `<div class="kt-wk-row" role="row"><b role="rowheader">${esc(new Date(dd + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }))}</b><span class="kt-wk-bar" role="cell">${t.rows.map(r => `<i data-k="${esc(r.kind || '')}" style="left:${pc(r.s)}%;width:${Math.max(.6, pc(r.e) - pc(r.s))}%" title="${esc(SP().clk(r.s) + '–' + SP().clk(r.e) + ' ' + (r.title || ''))}"></i>`).join('')}</span><span role="cell">${hmLen(total(t))}${st.length ? ` · ${SP().clk(st[0].s)}–${SP().clk(st[st.length - 1].e)}` : ''}</span></div>`; }).join('')}</div>`;
+  }
+  function forecastView() {
+    const f = SP().forecast(L, {}), w = f.weeksLow == null ? 'no estimate yet' : `${f.weeksLow}–${f.weeksHigh} weeks`;
+    return `<div class="kt-fc"><p class="kl-eyebrow">FORECAST · NOT A PLAN</p><p><b>${esc(w)}</b> for the remaining syllabus at ${hmLen(f.plannedWeekly || 0)} of PCM a week${f.complete ? '' : ' (incomplete inputs)'}.</p>
+      <p class="kl-small">Provisional inputs, shown so you can see what this rests on:</p><ul class="kt-fc-in">${f.assumptions.map(x => `<li><span class="kt-prov">provisional</span> ${esc(x)}</li>`).join('')}${(f.missing || []).map(x => `<li><span class="kt-prov">missing</span> ${esc(String(x))}</li>`).join('')}<li><span class="kt-prov">provisional</span> ${esc(f.uncertainty)}</li></ul></div>`;
+  }
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-ktv]'); if (!b) return; tv = b.dataset.ktv; M.render(); setTimeout(() => document.querySelector(`[data-ktv="${tv}"]`)?.focus(), 30); });
   function card() {
     const d = day(), sp = SP(), cur = sp.dayHours(S(), d), t = preview(d), gr = t.gentle, light = !!gr || ['sunday', 'gentle', 'reduced', 'stop'].includes(t.plan);
     const date = new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -14368,7 +14384,9 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
     return `<section class="kl-card kg-tmrw"><p class="kl-eyebrow">TOMORROW'S PLAN · ${esc(date)}</p>
       <p class="kl-small">${esc(sp.PLAN_NAME[t.plan] || 'Your day')} · wake ${sp.clk(t.wake)} · <b>${hmLen(total(t))}</b> of study${t.extend ? ' (extended evening)' : ''} · bed by 1:30 AM</p>
       ${gr ? `<p class="kl-small">Gentle return is on: ${gr.cap == null ? 'no maximum is set, so nothing is planned automatically' : gr.cap ? `up to ${hmLen(gr.cap)} of study in all, evening first` : 'your maximum is 0, so nothing is planned'}. Change it in Settings.</p>` : light ? '<p class="kl-small">This is a light day, so it has no hours target.</p>' : opts}
-      <details class="kg-tmrw-list"><summary>Show tomorrow's blocks</summary><ol>${rows || '<li>No study blocks.</li>'}</ol></details>
+      <div class="kl-row kt-tv" role="group" aria-label="Terrace view">${[['day', 'Day'], ['week', 'Week'], ['forecast', 'Forecast']].map(([k, l]) => `<button type="button" data-ktv="${k}" aria-pressed="${tv === k}">${l}</button>`).join('')}</div>
+      ${tv === 'week' ? weekView(d) : tv === 'forecast' ? forecastView() : dayLedger(t)}
+      <details class="kg-tmrw-list"><summary>Study blocks only</summary><ol>${rows || '<li>No study blocks.</li>'}</ol></details>
       <p class="kl-small">The real day still follows when you wake. 8h is the most that fits before bedtime, so it may show less.</p></section>`;
   }
   const base = M.PANELS.countdown;
@@ -16909,20 +16927,22 @@ function serpentSVG(o) {
     for (const gr of document.querySelectorAll('#moon-lab [data-qgroup]')) gr.hidden = !gr.querySelector('[data-qrow]:not([hidden])');
     const c = document.getElementById('kqc-count'); if (c) c.textContent = `${n} of ${rows.length} chapters`;
   }
+  let ret = null; // the drawer (and scroll position) an Inspect came from, for "Back to cabinet"
   function guPanel(g) {
     if (!g) return '<p class="kl-small">Choose a Gu or a chapter in the cabinet or the collection below.</p>';
     const pl = plates(g), bm = g.name === 'Basic Mathematics' && g.acq === 'obtained', nx = nextStep(g), st = stateOf(g);
     const art = bm ? `<svg viewBox="-130 -70 260 130" class="kq-gu-art" role="img" aria-label="Wave-Sign Serpent, ${esc(LEVEL[g.level])}">${serpentSVG({ id: 'close', state: look(g), sk: pl, labels: ['−2', '1'] })}</svg>`
       : `<svg viewBox="-80 -62 160 100" class="kq-gu-art" role="img" aria-label="${esc(guName(g))}, ${esc(STATE_N[st])}">${guSVG(g, 'close')}</svg>`;
     return `<div class="kl-stack kqc-gu" id="kqc-gu" tabindex="-1">${art}
-      <p class="kl-eyebrow">${esc((SUBJ[g.subj] || '').toUpperCase())} · ${esc(g.name.toUpperCase())}</p>
+      ${ret ? `<button class="kl-ghost kqc-back" data-qret="1">← Back to cabinet</button>` : ''}<p class="kl-eyebrow">${esc((SUBJ[g.subj] || '').toUpperCase())} · ${esc(g.name.toUpperCase())}</p>
       <h2 class="kqc-name">${esc(guName(g))} <span class="kqc-st kqc-st-${st}">${STATE_N[st]}</span>${g.planned ? ' <span class="kl-small">· lecture count provisional</span>' : ''}</h2>
+      <dl class="kqc-label"><dt>Chapter</dt><dd>${esc(g.name)}</dd><dt>Stage</dt><dd>${esc(STATE_N[st])}</dd></dl>
       <div class="kqc-next"><p><b>Next:</b> ${esc(nx.t)}</p><div class="kl-row" style="flex-wrap:wrap">${nx.b ? `<button class="kl-primary" ${nx.b[1]}>${esc(nx.b[0])}</button>` : ''}${g.acq !== 'obtained' ? `<button data-qstudy="${esc(g.key)}">Guided session on this chapter</button>` : ''}</div></div>
       <p class="kl-small">${esc(rankLine(g))}${(() => { const A = window.KgGuArt && window.KgGuArt.ART[g.key]; return A && g.acq === 'obtained' ? ' · ' + esc(A.design) : ''; })()}</p>
-      <p class="kl-small"><b>Acquisition</b> · ${esc(acqText(g))}</p><p class="kl-small"><b>Refinement</b> · ${esc(refineText(g))}</p>
+      <div class="kqc-slip"><p class="kl-small"><b>Acquisition</b> · ${esc(acqText(g))}</p><p class="kl-small"><b>Refinement</b> · ${esc(refineText(g))}</p>
       ${bm ? `<p class="kl-small">An illustrative sign diagram for the sample (x − 1)/(x + 2), not a graph: only the side of the gold line matters. At −2 the expression is undefined (open ring, a gap in the body); at 1 it is zero (filled bead).</p>` : ''}
       ${g.skills && g.acq === 'obtained' ? `<ul class="kl-list kqc-sk">${g.skills.map((s, i) => `<li>${pl[i] === 'r' ? '◆ retained' : pl[i] === 'd' ? '◇ shown' : '· not shown yet'} · ${esc(s.name)}</li>`).join('')}</ul>` : ''}
-      <div class="kl-row" style="flex-wrap:wrap"><button class="kl-ghost" data-qdetail="${esc(g.key)}">Checklist, skills and proof</button><button class="kl-ghost" data-a="cpropose" data-k="${esc(g.key)}">Propose from my logged questions</button></div>
+      </div><div class="kl-row" style="flex-wrap:wrap"><button class="kl-ghost" data-qdetail="${esc(g.key)}">Checklist, skills and proof</button><button class="kl-ghost" data-a="cpropose" data-k="${esc(g.key)}">Propose from my logged questions</button></div>
       <p class="kl-small">Photo checks stay labelled Provisional AI assessment (Iroha). Plates turn gold only through the later retention check; nothing fades.</p></div>`;
   }
   function cabinetView(p) {
@@ -16962,17 +16982,20 @@ function serpentSVG(o) {
     targets: () => PLACES.flatMap(p => (p.go || []).map(x => x[1])).concat(MENU.map(x => x[1])) };
   if (!M || !M.PANELS || !K) return;
   const base = M.PANELS.cultivation;
-  M.PANELS.cultivation = () => peek ? `<section class="kl-card kl-row"><button class="kl-ghost" data-qback="1">← Back to the Gu cabinet</button></section>` + base() : cabinetView(prefs());
+  // inspecting evidence keeps the selected specimen pinned in view
+  M.PANELS.cultivation = () => { if (!peek) return cabinetView(prefs()); const g = sel && allGu(read().v).find(x => x.key === sel);
+    return `<section class="kl-card kl-row kqc-pin"><button class="kl-ghost" data-qback="1">← Back to the Gu cabinet</button>${g ? `<span class="kqc-pin-l"><b>${esc(g.name)}</b> · ${esc(STATE_N[stateOf(g)])}</span>` : ''}</section>` + base(); };
   const focusEl = id => requestAnimationFrame(() => { const el = document.getElementById(id); if (el) { el.scrollIntoView({ block: 'nearest', behavior: prefs().still || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); el.focus({ preventScroll: true }); } });
   const toCabinet = () => { if (document.body.classList.contains('kg-sec-study') && document.querySelector('.kl-tabs [data-v="cultivation"][aria-current="page"]')) M.render(); else M.go('study', 'cultivation'); };
   // one listener for every quarters control, inside or outside the lab
   document.addEventListener('click', e => {
-    const t = e.target.closest && e.target.closest('[data-qgo],[data-qsel],[data-qshow],[data-qdetail],[data-qsetup],[data-qback],[data-qpref],[data-qtable],[data-qpause],[data-qlabels],[data-qstudy]'); if (!t) return;
+    const t = e.target.closest && e.target.closest('[data-qgo],[data-qsel],[data-qshow],[data-qdetail],[data-qsetup],[data-qback],[data-qpref],[data-qtable],[data-qpause],[data-qlabels],[data-qstudy],[data-qret]'); if (!t) return;
     e.preventDefault(); const d = t.dataset;
     if (d.qgo) { const [a, b] = d.qgo.split(':'); return M.go(a, b); }
     if (d.qtable) return toTable();
     if (d.qstudy) { const g = allGu(read().v).find(x => x.key === d.qstudy); if (g) window.__kgGuPre = { subj: { maths: 'Maths', physics: 'Physics', chem: 'Chemistry' }[g.subj] || 'Maths', topic: g.acq === 'not-obtained' ? `${g.name} · lecture ${g.done + 1} of ${g.lectures}` : g.name, at: Date.now() }; return M.go('study', 'session'); }
-    if (d.qsel != null) { sel = d.qsel; peek = false; toCabinet(); return focusEl('kqc-gu'); }
+    if (d.qret) { const r = ret; ret = null; M.render(); return setTimeout(() => { scrollTo(0, r ? r.y : 0); const b = r && document.querySelector(`#moon-lab [data-qrow] [data-qsel="${CSS.escape(r.key)}"]`); if (b) b.focus({ preventScroll: true }); }, 60); }
+    if (d.qsel != null) { ret = t.closest && t.closest('[data-qrow]') ? { key: d.qsel, y: scrollY } : null; sel = d.qsel; peek = false; toCabinet(); focusEl('kqc-gu'); return setTimeout(() => { const g = document.getElementById('kqc-gu'); if (g && g.getBoundingClientRect().top < 0) g.scrollIntoView({ block: 'start' }); }, 150); }
     if (d.qshow) { const p = prefs(), s = (p.shown || []).filter(k => k !== d.qshow); p.shown = s.length === (p.shown || []).length ? [d.qshow].concat(s).slice(0, 4) : s; save(p); M.render(); return; }
     if (d.qdetail) { peek = true; if (K.setOpen) K.setOpen(d.qdetail); return toCabinet(); }
     if (d.qsetup) { peek = true; if (K.setOpen) K.setOpen(''); return toCabinet(); }
@@ -17358,9 +17381,13 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
     return `<section class="kl-card kl-stack klib klib-full"><div class="kl-row" style="justify-content:space-between;flex-wrap:wrap"><button class="kl-ghost" data-lib="home">← Back to the shelves</button></div>
       <p class="kl-eyebrow">📜 COURSE${c.by ? ' · ' + esc(c.by.toUpperCase()) : ''}</p><h2>${esc(c.title)}</h2>
       <p class="klib-chips">${chip(st, ST[st])}${chip(av, AV[av])}</p>${c.note ? `<p class="kl-small">${esc(c.note)}</p>` : ''}
+      ${(() => { const cm = r ? c.modules.find(m => m.lectures.some(l => l.id === r.id)) : null, pi = c.modules.findIndex((m, mi) => { const a = s.asm && s.asm[mkey(c, mi)]; return a && !a.passed; }), rs = r && lecState(s.lec[lk(c.id, r.id)]) === 'in-progress';
+        return `<nav class="klib-toc" aria-label="Contents"><p class="kl-eyebrow">CONTENTS</p><dl>
+          <dt>Current module</dt><dd>${cm ? esc(cm.name) : '—'}</dd>
+          <dt>${rs ? 'Resume lecture' : 'Next lecture'}</dt><dd>${r ? `${esc(r.name)} <button class="kl-primary" data-lib="play" data-c="${esc(c.id)}" data-l="${esc(r.id)}">${rs ? 'Resume' : 'Play'}</button>` : 'No playable lecture is on disk yet.'}</dd>
+          <dt>Pending assessment</dt><dd>${pi >= 0 ? `${esc(c.modules[pi].name)} <button class="kl-ghost" data-lib="asm" data-c="${esc(c.id)}" data-m="${pi}">Take test</button>` : 'None pending'}</dd></dl></nav>`; })()}
       ${cguPanel(c, s)}
       <p class="kl-small">Chapter Gu link: none. No reliable mapping to your syllabus chapters, so this course is left unassigned.</p>
-      ${r ? `<div class="klib-resume"><span>${lecState(s.lec[lk(c.id, r.id)]) === 'in-progress' ? 'Resume' : 'Next'}: <b>${esc(r.name)}</b></span><button class="kl-primary" data-lib="play" data-c="${esc(c.id)}" data-l="${esc(r.id)}">${lecState(s.lec[lk(c.id, r.id)]) === 'in-progress' ? 'Resume' : 'Play'}</button></div>` : '<p class="kl-small">No playable lecture is on disk yet.</p>'}
       ${c.modules.map((m, mi) => { const open = r && m.lectures.some(l => l.id === r.id) || (!r && mi === 0), start = n; n += m.lectures.length;
         const done = m.lectures.filter(l => lecState(s.lec[lk(c.id, l.id)]) === 'completed').length;
         const a = s.asm && s.asm[mkey(c, mi)], wipLast = c.status === 'wip' && mi === c.modules.length - 1;
@@ -17371,7 +17398,7 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
     const s = store(), L = lecturesOf(c), i = L.findIndex(x => x.id === l.id), prev = L[i - 1], next = L[i + 1], p = s.lec[lk(c.id, l.id)], ls = lecState(p);
     const mine = s.notes.filter(n => n.c === c.id && n.l === l.id);
     return `<section class="kl-card kl-stack klib klib-full klib-player"><div class="kl-row" style="justify-content:space-between;flex-wrap:wrap">
-        <button class="kl-ghost" data-lib="course" data-c="${esc(c.id)}">← ${esc(c.title)}</button><span class="kl-small">${esc(l.module)} · lecture ${i + 1} of ${L.length}</span></div>
+        <button class="kl-ghost" data-lib="course" data-c="${esc(c.id)}" data-from="${esc(l.id)}">← ${esc(c.title)}</button><span class="kl-small">${esc(l.module)} · lecture ${i + 1} of ${L.length}</span></div>
       <h2 class="klib-title">${esc(l.name)}</h2>
       <div id="klib-stage" class="klib-stage">${l.ok ? '' : `<p class="klib-miss">This lecture's video is missing or invalid on disk (${esc(l.why || 'missing')}). Its other files are still listed below.</p>`}</div>
       <div class="kl-row klib-ctrl" style="flex-wrap:wrap">${prev ? `<button class="kl-ghost" data-lib="play" data-c="${esc(c.id)}" data-l="${esc(prev.id)}">← Previous</button>` : ''}${next ? `<button class="kl-ghost" data-lib="play" data-c="${esc(c.id)}" data-l="${esc(next.id)}">Next →</button>` : ''}
@@ -17532,7 +17559,10 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
       view = { c: d.c, l: '', m: mi }; go(); return requestAnimationFrame(() => scrollTo(0, 0)); }
     if (d.lib === 'asmgen') { const c = course(d.c), s = store(), a = c && s.asm && s.asm[mkey(c, PM(d.m))]; if (!a || a.passed) return; if (a.cur && a.cur.state !== 'ready') { a.cur = null; put(s); } else if (a.cur) return; return generate(c, PM(d.m)); }
     if (d.lib === 'asmgrade') { const c = course(d.c); return c && grade(c, PM(d.m)); }
-    if (d.lib === 'course') { view = { c: d.c, l: '' }; return go(); }
+    if (d.lib === 'course') { view = { c: d.c, l: '' }; const from = d.from, out = go();
+      // back from a lecture: land on that lecture's row, its module open
+      if (from) setTimeout(() => { const b = document.querySelector(`#moon-lab .klib-full [data-lib="play"][data-l="${CSS.escape(from)}"]`); if (!b) return; const m = b.closest('details'); if (m) m.open = true; b.closest('li').classList.add('klib-back'); b.scrollIntoView({ block: 'center' }); b.focus({ preventScroll: true }); }, 90);
+      return out; }
     if (d.lib === 'play') { if (t.getAttribute('aria-disabled') === 'true') return; view = { c: d.c, l: d.l }; go(); return requestAnimationFrame(() => scrollTo(0, 0)); }
     if (d.lib === 'done') { const s = store(), p = s.lec[lk(d.c, d.l)] || { pos: 0 }; p.done = !p.done; p.at = Date.now(); s.lec[lk(d.c, d.l)] = p; const due = p.done ? checkDue(s, d.c) : null; put(s); if (due) announce(due); return M.render(); }
     if (d.lib === 'file') { const w = window.open('', '_blank'); try { const u = await mediaURL(d.p); if (w) w.location = u; else location.assign(u); } catch (x) { if (w) w.close(); alert('That file is missing from the library folder.'); } return; }
@@ -17805,9 +17835,10 @@ body.kt-p-settings{--kt-bg:url(quarters/room-plate.webp);--kt-bgs:240%;--kt-bgp:
       else if (p === 'table') { h = document.querySelector('#hb-day-map h2'); if (h) h.tabIndex = -1; }
       else if (B.classList.contains('kqc-full')) { h = document.querySelector('#kqc-gu, #moon-lab .klib-full h2, #moon-lab .klib-full h3'); if (h && h.tabIndex < 0 && !h.hasAttribute('tabindex')) h.tabIndex = -1; }
       if (!h) h = band.querySelector('h1');
-      if (h && document.activeElement !== h && !(h.contains && h.contains(document.activeElement))) h.focus({ preventScroll: true });
+      const keep = () => document.activeElement && document.activeElement.closest && document.activeElement.closest('.klib-back,[data-qrow]');
+      if (h && !keep() && document.activeElement !== h && !(h.contains && h.contains(document.activeElement))) h.focus({ preventScroll: true });
       // a re-render can replace the heading; settle focus once more
-      setTimeout(() => { if (document.activeElement === document.body || !document.activeElement) { const again = h && h.isConnected ? h : pick(); if (again) { if (again.tabIndex < 0 && !again.hasAttribute('tabindex')) again.tabIndex = -1; again.focus({ preventScroll: true }); } } }, 350);
+      setTimeout(() => { if (!keep() && (document.activeElement === document.body || !document.activeElement)) { const again = h && h.isConnected ? h : pick(); if (again) { if (again.tabIndex < 0 && !again.hasAttribute('tabindex')) again.tabIndex = -1; again.focus({ preventScroll: true }); } } }, 350);
     });
   }
   let booted = false;
@@ -17835,4 +17866,51 @@ body.kt-p-settings{--kt-bg:url(quarters/room-plate.webp);--kt-bgs:240%;--kt-bgp:
   apply();
 })();
 </script>
+<style id="kt-interior-style">
+/* Gu repository: a bank of specimen drawers, a labelled specimen, an evidence slip */
+html body.kt-p-cabinet #moon-lab ul.kl-list:has(>li[data-qrow]){display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px;padding:8px;background:#2a1a12;border:1px solid #5a3d26;border-radius:4px}
+html body.kt-p-cabinet #moon-lab .kl-list>li[data-qrow]{position:relative;border-radius:2px!important;border:1px solid #6b4a31!important;background:linear-gradient(#5d3c27,#4a2f1f)!important;box-shadow:inset 0 1px 0 rgba(255,235,200,.12),inset 0 -3px 0 rgba(0,0,0,.35)!important;padding:12px 12px 10px 12px!important;color:#f2e4ce}
+html body.kt-p-cabinet #moon-lab .kl-list>li[data-qrow]>span:first-child{background:#f2e4ce;color:#30231f;padding:6px 8px;border:1px solid #b89a6a;border-radius:1px;font-size:.92em}
+html body.kt-p-cabinet #moon-lab .kl-list>li[data-qrow]>span:first-child :is(b,span,small,.kl-small){color:#30231f!important}
+html body.kt-p-cabinet #moon-lab .kl-list>li[data-qrow]::after{content:"";position:absolute;left:50%;bottom:5px;width:34px;height:5px;margin-left:-17px;border-radius:3px;background:linear-gradient(#e8c77d,#a5803f);box-shadow:0 1px 1px rgba(0,0,0,.5)}
+html body.kt-p-cabinet #moon-lab .kl-list>li[data-qrow].kqc-on{background:linear-gradient(#6d4930,#553723)!important;outline:2px solid #e8c77d;outline-offset:-2px;transform:translateY(-2px)}
+html body.kt-p-cabinet #moon-lab .kl-list>li[data-qrow] .kl-row{padding-bottom:8px}
+html body.kt-p-cabinet #moon-lab #kqc-gu .kq-gu-art{display:block;width:100%;max-height:300px;margin:4px 0 10px;background:radial-gradient(70% 70% at 50% 45%,#fffaf0,#eadcc3);border:1px solid rgba(48,35,31,.25);border-radius:2px}
+html body.kt-p-cabinet #moon-lab #kqc-gu .kqc-label{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:0 0 10px;padding:8px 12px;border:1px solid #30231f;border-left:6px solid #30231f;background:#fffdf7;font-family:var(--kt-serif);max-width:28em}
+.kqc-label dt{font-size:.78em;letter-spacing:.08em;text-transform:uppercase;opacity:.7;align-self:center}.kqc-label dd{margin:0}
+html body.kt-p-cabinet #moon-lab #kqc-gu .kqc-slip{padding:10px 14px;background:#fffdf7;border:1px solid rgba(48,35,31,.2);background-image:repeating-linear-gradient(transparent 0 25px,rgba(48,35,31,.08) 25px 26px);line-height:26px}
+html body.kt-p-cabinet #moon-lab #kqc-gu .kqc-slip :is(p,li){margin:0;font-size:15px}
+html body.kt-p-cabinet #moon-lab #kqc-gu .kqc-slip .kl-small{color:var(--kt-ink)!important}
+@media(min-width:721px){html body.kt-p-cabinet #moon-lab #kqc-gu{position:sticky;top:10px}.kqc-back{display:none}}
+.kqc-pin{position:sticky;top:0;z-index:6;align-items:center;gap:12px;flex-wrap:wrap}.kqc-pin-l{font-family:var(--kt-serif)}
+/* Cliffside archive: a contents page, the row you came back to, legible WIP chips */
+html body.kt-on #kg-main #moon-lab .klib-toc{border:1px solid rgba(48,35,31,.3)!important;padding:12px 16px;margin:6px 0;background:#fffdf7!important}
+.klib-toc dl{display:grid;grid-template-columns:minmax(8em,auto) 1fr;gap:8px 16px;margin:6px 0 0;align-items:center}.klib-toc dt{font-family:var(--kt-serif);font-size:.95em}.klib-toc dd{margin:0}
+@media(max-width:600px){.klib-toc dl{grid-template-columns:1fr}.klib-toc dd{margin-bottom:6px}}
+html body.kt-on #kg-main #moon-lab .klib-full .klib-chips :is(span,b){color:var(--kt-ink)!important;background:#efe2c8!important;border:1px solid rgba(48,35,31,.45)!important;font-weight:600}
+html body.kt-on #moon-lab .klib-back>button{outline:2px solid var(--kt-walnut);background:rgba(232,199,125,.25)!important}
+/* Calendar terrace: one time column; a week on one axis; the forecast set apart */
+.kt-tv{gap:4px;margin:10px 0}.kt-tv button[aria-pressed=true]{background:var(--kt-walnut,#5a3526)!important;color:#f2e4ce!important}
+.kt-ledger{list-style:none;padding:0;margin:8px 0;border-top:1px solid rgba(128,110,90,.35)}
+.kt-ledger li{display:grid;grid-template-columns:4.6em 4.6em minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:6px 4px;border-bottom:1px solid rgba(128,110,90,.25)}
+.kt-ledger time{font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}.kt-ledger time+time{opacity:.7}.kt-ledger time+time::before{content:"– "}
+.kt-l-d{font-variant-numeric:tabular-nums;opacity:.7;font-size:.9em;white-space:nowrap}
+.kt-ledger li[data-k=study]{font-weight:600}.kt-ledger li[data-k=sleep],.kt-ledger li[data-k=rest]{opacity:.8}
+.kt-ledger li[data-read]{border-left:4px solid #6a8a5a;background:rgba(106,138,90,.12)}
+@media(max-width:600px){.kt-ledger li{grid-template-columns:4.2em minmax(0,1fr);gap:2px 10px}.kt-ledger time+time{grid-row:2;grid-column:1;font-size:.85em}.kt-l-t{grid-column:2;grid-row:1/3}.kt-l-d{display:none}}
+.kt-week{display:grid;gap:4px;margin:8px 0}.kt-wk-row,.kt-wk-axis{display:grid;grid-template-columns:5.5em minmax(0,1fr) 9.5em;gap:8px;align-items:center}
+.kt-wk-bar{position:relative;height:22px;background:rgba(128,110,90,.12);border-radius:2px}.kt-wk-axis .kt-wk-bar{height:16px;background:none}
+.kt-wk-bar i{position:absolute;top:3px;bottom:3px;background:#a99a86;border-radius:1px}.kt-wk-bar i[data-k=study]{background:#5a3526}.kt-wk-axis i{top:0;font-style:normal;font-size:11px;transform:translateX(-50%);opacity:.75}
+.kt-wk-row>span:last-child{font-variant-numeric:tabular-nums;font-size:.85em;white-space:nowrap}
+@media(max-width:600px){.kt-wk-row,.kt-wk-axis{grid-template-columns:3.6em minmax(0,1fr)}.kt-wk-row>span:last-child{grid-column:2;font-size:.8em}.kt-wk-axis>span:last-child{display:none}}
+.kt-fc{border:1px dashed rgba(128,110,90,.7);padding:12px 14px;background:repeating-linear-gradient(135deg,transparent 0 10px,rgba(128,110,90,.06) 10px 20px)}
+.kt-fc-in{padding-left:0;list-style:none;display:grid;gap:6px}.kt-prov{display:inline-block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;border:1px solid currentColor;padding:0 5px;margin-right:4px;opacity:.85}
+html body.kt-on #kg-main #moon-lab :is(.kt-ledger,.kt-week,.kt-fc){background-color:var(--kt-paper,#f2e4ce)!important;color:var(--kt-ink,#30231f)!important;padding:8px 10px;border-radius:2px}
+html body.kt-on #kg-main #moon-lab :is(.kt-ledger,.kt-week,.kt-fc) :is(li,span,b,i,time,p,small){color:inherit!important;opacity:1}
+/* courtyard: the chosen exercise in front; pavilion: the conversation gets the page; quiet reading and typing */
+html body.kt-p-practice #kg-main #moon-lab>.kl-tabs{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;gap:6px!important}
+html body.kt-p-practice #kg-main #moon-lab>.kl-tabs>button{flex:0 0 auto!important;min-height:0!important;padding:8px 12px!important}
+html body.kt-p-company #kg-main #moon-lab>:not(.kl-tabs){max-width:none!important}
+html body.kt-on #kg-main #moon-lab textarea{background:#fffdf7!important;color:#30231f!important;border:1px solid rgba(48,35,31,.3)!important;box-shadow:none!important;line-height:1.6}
+</style>
 </body></html>
