@@ -128,3 +128,12 @@ test('ladder: earned stages are permanent and imply the stages below; old record
   assert.strictEqual(R.gates(pv(10, 'obtained'), { earned: old }).find(x => x.id === 'r3-initial').status, 'earned');
   assert.strictEqual(R.land([{ gate: 'r4-upper' }], []).unlocked, true); assert.strictEqual(R.land([{ gate: 'r3-peak' }], []).unlocked, false);
 });
+
+test('a course whose real counts you confirmed overrides an old published-plan pick: the catalogue is no longer provisional', () => {
+  const out = { subjects: { maths: { complete: true, missing: [] }, physics: { complete: true, missing: [] }, chem: { complete: true, missing: [] } } };
+  const store = { catalog: { oc11: { label: 'PW plan', confirmed: false }, ic11: { label: 'PW plan', confirmed: false } } };
+  assert.strictEqual(win.KgCult.edition(out, store).provisional, true, 'without the syllabus nothing is assumed');
+  const syl = { courses: { oc11: { confirmed: true }, ic11: { confirmed: true } } };
+  assert.strictEqual(win.KgCult.edition(out, store, syl).provisional, false);
+  assert.strictEqual(win.KgCult.edition(out, store, { courses: { oc11: { confirmed: true } } }).provisional, true, 'an unconfirmed pick elsewhere still counts');
+});
