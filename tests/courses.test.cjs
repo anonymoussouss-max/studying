@@ -150,13 +150,28 @@ test('Course Gu: obtained → refining → proven → retained from saved assess
   const back = JSON.parse(JSON.stringify(s)); assert.strictEqual(K.courseGu(c, back, 3000 + 15 * DAY).stage, 'retained', 'survives a save/reload round trip');
 });
 
-test('Course Gu: a WIP course cannot be proven; missing evidence is pending; ranks are proposals only; kept apart from chapter rank', () => {
+test('Course Gu: a WIP course cannot be proven; missing evidence is pending; ranks are approved and descriptive; kept apart from chapter rank', () => {
   const K = assessK(), c = C2('wip'), s = { lec: {}, notes: [], asm: {} };
   for (const mi of [0, 1]) { const a = K.asmBlank(); a.cur = { id: 'q' }; K.applyGrade(a, 'q', 'pass'); s.asm[K.mkey(c, mi)] = a; }
   const g = K.courseGu(c, s); assert.strictEqual(g.stage, 'refining'); assert.strictEqual(g.canS, false); assert.match(g.pending.join(' '), /WIP/);
-  assert.strictEqual(Object.keys(K.CGU_RANK).length, 29); assert.ok(Object.values(K.CGU_RANK).every(([r, why]) => r >= 1 && r <= 5 && why));
-  const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1]; assert.match(src, /proposed rank \$\{r\[0\]\}[^\n]*awaiting your approval/);
+  assert.strictEqual(Object.keys(K.CGU_RANK).length, 29); assert.ok(Object.values(K.CGU_RANK).every(r => Number.isInteger(r) && r >= 1 && r <= 5));
+  const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1]; assert.match(src, /Gu rank \$\{r\} · approved by you/); assert.ok(!/awaiting your approval/.test(src), 'no course Gu rank is shown as a proposal');
   const art = {}; vm.runInNewContext(html.match(/<script id="kg-course-gu-art">([\s\S]*?)<\/script>/)[1], { window: art }); const ids = Object.keys(art.KgCourseGuArt);
   assert.strictEqual(ids.length, 29); assert.deepStrictEqual([...ids].sort(), Object.keys(K.CGU_RANK).sort(), 'one artwork per course, keyed by the stable course id');
   for (const a of Object.values(art.KgCourseGuArt)) assert.ok(!/<script|\son[a-z]+=|href|foreignObject|<image/i.test(a.svg));
+});
+// the 29 ranks you approved on 27 Nov 2026, by stable course id, with the Gu each belongs to
+const APPROVED = [['an-introduction-to-astronomy','Meridian Owl',1],['basics-of-rocket-science','Comet Squid',2],['understanding-modern-physics-2-quantum-mechanics-and-atoms','Balmer Firefly',3],['astro','Lookback Heron',1],['basis-flight-mechanics','Camber Swift',2],['foundations-quantum-mechanics','Spin Finch',4],['exoplanets','Transit Gecko',3],['spacecraft-dynamics-kinematics','Gimbal Pangolin',4],['quantum-mechanics','Boxwell Cat',4],['einstein-relativity','Lightclock Crane',2],['extra-galactic-astronomy','Spiral Crown Snail',3],['quantum-physics','Manypath Lacewing',5],['robotic-methodologies','Linkage Mantis',3],['cosmology-our-universe','Scaleweaver Spider',3],['phases-of-matter-solid-liquid-gas-and-beyond','Melting Crown Slug',4],['particle-physics','Chamber Beetle',3],['black-holes-astro-101','Eclipse Ray',2],['physique-deux-infinis-liens','Two Horizons Seahorse',2],['our-place-in-the-cosmos','Nested Shell Limpet',1],['astrobiology','Brine Lantern',2],['physics-101-forces-kinematics','Track Hare',2],['introduction-to-calculus','Tangent Ibex',2],['python','Loopback Skink',1],['mit-18-06sc-linear-algebra','Basis Weaver',4],['differential-equations-engineers','Slopefield Salmon',3],['vector-calculus-engineers','Curlwheel Shrimp',3],['mit-8-02-electricity-magnetism','Fieldline Eel',4],['mit-8-03sc-vibrations-waves','Nodewing Cicada',4],['numerical-methods-engineers','Interval Kingfisher',4]];
+test('approved Course Gu ranks: 29 distinct ids, each rank on the right Gu; the four quantum courses checked one by one', () => {
+  const K = assessK(), art = {}; vm.runInNewContext(html.match(/<script id="kg-course-gu-art">([\s\S]*?)<\/script>/)[1], { window: art });
+  assert.strictEqual(new Set(APPROVED.map(r => r[0])).size, 29);
+  for (const [id, gu, r] of APPROVED) { assert.strictEqual(art.KgCourseGuArt[id].gu, gu, id); assert.strictEqual(K.CGU_RANK[id], r, gu); }
+  const q = id => [art.KgCourseGuArt[id].gu, K.CGU_RANK[id]];
+  assert.deepStrictEqual(q('understanding-modern-physics-2-quantum-mechanics-and-atoms'), ['Balmer Firefly', 3]);
+  assert.deepStrictEqual(q('foundations-quantum-mechanics'), ['Spin Finch', 4]);
+  assert.deepStrictEqual(q('quantum-mechanics'), ['Boxwell Cat', 4]);
+  assert.deepStrictEqual(q('quantum-physics'), ['Manypath Lacewing', 5]);
+  assert.strictEqual(K.CGU_RANK_APPROVED, '27 Nov 2026');
+  const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1], cg = src.slice(src.indexOf('function courseGu'), src.indexOf('const CGU_RANK_APPROVED'));
+  assert.ok(!/CGU_RANK/.test(cg), 'the rank never feeds the earned stage');
 });

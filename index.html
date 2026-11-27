@@ -17088,12 +17088,9 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
     return { stage, passes, total: mods.length, synth, ret, pending, canS: all && complete && !sa, canR: !!sp && !ra && ret.state === 'due' };
   }
   const CGU_N = { none: 'Undiscovered', obtained: 'Obtained', refining: 'Refining', proven: 'Proven', retained: 'Retained' };
-  // proposed Gu ranks (1–5) from prerequisites, mathematical depth and independent reasoning; NOT active until you approve them
-  const CGU_RANK = { 'an-introduction-to-astronomy': [1, 'no prerequisites; descriptive, little mathematics'], 'our-place-in-the-cosmos': [1, 'conceptual survey'], 'astrobiology': [1, 'conceptual, evidence-based reasoning'], 'black-holes-astro-101': [1, 'Astro 101 level, conceptual'], 'physique-deux-infinis-liens': [1, 'broad conceptual tour (in French)'],
-    'astro': [2, 'introductory astronomy with light algebra'], 'exoplanets': [2, 'detection methods with simple quantitative reasoning'], 'extra-galactic-astronomy': [2, 'quantitative reasoning on galaxies, algebra level'], 'cosmology-our-universe': [2, 'expansion and scale arguments, algebra level'], 'einstein-relativity': [2, 'special relativity with algebra; thought experiments'],
-    'basics-of-rocket-science': [2, 'rocket equation and basic mechanics'], 'physics-101-forces-kinematics': [2, 'mechanics at school level'], 'introduction-to-calculus': [2, 'first calculus course'], 'python': [2, 'first programming course'], 'understanding-modern-physics-2-quantum-mechanics-and-atoms': [2, 'modern-physics overview, light mathematics'], 'phases-of-matter-solid-liquid-gas-and-beyond': [2, 'conceptual condensed matter'], 'particle-physics': [2, 'conceptual particle physics with some quantitative work'],
-    'basis-flight-mechanics': [3, 'applied mechanics and aerodynamics with calculus'], 'robotic-methodologies': [3, 'kinematics and control ideas, linear algebra'], 'differential-equations-engineers': [3, 'needs single-variable calculus'], 'vector-calculus-engineers': [3, 'needs two semesters of calculus'], 'mit-18-06sc-linear-algebra': [3, 'university linear algebra, proofs and computation'],
-    'quantum-physics': [4, 'quantum mechanics with calculus and linear algebra'], 'foundations-quantum-mechanics': [4, 'mathematical formalism of quantum mechanics'], 'quantum-mechanics': [4, 'engineering quantum mechanics within statistical thermodynamics'], 'spacecraft-dynamics-kinematics': [4, 'graduate-level rigid-body kinematics'], 'numerical-methods-engineers': [4, 'combines calculus, linear algebra, ODEs and programming'], 'mit-8-02-electricity-magnetism': [4, 'university E&M with vector calculus'], 'mit-8-03sc-vibrations-waves': [4, 'needs mechanics, E&M, multivariable calculus and some linear algebra'] };
+  // Gu ranks (1–5) approved by you on 27 Nov 2026. Descriptive only: independent of assessment tier, earned stage and the JEE cultivator rank
+  const CGU_RANK_APPROVED = '27 Nov 2026';
+  const CGU_RANK = { 'an-introduction-to-astronomy': 1, 'basics-of-rocket-science': 2, 'understanding-modern-physics-2-quantum-mechanics-and-atoms': 3, 'astro': 1, 'basis-flight-mechanics': 2, 'foundations-quantum-mechanics': 4, 'exoplanets': 3, 'spacecraft-dynamics-kinematics': 4, 'quantum-mechanics': 4, 'einstein-relativity': 2, 'extra-galactic-astronomy': 3, 'quantum-physics': 5, 'robotic-methodologies': 3, 'cosmology-our-universe': 3, 'phases-of-matter-solid-liquid-gas-and-beyond': 4, 'particle-physics': 3, 'black-holes-astro-101': 2, 'physique-deux-infinis-liens': 2, 'our-place-in-the-cosmos': 1, 'astrobiology': 2, 'physics-101-forces-kinematics': 2, 'introduction-to-calculus': 2, 'python': 1, 'mit-18-06sc-linear-algebra': 4, 'differential-equations-engineers': 3, 'vector-calculus-engineers': 3, 'mit-8-02-electricity-magnetism': 4, 'mit-8-03sc-vibrations-waves': 4, 'numerical-methods-engineers': 4 };
   function cguSVG(c, g, id) {
     const A = (window.KgCourseGuArt || {})[c.id];
     if (!A || g.stage === 'none') return `<svg viewBox="0 0 110 105" class="kcgu-art" role="img" aria-label="Undiscovered course Gu"><ellipse cx="55" cy="54" rx="26" ry="34" fill="none" stroke="#9c8a6e" stroke-width="1.5" stroke-dasharray="3 5" opacity=".6"/></svg>`;
@@ -17145,7 +17142,7 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
     if (rest.length) groups.push({ h: 'Other courses', items: rest });
     return groups.filter(g => g.items.length);
   }
-  window.KgCourses = { shelfHTML: (...a) => shelfHTML(...a), courseGu, CGU_RANK, RETAIN_DAYS, modOf, ARRANGE, arrange, TIERS, mkey, moduleDone, ensureDue, applyGrade, asmLabel, asmBlank, parseJSON: t => parseJ(t), KEY, srtToVtt, lecState, courseState, availOf, resumeOf, record, lecturesOf };
+  window.KgCourses = { shelfHTML: (...a) => shelfHTML(...a), courseGu, CGU_RANK, CGU_RANK_APPROVED, RETAIN_DAYS, modOf, ARRANGE, arrange, TIERS, mkey, moduleDone, ensureDue, applyGrade, asmLabel, asmBlank, parseJSON: t => parseJ(t), KEY, srtToVtt, lecState, courseState, availOf, resumeOf, record, lecturesOf };
   if (!M || !M.PANELS) return;
 
   // ---- where the files come from: a folder you chose (File System Access) or the local server ----
@@ -17209,7 +17206,7 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
     return `<div class="kcgu-panel"><div class="kcgu-big">${cguSVG(c, g, 'cv')}</div><div class="kl-stack">
       <p class="kl-eyebrow">COURSE GU · ${esc(CGU_N[g.stage].toUpperCase())}</p><h3>${esc(g.stage !== 'none' && A ? A.gu : labelOf(c) + ' Gu')}</h3>
       ${g.stage !== 'none' && A ? `<p class="kl-small">${esc(A.design)}</p>` : ''}
-      <p class="kl-small">${r ? `Gu rank not set · proposed rank ${r[0]} (${esc(r[1])}), awaiting your approval` : 'Gu rank not set'}</p>
+      <p class="kl-small">${r ? `Gu rank ${r} · approved by you (${CGU_RANK_APPROVED})` : 'Gu rank not set'}</p>
       <p class="kl-small"><b>Evidence</b></p><ul class="kl-list kl-small">
         ${g.passes.map(p => `<li>✓ ${esc(p.name)} · module passed — ${tierOf(p.tier)} · ${new Date(p.at).toISOString().slice(0, 10)}</li>`).join('') || '<li>No module assessment passed yet.</li>'}
         <li>${g.synth.state === 'passed' ? `✓ Course synthesis passed — ${tierOf(g.synth.tier)} · ${new Date(g.synth.at).toISOString().slice(0, 10)}` : 'Course synthesis: pending'}</li>
@@ -17226,7 +17223,7 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
     const s = store(), list = arrange(index.courses).flatMap(gp => gp.items.map(x => x.c)), gs = list.map(c => [c, courseGu(c, s)]);
     return `<section class="kl-card kl-stack kcgu-shelf"><p class="kl-eyebrow">COURSE GU SHELF</p><p class="kl-small">${gs.filter(([, g]) => g.stage !== 'none').length} of ${gs.length} obtained. One Gu per course, earned only by passing Iroha's assessments; kept apart from your chapter Gu and cultivator rank. Shelf order follows the learning path; it never sets a rank.</p>
       <div class="kcgu-grid">${gs.map(([c, g], i) => { const A = (window.KgCourseGuArt || {})[c.id];
-        return `<button class="kcgu-card" data-lib="course" data-c="${esc(c.id)}">${cguSVG(c, g, 'sh' + i)}<b>${esc(g.stage !== 'none' && A ? A.gu : labelOf(c))}</b><span class="kl-small">${CGU_N[g.stage]}${g.passes.length ? ` · ${g.passes.length}/${g.total} modules` : ''}${c.status === 'wip' ? ' · WIP' : ''}</span></button>`; }).join('')}</div></section>`;
+        return `<button class="kcgu-card" data-lib="course" data-c="${esc(c.id)}">${cguSVG(c, g, 'sh' + i)}<b>${esc(g.stage !== 'none' && A ? A.gu : labelOf(c))}</b><span class="kl-small">${CGU_N[g.stage]}${g.passes.length ? ` · ${g.passes.length}/${g.total} modules` : ''}${CGU_RANK[c.id] ? ` · R${CGU_RANK[c.id]}` : ''}${c.status === 'wip' ? ' · WIP' : ''}</span></button>`; }).join('')}</div></section>`;
   }
   function courseView(c) {
     const s = store(), r = resumeOf(c, s), av = availOf(c), st = courseState(c, s);
