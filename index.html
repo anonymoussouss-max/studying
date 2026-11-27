@@ -8209,7 +8209,7 @@ window.KG_RECALL = {
   async function loadBank(subj) {
     if (banks[subj]) return banks[subj];
     const f = subj.toLowerCase() + '.json';
-    for (const url of ['data/' + f, f]) {
+    for (const url of [f]) { // the banks ship at the site root; there is no data/ folder
       try { const r = await fetch(url); if (r.ok) { const j = await r.json(); return banks[subj] = j.q || []; } } catch (e) {}
     }
     return banks[subj] = [];
