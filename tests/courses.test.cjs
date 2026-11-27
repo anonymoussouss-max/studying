@@ -76,20 +76,20 @@ test('progress: positions, completion at 92%, course states; completion is never
   assert.doesNotMatch(src, /kg-cult-v1|KgCult\.|KgRank\.|KgProof\./);
 });
 
-test('arrangement: 29 courses exactly once in stage order, by id, whatever their download status', () => {
+test('arrangement: 37 courses exactly once in stage order, by id, whatever their download status', () => {
   const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1];
   const ctx = { window: {}, localStorage: { getItem: () => null, setItem() {} } }; ctx.globalThis = ctx; vm.runInNewContext(src, ctx);
   const K = ctx.window.KgCourses, ids = K.ARRANGE.flatMap(g => g.c.map(x => x[0]));
-  assert.strictEqual(ids.length, 29); assert.strictEqual(new Set(ids).size, 29);
-  assert.deepStrictEqual([...K.ARRANGE.map(g => g.c.length)], [3, 3, 3, 4, 5, 2, 9], '18 main, 2 optional, 9 supporting');
+  assert.strictEqual(ids.length, 37); assert.strictEqual(new Set(ids).size, 37);
+  assert.deepStrictEqual([...K.ARRANGE.map(g => g.c.length)], [3, 3, 3, 4, 5, 2, 8, 9], '18 main, 2 optional, 8 recommended, 9 reference');
   const { WIP } = require('../tools/library-index.cjs');
-  assert.deepStrictEqual([...K.ARRANGE[6].c.slice(1).map(x => x[0])].sort(), WIP.map(w => w.id).sort(), 'all eight WIP courses sit on the supporting shelf');
+  assert.deepStrictEqual([...[...K.ARRANGE[6].c, ...K.ARRANGE[7].c.slice(1)].map(x => x[0])].sort(), WIP.map(w => w.id).sort(), 'planned courses appear on the recommended and reference shelves');
   // download order and status never move a course; an unknown course falls into "Other courses"; lecture order is untouched
   const mk = (id, status) => ({ id, title: id, status, kind: status === 'wip' ? 'planned' : 'verified', modules: [{ lectures: [{ id: 'b' }, { id: 'a' }] }] });
   const courses = [...ids].reverse().map((id, i) => mk(id, i % 2 ? 'wip' : 'available')).concat(mk('new-course', 'available'));
   const g = K.arrange(courses);
   assert.deepStrictEqual([...g.flatMap(x => x.items.map(i => i.c.id))], [...ids, 'new-course']);
-  assert.strictEqual(g[7].h, 'Other courses'); assert.strictEqual(g[0].items[0].c.modules[0].lectures[0].id, 'b');
+  assert.strictEqual(g[8].h, 'Other courses'); assert.strictEqual(g[0].items[0].c.modules[0].lectures[0].id, 'b');
 });
 
 function assessK() {
