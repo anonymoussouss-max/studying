@@ -38,3 +38,7 @@ test('the Immortal Gu preview is labelled proposed and awards or unlocks nothing
   const rw = {}; vm.runInNewContext(r, { window: rw, Object, Math, String, JSON, Set, Array, Number, Date });
   assert.strictEqual(rw.KgRank.land([], []).unlocked, false, 'no Immortal Gu recorded: the land stays closed');
 });
+test('draft skill lists never present an older batch worksheet as your own', () => {
+  const cw = {}; vm.runInNewContext(grab('kg-cult-script'), { window: cw, Object, Math, String, JSON, Set, Array, Number, Date });
+  const src = cw.KgCult.DRAFTS['Basic Mathematics'].src; assert.doesNotMatch(src, /your Basic Mathematics DPP/); assert.match(src, /2025 \(an older batch, not your 2027 course\)/);
+});
