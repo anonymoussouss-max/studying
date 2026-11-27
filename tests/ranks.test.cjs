@@ -19,7 +19,7 @@ test('Rank 3 initial is met when every Class 11 Gu is obtained and at least Lear
   const gs = R.gates(v({}));
   assert.strictEqual(st(gs, 'r3-initial').status, 'met');
   for (const id of ['r3-middle', 'r4-initial', 'r4-middle', 'r5-initial']) assert.strictEqual(st(gs, id).status, 'provisional');
-  assert.strictEqual(st(gs, 'r6-initial').status, 'roadmap');
+  const lad = R.ladder(v({})); assert.strictEqual(lad.find(x => x.id === 'r6-initial').kind, 'roadmap'); assert.ok(!gs.some(x => x.id === 'r6-initial'), 'an undefined stage is never a counted gate');
 });
 test('subject gates are separate: high Maths cannot carry low Chemistry', () => {
   const s = st(R.gates(v({ maths: 'proven', chem: 'obtained' })), 'r3-initial');
@@ -63,4 +63,68 @@ test('a catalogue built from unconfirmed published plans never unlocks a rank: g
   const gs = R.gates(x);
   assert.strictEqual(st(gs, 'r3-initial').status, 'provisional'); assert.ok(/not confirmed/.test(st(gs, 'r3-initial').why));
   assert.ok(!gs.some(g => g.status === 'met'));
+});
+
+// ---- the full ladder (rev 5) ----
+const L = R.LADDER, LV = R.LV, pv = (pct, lv = 'learning') => { const x = v({ maths: lv, physics: lv, chem: lv }); for (const s of ['maths', 'physics', 'chem']) x.subjects[s].pct = pct; return x; };
+const find = (lad, id) => lad.find(x => x.id === id);
+
+test('ladder: Ranks 1–9, each Initial → Middle → Upper → Peak, in order, with no empty requirement', () => {
+  assert.strictEqual(L.length, 36);
+  L.forEach((g, i) => { assert.strictEqual(g.rank, Math.floor(i / 4) + 1); assert.strictEqual(g.stage, R.STAGE_N[i % 4]); assert.ok(g.needs && g.needs.length > 10, g.id);
+    if (g.def === 'undefined') assert.ok(g.missing && g.missing.length > 10, g.id + ' names its missing specification');
+    if (g.def === 'proposed') assert.ok(g.why && g.src, g.id + ' has a rationale and source'); });
+  for (let r = 1; r <= 6; r++) assert.ok(L.filter(g => g.rank === r && g.def !== 'undefined').length >= (r === 6 ? 3 : 4), 'Ranks 1–6 have defined or proposed criteria');
+});
+
+test('ladder: the agreed anchors are unchanged — five counted milestones, and Rank 6 agreed in principle but pending definition', () => {
+  assert.deepStrictEqual([...L.filter(g => g.def === 'agreed').map(g => g.id)], ['r3-initial', 'r3-middle', 'r4-initial', 'r4-middle', 'r5-initial']);
+  assert.match(find(L, 'r3-initial').needs, /^every Class 11 chapter Gu obtained and at least Learning/);
+  assert.match(find(L, 'r5-initial').needs, /German B2/);
+  const r6 = find(L, 'r6-initial'); assert.strictEqual(r6.def, 'undefined'); assert.ok(r6.agreedIdea); assert.match(r6.needs, /not enrolment/);
+});
+
+test('ladder: later stages are never easier — thresholds rise and levels never drop; Rank 2 peak sits below Rank 3 initial', () => {
+  let pct = -1, lvl = -1, bank = -1, p12 = -1;
+  for (const g of L.filter(x => x.test)) { const t = g.test;
+    if (t.pct != null) { assert.ok(t.pct > pct, g.id); pct = t.pct; }
+    if (t.min) { assert.ok(LV[t.min] >= lvl || t.cls.includes(12) && lvl <= LV.learning, g.id); lvl = Math.max(lvl, LV[t.min]); }
+    if (t.pct12 != null) { assert.ok(t.pct12 > p12, g.id); p12 = t.pct12; }
+    if (t.bank != null) { assert.ok(t.bank > bank, g.id); bank = t.bank; } }
+  assert.ok(find(L, 'r2-peak').test.pct < 75, 'every chapter Learning gives 75%, above Rank 2 peak');
+  assert.ok(find(L, 'r3-peak').test.pct12 < 75, 'Rank 3 peak stays below Rank 4 initial');
+});
+
+test('ladder: proposed criteria stay out of the calculation until approved; pending ones cannot be approved', () => {
+  const lad = R.ladder(pv(70, 'obtained'));
+  assert.strictEqual(find(lad, 'r2-peak').kind, 'proposed'); assert.strictEqual(find(lad, 'r2-peak').now, 'met', 'the preview shows it would be met');
+  assert.ok(!R.gates(pv(70, 'obtained')).some(g => /^r[12]-/.test(g.id)), 'not a counted gate');
+  assert.strictEqual(find(lad, 'r3-initial').kind, 'current');
+  let ap = R.approve([], 'r1-middle', 1); ap = R.approve(ap, 'r1-middle', 2); assert.strictEqual(ap.length, 1);
+  assert.strictEqual(R.approve([], 'r5-middle', 1).length, 0, 'a proposal pending definition cannot be approved');
+  assert.strictEqual(R.approve([], 'r7-initial', 1).length, 0); assert.strictEqual(R.approve([], 'r3-initial', 1).length, 0);
+  const lad2 = R.ladder(pv(7, 'obtained'), { approved: ap });
+  assert.strictEqual(find(lad2, 'r1-middle').kind, 'current'); assert.strictEqual(find(lad2, 'r1-middle').now, 'met');
+  assert.strictEqual(find(lad2, 'r3-initial').kind, 'upcoming');
+});
+
+test('ladder: an incomplete catalogue or unknown evidence is "Insufficient data", never a low rank or a failure', () => {
+  const lad = R.ladder(v({}, { incomplete: true }));
+  assert.ok(!lad.some(g => g.kind === 'earned' || g.kind === 'current' && g.now === 'met'));
+  for (const id of ['r1-initial', 'r3-initial']) { assert.strictEqual(find(lad, id).now, 'unknown'); assert.ok(find(lad, id).cat); }
+  assert.strictEqual(find(lad, 'r3-initial').kind, 'insufficient');
+  // bank edition not frozen: unknown, not failed
+  const c12 = { maths: [g('proven')], physics: [g('proven')], chem: [g('proven')] }, all = v({ maths: 'proven', physics: 'proven', chem: 'proven' });
+  const up = find(R.ladder(all, { class12: c12, approved: R.approve([], 'r4-upper', 1), earned: [{ gate: 'r4-middle' }] }), 'r4-upper');
+  assert.strictEqual(up.now, 'unknown'); assert.strictEqual(up.kind, 'insufficient'); assert.match(up.why, /not frozen/);
+});
+
+test('ladder: earned stages are permanent and imply the stages below; old records migrate unchanged; land opens at any Rank 4+', () => {
+  const old = [{ gate: 'r3-initial', at: 1, edition: 'class11-edition-0', by: 'you accepted' }]; // a record written before rev 5
+  const lad = R.ladder(pv(10, 'obtained'), { earned: old });
+  assert.strictEqual(find(lad, 'r3-initial').kind, 'earned'); assert.ok(/refreshing/.test(find(lad, 'r3-initial').refresh), 'a later gap asks for refreshing');
+  for (const id of ['r1-initial', 'r2-peak']) { assert.strictEqual(find(lad, id).kind, 'earned'); assert.ok(find(lad, id).implied); }
+  assert.strictEqual(find(lad, 'r3-middle').kind, 'insufficient', 'Class 12 not catalogued');
+  assert.strictEqual(R.gates(pv(10, 'obtained'), { earned: old }).find(x => x.id === 'r3-initial').status, 'earned');
+  assert.strictEqual(R.land([{ gate: 'r4-upper' }], []).unlocked, true); assert.strictEqual(R.land([{ gate: 'r3-peak' }], []).unlocked, false);
 });
