@@ -115,8 +115,8 @@ test('rank: unresolved placement says what is missing and links to resolve it; c
   assert.match(h, /Now: <button[^>]*data-qsel="bm:Basic Mathematics">Basic Mathematics<\/button> · lectures 20\/23/);
   // once every count is in, an unmet first gate is progress, not a setup gap: name the next gate, offer no "Resolve"
   const r = load(), id = r.Kq.identity({ v: { placement: 'computable', why: [], subjects: { maths: { gu: [] }, physics: { gu: [] }, chem: { gu: [] } } }, st: {} });
-  assert.strictEqual(id.rank.t, 'Placed below Rank 3 · initial'); assert.strictEqual(id.rank.why, '');
-  assert.match(id.rank.next, /^next gate: Rank 3 · initial, every Class 11 chapter Gu obtained/);
+  assert.strictEqual(id.rank.t, 'Placed below Rank 1 · initial'); assert.strictEqual(id.rank.why, '');
+  assert.match(id.rank.next, /^next gate: Rank 1 · initial, Placement computable from a complete, confirmed Class 11 catalogue/);
   // a finished chapter whose checklist and skill list aren't settled: placement first, no distant gate
   const fin = { key: 'bm:Basic Mathematics', name: 'Basic Mathematics', done: 23, lectures: 23, scope: 'unverified', skills: null, acq: 'scope-unverified', level: 'none' };
   const id2 = r.Kq.identity({ v: { placement: 'computable', why: [], subjects: { maths: { gu: [fin] }, physics: { gu: [] }, chem: { gu: [] } } }, st: {} });
