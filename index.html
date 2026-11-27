@@ -1376,12 +1376,33 @@ body.habit-shh #hb-session-card {text-align:center;}
       days.push({d,src,all,german:ger,astro:ast,pcm});week+=pcm;}
     const dip=+((S.diploma.heavy||{})[mondayOf(from)])||+S.diploma.week||0;
     return {days,diploma:dip,weekly:Math.max(0,week-dip)};}
+  // recorded lecture sources (chapter, lecture numbers, listed durations, source track). Recorded only, not used in the calculation.
+  // How a count is taken: PW loads more lectures as you scroll, so count the View Lecture cards after the list stops growing;
+  // a title can appear twice within one card. A total is partial while any listed duration is missing.
+  const TRACKS=[{chapter:'Basic Mathematics',course:'m11',track:'Ashish Aggrawal · Complete Maths (2025) · Khazana',lectures:23,
+    durations:[{from:1,to:20,secs:48*3600+47*60+1,at:'1x'}],unverified:[21,22,23],partial:true,recorded:'2026-11-27'}];
+  const hms=t=>[Math.floor(t/3600),Math.floor(t%3600/60),t%60].map((n,i)=>i?String(n).padStart(2,'0'):String(n)).join(':');
+  const rngTxt=r=>r[0]===r[1]?String(r[0]):r[0]+'–'+r[1];
+  function assumptionsOf(durs,cap,planned){
+    const row=(k,lab)=>lab+' '+SUB3.map(s=>SNAME[s]+' '+rngTxt(durs[s][k])+(durs[s].from&&durs[s].from[k]==='your logs'?' (your logs)':'')).join(', ');
+    return ['minutes per lecture (low–high; defaults unless marked "your logs"): '+row('lecture','lecture')+'; '+row('reattempt','class re-attempts')+'; '+row('homework','homework (Maths: TAH/KCLS + KTK)')+'; '+row('retries','extra retries of missed questions'),
+      'playback speed: not set, so lectures count at their listed length; DPP and module practice: not confirmed, not counted',
+      'plus 10–25% for older-topic practice and tests',
+      'capacity: the allowance selected this week ('+[...new Set(cap.days.filter(x=>x.all).map(x=>x.src))].join(', ')+') minus German, astrophysics and '+cap.diploma+' min diploma = '+planned+' min PCM a week',
+      'Sunday is 60 min PCM + 30 min German; nothing else is added',
+      'Class 11 counts confirmed 26 Nov 2026; Class 12 counts are Lakshya JEE 2027 planner proxies until the Lakshya JEE 2028 chapter plan exists, so the completion date stays pending']
+      .concat(TRACKS.map(t=>t.chapter+' source ('+t.track+'): '+t.lectures+' numbered lectures; '+t.durations.map(d=>'lectures '+d.from+'–'+d.to+' total '+hms(d.secs)+' at 1×').join(', ')+(t.partial?'; lectures '+t.unverified.join(', ')+' not yet verified, so the total is partial':'')+' (recorded, not used in the calculation)'));
+  }
   function forecast(L,hist={},from){
     const syl=L.syl||{},per={},missing=[],provisional=[],absent=[],day0=from||studyDate();
     const parts={lecture:[0,0],revision:[0,0],homework:[0,0],reattempt:[0,0]};
     // low = the shared estimate the planner schedules with (stageEst); high = the handoff's upper end where it gives one
     const HI={maths:{lecture:180,revision:90,homework:120}},rng={};
     for(const s of SUB3){const e=stageEst(syl,s),h=HI[s]||{};rng[s]={lecture:[e.lecture,Math.max(e.lecture,h.lecture||0)],revision:[e.reattempt,Math.max(e.reattempt,h.revision||0)],homework:[e.homework,Math.max(e.homework,h.homework||0)]};}
+    // the per-lecture minutes this calculation uses (low, high), and whether each comes from your logs or a default
+    const logged=(kind,s)=>!!medianOf((((syl||{}).took||{})[kind]||{})[s]),durs={};
+    for(const s of SUB3)durs[s]={lecture:rng[s].lecture,reattempt:rng[s].revision,homework:rng[s].homework,retries:REATT[s],
+      from:{lecture:medianOf(((syl||{}).watch||{})[s])?'your logs':'default',reattempt:logged('re',s)?'your logs':'default',homework:(s==='maths'?logged('tah',s)||logged('ktk',s):logged('hw',s))?'your logs':'default'}};
     let low=0,high=0;
     for(const s of SUB3){let rem=0,done=0,total=0;
       for(const id of (syl.order||{})[s]||[]){const c=(syl.courses||{})[id];if(!c)continue;
@@ -1402,7 +1423,8 @@ body.habit-shh #hb-session-card {text-align:center;}
       weeksLow:head.weeksLow,weeksHigh:head.weeksHigh,provisional:!histOK,plannedWeekly:planned,actualWeekly:Math.round(avg),
       minutesLow:Math.round(low),minutesHigh:Math.round(high),aimWeeks:104,
       uncertainty:'the range runs from every block kept at typical durations (low) to longer lectures, slower homework and more re-attempts (high); '+(actual?'the forecast uses your last '+actual.weeksUsed+' weeks of PCM, ±15%':'there is not enough history yet for a forecast from real study'),
-      assumptions:['durations per lecture: lecture '+SUB3.map(s=>SNAME[s]+' '+lecMin(syl,s)+' min').join(', ')+'; revision Maths 90, Physics 30, Chemistry 30; homework Maths 45-90, Physics 30-45, Chemistry 30-45; re-attempts Maths 20-40, Physics and Chemistry 15-30','plus 10-25% for older-topic practice and tests','capacity: the selected allowance this week allowance ('+[...new Set(cap.days.filter(x=>x.all).map(x=>x.src))].join(', ')+') minus German, astrophysics and '+cap.diploma+' min diploma = '+planned+' min PCM a week','Sunday is 60 min PCM + 30 min German; nothing else is added','Class 11 organic and inorganic are not counted until their lecture counts are added; Class 12 counts are provisional']};
+      durations:durs,tracks:TRACKS,
+      assumptions:assumptionsOf(durs,cap,planned)};
   }
   // default syllabus: Class 11 Arjuna JEE 2027 counts you supplied, Class 12 counts from Lakshya JEE 2027 planners (provisional proxies)
   // lecture counts you confirmed on 26 Nov 2026: Inorganic follows PW planner A (44), Organic the 43-lecture Rohit Agarwal copy,
@@ -1447,7 +1469,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     const daysLeft=w===0?0:7-w,loggedAny=ss.some(s=>s&&s.date===day&&s.subject!=='Other'&&(+s.minutes||0)>0)||Object.values(((desk.state||desk).days||{})[day]?.completed||{}).some(x=>+x>0)||!!(habit.active&&habit.active.date===day);
     return {actual14:a14,loggedAny,diplomaToday:daysLeft?Math.max(0,Math.ceil((target-dipDone)/daysLeft/5)*5):0,diplomaTarget:target,diplomaDone:dipDone,monday:mon};}
   const nowClock=()=>{const n=new Date();let m=n.getHours()*60+n.getMinutes();if(m<240)m+=1440;return m;};
-  const api={CONFIRMED11,applyConfirmed11,DAY_HOURS,dayHours,reviewOf,reviewSettle,cExam,cExamOff:()=>{cxOff=true;},gentleOf,gentleUsed,astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,cycleAfterLecture,qAdd,qConfirm,qMark,qCredit,qProgress,Q_STATES,Q_ROLES,STAGEMIN,revMin,stageEst,forecast:(L,hist,from)=>forecast(L||labData(),hist||{},from),pcmCapacity:(L,from)=>pcmCapacity(L||labData(),from||studyDate()),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
+  const api={TRACKS,assumptionsOf,CONFIRMED11,applyConfirmed11,DAY_HOURS,dayHours,reviewOf,reviewSettle,cExam,cExamOff:()=>{cxOff=true;},gentleOf,gentleUsed,astroMinutes,astroNext,astroConflicts:(L,d)=>astroConflicts(L||labData(),d||studyDate()),astroState,ASTRO_STATES,astroDay,weekPreview:(L,start,now,ctx)=>weekPreview(L||labData(),start||studyDate(),now!=null?now:nowClock(),ctx||schedCtx(start||studyDate())),GERMAN_SEQ,germanTitle,nextAfter,mondayOf,WEEK_BUDGET,templateDay:(L,d,dow,now,ctx)=>templateDay(L||labData(),d||studyDate(),dow!=null?dow:new Date((d||studyDate())+'T12:00:00').getDay(),now!=null?now:nowClock(),ctx||schedCtx(d||studyDate())),templateRows,skeleton,cycleAfterLecture,qAdd,qConfirm,qMark,qCredit,qProgress,Q_STATES,Q_ROLES,STAGEMIN,revMin,stageEst,forecast:(L,hist,from)=>forecast(L||labData(),hist||{},from),pcmCapacity:(L,from)=>pcmCapacity(L||labData(),from||studyDate()),seedSyllabus,schedOf,schedCtx,clk,parseClock,buildTasks,nextLecture,PLAN_NAME,PLAN_IDS,REVMIN,HWMIN,nowClock,studyDate,routineOptions:(dow,w)=>routineOptions(dow,w!=null?w:Number((labData().wokeAt||{})[studyDate()])||0),routineHours:R_HOURS,loggedToday,lateStart,replanFrom,fallbackRaw,skillsFromLectures,pickMix,mixAllot,mixLeft,recallToday,recordAttempt,restDays,creditTarget,reviewBudget,reviewQueue,previousSkillDate,dayKind,dayProgress,parseMins,recoverySubject,focus,limits,full,fallback:fallbackMix,need,hours,shortHours,revMethod,lens8,eightStart:()=>(fallback(1,8).find(r=>r.kind==='study')||{start:120}).start,dueSubjects:()=>[...dueSubjects()],startFor:h=>(fallback(1,h).find(r=>r.kind==='study')||{start:195}).start};
   if(typeof module!=='undefined')module.exports=api;else root.StudyPlan=api;
 })(globalThis);
 
@@ -8739,7 +8761,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
       return `<details><summary class="kl-small">${esc(c.name)} · ${esc(c.teacher || '')}${c.provisional ? ' · provisional count' : ''}</summary><ul class="kl-list">${ch}</ul><div class="kl-row"><input name="addname_${esc(id)}" maxlength="80" placeholder="add a chapter"><input name="addn_${esc(id)}" type="number" min="1" max="400" placeholder="lectures" style="width:6em"></div></details>`;
     }).join('');
     const vsAim = r => !f.complete ? '' : r.weeksHigh <= 104 ? ', inside the aim' : r.weeksLow > 104 ? ', beyond the aim at this pace: the first answer is to adjust priorities and the forecast, not to add hours' : ', overlapping the aim';
-    const span = r => `${r.weeksLow}–${r.weeksHigh} weeks (around ${fmt(r.weeksLow)} to ${fmt(r.weeksHigh)})${vsAim(r)}`;
+    const span = r => f.complete ? `${r.weeksLow}–${r.weeksHigh} weeks (around ${fmt(r.weeksLow)} to ${fmt(r.weeksHigh)})${vsAim(r)}` : `${r.weeksLow}–${r.weeksHigh} weeks for the counted lectures (date pending until every count is confirmed)`;
     const P = f.parts, pr = k => `${dur(P[k][0])}–${dur(P[k][1])}`;
     return `<details><summary class="kl-small">Progress and forecast · ${per}${f.complete ? '' : ` · ${f.absent.length} count${f.absent.length === 1 ? '' : 's'} missing, ${f.provisionalCounts.length} provisional`}</summary>
       <p class="kl-small"><b>Provisional aim:</b> complete Class 11–12 PCM within about 24 months (around ${aimTxt}), adjusting the forecast from actual progress while protected commitments stay as they are.</p>
