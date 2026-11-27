@@ -16259,67 +16259,6 @@ You entered 25</pre></div>
   });
 })();
 </script>
-<script id="kg-greet-script">
-/* ---------- Opening greeting: a line on screen and your own audio clip each time the desk opens. ----------
-   The clip stays on this device (its own IndexedDB), never in the site's code or in sync. Settings → Opening greeting. */
-(function () {
-  const KEY = 'kg-greet-v1', DEF = '', OLD = 'You are an amazing guy, Ayan'; // no default line; the old one is dropped from saved settings
-  const cfg = () => { let c; try { c = Object.assign({ on: true, text: DEF }, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { c = { on: true, text: DEF }; } if (c.text === OLD) c.text = ''; return c; };
-  const setCfg = c => localStorage.setItem(KEY, JSON.stringify(c));
-  const db = () => new Promise((ok, no) => { const r = indexedDB.open('kg-greet', 1); r.onupgradeneeded = () => r.result.createObjectStore('f'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
-  const idb = async (mode, fn) => { const d = await db(); return new Promise((ok, no) => { const t = d.transaction('f', mode), q = fn(t.objectStore('f')); t.oncomplete = () => { d.close(); ok(q && q.result); }; t.onerror = t.onabort = () => { d.close(); no(t.error); }; }); };
-  const getClip = () => idb('readonly', s => s.get('clip')).catch(() => null);
-  const setClip = v => idb('readwrite', s => s.put(v, 'clip'));
-  const delClip = () => idb('readwrite', s => s.delete('clip')).catch(() => {});
-  let clipInfo = null; // { name, size } for the settings card
-  getClip().then(c => { clipInfo = c ? { name: c.name, size: c.blob.size } : null; });
-
-  function show(text, blob) {
-    const ov = document.createElement('div'); ov.id = 'kg-greet';
-    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Opening greeting');
-    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;background:radial-gradient(circle at 50% 40%,#2a2350,#0d0b1d 70%);color:#f5e9c8;text-align:center;cursor:pointer;transition:opacity .6s';
-    ov.innerHTML = '<p style="font:600 clamp(26px,6vw,54px)/1.2 Georgia,serif;margin:0;max-width:16em;text-shadow:0 0 24px rgba(245,210,122,.45)"></p><p class="kg-greet-hint" style="font:14px system-ui,sans-serif;opacity:.75;margin:0"></p><button type="button" style="font:14px system-ui,sans-serif;padding:8px 18px;border-radius:999px;border:1px solid #f5d27a;background:transparent;color:#f5e9c8;cursor:pointer">Continue to the desk</button>';
-    ov.firstChild.textContent = text; if (!text) ov.firstChild.remove();
-    const hint = ov.querySelector('.kg-greet-hint'), btn = ov.querySelector('button');
-    let audio = null, url = '';
-    const close = () => { if (audio) { audio.pause(); } if (url) URL.revokeObjectURL(url); ov.style.opacity = '0'; setTimeout(() => ov.remove(), 600); document.removeEventListener('keydown', onKey); };
-    const onKey = e => { if (e.key === 'Escape') close(); };
-    document.addEventListener('keydown', onKey);
-    btn.addEventListener('click', e => { e.stopPropagation(); close(); });
-    if (blob) {
-      url = URL.createObjectURL(blob); audio = new Audio(url); audio.addEventListener('ended', () => setTimeout(close, 900));
-      const play = () => audio.play().then(() => { hint.textContent = ''; }).catch(() => { hint.textContent = 'Tap anywhere to play'; });
-      ov.addEventListener('click', () => { if (audio.paused) play(); });
-      play();
-    } else hint.textContent = 'Add your audio clip in Settings → Opening greeting.';
-    (document.getElementById('kg-greet') || {}).remove?.(); document.documentElement.appendChild(ov); btn.focus(); // outside <body>: the desk re-renders body on start
-  }
-  async function start() {
-    const c = cfg(); if (!c.on) return;
-    const clip = await getClip();
-    show(c.text, clip && clip.blob);
-  }
-  window.KgGreet = { cfg, DEF };
-  if (document.readyState === 'complete') start(); else window.addEventListener('load', start, { once: true });
-
-  const M = window.MoonLab; if (!M || !M.PANELS) return;
-  M.SECTIONS.settings.push(['greeting', '👋 Opening greeting']);
-  M.PANELS.greeting = () => { const c = cfg(); return `<section class="kl-card kl-stack"><p class="kl-eyebrow">OPENING GREETING</p><h3>What you see and hear when the desk opens</h3>
-    <form data-f="greet" class="kl-stack"><label class="kl-row"><input type="checkbox" name="on" ${c.on ? 'checked' : ''}> Show it every time the desk opens</label>
-    <input name="text" maxlength="120" value="${M.esc(c.text)}" aria-label="Greeting text" placeholder="Optional line (leave empty for none)"><button>Save</button></form>
-    <p class="kl-small">Audio: ${clipInfo ? `${M.esc(clipInfo.name)} (${Math.round(clipInfo.size / 1024 / 102.4) / 10} MB), stored on this device only` : 'none yet'}. A video file works too; only its sound plays. The clip isn't uploaded, synced or included in backups, so keep your copy of the file.</p>
-    <div class="kl-row"><label class="kl-ghost">Choose audio or video file <input type="file" accept="audio/*,video/mp4,video/webm" data-greetfile hidden></label>${clipInfo ? '<button class="kl-ghost" data-a="greetplay">Preview</button><button class="kl-ghost" data-a="greetdel">Remove clip</button>' : ''}</div>
-    <p class="kl-small">Browsers may block sound until you tap the page; if so, the greeting says "Tap anywhere to play".</p></section>`; };
-  M.FORMS.greet = v => { setCfg({ on: !!v.on, text: String(v.text || '').trim() }); M.render(); };
-  M.ACTIONS.greetplay = async () => { const clip = await getClip(); show(cfg().text, clip && clip.blob); };
-  M.ACTIONS.greetdel = async () => { if (!confirm('Remove the greeting clip from this device? Your own copy of the file is not affected.')) return; await delClip(); clipInfo = null; M.render(); };
-  document.addEventListener('change', async e => {
-    const t = e.target; if (!t.dataset || !('greetfile' in t.dataset) || !t.files || !t.files[0]) return;
-    const f = t.files[0]; if (f.size > 40 * 1024 * 1024) return alert('That file is over 40 MB. Choose a shorter clip.');
-    try { await setClip({ name: f.name, blob: f, at: Date.now() }); clipInfo = { name: f.name, size: f.size }; M.render(); } catch (err) { alert("Couldn't save the clip on this device. Nothing was changed."); }
-  });
-})();
-</script>
 <script id="kg-proof-script">
 /* ---------- Photo proofs, appeals, retention and exposure (rev 4). Pure rules first (window.KgProof), then a thin panel. ----------
    Photos are the primary evidence and live in the attached-notes store (so the complete backup carries them).
@@ -16831,7 +16770,7 @@ function serpentSVG(o) {
     { id: 'kaguya', name: 'Kaguya', about: 'Company and comfort.',
       go: [['🌙 Hang out', 'company:hangout'], ['Sit with me', 'company:sit'], ['🫶 Comfort', 'company:comfort'], ['💭 Memories', 'company:memories'], ['💌 Letters', 'company:letters'], ['💞 Bond', 'progress:bond']] }
   ];
-  const MENU = [['✦ Companions', 'settings:companions'], ['📱 App', 'settings:app'], ['🛟 Support', 'settings:support'], ['👋 Opening greeting', 'settings:greeting'], ['Care · doctor summary', 'settings:doctor']];
+  const MENU = [['✦ Companions', 'settings:companions'], ['📱 App', 'settings:app'], ['🛟 Support', 'settings:support'], ['Care · doctor summary', 'settings:doctor']];
   const NOOKS = [[175, 360], [355, 360], [175, 556], [355, 556]];
   const LVN = { none: 0, obtained: 1, learning: 2, proof: 3, proven: 4 };
   const LEVEL = { none: 'On its way', obtained: 'Obtained', learning: 'Learning', proof: 'Proof passed · retention pending', proven: 'Proven' };
