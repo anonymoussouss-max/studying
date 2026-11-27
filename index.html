@@ -16413,9 +16413,9 @@ window.KgGuArt = {"ART":{"m11:Sets":{"name":"Venn Mussel","design":"Two overlapp
     S_(2, 'upper', 'proposed', 'Class 11 weighted progress at least 55% in each subject.', { test: { pct: 55 }, src: BRIEF, why: 'Requires refinement beyond acquisition in a good part of each subject.' }),
     S_(2, 'peak', 'proposed', 'Class 11 weighted progress at least 65% in each subject.', { test: { pct: 65 }, src: BRIEF, why: 'Sits below Rank 3 initial (every chapter Learning = 75%), so no stage is skipped or reversed.' }),
     S_(3, 'initial', 'agreed', 'every Class 11 chapter Gu obtained and at least Learning', { test: { cls: [11], min: 'learning' } }),
-    S_(3, 'middle', 'agreed', 'all Class 12 chapter Gu also obtained (Class 12 mastery not required yet)', { test: { cls: [11, 12], min: 'obtained' } }),
-    S_(3, 'upper', 'proposed', 'Rank 3 middle, plus Class 12 weighted progress at least 55% in each subject.', { test: { cls: [11, 12], min: 'obtained', pct12: 55 }, src: BRIEF, why: 'Refinement of Class 12, past the 40% that obtaining alone gives.' }),
-    S_(3, 'peak', 'proposed', 'Rank 3 middle, plus Class 12 weighted progress at least 65% in each subject.', { test: { cls: [11, 12], min: 'obtained', pct12: 65 }, src: BRIEF, why: 'Stays below Rank 4 initial (every Class 11–12 chapter Learning = 75%).' }),
+    S_(3, 'middle', 'agreed', 'every Class 11 chapter Gu still at least Learning, and all Class 12 chapter Gu obtained (Class 12 mastery not required yet)', { test: { cls: [11, 12], min: { 11: 'learning', 12: 'obtained' } } }),
+    S_(3, 'upper', 'proposed', 'Rank 3 middle (every Class 11 Gu at least Learning, every Class 12 Gu obtained), plus Class 12 weighted progress at least 55% in each subject.', { test: { cls: [11, 12], min: { 11: 'learning', 12: 'obtained' }, pct12: 55 }, src: BRIEF, why: 'Refinement of Class 12, past the 40% that obtaining alone gives.' }),
+    S_(3, 'peak', 'proposed', 'Rank 3 middle (every Class 11 Gu at least Learning, every Class 12 Gu obtained), plus Class 12 weighted progress at least 65% in each subject.', { test: { cls: [11, 12], min: { 11: 'learning', 12: 'obtained' }, pct12: 65 }, src: BRIEF, why: 'Stays below Rank 4 initial (every Class 11–12 chapter Learning = 75%).' }),
     S_(4, 'initial', 'agreed', 'every Class 11–12 chapter at least Learning', { test: { cls: [11, 12], min: 'learning' } }),
     S_(4, 'middle', 'agreed', 'every Class 11–12 chapter Proven (retention evidence included)', { test: { cls: [11, 12], min: 'proven' } }),
     S_(4, 'upper', 'proposed', 'Rank 4 middle, plus at least 50% of the frozen valid question bank completed independently in each subject.', { test: { cls: [11, 12], min: 'proven', bank: 50 }, src: BRIEF, why: 'Independent problem-solving on the agreed bank, on the way to the whole bank at Rank 5.' }),
@@ -16433,6 +16433,8 @@ window.KgGuArt = {"ART":{"m11:Sets":{"name":"Venn Mussel","design":"Two overlapp
   LADDER.push(S_(9, 'initial', 'undefined', 'Bachelor’s completion, approaching master’s study.', { agreedIdea: true, missing: 'the degree’s defined content; the agreed milestone names Rank 9 but not which stage, so it is shown at Initial for you to confirm' }));
   for (const st of STAGE_N.slice(1)) LADDER.push(S_(9, st, 'undefined', 'Requirements pending definition.', { missing: 'beyond the agreed bachelor’s milestone; nothing defined' }));
   const GATES = LADDER.filter(g => g.def === 'agreed'); // the agreed anchors, kept for older readers
+  // approved by you in chat on 27 Nov 2026, as written (Rank 3 upper and peak together with the per-class floors above)
+  const CHAT_APPROVED = ['r1-initial', 'r1-middle', 'r1-upper', 'r1-peak', 'r2-initial', 'r2-middle', 'r2-upper', 'r2-peak', 'r3-upper', 'r3-peak', 'r4-upper', 'r4-peak'].map(id => ({ id, at: Date.UTC(2026, 10, 27), by: 'you approved in chat' }));
   const ORDER = id => LADDER.findIndex(g => g.id === id);
 
   // per-subject weighted progress of a list of Gu (weight × share), as cultivation() computes it for Class 11
@@ -16447,14 +16449,19 @@ window.KgGuArt = {"ART":{"m11:Sets":{"name":"Venn Mussel","design":"Two overlapp
     if (t.cls && t.cls.includes(12) && !ctx.class12) return { now: 'provisional', why: 'Class 12 catalogue incomplete (Lakshya JEE 2028 not catalogued)', have, left, tag: 'Class 12 catalogue', cat: true };
     if (t.pct != null) for (const s of SUBS) { const p = v.subjects[s] ? v.subjects[s].pct || 0 : 0; (p >= t.pct ? have : left).push(`${s}: ${p}% of ${t.pct}%`); }
     if (t.cls) for (const s of SUBS) {
-      const gu = (v.subjects[s] ? v.subjects[s].gu : []).concat(ctx.class12 ? ctx.class12[s] || [] : []);
-      const short = gu.filter(x => LV[x.level] < LV[t.min] || x.acq !== 'obtained').length;
-      (gu.length && !short ? have : left).push(gu.length && !short ? `${s}: every chapter ${t.min}` : `${s}: ${short || 'no'} chapter${short === 1 ? '' : 's'} below ${t.min}`);
+      const floor = c => typeof t.min === 'object' ? t.min[c] : t.min, per = typeof t.min === 'object';
+      for (const c of per ? t.cls : [t.cls]) {
+        const gu = per ? (c === 11 ? (v.subjects[s] ? v.subjects[s].gu : []) : ctx.class12 ? ctx.class12[s] || [] : [])
+          : (v.subjects[s] ? v.subjects[s].gu : []).concat(ctx.class12 ? ctx.class12[s] || [] : []);
+        const m = per ? floor(c) : t.min, lab = per ? `${s} Class ${c}` : s;
+        const short = gu.filter(x => LV[x.level] < LV[m] || x.acq !== 'obtained').length;
+        (gu.length && !short ? have : left).push(gu.length && !short ? `${lab}: every chapter ${m}` : `${lab}: ${short || 'no'} chapter${short === 1 ? '' : 's'} below ${m}`);
+      }
     }
     if (t.pct12 != null) for (const s of SUBS) { const p = pctOf(ctx.class12[s] || []); (p >= t.pct12 ? have : left).push(`${s} Class 12: ${p}% of ${t.pct12}%`); }
     if (t.bank != null) {
       const b = ctx.bank;
-      if (t.bank === 100 && b && b.verified) have.push('whole valid bank completed independently');
+      if (b && b.verified) have.push('whole valid bank completed independently'); // the whole bank also meets every lower bank threshold
       else if (!b || !b.edition && !b.verified) unknown.push('the valid question bank edition is not frozen yet');
       else for (const s of SUBS) { const p = (b.pct || {})[s]; if (p == null) unknown.push(`${s}: bank progress unknown`); else (p >= t.bank ? have : left).push(`${s} bank: ${p}% of ${t.bank}%`); }
     }
@@ -16465,7 +16472,7 @@ window.KgGuArt = {"ART":{"m11:Sets":{"name":"Venn Mussel","design":"Two overlapp
   // The whole ladder with display kinds: earned | current | upcoming | proposed | roadmap | insufficient.
   // Only agreed stages and proposals you approved count; earlier counted stages stay binding prerequisites.
   function ladder(v, ctx = {}) {
-    const earned = new Set((ctx.earned || []).map(e => e.gate)), ok = new Set((ctx.approved || []).map(a => a.id));
+    const earned = new Set((ctx.earned || []).map(e => e.gate)), ok = new Set(CHAT_APPROVED.concat(ctx.approved || []).map(a => a.id));
     const top = Math.max(-1, ...[...earned].map(ORDER));
     let prevMet = true, cur = false; const out = [];
     LADDER.forEach((g, i) => {
@@ -16492,7 +16499,7 @@ window.KgGuArt = {"ART":{"m11:Sets":{"name":"Venn Mussel","design":"Two overlapp
     return ladder(v, ctx).filter(g => g.active).map(g => ({ id: g.id, name: g.name, needs: g.needs, status: g.kind === 'earned' ? 'earned' : g.now, now: g.now, why: g.why, refresh: g.refresh }));
   }
   // approving a proposed criterion is your decision, append-only like earning; undefined stages and pending proposals can't be approved
-  function approve(list, id, now) { const g = LADDER.find(x => x.id === id); if (!g || g.def !== 'proposed' || g.pending || (list || []).some(a => a.id === id)) return list || []; return (list || []).concat({ id, at: now, by: 'you approved' }); }
+  function approve(list, id, now) { const g = LADDER.find(x => x.id === id); if (!g || g.def !== 'proposed' || g.pending || CHAT_APPROVED.some(a => a.id === id) || (list || []).some(a => a.id === id)) return list || []; return (list || []).concat({ id, at: now, by: 'you approved' }); }
   // Permanence: recording a stage is append-only and needs your acceptance; re-recording is a no-op; nothing ever removes one.
   function earn(earned, gate, now, edition) { if ((earned || []).some(e => e.gate === gate)) return earned; return (earned || []).concat({ gate, at: now, edition, by: 'you accepted' }); }
   // Immortal Gu: separate from chapter Gu. A record only counts when every check below is complete; nothing is generated or awarded here.
@@ -16500,7 +16507,7 @@ window.KgGuArt = {"ART":{"m11:Sets":{"name":"Venn Mussel","design":"Two overlapp
   function immortalValid(r) { return !!(r && r.fresh && Array.isArray(r.checks) && r.checks.length && r.checks.every(c => c.kind !== 'same-model') && r.independent && r.defence && r.extension && r.verifiedBy && !/model|ai/i.test(r.verifiedBy)); }
   // Blessed land: unlocks at Rank 4 initial OR the first valid Immortal Gu. Prior achievements count when it opens; features develop once.
   function land(earned, immortals) { const r4 = (earned || []).some(e => { const m = /^r(\d+)-/.exec(e.gate || ''); return m && +m[1] >= 4; }); const im = (immortals || []).filter(immortalValid); return { unlocked: r4 || im.length > 0, why: r4 ? 'Cultivator Rank 4' : im.length ? 'first Immortal Gu' : 'opens at Rank 4 or with your first Immortal Gu' }; }
-  window.KgRank = { GATES, LADDER, STAGE_N, ladder, gates, evaluate, approve, earn, land, immortalValid, IMMORTAL_RUBRIC, LV };
+  window.KgRank = { GATES, LADDER, CHAT_APPROVED, STAGE_N, ladder, gates, evaluate, approve, earn, land, immortalValid, IMMORTAL_RUBRIC, LV };
 
   const M = window.MoonLab; if (!M || !M.PANELS || !window.KgCult) return;
   const K = window.KgCult, esc = M.esc, read = () => K.readStore(localStorage);

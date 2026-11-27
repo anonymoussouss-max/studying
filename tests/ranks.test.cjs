@@ -5,9 +5,10 @@ const grab = id => { const a = html.indexOf(`<script id="${id}">`), b = html.ind
 const win = {}, ctx = { window: win, Object, Math, String, JSON, Set, Array, Number, Date };
 for (const id of ['kg-cult-script', 'kg-proof-script', 'kg-rank-script']) vm.runInNewContext(grab(id), ctx);
 const R = win.KgRank;
-const g = (level, acq = 'obtained') => ({ level, acq });
+const SH = { obtained: 40, learning: 75, proof: 90, proven: 100 }, g = (level, acq = 'obtained') => ({ level, acq, share: acq === 'obtained' ? SH[level] || 0 : 0 });
 const v = (lv, o = {}) => ({ ed: { complete: o.incomplete ? false : true, missing: o.incomplete ? ['Class 11 organic'] : [], id: 'class11-edition-0' },
-  subjects: { maths: { gu: [g(lv.maths || 'learning')] }, physics: { gu: [g(lv.physics || 'learning')] }, chem: { gu: [g(lv.chem || 'learning')] } } });
+  subjects: Object.fromEntries(['maths', 'physics', 'chem'].map(k => [k, { gu: [g(lv[k] || 'learning')], pct: SH[lv[k] || 'learning'] }])) });
+// weighted progress follows the Gu level, as in real records (obtained 40, learning 75, proof 90, proven 100)
 const st = (gs, id) => gs.find(x => x.id === id);
 
 test('an incomplete catalogue gives "unknown", never a rank or a failure; no starting rank is awarded', () => {
@@ -29,7 +30,10 @@ test('earlier milestones stay binding prerequisites', () => {
   const c12 = { maths: [g('proven')], physics: [g('proven')], chem: [g('proven')] };
   const gs = R.gates(v({ chem: 'obtained' }), { class12: c12 });
   assert.strictEqual(st(gs, 'r3-initial').status, 'not-yet'); assert.strictEqual(st(gs, 'r3-middle').status, 'not-yet');
-  assert.ok(/prerequisite/.test(st(gs, 'r3-middle').why));
+  assert.match(st(gs, 'r3-middle').why, /chem Class 11: 1 chapter below learning/, 'Rank 3 middle checks its own Class 11 floor');
+  // a stage that would be met on its own still waits for an earlier unmet stage
+  const low = v({}); low.subjects.chem.pct = 50; const g2 = R.gates(low, { class12: c12 });
+  assert.strictEqual(st(g2, 'r2-upper').status, 'not-yet'); assert.strictEqual(st(g2, 'r3-initial').status, 'not-yet'); assert.match(st(g2, 'r3-initial').why, /prerequisite/);
 });
 test('Rank 5 needs the external evidence (valid bank and B2) as well as PCM Proven', () => {
   const c12 = { maths: [g('proven')], physics: [g('proven')], chem: [g('proven')] }, all = v({ maths: 'proven', physics: 'proven', chem: 'proven' });
@@ -88,24 +92,44 @@ test('ladder: later stages are never easier — thresholds rise and levels never
   let pct = -1, lvl = -1, bank = -1, p12 = -1;
   for (const g of L.filter(x => x.test)) { const t = g.test;
     if (t.pct != null) { assert.ok(t.pct > pct, g.id); pct = t.pct; }
-    if (t.min) { assert.ok(LV[t.min] >= lvl || t.cls.includes(12) && lvl <= LV.learning, g.id); lvl = Math.max(lvl, LV[t.min]); }
+    if (t.min) { const m = typeof t.min === 'object' ? t.min[11] : t.min; assert.ok(LV[m] >= lvl, g.id + ': the Class 11 floor never drops'); lvl = Math.max(lvl, LV[m]); }
     if (t.pct12 != null) { assert.ok(t.pct12 > p12, g.id); p12 = t.pct12; }
     if (t.bank != null) { assert.ok(t.bank > bank, g.id); bank = t.bank; } }
   assert.ok(find(L, 'r2-peak').test.pct < 75, 'every chapter Learning gives 75%, above Rank 2 peak');
   assert.ok(find(L, 'r3-peak').test.pct12 < 75, 'Rank 3 peak stays below Rank 4 initial');
 });
 
-test('ladder: proposed criteria stay out of the calculation until approved; pending ones cannot be approved', () => {
+test('ladder: the 12 criteria you approved in chat count; the 6 pending proposals stay out and cannot be approved', () => {
+  const ids = ['r1-initial', 'r1-middle', 'r1-upper', 'r1-peak', 'r2-initial', 'r2-middle', 'r2-upper', 'r2-peak', 'r3-upper', 'r3-peak', 'r4-upper', 'r4-peak'];
+  assert.deepStrictEqual([...R.CHAT_APPROVED.map(a => a.id)], ids);
   const lad = R.ladder(pv(70, 'obtained'));
-  assert.strictEqual(find(lad, 'r2-peak').kind, 'proposed'); assert.strictEqual(find(lad, 'r2-peak').now, 'met', 'the preview shows it would be met');
-  assert.ok(!R.gates(pv(70, 'obtained')).some(g => /^r[12]-/.test(g.id)), 'not a counted gate');
-  assert.strictEqual(find(lad, 'r3-initial').kind, 'current');
-  let ap = R.approve([], 'r1-middle', 1); ap = R.approve(ap, 'r1-middle', 2); assert.strictEqual(ap.length, 1);
-  assert.strictEqual(R.approve([], 'r5-middle', 1).length, 0, 'a proposal pending definition cannot be approved');
+  for (const id of ids) { const x = find(lad, id); assert.strictEqual(x.def, 'proposed'); assert.ok(x.active && x.approved, id + ' counts'); }
+  const pend = [...L.filter(x => x.def === 'proposed' && x.pending).map(x => x.id)];
+  assert.deepStrictEqual(pend, ['r5-middle', 'r5-upper', 'r5-peak', 'r6-middle', 'r6-upper', 'r6-peak']);
+  for (const id of pend) { assert.strictEqual(find(lad, id).kind, 'proposed'); assert.strictEqual(R.approve([], id, 1).length, 0); }
+  assert.ok(!R.gates(pv(70, 'obtained')).some(x => pend.includes(x.id)), 'pending proposals are never counted gates');
+  assert.strictEqual(R.approve([], 'r1-middle', 1).length, 0, 'already approved: nothing to add');
   assert.strictEqual(R.approve([], 'r7-initial', 1).length, 0); assert.strictEqual(R.approve([], 'r3-initial', 1).length, 0);
-  const lad2 = R.ladder(pv(7, 'obtained'), { approved: ap });
-  assert.strictEqual(find(lad2, 'r1-middle').kind, 'current'); assert.strictEqual(find(lad2, 'r1-middle').now, 'met');
+  const lad2 = R.ladder(pv(7, 'obtained'));
+  assert.strictEqual(find(lad2, 'r1-initial').kind, 'current'); assert.strictEqual(find(lad2, 'r1-middle').now, 'met'); assert.strictEqual(find(lad2, 'r1-upper').now, 'not-yet');
   assert.strictEqual(find(lad2, 'r3-initial').kind, 'upcoming');
+});
+
+test('Rank 3 middle, upper and peak: every Class 11 Gu at least Learning and every Class 12 Gu obtained; Class 12 progress never compensates', () => {
+  const c12 = { maths: [g('proven')], physics: [g('proven')], chem: [g('proven')] }; // Class 12 at 100%
+  const pass = R.ladder(v({}), { class12: c12 });
+  for (const id of ['r3-middle', 'r3-upper', 'r3-peak']) assert.strictEqual(find(pass, id).now, 'met', id);
+  // one Class 11 chemistry Gu only Obtained (pct kept high so earlier stages are not what blocks it)
+  const weak = v({}); weak.subjects.chem.gu.push(g('obtained')); const lad = R.ladder(weak, { class12: c12, earned: [{ gate: 'r3-initial' }] });
+  for (const id of ['r3-middle', 'r3-upper', 'r3-peak']) { const x = find(lad, id); assert.strictEqual(x.now, 'not-yet', id); }
+  for (const id of ['r3-middle', 'r3-upper', 'r3-peak']) assert.ok(R.evaluate(L.find(x => x.id === id), weak, { class12: c12 }).left.some(w => /chem Class 11: 1 chapter below learning/.test(w)), id + ' names the Class 11 gap itself');
+  // a Class 12 Gu not yet obtained also blocks, whatever the Class 12 percentage says
+  const c12b = { maths: [g('proven'), g('none', 'not-obtained')], physics: [g('proven')], chem: [g('proven')] };
+  assert.ok(R.evaluate(L.find(x => x.id === 'r3-upper'), v({}), { class12: c12b }).left.some(w => /maths Class 12: 1 chapter below obtained/.test(w)));
+  // permanence: a stage earned earlier stays earned after a later gap; it asks for refreshing, never demotes
+  const kept = R.ladder(weak, { class12: c12, earned: [{ gate: 'r3-peak' }] });
+  for (const id of ['r3-middle', 'r3-upper', 'r3-peak']) assert.strictEqual(find(kept, id).kind, 'earned', id);
+  assert.match(find(kept, 'r3-peak').refresh, /refreshing/);
 });
 
 test('ladder: an incomplete catalogue or unknown evidence is "Insufficient data", never a low rank or a failure', () => {
