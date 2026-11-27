@@ -102,3 +102,12 @@ test("every program in the answer bank has an explanation (the teacher asked for
     if (/class="qt">Program/.test(part)) assert.ok(part.includes('<p class="expl-h">Output</p>'), id + ' shows its output');
   }
 });
+
+test('retired (27 Nov 2026): with L.cexam.retired nothing of the C exam shows on any date; the module keeps the records', () => {
+  const html2 = html, src2 = [...html2.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).find(s => s.includes('root.StudyPlan=api'));
+  const store = { 'kg-lab-v1': JSON.stringify({ cexam: { retired: { at: '2026-11-27' }, learned: { q1: 1 } } }) };
+  const ctx = { Date, Math, JSON, Number, String, Object, Array, Set, Map, console, localStorage: { getItem: k => store[k] ?? null, setItem() {} } }; ctx.globalThis = ctx; vm.runInNewContext(src2, ctx);
+  for (const d of ['2026-11-23', '2026-11-25', '2026-11-26']) assert.strictEqual(ctx.StudyPlan.cExam(d), null, d);
+  const mod = html2.slice(html2.indexOf('/* C exam (IT23102, Thu 26 Nov 2026): the day'), html2.indexOf('// ---- the bank, read once from the template ----'));
+  assert.match(mod, /if \(!X\(\)\.retired\) \{ X\(\)\.retired = /); assert.ok(!/delete X\(\)\.(learned|results|doubts)|L\.cexam = null/.test(mod), 'ticks, results and doubts are kept');
+});
