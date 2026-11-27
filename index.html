@@ -15959,9 +15959,9 @@ You entered 25</pre></div>
     return { defined: true, shown, share: Math.round((SHARE.learning - SHARE.obtained) * shown.length / need.length * 10) / 10 };
   }
   // Catalogue editions (rev 4): a Class 11 edition can be fixed on its own. It is never shown as a Class 11–12 catalogue.
-  function edition(out, store) {
+  function edition(out, store, syl) {
     const subs = ['maths', 'physics', 'chem'], complete = subs.every(x => out.subjects[x] && out.subjects[x].complete);
-    const prov = Object.entries(store.catalog || {}).filter(([, c]) => !c.confirmed).map(([cid, c]) => cid + ': ' + (c.label || 'published plan'));
+    const prov = Object.entries(store.catalog || {}).filter(([cid, c]) => !c.confirmed && !(syl && syl.courses && syl.courses[cid] && syl.courses[cid].confirmed)) // a course whose real counts you confirmed overrides an old published-plan pick.map(([cid, c]) => cid + ': ' + (c.label || 'published plan'));
     return { id: 'class11-edition-0', classes: [11], complete, provisional: prov.length > 0, provisionalWhy: prov, frozen: !!(store.frozen11 && complete), class12: 'not catalogued (Lakshya JEE 2027 planners are proxy reference only; your batch is Lakshya JEE 2028)', missing: subs.flatMap(x => (out.subjects[x] && out.subjects[x].missing) || [x]) };
   }
 
@@ -15969,7 +15969,7 @@ You entered 25</pre></div>
   function cultivation(L, evidenceOf, store) {
     store = Object.assign(blankStore(), store || {});
     const syl = L && L.syl, medals = (L && L.medals) || {}, out = { edition: 0, subjects: {} };
-    if (!syl || !syl.courses) { out.placement = 'not-computed'; out.why = ['maths', 'physics', 'chem']; out.ed = edition(out, store); return out; }
+    if (!syl || !syl.courses) { out.placement = 'not-computed'; out.why = ['maths', 'physics', 'chem']; out.ed = edition(out, store, syl); return out; }
     const covers = {};
     const picked = (cid, c) => !c.confirmed && store.catalog && store.catalog[cid], chaptersOf = (cid, c) => (picked(cid, c) && store.catalog[cid].chapters) || c.chapters || [];
     for (const [cid, c] of Object.entries(syl.courses)) if (c.cls === 11 && !c.provisional) chaptersOf(cid, c).forEach(([name]) => { const k = cid + ':' + name, s = skillsOf(store, k); if (s) covers[k] = s; });
@@ -16002,7 +16002,7 @@ You entered 25</pre></div>
     const pend = Object.entries(store.catalog || {}).some(([cid, c]) => !c.confirmed && !(syl.courses[cid] && syl.courses[cid].confirmed));
     out.placement = subs.every(x => out.subjects[x] && out.subjects[x].complete) ? (pend ? 'provisional' : 'computable') : 'not-computed';
     out.why = subs.filter(x => !out.subjects[x] || !out.subjects[x].complete);
-    out.ed = edition(out, store); out.skipped = alloc.skipped;
+    out.ed = edition(out, store, syl); out.skipped = alloc.skipped;
     return out;
   }
   window.KgCult = { cultivation, PLANNED, DRAFTS, SOURCES, STARTERS, TAGS, tagFor, RANK, LINKS, MULT, SHARE, DEPTH, STORE, genuine, invState, parseDPP, proposeFromLogged, legacyOf, allocate, refinement, edition, blankStore, readStore };
