@@ -16375,45 +16375,112 @@ Rules: a right final answer with invalid reasoning gets method 0 or 1. A minor a
 (function () {
   const LV = { none: 0, obtained: 1, learning: 2, proof: 3, proven: 4 };
   const SUBS = ['maths', 'physics', 'chem'];
-  // AGREED fixed milestones. Intermediate thresholds and undergraduate units remain PROVISIONAL and aren't gated here.
-  const GATES = [
-    { id: 'r3-initial', name: 'Rank 3 · initial', needs: 'every Class 11 chapter Gu obtained and at least Learning', cls: [11], min: 'learning' },
-    { id: 'r3-middle', name: 'Rank 3 · middle', needs: 'all Class 12 chapter Gu also obtained', cls: [11, 12], min: 'obtained' },
-    { id: 'r4-initial', name: 'Rank 4 · initial', needs: 'every Class 11–12 chapter at least Learning', cls: [11, 12], min: 'learning' },
-    { id: 'r4-middle', name: 'Rank 4 · middle', needs: 'every Class 11–12 chapter Proven', cls: [11, 12], min: 'proven' },
-    { id: 'r5-initial', name: 'Rank 5 · initial', needs: 'all PCM Proven, the whole agreed valid bank completed independently, and a recognised external German B2 certificate', cls: [11, 12], min: 'proven', external: ['bank', 'b2'] },
-    { id: 'r6-initial', name: 'Rank 6 · initial', needs: 'real first-year undergraduate foundation mastery (not enrolment); units still to be defined', roadmap: true }
+  // The full ladder: Ranks 1–9, each Initial → Middle → Upper → Peak. Every stage carries its criterion status:
+  //  agreed    — fixed milestone you agreed; counts automatically.
+  //  proposed  — from the earlier brief or proposed here; shown with a preview but NOT counted until you approve it.
+  //  undefined — requirements pending definition; never earnable, never shown with empty requirements.
+  const STAGE_N = ['initial', 'middle', 'upper', 'peak'];
+  const S_ = (rank, stage, def, needs, o) => Object.assign({ id: `r${rank}-${stage}`, rank, stage, name: `Rank ${rank} · ${stage}`, def, needs }, o || {});
+  const BRIEF = 'earlier brief (marked PROPOSED there)', HERE = 'proposed in this revision';
+  const U_UNITS = 'the first-year undergraduate foundation units (mathematics; mechanics and other first-year physics; experimental reasoning and labs; scientific programming and numerical work), defined from real curricula';
+  const LADDER = [
+    S_(1, 'initial', 'proposed', 'Placement computable from a complete, confirmed Class 11 catalogue. No minimum evidence beyond that.', { test: { pct: 0 }, src: BRIEF, why: 'Rank 1 marks an honest starting point. It needs the full catalogue, so a missing or unconfirmed catalogue can never hand you a low rank.' }),
+    S_(1, 'middle', 'proposed', 'Class 11 weighted progress at least 5% in each subject.', { test: { pct: 5 }, src: BRIEF, why: 'About one small chapter obtained per subject: the first real evidence, in all three subjects.' }),
+    S_(1, 'upper', 'proposed', 'Class 11 weighted progress at least 10% in each subject.', { test: { pct: 10 }, src: BRIEF, why: 'Progress counts only obtained and refined chapter Gu (40/75/90/100% shares), never hours or videos.' }),
+    S_(1, 'peak', 'proposed', 'Class 11 weighted progress at least 15% in each subject.', { test: { pct: 15 }, src: BRIEF, why: 'Closes Rank 1 with steady, balanced evidence; high Maths cannot carry low Chemistry.' }),
+    S_(2, 'initial', 'proposed', 'Class 11 weighted progress at least 25% in each subject.', { test: { pct: 25 }, src: BRIEF, why: 'A quarter of the Class 11 weight: several chapters obtained and some refined.' }),
+    S_(2, 'middle', 'proposed', 'Class 11 weighted progress at least 40% in each subject.', { test: { pct: 40 }, src: BRIEF, why: '40% equals every chapter obtained at the minimum, or fewer chapters taken further toward Learning.' }),
+    S_(2, 'upper', 'proposed', 'Class 11 weighted progress at least 55% in each subject.', { test: { pct: 55 }, src: BRIEF, why: 'Requires refinement beyond acquisition in a good part of each subject.' }),
+    S_(2, 'peak', 'proposed', 'Class 11 weighted progress at least 65% in each subject.', { test: { pct: 65 }, src: BRIEF, why: 'Sits below Rank 3 initial (every chapter Learning = 75%), so no stage is skipped or reversed.' }),
+    S_(3, 'initial', 'agreed', 'every Class 11 chapter Gu obtained and at least Learning', { test: { cls: [11], min: 'learning' } }),
+    S_(3, 'middle', 'agreed', 'all Class 12 chapter Gu also obtained (Class 12 mastery not required yet)', { test: { cls: [11, 12], min: 'obtained' } }),
+    S_(3, 'upper', 'proposed', 'Rank 3 middle, plus Class 12 weighted progress at least 55% in each subject.', { test: { cls: [11, 12], min: 'obtained', pct12: 55 }, src: BRIEF, why: 'Refinement of Class 12, past the 40% that obtaining alone gives.' }),
+    S_(3, 'peak', 'proposed', 'Rank 3 middle, plus Class 12 weighted progress at least 65% in each subject.', { test: { cls: [11, 12], min: 'obtained', pct12: 65 }, src: BRIEF, why: 'Stays below Rank 4 initial (every Class 11–12 chapter Learning = 75%).' }),
+    S_(4, 'initial', 'agreed', 'every Class 11–12 chapter at least Learning', { test: { cls: [11, 12], min: 'learning' } }),
+    S_(4, 'middle', 'agreed', 'every Class 11–12 chapter Proven (retention evidence included)', { test: { cls: [11, 12], min: 'proven' } }),
+    S_(4, 'upper', 'proposed', 'Rank 4 middle, plus at least 50% of the frozen valid question bank completed independently in each subject.', { test: { cls: [11, 12], min: 'proven', bank: 50 }, src: BRIEF, why: 'Independent problem-solving on the agreed bank, on the way to the whole bank at Rank 5.' }),
+    S_(4, 'peak', 'proposed', 'Rank 4 middle, plus at least 90% of the frozen valid question bank completed independently in each subject.', { test: { cls: [11, 12], min: 'proven', bank: 90 }, src: BRIEF, why: 'Leaves only the last 10% and the B2 certificate for Rank 5 initial.' }),
+    S_(5, 'initial', 'agreed', 'all PCM Proven, the whole agreed valid question bank completed independently, and a recognised external German B2 certificate', { test: { cls: [11, 12], min: 'proven', bank: 100, b2: true } }),
+    S_(5, 'middle', 'proposed', 'A later sampled PCM retention assessment, plus mastery of defined introductory undergraduate mathematics and physics units.', { src: BRIEF, pending: 'the sampled retention assessment and the introductory undergraduate units are not defined', why: 'Rank 5’s later stages combine retained PCM mastery with undergraduate progress (agreed direction).' }),
+    S_(5, 'upper', 'proposed', 'A substantial independent synthesis project, plus unfamiliar undergraduate mathematical-methods applications.', { src: BRIEF, pending: 'the project rubric and the mathematical-methods units are not defined', why: 'Applying knowledge to unfamiliar problems, beyond practised ones. One developing project may serve Upper and Peak.' }),
+    S_(5, 'peak', 'proposed', 'A cumulative assessment combining retained foundations and undergraduate knowledge, plus a defence of the project’s assumptions, limitations and validation.', { src: BRIEF, pending: 'the cumulative assessment is not defined', why: 'Combines retention, new knowledge and the ability to defend your own work.' }),
+    S_(6, 'initial', 'undefined', 'Demonstrated mastery of a defined first-year undergraduate foundation — not enrolment.', { agreedIdea: true, missing: U_UNITS }),
+    S_(6, 'middle', 'proposed', 'The Rank 6 foundation units retained on a later sampled check (closed-book, independent), at least 30 days after Rank 6 initial.', { src: HERE, pending: 'needs ' + U_UNITS, why: 'Mirrors the agreed proof-then-retention pattern: mastery must last, not just pass once.' }),
+    S_(6, 'upper', 'proposed', 'An independent laboratory or numerical project using the foundation units, defended (assumptions, uncertainty, validation).', { src: HERE, pending: 'needs the units and a project rubric', why: 'Adds the experimental and computational side of a first-year foundation.' }),
+    S_(6, 'peak', 'proposed', 'A cumulative closed-book assessment at the level of a real first-year end-of-year exam, across every foundation unit.', { src: HERE, pending: 'needs the units and a source exam to benchmark against', why: 'The whole first year at once, at a real university standard.' })
   ];
-  // gates(v, ctx): v = cultivation() output (Class 11). ctx: { class12: null | per-subject Gu, bank, b2, earned }.
-  function gates(v, ctx = {}) {
-    const earned = new Set((ctx.earned || []).map(e => e.gate)), out = []; let prevMet = true;
-    for (const g of GATES) {
-      let status, why = '';
-      if (g.roadmap) { status = 'roadmap'; why = 'academic content not yet defined'; }
-      else if (!v.ed || !v.ed.complete) { status = 'unknown'; why = 'Class 11 catalogue incomplete: ' + (v.ed ? v.ed.missing.join(', ') : 'missing'); }
-      else if (v.ed.provisional) { status = 'provisional'; why = 'the catalogue uses published plans you have not confirmed: ' + (v.ed.provisionalWhy || []).join('; '); }
-      else if (g.cls.includes(12) && !ctx.class12) { status = 'provisional'; why = 'Class 12 catalogue incomplete (Lakshya JEE 2028 not catalogued)'; }
-      else {
-        const per = SUBS.map(s => { const gu = (v.subjects[s] ? v.subjects[s].gu : []).concat(ctx.class12 ? ctx.class12[s] || [] : []); return { s, ok: gu.length > 0 && gu.every(x => LV[x.level] >= LV[g.min]) && gu.every(x => x.acq === 'obtained'), short: gu.filter(x => LV[x.level] < LV[g.min]).length }; });
-        const ext = (g.external || []).filter(x => !(ctx[x] && ctx[x].verified));
-        status = per.every(p => p.ok) && !ext.length ? 'met' : 'not-yet';
-        why = per.filter(p => !p.ok).map(p => `${p.s}: ${p.short} chapter${p.short === 1 ? '' : 's'} below ${g.min}`).concat(ext.map(x => x === 'b2' ? 'external B2 certificate not recorded' : 'valid bank not completed')).join('; ');
-      }
-      if (status === 'met' && !prevMet) { status = 'not-yet'; why = 'an earlier milestone is still a prerequisite'; } // earlier milestones stay binding
-      const kept = earned.has(g.id);
-      out.push({ id: g.id, name: g.name, needs: g.needs, status: kept ? 'earned' : status, now: status, why, refresh: kept && status !== 'met' ? 'earned and kept; some evidence needs refreshing before the next advance' : '' });
-      prevMet = kept || status === 'met';
+  for (const r of [7, 8]) for (const st of STAGE_N) LADDER.push(S_(r, st, 'undefined', 'Requirements pending definition.', { missing: 'the content between the first-year foundation and bachelor’s completion (second- and third-year units), research required' }));
+  LADDER.push(S_(9, 'initial', 'undefined', 'Bachelor’s completion, approaching master’s study.', { agreedIdea: true, missing: 'the degree’s defined content; the agreed milestone names Rank 9 but not which stage, so it is shown at Initial for you to confirm' }));
+  for (const st of STAGE_N.slice(1)) LADDER.push(S_(9, st, 'undefined', 'Requirements pending definition.', { missing: 'beyond the agreed bachelor’s milestone; nothing defined' }));
+  const GATES = LADDER.filter(g => g.def === 'agreed'); // the agreed anchors, kept for older readers
+  const ORDER = id => LADDER.findIndex(g => g.id === id);
+
+  // per-subject weighted progress of a list of Gu (weight × share), as cultivation() computes it for Class 11
+  const pctOf = gu => { const W = gu.reduce((a, g) => a + (g.weight || g.lectures || 1), 0); return W ? Math.round(1000 * gu.reduce((a, g) => a + (g.weight || g.lectures || 1) * (g.share || 0) / 100, 0) / W) / 10 : 0; };
+  // one stage against the evidence. now: met | not-yet | unknown | provisional. have = supporting evidence, left = what remains.
+  function evaluate(g, v, ctx) {
+    const t = g.test, have = [], left = [], unknown = [];
+    if (g.def === 'undefined') return { now: 'unknown', why: 'requirements pending definition: ' + g.missing, have, left: ['definition: ' + g.missing], tag: 'pending definition' };
+    if (!t) return { now: 'unknown', why: 'cannot be evaluated yet: ' + g.pending, have, left: [g.pending], tag: 'pending definition' };
+    if (!v.ed || !v.ed.complete) return { now: 'unknown', why: 'Class 11 catalogue incomplete: ' + (v.ed ? v.ed.missing.join(', ') : 'missing'), have, left, tag: 'catalogue', cat: true };
+    if (v.ed.provisional) return { now: 'provisional', why: 'the catalogue uses published plans you have not confirmed: ' + (v.ed.provisionalWhy || []).join('; '), have, left, tag: 'catalogue', cat: true };
+    if (t.cls && t.cls.includes(12) && !ctx.class12) return { now: 'provisional', why: 'Class 12 catalogue incomplete (Lakshya JEE 2028 not catalogued)', have, left, tag: 'Class 12 catalogue', cat: true };
+    if (t.pct != null) for (const s of SUBS) { const p = v.subjects[s] ? v.subjects[s].pct || 0 : 0; (p >= t.pct ? have : left).push(`${s}: ${p}% of ${t.pct}%`); }
+    if (t.cls) for (const s of SUBS) {
+      const gu = (v.subjects[s] ? v.subjects[s].gu : []).concat(ctx.class12 ? ctx.class12[s] || [] : []);
+      const short = gu.filter(x => LV[x.level] < LV[t.min] || x.acq !== 'obtained').length;
+      (gu.length && !short ? have : left).push(gu.length && !short ? `${s}: every chapter ${t.min}` : `${s}: ${short || 'no'} chapter${short === 1 ? '' : 's'} below ${t.min}`);
     }
+    if (t.pct12 != null) for (const s of SUBS) { const p = pctOf(ctx.class12[s] || []); (p >= t.pct12 ? have : left).push(`${s} Class 12: ${p}% of ${t.pct12}%`); }
+    if (t.bank != null) {
+      const b = ctx.bank;
+      if (t.bank === 100 && b && b.verified) have.push('whole valid bank completed independently');
+      else if (!b || !b.edition && !b.verified) unknown.push('the valid question bank edition is not frozen yet');
+      else for (const s of SUBS) { const p = (b.pct || {})[s]; if (p == null) unknown.push(`${s}: bank progress unknown`); else (p >= t.bank ? have : left).push(`${s} bank: ${p}% of ${t.bank}%`); }
+    }
+    if (t.b2) (ctx.b2 && ctx.b2.verified ? have : left).push(ctx.b2 && ctx.b2.verified ? 'external B2 certificate recorded' : 'external B2 certificate not recorded');
+    const now = left.length ? 'not-yet' : unknown.length ? 'unknown' : 'met';
+    return { now, why: left.concat(unknown).join('; '), have, left: left.concat(unknown), tag: unknown.length && !left.length ? 'bank edition' : '' };
+  }
+  // The whole ladder with display kinds: earned | current | upcoming | proposed | roadmap | insufficient.
+  // Only agreed stages and proposals you approved count; earlier counted stages stay binding prerequisites.
+  function ladder(v, ctx = {}) {
+    const earned = new Set((ctx.earned || []).map(e => e.gate)), ok = new Set((ctx.approved || []).map(a => a.id));
+    const top = Math.max(-1, ...[...earned].map(ORDER));
+    let prevMet = true, cur = false; const out = [];
+    LADDER.forEach((g, i) => {
+      const e = evaluate(g, v, ctx), active = g.def === 'agreed' || g.def === 'proposed' && ok.has(g.id) && !g.pending;
+      const kept = earned.has(g.id), implied = !kept && i < top;
+      let now = e.now, why = e.why;
+      if (active && now === 'met' && !prevMet) { now = 'not-yet'; why = 'an earlier stage is still a prerequisite'; }
+      let kind;
+      if (kept || implied) kind = 'earned';
+      else if (g.def === 'undefined') kind = 'roadmap';
+      else if (!active) kind = 'proposed';
+      else if (now === 'unknown' || now === 'provisional') kind = 'insufficient';
+      else kind = cur ? 'upcoming' : 'current';
+      if (active && !kept && !implied && kind !== 'insufficient' && !cur) cur = true;
+      if (active && !kept && !implied && kind === 'insufficient' && !cur) cur = true; // the next stage is the one you work on, even without data
+      out.push(Object.assign({}, g, { kind, now, why, have: e.have, left: e.left, tag: e.tag, cat: !!e.cat, active, approved: ok.has(g.id), implied,
+        refresh: kept && now !== 'met' && g.def !== 'undefined' ? 'earned and kept; some evidence needs refreshing before the next advance' : '' }));
+      if (active || kept) prevMet = kept || implied || now === 'met';
+    });
     return out;
   }
+  // gates(): the counted stages only (agreed + approved proposals), in the shape older readers expect
+  function gates(v, ctx = {}) {
+    return ladder(v, ctx).filter(g => g.active).map(g => ({ id: g.id, name: g.name, needs: g.needs, status: g.kind === 'earned' ? 'earned' : g.now, now: g.now, why: g.why, refresh: g.refresh }));
+  }
+  // approving a proposed criterion is your decision, append-only like earning; undefined stages and pending proposals can't be approved
+  function approve(list, id, now) { const g = LADDER.find(x => x.id === id); if (!g || g.def !== 'proposed' || g.pending || (list || []).some(a => a.id === id)) return list || []; return (list || []).concat({ id, at: now, by: 'you approved' }); }
   // Permanence: recording a stage is append-only and needs your acceptance; re-recording is a no-op; nothing ever removes one.
   function earn(earned, gate, now, edition) { if ((earned || []).some(e => e.gate === gate)) return earned; return (earned || []).concat({ gate, at: now, edition, by: 'you accepted' }); }
   // Immortal Gu: separate from chapter Gu. A record only counts when every check below is complete; nothing is generated or awarded here.
   const IMMORTAL_RUBRIC = ['substantially fresh challenge of comparable reasoning difficulty to your benchmark', 'solution and rubric checked before the attempt, each check’s coverage recorded (script, source, expert where possible)', 'independent attempt without solution-bearing hints', 'a defence of your assumptions and checks', 'a suitable unseen extension'];
   function immortalValid(r) { return !!(r && r.fresh && Array.isArray(r.checks) && r.checks.length && r.checks.every(c => c.kind !== 'same-model') && r.independent && r.defence && r.extension && r.verifiedBy && !/model|ai/i.test(r.verifiedBy)); }
   // Blessed land: unlocks at Rank 4 initial OR the first valid Immortal Gu. Prior achievements count when it opens; features develop once.
-  function land(earned, immortals) { const r4 = (earned || []).some(e => ['r4-initial', 'r4-middle', 'r5-initial', 'r6-initial'].includes(e.gate)); const im = (immortals || []).filter(immortalValid); return { unlocked: r4 || im.length > 0, why: r4 ? 'Cultivator Rank 4' : im.length ? 'first Immortal Gu' : 'opens at Rank 4 or with your first Immortal Gu' }; }
-  window.KgRank = { GATES, gates, earn, land, immortalValid, IMMORTAL_RUBRIC, LV };
+  function land(earned, immortals) { const r4 = (earned || []).some(e => { const m = /^r(\d+)-/.exec(e.gate || ''); return m && +m[1] >= 4; }); const im = (immortals || []).filter(immortalValid); return { unlocked: r4 || im.length > 0, why: r4 ? 'Cultivator Rank 4' : im.length ? 'first Immortal Gu' : 'opens at Rank 4 or with your first Immortal Gu' }; }
+  window.KgRank = { GATES, LADDER, STAGE_N, ladder, gates, evaluate, approve, earn, land, immortalValid, IMMORTAL_RUBRIC, LV };
 
   const M = window.MoonLab; if (!M || !M.PANELS || !window.KgCult) return;
   const K = window.KgCult, esc = M.esc, read = () => K.readStore(localStorage);
@@ -16423,13 +16490,34 @@ Rules: a right final answer with invalid reasoning gets method 0 or 1. A minor a
     const pts = gu.slice(0, 24).map((g, i) => { const x = 40 + (i * 97) % 520, y = 150 + ((i * 53) % 90); return `<g><title>${esc(g.name)} · ${esc(g.level)}</title><circle cx="${x}" cy="${y}" r="${4 + (K.SHARE[g.level] || 0) / 20}" fill="${g.level === 'proven' ? '#f5d27a' : g.level === 'none' ? '#5b5675' : '#9bd3a6'}"/></g>`; }).join('');
     return `<svg viewBox="0 0 600 280" role="img" aria-label="Blessed land preview: hills, a river and scattered buildings" style="width:100%;height:auto;border-radius:12px;background:#1c2a3a"><path d="M0 170 Q120 110 240 160 T480 140 T600 150 V280 H0Z" fill="#2f5a46"/><path d="M0 210 Q150 180 300 220 T600 200 V280 H0Z" fill="#3b6e52"/><path d="M60 280 C140 230 260 250 330 205 S520 170 600 185" stroke="#7fb6d9" stroke-width="10" fill="none" opacity=".8"/><rect x="420" y="128" width="18" height="16" fill="#d9c79a"/><path d="M416 128 L429 116 L442 128Z" fill="#a35d4a"/><rect x="150" y="146" width="16" height="13" fill="#d9c79a"/><path d="M146 146 L158 135 L170 146Z" fill="#a35d4a"/>${pts}</svg>`;
   }
+  const KIND = { earned: 'Earned', current: 'Current', upcoming: 'Upcoming', proposed: 'Proposed — not active', roadmap: 'Roadmap', insufficient: 'Insufficient data' };
+  const DEF = { agreed: 'Agreed', proposed: 'Proposed — not active', undefined: 'Requirements pending definition' };
+  const ctxOf = st => ({ earned: st.earned, approved: st.rankApproved, bank: st.bankDone, b2: st.b2 });
+  function stageRow(g) {
+    const def = g.def !== 'proposed' ? DEF[g.def] : g.approved ? 'approved by you' : g.pending ? 'needs definition first' : g.src === BRIEF ? 'from your earlier brief' : 'new proposal';
+    const prev = g.kind === 'proposed' ? `Preview, not counted: ${g.now === 'met' ? 'would be met' : g.now === 'not-yet' ? 'not yet' : 'insufficient data'}` : '';
+    return `<li class="krk-st krk-${g.kind}"><div class="krk-top"><b>${esc(g.stage[0].toUpperCase() + g.stage.slice(1))}</b><span class="krk-chip krk-c-${g.kind}">${KIND[g.kind]}${g.implied ? ' · implied by a later stage' : ''}</span><span class="krk-def">${esc(def)}</span></div>
+      <p class="krk-need">${esc(g.needs)}</p>
+      ${g.have && g.have.length && g.kind !== 'roadmap' ? `<p class="kl-small">Evidence: ${g.have.map(esc).join(' · ')}</p>` : ''}
+      ${g.kind === 'earned' ? (g.refresh ? `<p class="kl-small">${esc(g.refresh)}</p>` : '') : g.kind === 'roadmap' ? `<p class="kl-small">Missing specification: ${esc(g.missing)}</p>`
+        : g.cat ? `<p class="kl-small">Insufficient data: ${esc(g.tag)} (see the note above).</p>` : g.left && g.left.length ? `<p class="kl-small">Remaining: ${g.left.map(esc).join(' · ')}</p>` : ''}
+      ${prev ? `<p class="kl-small">${prev}</p>` : ''}
+      ${g.why && g.def !== 'agreed' && g.src ? `<details class="kl-small"><summary>Rationale</summary>${esc(g.why || '')} <i>Source: ${esc(g.src)}.</i></details>` : ''}
+      ${g.kind === 'current' && g.now === 'met' ? `<button class="kl-primary" data-a="rearn" data-g="${g.id}">Accept · earned stages are permanent</button>` : ''}
+      ${g.kind === 'proposed' && !g.pending ? `<button class="kl-ghost" data-a="rapprove" data-g="${g.id}">Approve this criterion</button>` : ''}</li>`;
+  }
   M.PANELS.ranks = () => {
-    const st = read(), v = K.cultivation(M.L, null, st), gs = gates(v, { earned: st.earned, bank: st.bankDone, b2: st.b2 }), ld = land(st.earned, st.immortals);
-    const gu = Object.values(v.subjects).flatMap(s => s.gu);
-    return `<section class="kl-card kl-stack"><p class="kl-eyebrow">CULTIVATOR RANK · MILESTONES</p><h3>Fixed milestones, from your evidence</h3>
-      <p class="kl-small">Ranks never limit which Gu you study, and your academic region follows what you study. Earned stages are permanent; a later gap only asks for refreshing before the next advance. No starting rank is shown while the catalogue is incomplete, and missing data never counts as a low rank.</p>
-      ${gs.map(g => `<div class="kl-li"><span><b>${esc(g.name)}</b> · ${esc(g.needs)}<br><span class="kl-small">${ST[g.status]}${g.why ? ' · ' + esc(g.why) : ''}${g.refresh ? ' · ' + esc(g.refresh) : ''}</span></span>${g.status === 'met' ? `<button data-a="rearn" data-g="${g.id}">Accept</button>` : ''}</div>`).join('')}
-      <p class="kl-small">Intermediate thresholds and undergraduate units are provisional and aren't gated yet. Chapter weights stay provisional; changing one never revokes a stage.</p></section>
+    const st = read(), v = K.cultivation(M.L, null, st), lad = ladder(v, ctxOf(st)), ld = land(st.earned, st.immortals);
+    const gu = Object.values(v.subjects).flatMap(s => s.gu), cats = [...new Set(lad.filter(g => g.cat).map(g => g.why))];
+    const count = k => lad.filter(g => g.def === k).length, cur = lad.find(g => g.kind === 'current' || g.kind === 'insufficient' && g.active && !lad.some(x => x.kind === 'current'));
+    const rankBlock = r => { const rows = lad.filter(g => g.rank === r); return `<div class="krk-rank"><p class="kl-eyebrow">RANK ${r}</p><ol class="krk-stages">${rows.map(stageRow).join('')}</ol></div>`; };
+    return `<section class="kl-card kl-stack"><p class="kl-eyebrow">CULTIVATOR RANK · FULL LADDER</p><h3>Ranks 1–9, Initial → Middle → Upper → Peak</h3>
+      <p class="kl-small">Ranks never limit which Gu you study, and your academic region follows what you study. Earned stages are permanent; a later gap only asks for refreshing before the next advance. Missing data never counts as a low rank. Chapter weights stay provisional; changing one never revokes a stage.</p>
+      <p class="kl-small">${count('agreed')} agreed stages count automatically. ${count('proposed')} are proposals: shown with a preview, counted only once you approve them. ${count('undefined')} are roadmap stages with requirements pending definition. ${cur ? `Working on: <b>${esc(cur.name)}</b>.` : ''}</p>
+      <p class="krk-legend">${Object.entries(KIND).map(([k, t]) => `<span class="krk-chip krk-c-${k}">${t}</span>`).join(' ')}</p>
+      ${cats.length ? `<div class="krk-warn"><b>Some stages can't be evaluated yet: catalogue data is missing or unconfirmed.</b> They show “Insufficient data”, never failure. <details><summary>Source details</summary><ul>${cats.map(w => `<li>${esc(w)}</li>`).join('')}</ul></details></div>` : ''}
+      ${[1, 2, 3, 4, 5, 6].map(rankBlock).join('')}
+      <details class="krk-road"><summary><b>Roadmap · Ranks 7–9</b> <span class="kl-small">· not earnable yet; Rank 9 is your agreed bachelor’s milestone</span></summary>${[7, 8, 9].map(rankBlock).join('')}</details></section>
       <section class="kl-card kl-stack"><p class="kl-eyebrow">IMMORTAL GU</p><p class="kl-small">Separate from Rank 1–5 chapter Gu, and only for exceptional independent work. A record needs: ${IMMORTAL_RUBRIC.map(esc).join('; ')}. None recorded. Two models agreeing is never a check.</p></section>
       <section class="kl-card kl-stack"><p class="kl-eyebrow">BLESSED LAND</p>${ld.unlocked ? '<p>Your land is open.</p>' : `<p class="kl-small">Locked: ${esc(ld.why)}. When it opens, everything you've already achieved grows there at once. It has no upkeep, decay, currency or missed-day penalties.</p>`}
       <button class="kl-ghost" data-a="rpreview" aria-expanded="${preview}">${preview ? 'Hide' : 'Show'} the development preview</button>
@@ -16437,7 +16525,16 @@ Rules: a right final answer with invalid reasoning gets method 0 or 1. A minor a
   };
   M.SECTIONS.progress.push(['ranks', '⛰ Cultivator rank']);
   M.ACTIONS.rpreview = () => { preview = !preview; M.render(); };
-  M.ACTIONS.rearn = b => { const st = read(), v = K.cultivation(M.L, null, st), g = gates(v, { earned: st.earned, bank: st.bankDone, b2: st.b2 }).find(x => x.id === b.dataset.g); if (!g || g.status !== 'met') return; if (!confirm(`Record ${g.name}? Earned stages are permanent.`)) return; st.earned = earn(st.earned, g.id, Date.now(), v.ed.id); st.log = (st.log || []).concat({ at: Date.now(), what: 'earned ' + g.id }); localStorage.setItem(K.STORE, JSON.stringify(st)); M.render(); };
+  M.ACTIONS.rearn = b => { const st = read(), v = K.cultivation(M.L, null, st), g = gates(v, ctxOf(st)).find(x => x.id === b.dataset.g); if (!g || g.status !== 'met') return; if (!confirm(`Record ${g.name}? Earned stages are permanent.`)) return; st.earned = earn(st.earned, g.id, Date.now(), v.ed.id); st.log = (st.log || []).concat({ at: Date.now(), what: 'earned ' + g.id }); localStorage.setItem(K.STORE, JSON.stringify(st)); M.render(); };
+  M.ACTIONS.rapprove = b => { const st = read(), g = LADDER.find(x => x.id === b.dataset.g); if (!g || g.def !== 'proposed' || g.pending) return;
+    if (!confirm(`Approve the proposed criterion for ${g.name}?\n\n“${g.needs}”\n\nIt will then count toward your rank. Earned stages stay permanent either way.`)) return;
+    st.rankApproved = approve(st.rankApproved, g.id, Date.now()); st.log = (st.log || []).concat({ at: Date.now(), what: 'approved criterion ' + g.id }); localStorage.setItem(K.STORE, JSON.stringify(st)); M.render(); };
+  const rcss = document.createElement('style'); rcss.textContent = `.krk-rank{margin-top:10px}.krk-stages{list-style:none;margin:0;padding:0;display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+    .krk-st{padding:10px 12px;border-radius:10px;border:1px solid var(--desk-line,#5a3d26);background:var(--desk-soft,#33201a)}.krk-st p{margin:4px 0}.krk-top{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+    .krk-chip{font:600 11px/1 Georgia,serif;padding:4px 8px;border-radius:999px;border:1px solid currentColor}.krk-def{font-size:11px;opacity:.75}.krk-need{font-size:13px}
+    .krk-c-earned{color:#f5d27a}.krk-c-current{color:#9fd8c4}.krk-c-upcoming{color:#cfc3a8}.krk-c-proposed{color:#c9a6ff}.krk-c-roadmap{color:#8f8a9e}.krk-c-insufficient{color:#e7a07a}
+    .krk-earned{border-color:#f5d27a}.krk-current{border-color:#9fd8c4;box-shadow:0 0 0 1px #9fd8c4 inset}.krk-roadmap{opacity:.8;border-style:dashed}.krk-proposed{border-style:dashed}
+    .krk-warn{padding:10px 12px;border-radius:10px;border:1px solid #e7a07a;background:rgba(231,160,122,.08)}.krk-legend{display:flex;flex-wrap:wrap;gap:6px}`; document.head.appendChild(rcss);
 })();
 </script>
 <script id="kg-cult-quarters-script">
@@ -16638,7 +16735,7 @@ function serpentSVG(o) {
   function identity(data) {
     const v = data.v, st = data.st, g = current(v), needs = placementNeeds(v);
     let rank = { t: 'Placement not established', why: '', needs, a: 'data-qsetup="1"' };
-    const gs = R ? R.gates(v, { earned: st.earned, bank: st.bankDone, b2: st.b2 }) : [], earned = gs.filter(x => x.status === 'earned').pop(), met = gs.find(x => x.status === 'met');
+    const gs = R ? R.gates(v, { earned: st.earned, approved: st.rankApproved, bank: st.bankDone, b2: st.b2 }) : [], earned = gs.filter(x => x.status === 'earned').pop(), met = gs.find(x => x.status === 'met');
     if (earned) rank = { t: earned.name, why: '' };
     else if (met) rank = { t: met.name + ' · ready to accept', why: '' };
     else if (v.placement === 'not-computed') rank.why = `the catalogue is incomplete for ${(v.why || []).map(x => SUBJ[x] || x).join(', ')}`;
