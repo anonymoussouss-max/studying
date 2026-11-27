@@ -16263,8 +16263,8 @@ You entered 25</pre></div>
 /* ---------- Opening greeting: a line on screen and your own audio clip each time the desk opens. ----------
    The clip stays on this device (its own IndexedDB), never in the site's code or in sync. Settings → Opening greeting. */
 (function () {
-  const KEY = 'kg-greet-v1', DEF = 'You are an amazing guy, Ayan';
-  const cfg = () => { try { return Object.assign({ on: true, text: DEF }, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { return { on: true, text: DEF }; } };
+  const KEY = 'kg-greet-v1', DEF = '', OLD = 'You are an amazing guy, Ayan'; // no default line; the old one is dropped from saved settings
+  const cfg = () => { let c; try { c = Object.assign({ on: true, text: DEF }, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { c = { on: true, text: DEF }; } if (c.text === OLD) c.text = ''; return c; };
   const setCfg = c => localStorage.setItem(KEY, JSON.stringify(c));
   const db = () => new Promise((ok, no) => { const r = indexedDB.open('kg-greet', 1); r.onupgradeneeded = () => r.result.createObjectStore('f'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
   const idb = async (mode, fn) => { const d = await db(); return new Promise((ok, no) => { const t = d.transaction('f', mode), q = fn(t.objectStore('f')); t.oncomplete = () => { d.close(); ok(q && q.result); }; t.onerror = t.onabort = () => { d.close(); no(t.error); }; }); };
@@ -16279,7 +16279,7 @@ You entered 25</pre></div>
     ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Opening greeting');
     ov.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;background:radial-gradient(circle at 50% 40%,#2a2350,#0d0b1d 70%);color:#f5e9c8;text-align:center;cursor:pointer;transition:opacity .6s';
     ov.innerHTML = '<p style="font:600 clamp(26px,6vw,54px)/1.2 Georgia,serif;margin:0;max-width:16em;text-shadow:0 0 24px rgba(245,210,122,.45)"></p><p class="kg-greet-hint" style="font:14px system-ui,sans-serif;opacity:.75;margin:0"></p><button type="button" style="font:14px system-ui,sans-serif;padding:8px 18px;border-radius:999px;border:1px solid #f5d27a;background:transparent;color:#f5e9c8;cursor:pointer">Continue to the desk</button>';
-    ov.firstChild.textContent = text;
+    ov.firstChild.textContent = text; if (!text) ov.firstChild.remove();
     const hint = ov.querySelector('.kg-greet-hint'), btn = ov.querySelector('button');
     let audio = null, url = '';
     const close = () => { if (audio) { audio.pause(); } if (url) URL.revokeObjectURL(url); ov.style.opacity = '0'; setTimeout(() => ov.remove(), 600); document.removeEventListener('keydown', onKey); };
@@ -16297,7 +16297,7 @@ You entered 25</pre></div>
   async function start() {
     const c = cfg(); if (!c.on) return;
     const clip = await getClip();
-    show(c.text || DEF, clip && clip.blob);
+    show(c.text, clip && clip.blob);
   }
   window.KgGreet = { cfg, DEF };
   if (document.readyState === 'complete') start(); else window.addEventListener('load', start, { once: true });
@@ -16306,12 +16306,12 @@ You entered 25</pre></div>
   M.SECTIONS.settings.push(['greeting', '👋 Opening greeting']);
   M.PANELS.greeting = () => { const c = cfg(); return `<section class="kl-card kl-stack"><p class="kl-eyebrow">OPENING GREETING</p><h3>What you see and hear when the desk opens</h3>
     <form data-f="greet" class="kl-stack"><label class="kl-row"><input type="checkbox" name="on" ${c.on ? 'checked' : ''}> Show it every time the desk opens</label>
-    <input name="text" maxlength="120" value="${M.esc(c.text)}" aria-label="Greeting text"><button>Save</button></form>
+    <input name="text" maxlength="120" value="${M.esc(c.text)}" aria-label="Greeting text" placeholder="Optional line (leave empty for none)"><button>Save</button></form>
     <p class="kl-small">Audio: ${clipInfo ? `${M.esc(clipInfo.name)} (${Math.round(clipInfo.size / 1024 / 102.4) / 10} MB), stored on this device only` : 'none yet'}. A video file works too; only its sound plays. The clip isn't uploaded, synced or included in backups, so keep your copy of the file.</p>
     <div class="kl-row"><label class="kl-ghost">Choose audio or video file <input type="file" accept="audio/*,video/mp4,video/webm" data-greetfile hidden></label>${clipInfo ? '<button class="kl-ghost" data-a="greetplay">Preview</button><button class="kl-ghost" data-a="greetdel">Remove clip</button>' : ''}</div>
     <p class="kl-small">Browsers may block sound until you tap the page; if so, the greeting says "Tap anywhere to play".</p></section>`; };
-  M.FORMS.greet = v => { setCfg({ on: !!v.on, text: String(v.text || '').trim() || DEF }); M.render(); };
-  M.ACTIONS.greetplay = async () => { const clip = await getClip(); show(cfg().text || DEF, clip && clip.blob); };
+  M.FORMS.greet = v => { setCfg({ on: !!v.on, text: String(v.text || '').trim() }); M.render(); };
+  M.ACTIONS.greetplay = async () => { const clip = await getClip(); show(cfg().text, clip && clip.blob); };
   M.ACTIONS.greetdel = async () => { if (!confirm('Remove the greeting clip from this device? Your own copy of the file is not affected.')) return; await delClip(); clipInfo = null; M.render(); };
   document.addEventListener('change', async e => {
     const t = e.target; if (!t.dataset || !('greetfile' in t.dataset) || !t.files || !t.files[0]) return;

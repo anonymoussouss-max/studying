@@ -2,8 +2,8 @@
 const test = require('node:test'), assert = require('node:assert'), fs = require('fs'), path = require('path');
 const html = fs.readFileSync(process.env.KG_INDEX || path.join(__dirname, '..', 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 const src = /<script id="kg-greet-script">([\s\S]*?)<\/script>/.exec(html)[1];
-test('greeting runs on every open unless switched off, with the requested line as the default', () => {
-  assert.ok(src.includes("DEF = 'You are an amazing guy, Ayan'"));
+test('greeting runs on every open unless switched off, with no default line (the old one is dropped from saved settings)', () => {
+  assert.ok(src.includes("DEF = ''")); assert.ok(src.includes("if (c.text === OLD) c.text = ''")); assert.ok(src.includes('if (!text) ov.firstChild.remove()'));
   assert.ok(src.includes("window.addEventListener('load', start, { once: true })"));
   assert.ok(src.includes('document.documentElement.appendChild(ov)'), 'kept outside <body>, which the desk re-renders on start');
   assert.ok(/if \(!c\.on\) return;/.test(src));
