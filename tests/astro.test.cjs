@@ -98,3 +98,13 @@ test("hours targets: the day's study matches 4-7 h, 8 h stops at what fits befor
   assert.strictEqual(sum(study(SP.templateDay({ syl: SP.seedSyllabus(), sched: { reading: false, wake: { '2026-11-29': 720 }, hours: { '2026-11-29': 8 } } }, '2026-11-29', 0, -1, C0)), r => r.subj !== 'german' && !r.optional), sum(study(SP.templateDay({ syl: SP.seedSyllabus(), sched: { reading: false, wake: { '2026-11-29': 720 } } }, '2026-11-29', 0, -1, C0)), r => r.subj !== 'german' && !r.optional), 'Sunday stays light');
   assert.strictEqual(sum(study(SP.templateDay(lab({ min: 30 }, { hours: { [MON]: 4 } }), MON, 1, -1, C0)), r => r.subj === 'astro'), 30, 'course time still fits inside a 4 h day');
 });
+
+test('retired (27 Nov 2026): replaced by the Coursera courses — no course time, no deadline proposals, no Study tab; records are kept', () => {
+  const L = lab({ min: 30 }); L.astro.retired = { at: '2026-11-27' }; L.astro.tasks = [{ id: 't1', title: 'Quiz 1', due: '2026-11-26', dueOk: true, mins: 240, done: false }];
+  assert.strictEqual(SP.astroConflicts(L, MON).length, 0);
+  const mod = html.slice(html.indexOf("const FOLDER = 'https://drive.google.com"), html.indexOf("M.PANELS.astro = "));
+  assert.match(mod, /if \(!C\(\)\.retired\) \{[^\n]*a\.min = 0; delete a\.boost;/, 'the one-time retirement returns course time to PCM');
+  assert.match(html, /if \(!C\(\)\.retired\) M\.SECTIONS\.study\.push\(\['astro'/);
+  assert.ok(!/delete L\.astro|L\.astro = null|lectures = \[\]/.test(mod), 'nothing is deleted');
+  assert.ok(!html.includes("['🔭 Astrophysics course', 'study:astro']"), 'no shelf link to the course');
+});
