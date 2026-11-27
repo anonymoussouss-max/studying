@@ -150,12 +150,14 @@ test('home: painted by default, every old door has an object, labels appear on h
   const st = fakeStage(), { Kq, writes } = load({ stage: st });
   assert.ok(st.cls.has('kqp-painted'));
   assert.match(st.html, /quarters\/room-plate\.webp/);
-  const targets = [...Kq.HOME.map(h => h[0] === 'qtable' ? 'study:session' : h[1])];
-  for (const sec of ['today', 'study', 'library', 'plan', 'progress', 'company', 'settings']) assert.ok(targets.some(t => t.split(':')[0] === sec), 'no object for ' + sec);
+  // travel: the cabinet, writing table and doorway are objects; the doorway lists every other destination
+  const targets = [...Kq.HOME.map(h => h[1])];
+  for (const t of ['study:cultivation', 'today', 'doorway', 'library:courses', 'plan', 'settings', 'company']) assert.ok(targets.includes(t), 'no object for ' + t);
   assert.match(st.html, /<svg class="kqp-home" /, 'labels hidden until hover or focus');
-  assert.match(st.html, /id="kqp-table" tabindex="0" role="button" aria-label="Begin studying · writing table"/);
-  assert.match(st.html, /data-kv="plan" tabindex="0" role="button" aria-label="Planner · notebook"/);
-  assert.match(st.html, /<details class="kqp-guide"><summary>Room guide<\/summary>/);
+  assert.match(st.html, /data-kv="today" tabindex="0" role="button" aria-label="Writing table"/);
+  assert.match(st.html, /data-kt="doorway" tabindex="0" role="button" aria-label="Doorway · every destination"/);
+  assert.ok(!/data-qtable/.test(st.html), 'the writing table opens the daily leaf, never a session');
+  assert.match(st.html, /<details class="kqp-guide"><summary>Destinations<\/summary>/);
   assert.match(st.html, /class="kqp-id"[\s\S]*<b>Southern Border<\/b><span>Studying Mathematics<\/span>/);
   assert.ok(!/iroha-desk|kaguya-still/.test(st.html), 'the live companions stay; no painted duplicates');
   assert.deepStrictEqual(writes, []);
