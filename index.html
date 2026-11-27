@@ -1331,7 +1331,7 @@ body.habit-shh #hb-session-card {text-align:center;}
   function addDays(d,k){const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+k);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');}
   // deadline conflicts: confirmed due dates whose remaining work does not fit the course time before them
   // (course days are Monday-Saturday; days off are not counted). Proposes a temporary daily amount, never above 120 min, always replacing PCM.
-  function astroConflicts(L,d){const C=L.astro||{},S=schedOf(L),out=[];let need=0;
+  function astroConflicts(L,d){const C=L.astro||{},S=schedOf(L),out=[];let need=0;if(C.retired)return out;
     const due=(C.tasks||[]).filter(t=>t&&!t.done&&t.due&&t.dueOk&&t.due>=d&&+t.mins>0).sort((a,b)=>a.due.localeCompare(b.due)); // only tasks with your own time estimate
     for(const t of due){need+=Math.max(10,+t.mins);let avail=0,days=0;for(let x=d;x<t.due;x=addDays(x,1)){const dow=new Date(x+'T12:00:00').getDay();if(dow===0||((L.dayTypes||{})[x]||{}).t==='rest')continue;days++;avail+=astroMinutes(S,x);}
       if(need>avail){const per=days?Math.min(120,Math.ceil(need/days/15)*15):null;out.push({id:t.id,title:t.title,due:t.due,need,avail,days,per,fits:!!per&&per*days>=need});}}
@@ -10335,7 +10335,7 @@ Task: ${JSON.stringify({ subject: c.subj, topic: S(c.topic), lectureLinked: !!c.
     return `<form data-f="flowgoal" class="kl-stack"><p class="kl-eyebrow">GUIDED SESSION${pre ? ' · FROM THE GU CABINET' : ''}</p><h2>What will you work on?</h2>
       <p class="kl-small kg-flow-hint">Name the task and the time. Iroha picks one activity that suits it and explains why before anything starts.</p>
       <label>Task or topic <input name="topic" maxlength="120" value="${esc(f.topic)}" placeholder="e.g. Log inequalities with base below 1"></label>
-      <div class="kg-flow-grid"><label>Subject <select name="subj">${SUBJS.map(s => `<option ${s === f.subj ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+      <div class="kg-flow-grid"><label>Subject <select name="subj">${SUBJS.filter(s => s !== 'Astrophysics' || f.subj === s).map(s => `<option ${s === f.subj ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
       <label class="kg-flow-mins">Minutes <input name="mins" type="number" min="5" max="90" value="${f.mins || 25}"></label></div>
       <div class="kl-row"><button class="kl-primary">Ask Iroha to choose</button></div>
       <details class="kg-flow-more"><summary class="kl-small">Optional: lecture, goals, recall, stopping and energy</summary><div class="kl-stack">
@@ -13941,6 +13941,9 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
     (l.doubts = l.doubts || []).push({ id: uid('aq'), q: ('From practice: ' + String(f.gap).trim()).slice(0, 400), d: today(), done: false, src: 'practice' }); };
   const S = () => { const s = L.sched = L.sched || {}; if (!s.astro || typeof s.astro !== 'object') s.astro = { min: 0 }; return s; };
   const audit = (a, d) => window.__kgDeskAudit?.(a, d);
+  // Retired 27 Nov 2026: replaced by the Coursera courses in Library → Courses. Its daily time goes back to PCM and it leaves
+  // the Study tabs; lectures, notes, tasks and practice records are kept (and stay in backups). Nothing is deleted.
+  if (!C().retired) { C().retired = { at: today(), why: 'replaced by the Coursera courses in the course library' }; const a = S().astro; a.prevMin = +a.min || 0; a.min = 0; delete a.boost; audit('astrophysics course retired', 'course time returned to PCM'); save(); }
   const lecOf = id => C().lectures.find(l => l.id === id);
   const byDay = () => C().lectures.slice().sort((a, b) => (+a.day || 0) - (+b.day || 0) || String(a.made).localeCompare(String(b.made)));
   const nc = v => String(v || '').trim() ? esc(String(v).trim()) : '<i>Not confirmed</i>';
@@ -14068,8 +14071,10 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
       <div class="kl-row" style="flex-wrap:wrap"><button type="button" data-a="astroproof">📎 Attach the requirements document</button>${proof?.files?.length ? proof.files.map((fid, i) => `<button type="button" class="kl-ghost" data-a="astroopen" data-v="${esc(fid)}">Open document ${i + 1}</button>`).join('') : ''}<span class="kl-small" data-k="astro-status"></span></div>
       <p class="kl-small">Completing the course, passing the assessment, internship eligibility and an LOR are separate. Nothing here assumes one follows from another.</p></details>`;
   }
-  M.SECTIONS.study.push(['astro', '🔭 Astrophysics course']);
-  M.PANELS.astro = () => { const c = C(), l = c.sel && lecOf(c.sel); return homeHTML() + libraryHTML() + (l ? lectureHTML(l) : '') + workHTML() + detailsHTML(); };
+  if (!C().retired) M.SECTIONS.study.push(['astro', '🔭 Astrophysics course']);
+  M.PANELS.astro = () => { const c = C(), l = c.sel && lecOf(c.sel);
+    if (c.retired && !c.peek) return `<section class="kl-card kl-stack"><p class="kl-eyebrow">ASTROPHYSICS COURSE · RETIRED</p><p>Retired on ${esc(c.retired.at)}: ${esc(c.retired.why)}. Its daily time went back to PCM.</p><p class="kl-small">Your lectures, notes, tasks and practice records are kept, and stay in backups.</p><div class="kl-row" style="flex-wrap:wrap"><button class="kl-primary" data-a="go" data-v="library:courses">Open the course library</button><button class="kl-ghost" data-a="astropeek">View the old records</button></div></section>`;
+    return homeHTML() + libraryHTML() + (l ? lectureHTML(l) : '') + workHTML() + detailsHTML(); };
   // ---- the notes viewer: kept across redraws, so the timer ticking never reloads the PDF ----
   let view = null; const urls = {};
   const missing = '<p class="kl-small">This attachment isn\'t in this browser any more (site data cleared, or another device). Restore a full backup that includes it, or attach the file again.</p>';
@@ -14135,6 +14140,7 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
       if (!e) { e = { id: 'lec' + Date.now().toString(36) + 'p', subj: 'Astrophysics', ch: '', topic: 'Astrophysics course · requirements document', details: '', made: today(), stage: 0, due: '', files: [], reviews: 0, astro: true, noSkill: true }; (L.lectures = L.lectures || []).push(e); d.proofId = e.id; save(); }
       M.pickNotes(e, { status: document.querySelector('.kg-astro-form + .kl-row [data-k="astro-status"]'), done: () => redo() }); }
   });
+  M.ACTIONS.astropeek = () => { C().peek = !C().peek; M.render(); };
   Object.assign(M.FORMS, {
     astromin: v => { const m = +v.min; if (![0, 15, 30, 45, 60, 90].includes(m)) return; S().astro.min = m; audit('astro course time', m + ' min a day'); redo(m ? `${m} min of course time a day, taken from PCM time 🌙` : 'no daily course time 🌙'); },
     astroadd: v => { const day = Math.max(1, Math.min(60, Math.round(+v.day || 1))), l = { id: uid('al'), day, title: String(v.title || '').trim().slice(0, 120), url: /^https?:\/\//i.test(v.url || '') ? String(v.url).slice(0, 400) : '', resume: '', watch: 'none', notesId: '', mine: '', doubts: [], made: today() };
@@ -14252,7 +14258,7 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
     const u = used(), left = g.cap == null ? null : Math.max(0, g.cap - u), rec = (G().day || {})[day()] || {};
     const maxLine = g.cap == null ? 'No maximum is set, so nothing is planned automatically.' : g.cap === 0 ? 'Your maximum today is 0, so nothing is planned.' : `Up to <b>${hm(g.cap)}</b> of study today, all subjects together${g.max != null && g.cap < g.max ? ` (smaller than your usual ${hm(g.max)})` : ''}.`;
     const usage = `<p class="kl-small">Timer today: <b>${hm(u)}</b>${left != null && g.cap ? ` · left: <b>${hm(left)}</b>` : ''}${g.over ? ' · you chose to continue beyond your maximum today' : ''}. Breaks don't count.</p>`;
-    const res = '<div class="kl-row" style="flex-wrap:wrap"><button type="button" data-a="kggopen" data-v="library">Notes</button><button type="button" data-a="kggopen" data-v="astro">Astrophysics course</button></div>';
+    const res = '<div class="kl-row" style="flex-wrap:wrap"><button type="button" data-a="kggopen" data-v="library">Notes</button>' + ((M.L.astro || {}).retired ? '' : '<button type="button" data-a="kggopen" data-v="astro">Astrophysics course</button>') + '</div>';
     if (g.stopped) return `<section class="kl-card kg-gentle"><p class="kl-eyebrow">GENTLE RETURN · DONE FOR TODAY</p><p><b>Done for today. That's following the plan.</b></p>${usage}<p class="kl-small">Nothing more is planned today and nothing moves to tomorrow. Notes and the course stay open if you want them.</p>${res}<div class="kl-row"><button type="button" class="kl-ghost" data-a="kggundo">Reopen today</button><span class="kl-small"> Only if you choose to study again, or tapped Done by mistake.</span></div>${parkedHTML()}</section>`;
     const picks = g.picks || [], noAuto = !g.cap;
     const opt = noAuto ? `<p class="kl-small"><b>Optional, only if you want to:</b></p><div class="kl-row" style="flex-wrap:wrap">
@@ -16638,7 +16644,7 @@ function serpentSVG(o) {
     { id: 'door', name: 'Doorway', about: 'Progress, rank, trials and side paths.',
       go: [['📈 Overview', 'progress:overview'], ['◆ Five skills', 'progress:skills'], ['↻ This week', 'progress:week'], ['🌙 Patterns', 'progress:patterns'], ['Weak links', 'progress:links'], ['🧾 Report', 'progress:report'],
         ['🌌 Syllabus sky', 'progress:sky'], ['🚀 Voyage', 'progress:voyage'], ['◇ Retention trial', 'progress:trial'], ['⛰ Cultivator rank', 'progress:ranks'], ['🏆 Rank', 'progress:rank'],
-        ['🎓 Exams', 'study:exams'], ['📝 Full mock', 'study:paper'], ['📊 Mocks', 'progress:mocks'], ['🔭 Astrophysics course', 'study:astro'], ['Rocket project', 'study:project']] },
+        ['🎓 Exams', 'study:exams'], ['📝 Full mock', 'study:paper'], ['📊 Mocks', 'progress:mocks'], ['Rocket project', 'study:project']] },
     { id: 'iroha', name: 'Iroha', about: 'Study help and doubts.', act: [['💬 Talk to Iroha', 'kgdtalk']], go: [['🤝 Study buddy', 'company:buddy'], ['❓ Doubts', 'study:doubts']] },
     { id: 'kaguya', name: 'Kaguya', about: 'Company and comfort.',
       go: [['🌙 Hang out', 'company:hangout'], ['Sit with me', 'company:sit'], ['🫶 Comfort', 'company:comfort'], ['💭 Memories', 'company:memories'], ['💌 Letters', 'company:letters'], ['💞 Bond', 'progress:bond']] }
