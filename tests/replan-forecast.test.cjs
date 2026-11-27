@@ -129,3 +129,36 @@ test('confirmed counts: Physics gains Units and Dimensions (10) and Vectors (14)
   assert.deepStrictEqual([...old.courses.ic11.chapters.map(x => x[0])], ['My own inorganic list'], 'a list you edited yourself is never replaced');
   assert.strictEqual(SP.applyConfirmed11(old), false, 'runs once');
 });
+
+test('the assumptions shown are rendered from the minutes the forecast calculates with, and agree with it', () => {
+  const f = SP.forecast(lab(), {}, MON), d = f.durations, S = ['maths', 'physics', 'chem'];
+  // class re-attempt defaults the calculation uses
+  assert.deepStrictEqual(S.map(s => d[s].reattempt[0]), [75, 45, 30]);
+  assert.ok(S.every(s => d[s].from.reattempt === 'default'), 'no logs yet: marked as defaults');
+  // the parts total is exactly these minutes times the remaining lectures (+10% low, +25% high)
+  for (const [part, key] of [['lecture', 'lecture'], ['revision', 'reattempt'], ['homework', 'homework'], ['reattempt', 'retries']])
+    for (const i of [0, 1]) assert.strictEqual(f.parts[part][i], Math.round(S.reduce((a, s) => a + f.per[s].rem * d[s][key][i] * (i ? 1.25 : 1.10), 0)), part + ' ' + i);
+  // and the text shows those same numbers
+  const txt = f.assumptions[0], r = x => x[0] === x[1] ? String(x[0]) : x[0] + '–' + x[1];
+  for (const [key, lab] of [['lecture', 'lecture'], ['reattempt', 'class re-attempts'], ['homework', 'homework (Maths: TAH/KCLS + KTK)'], ['retries', 'extra retries of missed questions']])
+    assert.ok(txt.includes(lab + ' Maths ' + r(d.maths[key]) + ', Physics ' + r(d.physics[key]) + ', Chemistry ' + r(d.chem[key])), key);
+  assert.ok(!/revision Maths 90|not counted until their lecture counts/.test(f.assumptions.join(' ')), 'the old hand-written figures are gone');
+  // logged medians replace a default and are marked as yours
+  const L = lab(); L.syl.took = { re: { physics: [50, 50, 50] } };
+  const g = SP.forecast(L, {}, MON); assert.deepStrictEqual([...g.durations.physics.reattempt], [50, 50]); assert.match(g.assumptions[0], /Physics 50 \(your logs\)/);
+});
+
+test('unconfirmed inputs stay unknown; Class 12 proxies keep the completion date pending; the Basic Mathematics source is recorded as partial', () => {
+  const f = SP.forecast(lab(), {}, MON), all = f.assumptions.join(' | ');
+  assert.match(all, /playback speed: not set/); assert.match(all, /DPP and module practice: not confirmed, not counted/);
+  assert.match(all, /Class 12 counts are Lakshya JEE 2027 planner proxies until the Lakshya JEE 2028 chapter plan exists, so the completion date stays pending/);
+  assert.strictEqual(f.complete, false);
+  const t = SP.TRACKS.find(x => x.chapter === 'Basic Mathematics');
+  assert.strictEqual(t.lectures, 23); assert.strictEqual(t.track, 'Ashish Aggrawal · Complete Maths (2025) · Khazana');
+  assert.deepStrictEqual([...t.durations.map(x => [x.from, x.to, x.secs])], [[1, 20, 48 * 3600 + 47 * 60 + 1]]);
+  assert.deepStrictEqual([...t.unverified], [21, 22, 23]); assert.strictEqual(t.partial, true);
+  assert.match(all, /lectures 1–20 total 48:47:01 at 1×; lectures 21, 22, 23 not yet verified, so the total is partial \(recorded, not used in the calculation\)/);
+  assert.strictEqual(SP.seedSyllabus().courses.m11.chapters.find(x => x[0] === 'Basic Mathematics')[1], 23, 'the chapter count agrees with the source');
+  // the panel prints calendar dates only when every count is confirmed
+  assert.match(html, /const span = r => f\.complete \? [^\n]*: `\$\{r\.weeksLow\}–\$\{r\.weeksHigh\} weeks for the counted lectures \(date pending until every count is confirmed\)`/);
+});
