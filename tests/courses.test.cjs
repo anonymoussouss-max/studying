@@ -175,3 +175,7 @@ test('approved Course Gu ranks: 29 distinct ids, each rank on the right Gu; the 
   const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1], cg = src.slice(src.indexOf('function courseGu'), src.indexOf('const CGU_RANK_APPROVED'));
   assert.ok(!/CGU_RANK/.test(cg), 'the rank never feeds the earned stage');
 });
+test('retention wait: 14 days, approved, measured from the successful synthesis assessment', () => {
+  const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1]; assert.match(src, /RETAIN_DAYS = 14; \/\/ approved by you on 27 Nov 2026/);
+  assert.match(src, /opens = sp \? sp\.at \+ RETAIN_DAYS \* 864e5/);
+});
