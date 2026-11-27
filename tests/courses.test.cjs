@@ -134,3 +134,29 @@ test('module assessment: HARD → MEDIUM → EASY after three graded misses each
   assert.strictEqual(K.asmBlank().tier, 'hard');
   assert.deepStrictEqual({ ...K.parseJSON('noise {"verdict":"fail"} tail') }, { verdict: 'fail' }); assert.strictEqual(K.parseJSON('no json'), null);
 });
+
+test('Course Gu: obtained → refining → proven → retained from saved assessment passes only, keeping each tier', () => {
+  const K = assessK(), c = C2(), s = { lec: {}, notes: [], asm: {} }, DAY = 864e5;
+  const pass = (mi, tier, at) => { const a = K.asmBlank(); a.tier = tier; a.cur = { id: 'q' + mi }; K.applyGrade(a, 'q' + mi, 'pass'); a.hist[0].at = at; s.asm[K.mkey(c, mi)] = a; };
+  assert.strictEqual(K.courseGu(c, s).stage, 'none', 'watching alone never obtains a Course Gu');
+  for (const id of ['a', 'b', 'c']) s.lec['stars/' + id] = { done: true };
+  assert.strictEqual(K.courseGu(c, s).stage, 'none');
+  pass(0, 'medium', 1000); let g = K.courseGu(c, s); assert.strictEqual(g.stage, 'obtained'); assert.strictEqual(g.passes[0].tier, 'medium');
+  assert.strictEqual(g.canS, false, 'synthesis opens only after every module');
+  pass(1, 'hard', 2000); g = K.courseGu(c, s); assert.strictEqual(g.stage, 'refining'); assert.strictEqual(g.canS, true);
+  pass('S', 'easy', 3000); g = K.courseGu(c, s, 3000 + 13 * DAY); assert.strictEqual(g.stage, 'proven'); assert.strictEqual(g.synth.tier, 'easy', 'a lower-tier pass stays lower-tier');
+  assert.strictEqual(g.canR, false, 'retention opens later'); assert.strictEqual(K.courseGu(c, s, 3000 + 14 * DAY).canR, true);
+  pass('R', 'hard', 3000 + 15 * DAY); g = K.courseGu(c, s, 3000 + 15 * DAY); assert.strictEqual(g.stage, 'retained');
+  const back = JSON.parse(JSON.stringify(s)); assert.strictEqual(K.courseGu(c, back, 3000 + 15 * DAY).stage, 'retained', 'survives a save/reload round trip');
+});
+
+test('Course Gu: a WIP course cannot be proven; missing evidence is pending; ranks are proposals only; kept apart from chapter rank', () => {
+  const K = assessK(), c = C2('wip'), s = { lec: {}, notes: [], asm: {} };
+  for (const mi of [0, 1]) { const a = K.asmBlank(); a.cur = { id: 'q' }; K.applyGrade(a, 'q', 'pass'); s.asm[K.mkey(c, mi)] = a; }
+  const g = K.courseGu(c, s); assert.strictEqual(g.stage, 'refining'); assert.strictEqual(g.canS, false); assert.match(g.pending.join(' '), /WIP/);
+  assert.strictEqual(Object.keys(K.CGU_RANK).length, 29); assert.ok(Object.values(K.CGU_RANK).every(([r, why]) => r >= 1 && r <= 5 && why));
+  const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1]; assert.match(src, /proposed rank \$\{r\[0\]\}[^\n]*awaiting your approval/);
+  const art = {}; vm.runInNewContext(html.match(/<script id="kg-course-gu-art">([\s\S]*?)<\/script>/)[1], { window: art }); const ids = Object.keys(art.KgCourseGuArt);
+  assert.strictEqual(ids.length, 29); assert.deepStrictEqual([...ids].sort(), Object.keys(K.CGU_RANK).sort(), 'one artwork per course, keyed by the stable course id');
+  for (const a of Object.values(art.KgCourseGuArt)) assert.ok(!/<script|\son[a-z]+=|href|foreignObject|<image/i.test(a.svg));
+});
