@@ -16319,6 +16319,9 @@ You entered 25</pre></div>
     switch (ev) {
       case 'capture': if (s.state !== 'solving') return s; stop(); t.state = 'capturing'; return t;           // camera, upload, retries: paused
       case 'resume': if (s.state !== 'capturing') return s; t.state = 'solving'; t.since = now; return t;     // back to solving: the clock runs again
+      // retention checks only: leaving the check, hiding the tab or closing the desk pauses it; time already used up reopens at photo-and-submit
+      case 'pause': if (s.state !== 'solving') return s; stop(); t.state = t.acc >= s.limit ? 'capturing' : 'paused'; return t;
+      case 'unpause': if (s.state !== 'paused') return s; if (s.acc >= s.limit) t.state = 'capturing'; else { t.state = 'solving'; t.since = now; } return t;
       case 'photo': if (!['solving', 'capturing'].includes(s.state)) return s; t.photos = s.photos.concat(data); return t;
       case 'submit': if (!['solving', 'capturing'].includes(s.state) || !data || !data.decl || !s.photos.some(p => p.saved)) return s; stop(); t.state = 'submitted'; t.decl = data.decl; return t;
       case 'reading': if (!['submitted', 'pending'].includes(s.state)) return s; t.state = 'reading'; return t;
@@ -16330,7 +16333,7 @@ You entered 25</pre></div>
   }
   // After a refresh: the saved state is restored as is. While Solving the clock is wall time (you keep working on paper);
   // in Capturing it stays paused. Work that wasn't submitted is shown as "not submitted" and is never assessed.
-  const restore = (s, now) => s ? Object.assign({}, s, { restoredAt: now, notSubmitted: ['solving', 'capturing'].includes(s.state) }) : null;
+  const restore = (s, now) => s ? Object.assign({}, s, { restoredAt: now, notSubmitted: ['solving', 'capturing', 'paused'].includes(s.state) }) : null;
 
   /* -- marking: per question, from Iroha's structured reading. Uncertain stays pending, never wrong. -- */
   const RUBRIC = ['method', 'concept', 'execution', 'checks']; // each 0–2
@@ -16435,9 +16438,11 @@ You entered 25</pre></div>
           ${!ap.some(a => a.status === 'open') ? `<form data-f="pappeal" data-q="${esc(q.id)}" class="kl-row"><select name="kind" aria-label="Appeal type"><option value="alternative">Valid alternative method</option><option value="counterexample">Counterexample</option><option value="reference">Reference contradicts the key</option><option value="faulty-question">Faulty question</option></select><input name="text" required maxlength="600" placeholder="Your objection" aria-label="Objection"><button class="kl-ghost">Appeal</button></form>` : ''}` : ''}</div>`; }).join('');
     const live = s.state === 'solving' || s.state === 'capturing';
     return `<div class="kl-stack"><p class="kl-eyebrow">${ret ? 'RETENTION CHECK' : 'PHOTO PROOF'} · ${esc(s.state.toUpperCase())}</p>
+      ${s.state === 'paused' ? '<button class="kl-primary" data-a="punpause">Resume check</button>' : ''}
       ${s.notSubmitted && live ? '<p class="kl-small">Restored after a reload: this work is <b>not submitted</b> and nothing has been assessed.</p>' : ''}
-      <p class="kl-timer">${clock(el)} / ${clock(s.limit)}${s.state === 'capturing' ? ' · paused while you photograph' : ''}${el > s.limit && live ? ' · time is up: photograph and submit' : ''}</p>${qhtml}
-      ${live ? `<div class="kl-row">${s.state === 'solving' ? '<button class="kl-ghost" data-a="pcap">📷 Photograph my working (pauses the clock)</button>' : `<label class="kl-ghost">Add photos <input type="file" accept="image/*" capture="environment" multiple data-pphoto hidden></label><select data-pq aria-label="Which question">${s.qs.map((q, i) => `<option value="${esc(q.id)}">Question ${i + 1}</option>`).join('')}</select><button class="kl-ghost" data-a="presume">Back to solving</button>`}</div>
+      ${s.state === 'paused' ? `<p class="kl-small"><b>Paused.</b> Your photos and question are saved and the clock is stopped. It starts again only when you press Resume check.</p>` : ''}
+      <p class="kl-timer">${clock(el)} / ${clock(s.limit)}${s.state === 'paused' ? ` · ${Math.floor(el / 60000)} min used, ${Math.max(0, Math.ceil((s.limit - el) / 60000))} min remaining` : ''}${s.state === 'capturing' ? ' · paused while you photograph' : ''}${el > s.limit && live ? ' · time is up: photograph and submit' : ''}</p>${qhtml}
+      ${live ? `<div class="kl-row">${s.state === 'solving' ? '<button class="kl-ghost" data-a="pcap">📷 Photograph my working (pauses the clock)</button>' : `<label class="kl-ghost">Add photos <input type="file" accept="image/*" capture="environment" multiple data-pphoto hidden></label><select data-pq aria-label="Which question">${s.qs.map((q, i) => `<option value="${esc(q.id)}"${s.cur === q.id ? ' selected' : ''}>Question ${i + 1}</option>`).join('')}</select><button class="kl-ghost" data-a="presume">Back to solving</button>`}</div>
         <form data-f="psubmit" class="kl-stack"><label class="kl-small"><input type="checkbox" name="decl" required> I worked closed-book: no formula sheet, notes, solutions or outside help.</label><button>Submit for reading</button></form>` : ''}
       ${s.state === 'submitted' ? `<p class="kl-small">${s.error ? 'Sending failed (' + esc(s.error) + '). Your photos are saved and nothing was awarded. ' : ''}Submitted. Iroha reads each photo, then marks method, reasoning, execution and checks.</p><button data-a="psend">${s.error ? 'Try again' : 'Send to Iroha'}</button>` : ''}
       ${s.state === 'reading' ? '<p class="kl-small">Iroha is reading your working…</p>' : ''}
@@ -16484,7 +16489,7 @@ You entered 25</pre></div>
       const when = id => { const t = recs.filter(e => (e.skills || [e.skill]).includes(id)).map(e => e.at).filter(Number.isFinite).sort((a, b) => a - b)[0]; return t ? ' (' + new Date(t).toISOString().slice(0, 10) + ')' : ''; };
       const s = st.proof && st.proof.gu === g.key ? st.proof : null, last = (st.proofs || []).filter(x => x.gu === g.key && x.kind === 'retention' && x.result).pop();
       let body = '';
-      if (s && s.kind === 'retention') body = window.KgCultProof(g.key);
+      if (s && s.kind === 'retention') body = (r.late ? `<p class="kl-small">The day-14 target (${esc(DAYS(r.dueDay))}) has passed. The check is still open and everything already earned is kept.</p>` : '') + window.KgCultProof(g.key);
       else if (s) body = '<p class="kl-small">A photo proof is open for this chapter. Finish or close it under Checklist, skills and proof first.</p>';
       else if (g.level === 'proven') body = '';
       else if (!retOk(st)) body = `<div class="kret-need"><p class="kl-small"><b>Before checks can start, these chapter rules need your decision.</b> Revised proposal, not yet approved:</p><ol class="kl-small">${RET_RULES.map(([k, v]) => `<li><b>${esc(k)}:</b> ${esc(v)}</li>`).join('')}</ol><p class="kl-small">Marking is already agreed: the closed-book photo rubric, slips pass, invalid reasoning is Not yet, unclear stays Pending, appeals stay open.</p><button class="kl-ghost" data-a="retapprove">Approve these four rules</button></div>`;
@@ -16534,6 +16539,21 @@ You entered 25</pre></div>
   A.retapprove = () => { const st = read(); if (retOk(st)) return; st.approvals = Object.assign({}, st.approvals, { chapterRetention: { at: Date.now(), by: 'you', rules: RET_RULES.map(r => r.join(': ')) } }); save(st, 'chapter retention rules approved'); };
   A.pcap = () => upd(s => step(s, 'capture', Date.now()), 'capture');
   A.presume = () => upd(s => step(s, 'resume', Date.now()), 'resume');
+  A.punpause = () => { const st = read(); if (st.proof && st.proof.kind === 'retention' && st.proof.state === 'paused') upd(s => step(s, 'unpause', Date.now()), 'retention check resumed'); };
+  // a running retention check pauses when you leave it: another place, a hidden tab, or the desk closing. Nothing else changes.
+  const pauseRet = (at, why) => { const st = read(), s = st.proof; if (!s || s.kind !== 'retention' || s.state !== 'solving') return;
+    st.proof = step(s, 'pause', Math.max(s.since || at, at)); st.proof.pausedBy = why; st.log = (st.log || []).concat({ at: Date.now(), what: 'retention check paused (' + why + ')' }).slice(-500);
+    localStorage.setItem(STORE, JSON.stringify(st)); if (document.visibilityState === 'visible') M.render(); };
+  const checkShown = () => [...document.querySelectorAll('.kl-timer')].some(e => e.getClientRects().length);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') pauseRet(Date.now(), 'tab hidden');
+    else { const p = read().proof; if (p && p.kind === 'retention' && p.state === 'paused') M.render(); } }); // back on the tab: show Paused / Resume check
+  window.addEventListener('pagehide', () => pauseRet(Date.now(), 'desk closed'));
+  setInterval(() => { const st = read(), s = st.proof; if (!s || s.kind !== 'retention' || s.state !== 'solving') return;
+    if (document.visibilityState !== 'visible' || !checkShown()) return pauseRet(Date.now(), 'left the check');
+    if (!s.seen || Date.now() - s.seen > 5000) { s.seen = Date.now(); localStorage.setItem(STORE, JSON.stringify(st)); } }, 1000);
+  // opening the desk with a check still running (closed without a pagehide): count only up to the last moment it was on screen
+  { const s0 = read().proof; if (s0 && s0.kind === 'retention' && s0.state === 'solving') pauseRet(Math.min(Date.now(), s0.seen || s0.since || Date.now()), 'desk reopened'); }
+  document.addEventListener('change', e => { if (!e.target.matches || !e.target.matches('[data-pq]')) return; const st = read(); if (!st.proof) return; st.proof.cur = e.target.value; localStorage.setItem(STORE, JSON.stringify(st)); });
   A.pclose = () => { const st = read(); if (st.proof) { st.proofs = (st.proofs || []).concat(st.proof).slice(-50); st.proof = null; save(st, 'proof closed'); } };
   F.psubmit = v => upd(s => { const t = step(s, 'submit', Date.now(), { decl: v.decl ? { at: Date.now(), text: 'closed-book declaration' } : null }); if (t === s) alert(s.photos.some(p => p.saved) ? 'Tick the closed-book declaration first.' : 'Add at least one photo of your working first.'); return t; }, 'submit');
   F.pfix = (v, f) => upd(s => step(s, 'clarify', Date.now(), { q: f.dataset.q, text: v.text }), 'clarify');

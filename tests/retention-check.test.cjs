@@ -11,8 +11,8 @@ function desk({ approved = false } = {}) {
   const localStorage = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: k => { delete mem[k]; } };
   const M = { PANELS: {}, ACTIONS: {}, FORMS: {}, render() {}, esc: s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]),
     getSet: async (ch, n) => ({ qs: Array.from({ length: n }, (_, i) => ({ t: 'Fresh ' + i, a: 'x', bid: 'b' + Math.random().toString(36).slice(2) })) }) };
-  const win = { localStorage }; // the cultivation UI stays off; only the proof script sees the desk
-  const document = { addEventListener() {}, querySelector: () => null, querySelectorAll: () => [], getElementById: () => null, body: { classList: { contains: () => false } } };
+  const win = { localStorage, addEventListener() {} }; // the cultivation UI stays off; only the proof script sees the desk
+  const document = { visibilityState: 'visible', addEventListener() {}, querySelector: () => null, querySelectorAll: () => [], getElementById: () => null, body: { classList: { contains: () => false } } };
   const ctx = { window: win, localStorage, document, alert: m => alerts.push(m), setInterval: () => 0, setTimeout: () => 0, console, Object, Math, String, JSON, Set, Map, Array, Number, Date, Promise, CSS: { escape: s => s } };
   vm.runInNewContext(grab('kg-cult-script'), ctx); win.MoonLab = M; vm.runInNewContext(grab('kg-proof-script'), ctx);
   const K = win.KgCult, st = K.readStore(localStorage), t0 = Date.now() - 8 * DAY;
@@ -97,4 +97,30 @@ test('sizing: one question per due skill, 1 to 4 a sitting; a single remaining s
   assert.deepStrictEqual(J(one.next), ['s2']);
   await d.M.ACTIONS.retstart({ dataset: { k: KEY, due: 's2' } }); const s = d.read().proof;
   assert.strictEqual(s.qs.length, 1); assert.strictEqual(s.limit, 8 * 60000);
+});
+
+test('pausing a retention check stops its clock; only Resume check restarts it; pressing Resume twice keeps one timer', () => {
+  const d = desk({ approved: true }), P = d.win.KgProof, MIN = 60000, T = Date.UTC(2026, 10, 20, 10);
+  let s = P.newSession({ id: 'rt', gu: KEY, qs: [{ id: 'q0' }, { id: 'q1' }, { id: 'q2' }], limit: 24 * MIN, now: T });
+  s = P.step(s, 'pause', T + 6 * MIN); assert.strictEqual(s.state, 'paused'); assert.strictEqual(P.elapsed(s, T + 7 * 1440 * MIN), 6 * MIN, 'a week away adds nothing');
+  assert.strictEqual(P.step(s, 'pause', T + 9 * MIN), s, 'pausing twice changes nothing');
+  const back = P.restore(J(s), T + 7 * 1440 * MIN); assert.strictEqual(back.state, 'paused'); assert.strictEqual(P.elapsed(back, T + 7 * 1440 * MIN), 6 * MIN);
+  const R = T + 7 * 1440 * MIN; let r = P.step(back, 'unpause', R); const r2 = P.step(r, 'unpause', R + 1000);
+  assert.strictEqual(r2, r, 'a second Resume is a no-op'); assert.strictEqual(P.elapsed(r2, R + MIN), 7 * MIN);
+});
+
+test('a check that had used its full time reopens at photo-and-submit, not solving', () => {
+  const d = desk({ approved: true }), P = d.win.KgProof, MIN = 60000, T = Date.UTC(2026, 10, 20, 10);
+  let s = P.newSession({ id: 'rt', gu: KEY, qs: [{ id: 'q0' }], limit: 8 * MIN, now: T });
+  s = P.step(s, 'pause', T + 9 * MIN); assert.strictEqual(s.state, 'capturing'); assert.strictEqual(P.elapsed(s, T + 99 * MIN), 9 * MIN);
+});
+
+test('the desk pauses a running retention check it finds on opening, counting only to the last moment it was on screen', () => {
+  const d = desk({ approved: true }), st = d.read(), MIN = 60000, now = Date.now();
+  st.proof = Object.assign(d.win.KgProof.newSession({ id: 'rt9', gu: KEY, qs: [{ id: 'q0' }, { id: 'q1' }, { id: 'q2' }], limit: 24 * MIN, now: now - 3 * DAY }), { kind: 'retention', due: ['s1', 's2', 's3'], seen: now - 3 * DAY + 6 * MIN });
+  d.write(st);
+  const html2 = html; // reload the proof script on the same storage
+  const ctx = { window: d.win, localStorage: d.win.localStorage, document: { visibilityState: 'visible', addEventListener() {}, querySelector: () => null, querySelectorAll: () => [] }, alert() {}, setInterval: () => 0, setTimeout: () => 0, console, Object, Math, String, JSON, Set, Map, Array, Number, Date, Promise, CSS: { escape: x => x } };
+  vm.runInNewContext(grab('kg-proof-script'), ctx);
+  const s = d.read().proof; assert.strictEqual(s.state, 'paused'); assert.strictEqual(s.acc, 6 * MIN); assert.ok(html2);
 });
