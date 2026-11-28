@@ -4,7 +4,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8').r
 const css = /<style id="kt-interior-style">([\s\S]*?)<\/style>/.exec(html)[1];
 test('Gu repository: specimen label, evidence slip, back to the drawer you came from', () => {
   assert.ok(html.includes('<dl class="kqc-label"><dt>Chapter</dt>') && html.includes('<div class="kqc-slip">'));
-  assert.ok(html.includes("ret = t.closest && t.closest('[data-qrow]') ? { key: d.qsel, y: scrollY } : null"));
+  assert.ok(html.includes("ret = row ? { key: d.qsel, y: scrollY } : null"));
   assert.ok(html.includes('data-qret="1">← Back to cabinet'));
   assert.match(css, /li\[data-qrow\]::after/, 'drawer pull');
 });

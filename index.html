@@ -13930,9 +13930,9 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
       if (!after) { sc.edits[d] = sc.edits[d].filter(x => x.from !== from); M.save(); throw new Error('that time overlaps a meal, break or another block'); }
       return `${r.title}: ${clk(s)}–${clk(e)}`; },
     lecture: o => { const s = subjOf(o.subj), at = String(o.at || '').trim(); need(/^\d{1,2}(:\d{2}){1,2}$/.test(at), 'timestamp like 42:10'); const sy = L().syl, n = SP().nextLecture(sy, s); const p = sy.pos[s] || (n && !n.missing ? { course: n.course, ci: n.ci, chapter: n.chapter, lec: n.lec } : null); need(p, 'no lecture in progress'); p.active = true; p.at = at; p.d = today(); sy.pos[s] = p; return `${SN[s]} lecture saved at ${at}`; },
-    lecturedone: o => { const s = subjOf(o.subj), sy = L().syl, p = sy.pos[s], n = SP().nextLecture(sy, s), cur = p && p.course ? p : (n && !n.missing ? n : null); need(cur, 'no lecture to finish'); const c = sy.courses[cur.course];
+    lecturedone: o => { window.KtMotion?.arm(); const s = subjOf(o.subj), sy = L().syl, p = sy.pos[s], n = SP().nextLecture(sy, s), cur = p && p.course ? p : (n && !n.missing ? n : null); need(cur, 'no lecture to finish'); const c = sy.courses[cur.course];
       c.done = c.done || []; c.done[cur.ci] = Math.min(c.chapters[cur.ci][1] || 999, (c.done[cur.ci] || 0) + 1); const rid = 'rv' + Date.now().toString(36), lt = `${cur.chapter} · lecture ${cur.lec}`; sy.revs.push({ id: rid, subj: s, title: lt, done: false, made: today(), stage: 'reattempt' }); SP().cycleAfterLecture(sy, s, lt, rid, today()); delete sy.pos[s]; return `${SN[s]} ${cur.chapter} lecture ${cur.lec} finished`; },
-    progress: o => { const sy = L().syl, c = sy.courses[o.course]; need(c, 'unknown course'); const k = Number.isInteger(+o.chapter) ? +o.chapter : c.chapters.findIndex(x => x[0].toLowerCase().includes(String(o.chapter || '').toLowerCase())); need(c.chapters[k], 'unknown chapter');
+    progress: o => { window.KtMotion?.arm(); const sy = L().syl, c = sy.courses[o.course]; need(c, 'unknown course'); const k = Number.isInteger(+o.chapter) ? +o.chapter : c.chapters.findIndex(x => x[0].toLowerCase().includes(String(o.chapter || '').toLowerCase())); need(c.chapters[k], 'unknown chapter');
       if (o.count != null) c.chapters[k][1] = Math.max(1, Math.min(400, +o.count)); if (o.done != null) { c.done = c.done || []; c.done[k] = Math.max(0, Math.min(c.chapters[k][1] || 400, +o.done)); } return `${c.name} · ${c.chapters[k][0]}: ${(c.done || [])[k] || 0}/${c.chapters[k][1] ?? '?'}`; },
     addchapter: o => { const sy = L().syl, c = sy.courses[o.course]; need(c, 'unknown course'); const nm = String(o.name || '').trim(), n = +o.count; need(nm && n > 0, 'chapter needs a name and a lecture count'); c.chapters = c.chapters.filter(x => x[1] != null || !/count missing/.test(x[0])); c.chapters.push([nm.slice(0, 80), Math.min(400, n)]); return `${c.name}: added ${nm} (${n})`; },
     revisiondone: o => { const sy = L().syl, r = sy.revs.find(x => !x.done && (x.id === o.id || (o.subj && x.subj === subjOf(o.subj)))); need(r, 'no open revision'); r.done = true; r.doneD = today(); return `revision done: ${r.title}`; },
@@ -14374,7 +14374,7 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
   function weekView(d0) {
     const days = Array.from({ length: 7 }, (_, i) => M.add(d0, i)), A = 360, Z = 1560, pc = m => Math.max(0, Math.min(100, (m - A) / (Z - A) * 100));
     return `<div class="kt-week" role="table" aria-label="Seven days on one time axis"><div class="kt-wk-axis" role="row" aria-hidden="true"><span></span><span class="kt-wk-bar">${[6, 10, 14, 18, 22, 26].map(h => `<i style="left:${pc(h * 60)}%">${SP().clk(h * 60)}</i>`).join('')}</span><span></span></div>${days.map(dd => { const t = preview(dd), st = studyOf(t);
-      return `<div class="kt-wk-row" role="row"><b role="rowheader">${esc(new Date(dd + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }))}</b><span class="kt-wk-bar" role="cell">${t.rows.map(r => `<i data-k="${esc(r.kind || '')}" style="left:${pc(r.s)}%;width:${Math.max(.6, pc(r.e) - pc(r.s))}%" title="${esc(SP().clk(r.s) + '–' + SP().clk(r.e) + ' ' + (r.title || ''))}"></i>`).join('')}</span><span role="cell">${hmLen(total(t))}${st.length ? ` · ${SP().clk(st[0].s)}–${SP().clk(st[st.length - 1].e)}` : ''}</span></div>`; }).join('')}</div>`;
+      return `<div class="kt-wk-row" role="row" data-kt-date="${esc(dd)}"><b role="rowheader">${esc(new Date(dd + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }))}</b><span class="kt-wk-bar" role="cell">${t.rows.map(r => `<i data-k="${esc(r.kind || '')}" style="left:${pc(r.s)}%;width:${Math.max(.6, pc(r.e) - pc(r.s))}%" title="${esc(SP().clk(r.s) + '–' + SP().clk(r.e) + ' ' + (r.title || ''))}"></i>`).join('')}</span><span role="cell">${hmLen(total(t))}${st.length ? ` · ${SP().clk(st[0].s)}–${SP().clk(st[st.length - 1].e)}` : ''}</span></div>`; }).join('')}</div>`;
   }
   // the same calculation as Progress → forecast (StudyPlan.forecast with your logged PCM weeks), named the same way
   function forecastView() {
@@ -14386,9 +14386,13 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
       <p class="kl-small">Inputs, with the provisional ones marked:</p><ul class="kt-fc-in">${f.actual ? '' : '<li><span class="kt-prov">provisional</span> no logged history yet, so only the hypothetical pace applies</li>'}${f.assumptions.map(x => `<li><span class="kt-prov">provisional</span> ${esc(x)}</li>`).join('')}${(f.provisionalCounts || []).map(x => `<li><span class="kt-prov">provisional count</span> ${esc(String(x))}</li>`).join('')}${(f.absent || []).map(x => `<li><span class="kt-prov">missing count</span> ${esc(String(x))}</li>`).join('')}</ul>
       <p class="kl-small">${esc(f.uncertainty)}. The same numbers appear under Progress → forecast.</p></div>`;
   }
-  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-ktv]'); if (!b) return; tv = b.dataset.ktv; M.render(); setTimeout(() => document.querySelector(`[data-ktv="${tv}"]`)?.focus(), 30); });
+  let tvDay = '';
+  const anchorOf = () => document.querySelector(`#moon-lab .kt-wk-row[data-kt-date="${tvDay}"]`) || document.querySelector('#moon-lab .kt-ledger');
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-ktv]'); if (!b) return; const was = anchorOf(), y = was && was.getBoundingClientRect().top; tv = b.dataset.ktv; M.render();
+    setTimeout(() => { const a = anchorOf(); if (a && y != null) { scrollTo(0, scrollY + a.getBoundingClientRect().top - y); window.KtMotion?.move(a.closest('.kt-week,.kt-ledger'), { opacity: .4, clipPath: tv === 'week' ? 'inset(0 0 60% 0)' : 'inset(0 100% 0 0)' }, 200); }
+      document.querySelector(`[data-ktv="${tv}"]`)?.focus(); }, 30); });
   function card() {
-    const d = day(), sp = SP(), cur = sp.dayHours(S(), d), t = preview(d), gr = t.gentle, light = !!gr || ['sunday', 'gentle', 'reduced', 'stop'].includes(t.plan);
+    const d = (tvDay = day()), sp = SP(), cur = sp.dayHours(S(), d), t = preview(d), gr = t.gentle, light = !!gr || ['sunday', 'gentle', 'reduced', 'stop'].includes(t.plan);
     const date = new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
     const opts = light ? '' : `<div class="kl-row kg-tmrw-h" role="group" aria-label="Study hours for tomorrow">${[0].concat(sp.DAY_HOURS).map(h => {
       const m = total(preview(d, h)), short = h && m < h * 60;
@@ -16412,7 +16416,7 @@ You entered 25</pre></div>
 
   /* -- the panel: one proof at a time, inside Cultivation → Details. -- */
   const STORE = window.KgCult.STORE, read = () => window.KgCult.readStore(localStorage);
-  const save = (s, what) => { s.log = (s.log || []).concat({ at: Date.now(), what }).slice(-500); localStorage.setItem(STORE, JSON.stringify(s)); M.render(); };
+  const save = (s, what) => { window.KtMotion?.arm(); s.log = (s.log || []).concat({ at: Date.now(), what }).slice(-500); localStorage.setItem(STORE, JSON.stringify(s)); M.render(); };
   const esc = M.esc, clock = ms => { const m = Math.floor(ms / 60000), x = Math.floor(ms / 1000) % 60; return m + ':' + String(x).padStart(2, '0'); };
   const VERDICT = { pass: 'Pass', 'pass-slip': 'Pass with slip', 'not-yet': 'Not yet', pending: 'Pending', void: 'Void (faulty question, not counted)' };
   const missingNow = () => { try { return new Set(((JSON.parse(localStorage.getItem('kg-restore-missing')) || {}).files || []).map(f => f.id)); } catch (e) { return new Set(); } };
@@ -16712,7 +16716,7 @@ window.KgGuArt = {"ART":{"m11:Sets":{"name":"Venn Mussel","design":"Two overlapp
   };
   M.SECTIONS.progress.push(['ranks', '⛰ Cultivator rank']);
   M.ACTIONS.rpreview = () => { preview = !preview; M.render(); };
-  M.ACTIONS.rev = b => { ev = b.dataset.g; M.render(); setTimeout(() => { const h = document.getElementById('krk-evh'); if (h) { const sec = h.closest('section') || h, bar = document.querySelector('#moon-lab>.kl-tabs'), off = bar && getComputedStyle(bar).position === 'sticky' ? bar.getBoundingClientRect().bottom : 0; scrollTo(0, scrollY + sec.getBoundingClientRect().top - off - 12); h.focus({ preventScroll: true }); } }, 60); };
+  M.ACTIONS.rev = b => { const mark = b.getBoundingClientRect(); ev = b.dataset.g; M.render(); setTimeout(() => { const h = document.getElementById('krk-evh'); if (h) { window.KtMotion?.cancel(); const sec = h.closest('section') || h, bar = document.querySelector('#moon-lab>.kl-tabs'), off = bar && getComputedStyle(bar).position === 'sticky' ? bar.getBoundingClientRect().bottom : 0; scrollTo(0, scrollY + sec.getBoundingClientRect().top - off - 12); h.focus({ preventScroll: true }); window.KtMotion?.flip(sec, mark, 200); } }, 60); };
   M.ACTIONS.revback = () => { const id = ev; ev = null; M.render(); setTimeout(() => { const b = document.querySelector(`[data-a="rev"][data-g="${CSS.escape(id || '')}"]`); if (b) { b.scrollIntoView({ block: 'center' }); b.focus({ preventScroll: true }); } }, 60); };
   M.ACTIONS.rearn = b => { const st = read(), v = K.cultivation(M.L, null, st), g = gates(v, ctxOf(st)).find(x => x.id === b.dataset.g); if (!g || g.status !== 'met') return; if (!confirm(`Record ${g.name}? Earned stages are permanent.`)) return; st.earned = earn(st.earned, g.id, Date.now(), v.ed.id); st.log = (st.log || []).concat({ at: Date.now(), what: 'earned ' + g.id }); localStorage.setItem(K.STORE, JSON.stringify(st)); M.render(); };
   M.ACTIONS.rapprove = b => { const st = read(), g = LADDER.find(x => x.id === b.dataset.g); if (!g || g.def !== 'proposed' || g.pending) return;
@@ -16971,18 +16975,24 @@ function serpentSVG(o) {
     const c = document.getElementById('kqc-count'); if (c) c.textContent = `${n} of ${rows.length} chapters`;
   }
   let ret = null; // the drawer (and scroll position) an Inspect came from, for "Back to cabinet"
+  // earning: compared only across an award path (armed just before the write), never across a reload, sync or restore
+  const ORD = { none: 0, obtained: 1, learning: 1, proof: 2, proven: 3 };
+  let pre = null; const levels = () => new Map(allGu(read().v).map(g => [g.key, [g.acq, g.level]]));
+  addEventListener('kt:arm', () => { try { pre = levels(); } catch (e) { pre = null; } });
+  addEventListener('moonlab:render', () => { if (!pre || !window.KtMotion) return; const was = pre; pre = null; try { for (const [k, [acq, lv]] of levels()) { const b = was.get(k); if (!b) continue;
+    if (b[0] !== 'obtained' && acq === 'obtained') window.KtMotion.award('ink', 'chap:' + k); else if ((ORD[lv] || 0) >= 2 && (ORD[lv] || 0) > (ORD[b[1]] || 0)) window.KtMotion.award('seal', 'chap:' + k); } } catch (e) {} });
   function guPanel(g) {
     if (!g) return '<p class="kl-small">Choose a Gu or a chapter in the cabinet or the collection below.</p>';
-    const pl = plates(g), bm = g.name === 'Basic Mathematics' && g.acq === 'obtained', nx = nextStep(g), st = stateOf(g);
-    const art = bm ? `<svg viewBox="-130 -70 260 130" class="kq-gu-art" role="img" aria-label="Wave-Sign Serpent, ${esc(LEVEL[g.level])}">${serpentSVG({ id: 'close', state: look(g), sk: pl, labels: ['−2', '1'] })}</svg>`
-      : `<svg viewBox="-80 -62 160 100" class="kq-gu-art" role="img" aria-label="${esc(guName(g))}, ${esc(STATE_N[st])}">${guSVG(g, 'close')}</svg>`;
+    const pl = plates(g), bm = g.name === 'Basic Mathematics' && g.acq === 'obtained', nx = nextStep(g), st = stateOf(g), ak = g.acq === 'obtained' && window.KtMotion ? window.KtMotion.take('chap:' + g.key) : '';
+    const art = bm ? `<svg viewBox="-130 -70 260 130" class="kq-gu-art${ak === 'ink' ? ' kt-ink' : ''}" role="img" aria-label="Wave-Sign Serpent, ${esc(LEVEL[g.level])}">${serpentSVG({ id: 'close', state: look(g), sk: pl, labels: ['−2', '1'] })}</svg>`
+      : `<svg viewBox="-80 -62 160 100" class="kq-gu-art${ak === 'ink' ? ' kt-ink' : ''}" role="img" aria-label="${esc(guName(g))}, ${esc(STATE_N[st])}">${guSVG(g, 'close')}</svg>`;
     return `<div class="kl-stack kqc-gu" id="kqc-gu" tabindex="-1">${art}
       ${ret ? `<button class="kl-ghost kqc-back" data-qret="1">← Back to cabinet</button>` : ''}<p class="kl-eyebrow">${esc((SUBJ[g.subj] || '').toUpperCase())} · ${esc(g.name.toUpperCase())}</p>
       <h2 class="kqc-name">${esc(guName(g))} <span class="kqc-st kqc-st-${st}">${STATE_N[st]}</span>${g.planned ? ' <span class="kl-small">· lecture count provisional</span>' : ''}</h2>
       <dl class="kqc-label"><dt>Chapter</dt><dd>${esc(g.name)}</dd><dt>Stage</dt><dd>${esc(STATE_N[st])}</dd></dl>
       <div class="kqc-next"><p><b>Next:</b> ${esc(nx.t)}</p><div class="kl-row" style="flex-wrap:wrap">${nx.b ? `<button class="kl-primary" ${nx.b[1]}>${esc(nx.b[0])}</button>` : ''}${g.acq !== 'obtained' ? `<button data-qstudy="${esc(g.key)}">Guided session on this chapter</button>` : ''}</div></div>
       <p class="kl-small">${esc(rankLine(g))}${(() => { const A = window.KgGuArt && window.KgGuArt.ART[g.key]; return A && g.acq === 'obtained' ? ' · ' + esc(A.design) : ''; })()}</p>
-      <div class="kqc-slip"><p class="kl-small"><b>Acquisition</b> · ${esc(acqText(g))}</p><p class="kl-small"><b>Refinement</b> · ${esc(refineText(g))}</p>
+      <div class="kqc-slip">${g.level === 'proof' || g.level === 'proven' ? `<span class="kt-stamp${ak === 'seal' ? ' kt-press' : ''}" aria-hidden="true">Sealed</span>` : ''}<p class="kl-small"><b>Acquisition</b> · ${esc(acqText(g))}</p><p class="kl-small"><b>Refinement</b> · ${esc(refineText(g))}</p>
       ${bm ? `<p class="kl-small">An illustrative sign diagram for the sample (x − 1)/(x + 2), not a graph: only the side of the gold line matters. At −2 the expression is undefined (open ring, a gap in the body); at 1 it is zero (filled bead).</p>` : ''}
       ${g.skills && g.acq === 'obtained' ? `<ul class="kl-list kqc-sk">${g.skills.map((s, i) => `<li>${pl[i] === 'r' ? '◆ retained' : pl[i] === 'd' ? '◇ shown' : '· not shown yet'} · ${esc(s.name)}</li>`).join('')}</ul>` : ''}
       </div><div class="kl-row" style="flex-wrap:wrap"><button class="kl-ghost" data-qdetail="${esc(g.key)}">Checklist, skills and proof</button><button class="kl-ghost" data-a="cpropose" data-k="${esc(g.key)}">Propose from my logged questions</button></div>
@@ -17037,8 +17047,11 @@ function serpentSVG(o) {
     if (d.qgo) { const [a, b] = d.qgo.split(':'); return M.go(a, b); }
     if (d.qtable) return toTable();
     if (d.qstudy) { const g = allGu(read().v).find(x => x.key === d.qstudy); if (g) window.__kgGuPre = { subj: { maths: 'Maths', physics: 'Physics', chem: 'Chemistry' }[g.subj] || 'Maths', topic: g.acq === 'not-obtained' ? `${g.name} · lecture ${g.done + 1} of ${g.lectures}` : g.name, at: Date.now() }; return M.go('study', 'session'); }
-    if (d.qret) { const r = ret; ret = null; M.render(); return setTimeout(() => { scrollTo(0, r ? r.y : 0); const b = r && document.querySelector(`#moon-lab [data-qrow] [data-qsel="${CSS.escape(r.key)}"]`); if (b) b.focus({ preventScroll: true }); }, 60); }
-    if (d.qsel != null) { ret = t.closest && t.closest('[data-qrow]') ? { key: d.qsel, y: scrollY } : null; sel = d.qsel; peek = false; toCabinet(); focusEl('kqc-gu'); return setTimeout(() => { const g = document.getElementById('kqc-gu'); if (g && g.getBoundingClientRect().top < 0) g.scrollIntoView({ block: 'start' }); }, 150); }
+    if (d.qret) { const lb = document.querySelector('#kqc-gu .kqc-label'), from = lb && lb.getBoundingClientRect(); const r = ret; ret = null; M.render(); return setTimeout(() => { scrollTo(0, r ? r.y : 0); const b = r && document.querySelector(`#moon-lab [data-qrow] [data-qsel="${CSS.escape(r.key)}"]`); if (b) { b.focus({ preventScroll: true }); if (window.KtMotion && from) window.KtMotion.drawerClose(b.closest('[data-qrow]'), from); } }, 60); }
+    if (d.qsel != null) { const row = t.closest && t.closest('[data-qrow]'), lb = row && (row.querySelector(':scope>span') || row), from = lb && lb.getBoundingClientRect ? lb.getBoundingClientRect() : t.getBoundingClientRect ? t.getBoundingClientRect() : null;
+      ret = row ? { key: d.qsel, y: scrollY } : null; sel = d.qsel; peek = false; toCabinet(); focusEl('kqc-gu');
+      let n = 0; const open = () => { const g = document.getElementById('kqc-gu'); if (!g || !g.querySelector('.kqc-label')) { if (++n < 8) return setTimeout(open, 30); return; } if (window.KtMotion) return window.KtMotion.drawerOpen(g, from); if (g.getBoundingClientRect().top < 0) g.scrollIntoView({ block: 'start' }); };
+      return setTimeout(open, 30); }
     if (d.qshow) { const p = prefs(), s = (p.shown || []).filter(k => k !== d.qshow); p.shown = s.length === (p.shown || []).length ? [d.qshow].concat(s).slice(0, 4) : s; save(p); M.render(); return; }
     if (d.qdetail) { peek = true; if (K.setOpen) K.setOpen(d.qdetail); return toCabinet(); }
     if (d.qsetup) { peek = true; if (K.setOpen) K.setOpen(''); return toCabinet(); }
@@ -17274,14 +17287,14 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
     // approved by you on 28 Nov 2026, as packaged with their artwork
     'introduction-python-scientific-computing': 2, 'analyze': 3, 'bayesian-statistics': 3, 'space-mission-design-and-operations': 4, 'spacecraft-dynamics-kinetics': 4, 'statistical-thermodynamics': 4, 'theory-of-angular-momentum': 5, 'approximation-methods': 5 }
   const CGU_RANK_DATES = { 'introduction-python-scientific-computing': '28 Nov 2026', 'analyze': '28 Nov 2026', 'bayesian-statistics': '28 Nov 2026', 'space-mission-design-and-operations': '28 Nov 2026', 'spacecraft-dynamics-kinetics': '28 Nov 2026', 'statistical-thermodynamics': '28 Nov 2026', 'theory-of-angular-momentum': '28 Nov 2026', 'approximation-methods': '28 Nov 2026' };;
-  function cguSVG(c, g, id) {
+  function cguSVG(c, g, id, mk) {
     const A = (window.KgCourseGuArt || {})[c.id];
     if (!A || g.stage === 'none') return `<svg viewBox="0 0 110 105" class="kcgu-art" role="img" aria-label="Undiscovered course Gu"><ellipse cx="55" cy="54" rx="26" ry="34" fill="none" stroke="#9c8a6e" stroke-width="1.5" stroke-dasharray="3 5" opacity=".6"/></svg>`;
     const lit = g.stage !== 'obtained', seal = g.stage === 'proven' || g.stage === 'retained', ret = g.stage === 'retained';
     const body = A.svg.replace(/id="ink"/g, `id="ink-${id}"`).replace(/url\(#ink\)/g, `url(#ink-${id})`);
-    return `<svg viewBox="-12 -12 134 129" class="kcgu-art" role="img" aria-label="${esc(A.gu)}, ${CGU_N[g.stage]}"><defs><filter id="cgl-${id}" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    return `<svg viewBox="-12 -12 134 129" class="kcgu-art${mk ? ' kt-' + mk : ''}" role="img" aria-label="${esc(A.gu)}, ${CGU_N[g.stage]}"><defs><filter id="cgl-${id}" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
       ${seal ? `<circle cx="55" cy="52" r="58" fill="none" stroke="#f5d27a" stroke-width="1.6" stroke-dasharray="2 3" opacity=".8"><title>Synthesis seal</title></circle>` : ''}${ret ? `<circle cx="55" cy="52" r="63" fill="none" stroke="#f5d27a" stroke-width="1.2" opacity=".6"><title>Retention ring${g.ret.at ? ' · ' + new Date(g.ret.at).toISOString().slice(0, 10) : ''}</title></circle>` : ''}
-      <g${lit ? ` filter="url(#cgl-${id})"` : ''}>${body}</g></svg>`;
+      ${mk === 'ink' ? '<ellipse class="kt-ink-ol" cx="55" cy="54" rx="26" ry="34" fill="none" stroke="#9c8a6e" stroke-width="1.5" stroke-dasharray="3 5" aria-hidden="true"/>' : ''}<g${lit ? ` filter="url(#cgl-${id})"` : ''}>${body}</g></svg>`;
   }
   // Suggested learning path: explicit stage and course order
   // complete = every lecture of the syllabus module has a valid file and was completed. A WIP course's last module on disk
@@ -17409,11 +17422,12 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
   }
   function cguPanel(c, s) {
     const g = courseGu(c, s), A = (window.KgCourseGuArt || {})[c.id], r = CGU_RANK[c.id], tierOf = t => TIER_N[t] || t;
-    return `<div class="kcgu-panel"><div class="kcgu-big">${cguSVG(c, g, 'cv')}</div><div class="kl-stack">
+    const mk = g.stage !== 'none' && window.KtMotion ? window.KtMotion.take('cgu:' + c.id) : '';
+    return `<div class="kcgu-panel"><div class="kcgu-big">${cguSVG(c, g, 'cv', mk)}</div><div class="kl-stack">
       <p class="kl-eyebrow">COURSE GU · ${esc(CGU_N[g.stage].toUpperCase())}</p><h3>${esc(g.stage !== 'none' && A ? A.gu : labelOf(c) + ' Gu')}</h3>
       ${g.stage !== 'none' && A ? `<p class="kl-small">${esc(A.design)}</p>` : ''}
       <p class="kl-small">${r ? `Gu rank ${r} · approved by you (${CGU_RANK_DATES[c.id] || CGU_RANK_APPROVED})` : 'Gu rank not set'}</p>
-      <p class="kl-small"><b>Evidence</b></p><ul class="kl-list kl-small">
+      <p class="kl-small">${g.stage === 'proven' || g.stage === 'retained' ? `<span class="kt-stamp${mk === 'seal' ? ' kt-press' : ''}" aria-hidden="true">${g.stage === 'retained' ? 'Retained' : 'Sealed'}</span>` : ''}<b>Evidence</b></p><ul class="kl-list kl-small">
         ${g.passes.map(p => `<li>✓ ${esc(p.name)} · module passed — ${tierOf(p.tier)} · ${new Date(p.at).toISOString().slice(0, 10)}</li>`).join('') || '<li>No module assessment passed yet.</li>'}
         <li>${g.synth.state === 'passed' ? `✓ Course synthesis passed — ${tierOf(g.synth.tier)} · ${new Date(g.synth.at).toISOString().slice(0, 10)}` : 'Course synthesis: pending'}</li>
         <li>${g.ret.state === 'passed' ? `✓ Retention check passed — ${tierOf(g.ret.tier)} · ${new Date(g.ret.at).toISOString().slice(0, 10)}` : 'Retention check: pending'}</li></ul>
@@ -17533,9 +17547,9 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
       const o = r && r.reply ? parseJ(r.reply) : null; s = store(); a = s.asm[k];
       const v = o && (o.verdict === 'pass' || o.verdict === 'fail') ? o.verdict : null;
       if (!v) { if (a && a.cur && a.cur.id === q.id) { a.cur.state = 'error'; a.cur.why = r && r.reply ? 'the grade came back unreadable' : navigator.onLine ? "Iroha's line dropped" : 'you are offline'; put(s); } return; }
-      const tier = a.tier;
+      const tier = a.tier, was = courseGu(c, s).stage;
       if (applyGrade(a, q.id, v, { q: q.q, ref: q.ref, rubric: q.rubric, answer: q.answer, met: (o.met || []).map(Boolean), why: String(o.why || ''), mis: String(o.misconception || ''), revisit: (o.revisit || []).map(String).slice(0, 5), by: r.model || '' })) {
-        put(s); window.__irohaSay?.(v === 'pass' ? `Passed — ${TIER_N[tier]}. ${String(o.why || '').slice(0, 140)}` : `Not yet. ${String(o.misconception || o.why || '').slice(0, 160)}`, { force: 1, delay: 0, face: v === 'pass' ? 'approve' : 'stern' }); }
+        { put(s); if (v === 'pass') { const now = courseGu(c, s).stage; window.KtMotion?.award(was === 'none' && now !== 'none' ? 'ink' : (mi === 'S' || mi === 'R') && now !== was ? 'seal' : '', 'cgu:' + c.id); } } window.__irohaSay?.(v === 'pass' ? `Passed — ${TIER_N[tier]}. ${String(o.why || '').slice(0, 140)}` : `Not yet. ${String(o.misconception || o.why || '').slice(0, 160)}`, { force: 1, delay: 0, face: v === 'pass' ? 'approve' : 'stern' }); }
     } finally { busy.delete(k); if (onCourses()) M.render(); }
   }
   function asmView(c, mi) {
@@ -17616,7 +17630,7 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
   document.addEventListener('click', async e => {
     const t = e.target.closest && e.target.closest('[data-lib]'); if (!t) return; e.preventDefault(); const d = t.dataset;
     if (t.getAttribute('aria-disabled') === 'true') return;
-    if (d.lib === 'home') { view = { c: '', l: '' }; const r = shelfRet; go(); if (r) setTimeout(() => { scrollTo(0, r.y); const b = document.querySelector(`#moon-lab .klib-book[data-c="${CSS.escape(r.c)}"]`); if (b) b.focus({ preventScroll: true }); }, 90); return; }
+    if (d.lib === 'home') { view = { c: '', l: '' }; const r = shelfRet; go(); if (r) setTimeout(() => { scrollTo(0, r.y); const b = document.querySelector(`#moon-lab .klib-book[data-c="${CSS.escape(r.c)}"]`); if (b) { b.focus({ preventScroll: true }); window.KtMotion?.move(b, { transform: 'perspective(900px) rotateY(-55deg)', opacity: .6, transformOrigin: '0 50%' }, 180); } }, 90); return; }
     if (d.lib === 'later') { invite = null; return M.render(); }
     if (d.lib === 'asm') { invite = null; const mi = PM(d.m), c = course(d.c);
       if (c && SPECIAL[mi]) { const s = store(), g = courseGu(c, s); s.asm = s.asm || {}; if (!s.asm[mkey(c, mi)] && (mi === 'S' ? g.canS : g.canR)) { s.asm[mkey(c, mi)] = asmBlank(); put(s); } }
@@ -17627,7 +17641,7 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
       return setTimeout(() => { const b = document.querySelector('#moon-lab .klib-toc .kl-primary') || document.querySelector('#moon-lab .klib-full h2'); if (b) { if (b.tagName === 'H2') b.tabIndex = -1; b.focus({ preventScroll: true }); } }, 90); }
     if (d.lib === 'course') { view = { c: d.c, l: '' }; const from = d.from, out = go();
       // back from a lecture: land on that lecture's row, its module open
-      if (from) setTimeout(() => { const b = document.querySelector(`#moon-lab .klib-full [data-lib="play"][data-l="${CSS.escape(from)}"]`); if (!b) return; const m = b.closest('details'); if (m) m.open = true; b.closest('li').classList.add('klib-back'); b.scrollIntoView({ block: 'center' }); b.focus({ preventScroll: true }); }, 90);
+      if (from) setTimeout(() => { const b = document.querySelector(`#moon-lab .klib-full li [data-lib="play"][data-l="${CSS.escape(from)}"]`) || document.querySelector(`#moon-lab .klib-full [data-lib="play"][data-l="${CSS.escape(from)}"]`); if (!b) return; const m = b.closest('details'); if (m) m.open = true; b.closest('li')?.classList.add('klib-back'); b.scrollIntoView({ block: 'center' }); b.focus({ preventScroll: true }); }, 90);
       return out; }
     if (d.lib === 'play') { if (t.getAttribute('aria-disabled') === 'true') return; view = { c: d.c, l: d.l }; go(); return requestAnimationFrame(() => scrollTo(0, 0)); }
     if (d.lib === 'done') { const s = store(), p = s.lec[lk(d.c, d.l)] || { pos: 0 }; p.done = !p.done; p.at = Date.now(); s.lec[lk(d.c, d.l)] = p; const due = p.done ? checkDue(s, d.c) : null; put(s); if (due) announce(due); return M.render(); }
@@ -17809,6 +17823,31 @@ body.kt-p-settings{--kt-bg:url(quarters/room-plate.webp);--kt-bgs:240%;--kt-bgp:
 .kt-a-pull{animation:kt-pull 240ms var(--kt-ease)}
 .kt-a-walk{animation:kt-walk 240ms var(--kt-ease)}
 @media(prefers-reduced-motion:reduce){.kt-a-push,.kt-a-drawer,.kt-a-volume,.kt-a-pull,.kt-a-walk{animation:none!important}}
+/* travel: one near object passes the frame (the only layer besides the page) */
+html body.kt-on .kl-enter{animation:none!important} /* travel already moves the page: no second entrance */
+.kt-fx{position:fixed;top:0;bottom:0;left:0;z-index:60;pointer-events:none;will-change:transform}
+.kt-fx-shelf{width:16vw;background:linear-gradient(90deg,#1c110b,#4e3020 30%,#6a4129 55%,#2a1a12);box-shadow:0 0 40px rgba(0,0,0,.6)}
+.kt-fx-post{width:12vw;background:linear-gradient(90deg,#2c2b28,#8c8678 40%,#5a5750 70%,#2c2b28);box-shadow:0 0 30px rgba(0,0,0,.5)}
+.kt-fx-blind{right:0;background:repeating-linear-gradient(0deg,#c8b07a 0 9px,#a88d55 9px 11px);box-shadow:0 8px 20px rgba(0,0,0,.4)}
+/* coming home: lantern light on the object you came back through */
+.kq-hot.kt-lantern .kq-ring{opacity:1!important;stroke:#f5d27a!important;stroke-width:5px!important}
+@keyframes kt-lantern{0%{filter:drop-shadow(0 0 0 rgba(245,210,122,0))}35%{filter:drop-shadow(0 0 16px rgba(245,210,122,.95))}100%{filter:drop-shadow(0 0 0 rgba(245,210,122,0))}}
+.kq-hot.kt-lantern{animation:kt-lantern 900ms ease-out}
+#kt-dest a.kt-lantern{outline:3px solid #e8c77d;outline-offset:2px}
+/* earning a Gu: the outline resolves into the creature in one ink wash; a new seal is pressed once */
+@keyframes kt-ink{from{opacity:0;filter:blur(4px) saturate(.2)}to{opacity:1;filter:none}}
+@keyframes kt-ink-ol{from{opacity:.85;transform:none}to{opacity:0;transform:scale(1.18)}}
+@keyframes kt-press{0%{opacity:0;transform:scale(1.6)}70%{opacity:1;transform:scale(.94)}100%{opacity:1;transform:none}}
+@keyframes kt-stamp{0%{opacity:0;transform:rotate(-6deg) scale(1.7)}70%{opacity:1;transform:rotate(-6deg) scale(.94)}100%{opacity:1;transform:rotate(-6deg)}}
+svg.kt-ink>g:last-of-type,.kq-gu-art.kt-ink>*{animation:kt-ink 560ms ease-out both}
+svg.kt-ink .kt-ink-ol{animation:kt-ink-ol 560ms ease-out both;transform-box:fill-box;transform-origin:center}
+svg.kt-seal>circle:last-of-type{animation:kt-press 260ms cubic-bezier(.3,.7,.3,1) both;transform-box:fill-box;transform-origin:center}
+.kt-stamp{float:right;margin:0 0 6px 10px;padding:4px 10px;border:2px solid #9c3b2e;color:#9c3b2e!important;font:700 12px/1 var(--kt-sans,sans-serif);letter-spacing:.14em;text-transform:uppercase;transform:rotate(-6deg);border-radius:3px;background:rgba(255,253,247,.7)}
+.kt-stamp.kt-press{animation:kt-stamp 260ms cubic-bezier(.3,.7,.3,1) both}
+/* the steward's cloth bookmark */
+html body.kt-p-settings #kg-main #moon-lab>.kl-tabs{position:relative}
+.kt-bookmark{position:absolute;left:0;width:6px;background:linear-gradient(#b0453a,#7e2c24);border-radius:0 2px 2px 0;pointer-events:none;box-shadow:1px 1px 2px rgba(0,0,0,.4)}
+@media(prefers-reduced-motion:reduce){.kt-fx{display:none!important}.kq-hot.kt-lantern,svg.kt-ink>g:last-of-type,.kq-gu-art.kt-ink>*,svg.kt-seal>circle:last-of-type,.kt-stamp.kt-press{animation:none!important}svg.kt-ink .kt-ink-ol{display:none}}
 @media(max-width:600px){#kt-band{min-height:120px}#kt-return{font-size:14px;padding:9px 16px}html body.kt-p-library #kg-main #moon-lab>.kl-tabs>button{min-height:120px!important;width:40px!important;font-size:15px!important}
   html body.kt-p-table #kg-main #habit-desk #hb-day-map .hb-timeline li{grid-template-columns:6.4em 1fr}}
 </style>
@@ -17885,14 +17924,64 @@ body.kt-p-settings{--kt-bg:url(quarters/room-plate.webp);--kt-bgs:240%;--kt-bgp:
     el.innerHTML = `<div><h2 style="margin:0;font-size:20px">Writing bench</h2><p class="kl-small" style="margin:2px 0 0">Timers, your question, notes and the session form${s.kind === 'timer' ? ' · a session is running' : ''}.</p></div><a class="kl-primary" href="#session" style="text-decoration:none;padding:8px 14px;border-radius:999px">${s.kind === 'timer' ? 'Return to your session' : 'Sit at the bench'}</a>`;
     const tabs = lab.querySelector(':scope>.kl-tabs'); if (tabs) tabs.after(el); else lab.prepend(el);
   }
-  // camera distance and arrival
-  let cur = '', curKey = '', busy = 0;
-  function animate(kind) {
-    const el = kind === 'pull' ? $('kg-scene') : main; if (!el || still()) return;
-    for (const c of ['kt-a-push', 'kt-a-drawer', 'kt-a-volume', 'kt-a-pull', 'kt-a-walk']) el.classList.remove(c);
-    void el.offsetWidth; el.classList.add('kt-a-' + kind);
-    clearTimeout(busy); busy = setTimeout(() => el.classList.remove('kt-a-' + kind), 400);
+  // ---- motion: the thing you touch decides how you travel. One coordinated movement per click, using at most a
+  // foreground layer and a backdrop. A second click, Back or a new destination cancels it; routes, focus and saves
+  // never wait for it. Reduced motion (or calm mode) switches instantly and keeps orientation through focus.
+  let cur = '', curKey = '';
+  const EASE = 'cubic-bezier(.2,.7,.2,1)', NEUTRAL = { transform: 'none', opacity: 1, clipPath: 'inset(0 0 0 0)' };
+  let live = [];
+  function cancelMotion() { for (const a of live.slice()) { try { a.cancel(); } catch (e) {} } live = []; document.querySelectorAll('.kt-fx').forEach(x => x.remove()); }
+  function play(el, kf, ms, o) {
+    if (!el || !el.animate || still()) return null;
+    const a = el.animate(kf, Object.assign({ duration: ms, easing: EASE }, o || {})); live.push(a);
+    const done = () => { live = live.filter(x => x !== a); }; a.addEventListener('finish', done); a.addEventListener('cancel', done); return a;
   }
+  const to = from => Object.fromEntries(Object.keys(from).map(k => [k, k === 'transformOrigin' ? from[k] : NEUTRAL[k]]));
+  const move = (el, from, ms) => play(el, [from, to(from)], ms);
+  function fx(cls, kf, ms) { if (still()) return; const d = document.createElement('div'); d.className = 'kt-fx ' + cls; d.setAttribute('aria-hidden', 'true'); B.append(d);
+    const a = play(d, kf, ms, { easing: 'cubic-bezier(.45,0,.25,1)' }); if (!a) return d.remove(); const rm = () => d.remove(); a.addEventListener('finish', rm); a.addEventListener('cancel', rm); }
+  // FLIP: an element seen at rect `r` slides from there into its new place
+  function flip(el, r, ms, translateOnly) {
+    if (!el || !r) return null; const n = el.getBoundingClientRect(); if (!n.width || !n.height) return null;
+    const dx = r.left - n.left, dy = r.top - n.top, sx = translateOnly ? 1 : r.width / n.width, sy = translateOnly ? 1 : r.height / n.height;
+    return move(el, { transform: `translate(${dx}px,${dy}px) scale(${sx},${sy})`, transformOrigin: '0 0' }, ms);
+  }
+  // arriving: 280–360 ms between places
+  const MOVE = {
+    table: () => move(main, { transform: 'translateY(40px) scale(.965)', opacity: .3, transformOrigin: '50% 100%' }, 320),          // the viewpoint lowers onto the open book
+    cabinet: () => move(main, { transform: 'translateX(-28px)', clipPath: 'inset(0 24% 0 0)', opacity: .4 }, 300),                    // a drawer slides out
+    library: () => { fx('kt-fx-shelf', [{ transform: 'translateX(-30vw)' }, { transform: 'translateX(120vw)' }], 320); move(main, { transform: 'translateX(22px)', opacity: .35 }, 320); }, // one near shelf edge passes
+    plan: () => move(main, { clipPath: 'inset(0 100% 0 0)' }, 340),                                                                      // the scroll unrolls; the time column stays put
+    practice: () => { fx('kt-fx-post', [{ transform: 'translateX(110vw)' }, { transform: 'translateX(-30vw)' }], 300); move(main, { transform: 'translateY(14px) scale(.96)', opacity: .35, transformOrigin: '50% 100%' }, 300); }, // past the gatepost
+    progress: () => move(main, { transform: 'translate(-26px,42px)', opacity: .3 }, 340),                                              // up the diagonal of the steps
+    company: () => { fx('kt-fx-blind', [{ transform: 'translateY(0)' }, { transform: 'translateY(-100%)' }], 320); move(main, { transform: 'translateY(-14px)', opacity: .5 }, 320); }, // a blind lifts; settle at table height
+    settings: () => move(main, { transform: 'perspective(1400px) rotateX(14deg)', opacity: .5, transformOrigin: '50% 0' }, 280),        // the ledger opens flat
+    home: () => move($('kg-scene'), { transform: 'scale(1.045)', opacity: .6 }, 300)
+  };
+  let trip = 0; // each journey has a number; a landing from an earlier one never takes focus
+  function travel(p) { trip++; cancelMotion(); (MOVE[p] || MOVE.home)(); }
+  // inside a place: 160–220 ms. A course opens like a hinged cover; a lecture or an assessment opens at once.
+  function inner(p, from, deep) {
+    if (p === 'library' && deep === 'course' && !from) { cancelMotion(); move(document.querySelector('#moon-lab .klib-full'), { transform: 'perspective(1200px) rotateY(-62deg)', opacity: .4, transformOrigin: '0 50%' }, 220); }
+  }
+  // coming home: resolve onto the room object you left through, pick it out with lantern light, focus it there
+  const OBJ = { table: '[data-kv="today"]', cabinet: '[data-qgo="study:cultivation"]', library: '[data-qgo="library:courses"]', plan: '[data-kv="plan"]', settings: '[data-kv="settings"]', company: '[data-kv="company"]' };
+  let via = ''; const entered = {};
+  document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-kt-go],.kq-hot'); if (t) via = t.closest('[data-kt-go]') ? 'doorway' : 'object'; }, true);
+  const inView = el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; };
+  function land(from) {
+    let n = 0; const mine = trip;
+    const tryLand = () => {
+      if (mine !== trip || placeOf() !== 'home') return;
+      const sc = $('kg-scene'), door = entered[from] === 'doorway' || !OBJ[from];
+      let el = sc && sc.querySelector(door ? '[data-kt="doorway"]' : OBJ[from]);
+      if (!el || !inView(el)) el = document.querySelector(`#kt-dest [data-kt-go="${from}"]`); // a phone's painting may crop the object: its name in the list
+      if (!el || !inView(el)) { if (++n < 6) setTimeout(tryLand, 70); return; }
+      el.focus({ preventScroll: true }); el.classList.add('kt-lantern'); setTimeout(() => el.classList.remove('kt-lantern'), 1100);
+    };
+    setTimeout(tryLand, 40);
+  }
+  addEventListener('popstate', cancelMotion);
   function focusHeading(p) {
     requestAnimationFrame(() => {
       const pick = () => { const x = p === 'home' ? $('kt-home-h') : p === 'table' ? document.querySelector('#hb-day-map h2') : B.classList.contains('kqc-full') ? document.querySelector('#kqc-gu, #moon-lab .klib-full h2, #moon-lab .klib-full h3') : null; return x || band.querySelector('h1'); };
@@ -17919,15 +18008,58 @@ body.kt-p-settings{--kt-bg:url(quarters/room-plate.webp);--kt-bgs:240%;--kt-bgp:
     const tabs = document.querySelectorAll('#moon-lab>.kl-tabs>button'); tabs.forEach((b, i) => b.style.setProperty('--kt-i', i));
     benchCard();
     if (key === curKey && !force) return;
-    const moved = p !== cur, prev = curKey; cur = p; curKey = key;
+    const moved = p !== cur, prev = curKey, left = cur; cur = p; curKey = key;
     if (!booted) { booted = true; return; }
-    if (moved) { animate(n[4]); focusHeading(p); return; }
+    if (moved) { if (p !== 'home') { entered[p] = via || entered[p] || 'object'; } via = ''; travel(p); focusHeading(p); if (p === 'home' && left) land(left); return; }
     // moving in close inside a place
-    if (deep && !prev.endsWith('|' + deep)) { animate(p === 'library' ? 'volume' : p === 'cabinet' ? 'drawer' : 'walk'); focusHeading(p); }
+    if (deep && !prev.endsWith('|' + deep)) { inner(p, prev.split('|')[1] || '', deep); focusHeading(p); }
   }
   addEventListener('hashchange', () => setTimeout(apply, 0));
   addEventListener('moonlab:render', e => { if (e.detail && e.detail.tab && e.detail.section === 'study') lastTab = e.detail.tab; setTimeout(apply, 80); });
   new MutationObserver(() => apply()).observe(B, { attributes: true, attributeFilter: ['class'] });
+  // the steward's cloth bookmark moves to the chosen ledger entry; the controls stay still
+  let markTop = null;
+  function bookmark() {
+    const tabs = document.querySelector('#moon-lab>.kl-tabs'); if (!tabs) return;
+    let bm = tabs.querySelector(':scope>.kt-bookmark');
+    if (placeOf() !== 'settings') { bm?.remove(); markTop = null; return; }
+    const on = tabs.querySelector('[aria-current="page"]'); if (!on) return;
+    if (!bm) { bm = document.createElement('span'); bm.className = 'kt-bookmark'; bm.setAttribute('aria-hidden', 'true'); tabs.append(bm); }
+    const top = on.offsetTop, h = on.offsetHeight; bm.style.top = top + 'px'; bm.style.height = h + 'px';
+    if (markTop != null && markTop !== top) move(bm, { transform: `translateY(${markTop - top}px)` }, 180);
+    markTop = top;
+  }
+  // a practice station's work surface comes forward when chosen; resuming a session goes straight to it
+  let lastStudyTab = '';
+  addEventListener('moonlab:render', e => { const d = e.detail || {};
+    if (d.section === 'study' && d.tab && lastStudyTab && d.tab !== lastStudyTab && d.tab !== 'cultivation' && lastStudyTab !== 'cultivation') setTimeout(() => move(document.querySelector('#moon-lab>.kl-tabs ~ :not(#kt-bench)'), { transform: 'translateY(10px) scale(.97)', opacity: .5, transformOrigin: '50% 100%' }, 200), 90);
+    if (d.section === 'study' && d.tab) lastStudyTab = d.tab;
+    setTimeout(bookmark, 90); setTimeout(letters, 90); });
+  // the tea pavilion: a new letter is drawn from its envelope once; everything already there rests
+  let seen = null;
+  function letters() {
+    if (placeOf() !== 'company') return; const all = [...document.querySelectorAll('#moon-lab article.kl-letter')];
+    const key = a => a.textContent.slice(0, 80);
+    if (!seen) { seen = new Set(all.map(key)); return; }
+    for (const a of all) if (!seen.has(key(a))) { seen.add(key(a)); move(a, { clipPath: 'inset(0 0 100% 0)', transform: 'translateY(26px)' }, 220); }
+  }
+  // earning a Gu: set by the award event itself, shown once where the Gu is next drawn. Never stored, so a reload,
+  // a sync, a restored backup or an ordinary visit shows the current state at once.
+  const pend = new Map(); let armed = null;
+  const award = (kind, key) => { if (kind && key && !still()) pend.set(key, { kind, at: Date.now() }); };
+  const take = key => { const x = pend.get(key); if (!x) return ''; pend.delete(key); return Date.now() - x.at < 6e5 ? x.kind : ''; };
+  window.KtMotion = { still, play, move, flip, cancel: cancelMotion, award, take, arm: () => { armed = Date.now(); dispatchEvent(new Event('kt:arm')); }, armed: () => armed && Date.now() - armed < 8000,
+    // the Gu cabinet: the drawer you tapped slides forward and its label rises into the evidence slip; on a phone the label settles at the top
+    drawerOpen(g, from) {
+      const lab = g.querySelector('.kqc-label') || g, bars = [...document.querySelectorAll('#moon-lab>.kl-tabs,#moon-lab .kqc-pin')].filter(x => getComputedStyle(x).position === 'sticky' && x.getClientRects().length);
+      const off = Math.max(0, ...bars.map(x => x.getBoundingClientRect().bottom));
+      if (innerWidth <= 720) scrollTo(0, scrollY + lab.getBoundingClientRect().top - off - 8); else if (g.getBoundingClientRect().top < 0) g.scrollIntoView({ block: 'start' });
+      cancelMotion(); flip(lab, from, 220);
+      move(g.querySelector('.kqc-slip'), { clipPath: 'inset(0 0 100% 0)' }, 200);
+      move(document.querySelector('#moon-lab li[data-qrow].kqc-on'), { transform: 'none' }, 180);
+    },
+    // ...and on the way back the label closes into the same drawer
+    drawerClose(row, from) { cancelMotion(); flip(row, from, 180, true); } };
   window.KtTravel = { PLACES, placeOf, go, home, openDoor, listHTML };
   apply();
 })();
