@@ -8,8 +8,9 @@ const ARRANGE = new Function('return ' + src.slice(src.indexOf('['), src.indexOf
 const EIGHT = { analyze: 'Photon Lynx', 'space-mission-design-and-operations': 'Waystation Tern', 'theory-of-angular-momentum': 'Axis Crown Stag', 'spacecraft-dynamics-kinetics': 'Flywheel Tortoise',
   'statistical-thermodynamics': 'Ember Brood Toad', 'approximation-methods': 'Ripplewing Moth', 'introduction-python-scientific-computing': 'Lattice Newt', 'bayesian-statistics': 'Posterior Cuttle' };
 test('all 37 courses on the path have art, keyed by stable id', () => {
-  const ids = ARRANGE.flatMap(g => g.c.map(c => c[0]));
-  assert.strictEqual(Object.keys(ART).length, 37);
+  const ids = ARRANGE.flatMap(g => g.c.filter(c => c[3] !== 'workshop').map(c => c[0]));
+  assert.strictEqual(ids.length, 37); assert.strictEqual(Object.keys(ART).length, 37);
+  assert.ok(!ART['astronomical-data-in-python'], 'the workshop has no Course Gu');
   for (const id of ids) assert.ok(ART[id] && ART[id].gu && ART[id].svg.startsWith('<desc>'), id);
   for (const [id, gu] of Object.entries(EIGHT)) assert.strictEqual(ART[id].gu, gu, id);
 });

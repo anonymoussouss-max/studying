@@ -25,6 +25,16 @@ const WIP = [
   {"id": "approximation-methods", "title": "Approximation Methods", "by": "University of Colorado Boulder", "dir": "approximation-methods", "syllabus": "approximation-methods-syllabus-parsed.json"},
   {"id": "statistical-thermodynamics", "title": "Statistical Molecular Thermodynamics", "by": "University of Minnesota", "dir": "statistical-thermodynamics", "syllabus": "statistical-thermodynamics-syllabus-parsed.json"}
 ];
+// Hands-on workshops: notebooks, data and a browser-readable lesson site instead of lectures. They carry no videos,
+// so video completion, assessments and Course Gu never apply. Paths are relative to the workshop folder.
+const WORKSHOPS = [
+  { id: 'astronomical-data-in-python', title: 'Astronomical Data in Python', by: 'Allen Downey', dir: 'Astronomical Data in Python', blurb: 'Hands-on workshop · 7 notebook lessons',
+    start: 'Start here.html', reading: 'Offline reading/index.html',
+    notebooks: [['01_query.ipynb', 'Queries'], ['02_coords.ipynb', 'Coordinates and Units'], ['03_motion.ipynb', 'Proper Motion'], ['04_select.ipynb', 'Transformation and Selection'],
+      ['05_join.ipynb', 'Joining Tables'], ['soln/06_photo.ipynb', 'Photometry'], ['07_plot.ipynb', 'Visualization']],
+    data: [['data/gd1_results.fits', 'Gaia results (FITS)'], ['data/gd1_photo.fits', 'Pan-STARRS photometry (FITS)'], ['data/gd1-joined-sample.csv', 'Starter dataset (CSV)']],
+    starter: 'Starter exercise.py', extra: ['README.md'] }
+];
 const posix = p => p.split(path.sep).join('/').replace(/\\/g, '/');
 const pretty = s => s.replace(/^\d+[_-]/, '').replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^./, c => c.toUpperCase());
 const titleOf = slug => slug.split('-').map(w => w.length > 2 || /^[a-z]/.test(w) && w.length > 1 ? w[0].toUpperCase() + w.slice(1) : w).join(' ').replace(/^./, c => c.toUpperCase());
@@ -70,6 +80,23 @@ function walkMp4(abs, rel = '', out = []) {
   return out.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
+// every file of a static site folder, skipping dot-files and dot-folders (.git, .buildinfo, .nojekyll)
+function siteFiles(abs, rel, out = []) {
+  for (const f of listDir(abs)) { if (f.startsWith('.')) continue; const a = path.join(abs, f), r = rel + '/' + f; let st; try { st = fs.statSync(a); } catch (e) { continue; }
+    if (st.isDirectory()) siteFiles(a, r, out); else out.push(r); }
+  return out.sort();
+}
+function workshopOf(root, w) {
+  const file = (p, name, kind) => { let size = 0, ok = false; try { const st = fs.statSync(path.join(root, w.dir, p)); ok = st.isFile() && st.size > 0; size = st.size; } catch (e) {}
+    return { kind, name, path: posix(path.join(w.dir, p)), ok, size }; };
+  const res = [file(w.start, 'Start here', 'start'), file(w.reading, 'Lessons and worked solutions', 'reading')]
+    .concat(w.notebooks.map(([p, n], i) => file(p, `${i + 1}. ${n}`, 'notebook')), w.data.map(([p, n]) => file(p, n, 'data')), [file(w.starter, 'Starter Python exercise', 'starter')]);
+  const extra = w.extra.map(p => file(p, pretty(p), 'extra')).filter(x => x.ok);
+  const readDir = path.dirname(w.reading), site = fs.existsSync(path.join(root, w.dir, readDir)) ? siteFiles(path.join(root, w.dir, readDir), posix(path.join(w.dir, readDir))) : [];
+  const missing = res.filter(x => !x.ok).length;
+  return { id: w.id, title: w.title, by: w.by, kind: 'workshop', blurb: w.blurb, status: missing ? 'partial' : 'available', expected: res.length, valid: res.length - missing,
+    resources: res, extra, site, modules: [], note: missing ? `${missing} of ${res.length} workshop files are missing.` : `All ${res.length} workshop files are present.` };
+}
 function build(root) {
   dirCache.clear();
   const cat = readJSON(path.join(root, 'course-catalogue.json')) || [], ver = readJSON(path.join(root, 'verification.json')) || [], cov = readJSON(path.join(root, 'lecture-coverage.json')) || [];
@@ -96,6 +123,7 @@ function build(root) {
       expected, valid, modules: modulesOf(lecs, root),
       note: verified ? 'Every expected lecture has a valid video.' : !present ? 'Folder not present yet.' : expected ? `${valid} of ${expected} expected lectures have a valid video.` : `${valid} valid videos found; the expected lecture list is not known yet.` });
   }
+  for (const w of WORKSHOPS) courses.push(workshopOf(root, w));
   return { v: 1, built: new Date().toISOString(), courses };
 }
 if (require.main === module) {
@@ -106,4 +134,4 @@ if (require.main === module) {
   console.log(`wrote ${out}: ${idx.courses.length} courses, ${lec} lectures`);
   for (const c of idx.courses) console.log(`  ${c.status.padEnd(9)} ${c.id}: ${c.valid}/${c.expected ?? '?'} valid${c.note ? ' · ' + c.note : ''}`);
 }
-module.exports = { build, expectedFromSyllabus, videoCheck, sidecars, WIP };
+module.exports = { build, expectedFromSyllabus, videoCheck, sidecars, WIP, WORKSHOPS };
