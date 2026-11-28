@@ -154,7 +154,7 @@ test('Course Gu: a WIP course cannot be proven; missing evidence is pending; ran
   const K = assessK(), c = C2('wip'), s = { lec: {}, notes: [], asm: {} };
   for (const mi of [0, 1]) { const a = K.asmBlank(); a.cur = { id: 'q' }; K.applyGrade(a, 'q', 'pass'); s.asm[K.mkey(c, mi)] = a; }
   const g = K.courseGu(c, s); assert.strictEqual(g.stage, 'refining'); assert.strictEqual(g.canS, false); assert.match(g.pending.join(' '), /WIP/);
-  assert.strictEqual(Object.keys(K.CGU_RANK).length, 29); assert.ok(Object.values(K.CGU_RANK).every(r => Number.isInteger(r) && r >= 1 && r <= 5));
+  assert.strictEqual(Object.keys(K.CGU_RANK).length, 37); assert.ok(Object.values(K.CGU_RANK).every(r => Number.isInteger(r) && r >= 1 && r <= 5));
   const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1]; assert.match(src, /Gu rank \$\{r\} · approved by you/); assert.ok(!/awaiting your approval/.test(src), 'no course Gu rank is shown as a proposal');
   const art = {}; vm.runInNewContext(html.match(/<script id="kg-course-gu-art">([\s\S]*?)<\/script>/)[1], { window: art }); const ids = Object.keys(art.KgCourseGuArt);
   assert.strictEqual(ids.length, 37); assert.deepStrictEqual([...ids].sort(), [...K.ARRANGE.flatMap(g => g.c.map(x => x[0]))].sort(), 'one artwork per course, keyed by the stable course id');
