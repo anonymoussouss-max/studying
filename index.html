@@ -7670,7 +7670,7 @@ window.KG_RECALL = {
   M.SECTIONS.study.splice(3, 0, ['paper', '📝 Full mock']);
   M.SECTIONS.progress.splice(1, 0, ['patterns', '🌙 Patterns']);
   M.SECTIONS.company.splice(1, 0, ['buddy', '🤝 Study buddy']);
-  M.SECTIONS.settings.splice(1, 0, ['app', '📱 App']);
+  M.SECTIONS.settings.splice(1, 0, ['app', '📱 Appearance & app']);
 
   /* ---------- flag a bad question: it stops counting and Iroha is told to avoid the flaw ---------- */
   const WHY = ['wrong answer key', 'unclear wording', 'missing data', 'too easy', 'off syllabus'];
@@ -8869,6 +8869,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     while (M.add(w0, 7) <= end) { const w1 = M.add(w0, 7); weeks.push(ss.filter(s => s.date >= w0 && s.date < w1).reduce((n, s) => n + (+s.minutes || 0), 0)); w0 = w1; }
     return weeks.slice(-4);
   }
+  M.weeksHistory = weeksHistory; // the terrace's forecast reads the same logged weeks as the progress page
   function understanding() {
     const from = M.add(today(), -14), log = L.log || [], fl = L.flowLog || [];
     const indep = log.filter(e => e.d >= from && e.ok && (e.t === 'pyq' || e.t === 'recall' || e.mix)).length + fl.filter(f => f.d >= from && f.ev === 'indep').length;
@@ -8928,6 +8929,8 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
       <p class="kl-small">Six hours is a complete normal day. Late days are shorter by design, not failed. Meals, your commitment, breaks and bedtime come before any task; unfinished work moves on, it is never squeezed in.</p>
       ${settingsHTML(v)}${forecastHTML()}</details></section>`;
   };
+  // the writing table is daily-only, so the targets and the full forecast also live on the calendar terrace
+  M.deskTargetsHTML = () => { if (!SP()?.templateDay) return ''; const v = view(); return settingsHTML(v) + forecastHTML(); };
   // ---- actions ----
   const toast = t => M.K?.(t);
   Object.assign(M.ACTIONS, {
@@ -11248,7 +11251,8 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
   M.ACTIONS.snapnow = () => snapshot('manual').then(() => (M.notify || M.K)('Recovery copy saved on this device.')).catch(() => M.K("couldn't save a copy here, try a full backup download instead 🌙"));
   const backup = M.PANELS.backup;
   const lastFull = () => { const t = Number(localStorage.getItem('kg-full-backup') || 0); return t ? new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'never'; };
-  if (backup) M.PANELS.backup = () => backup() + `<section class="kl-card kl-stack kg-fullbk"><h3>Complete backup: records and attached notes in one file</h3>
+  if (backup) M.PANELS.backup = () => `<section class="kl-card kt-ledger-pair" aria-label="Back up or restore"><div><p class="kl-eyebrow">BACK UP</p><p class="kl-small">Save everything in this browser, with attached notes, to one file you keep elsewhere.</p><button class="kl-primary" data-a="fullbackup">⬇ Download a full backup</button></div>
+    <div><p class="kl-eyebrow">RESTORE</p><p class="kl-small">Load a backup file you saved earlier into this browser.</p><button class="kt-restore" data-a="ktrestore">⬆ Restore from a backup file…</button></div></section>` + backup() + `<section class="kl-card kl-stack kg-fullbk"><h3>Complete backup: records and attached notes in one file</h3>
     <p class="kl-small">Everything above plus the PDFs and photos attached to your lectures, in one file. Keep it somewhere other than this browser (a drive, a USB stick, your email) so it survives cleared data or a lost device. It can be large if you have many notes.</p>
     <p class="kl-small"><b>Last full backup:</b> ${lastFull()}</p>${(() => { try { const m = JSON.parse(localStorage.getItem('kg-restore-missing') || 'null'); return m && m.files.length ? `<p class="kl-small"><b>⚠ Evidence missing:</b> the last restore was a partial recovery. These attached files couldn't be restored: ${m.files.map(x => M.esc(x.name || x.id)).join(', ')}. Anything that relied on them is not fully supported until you restore a sound copy.</p>` : ''; } catch (e) { return ''; } })()}
     <div class="kl-row"><button class="kl-primary" data-a="fullbackup">Download a full backup</button><label class="kl-ghost kg-filebtn">Restore a full backup<input type="file" id="kg-fullrestore" accept="application/json,.json" hidden></label></div></section>` + `<section class="kl-card kl-stack kg-snaps"><h3>Local recovery copies: study records only</h3>
@@ -11258,6 +11262,7 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
     ${snaps.length ? snaps.map(s => `<div class="kl-li"><span>${s.kind === 'daily' ? new Date(s.at).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' }) : s.kind === 'manual' ? 'Saved by hand' : 'Before a restore'}<small>${new Date(s.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · ${s.kb} KB</small></span><button class="kl-ghost" data-a="snaprestore" data-v="${M.esc(s.id)}">Restore</button></div>`).join('') : '<p class="kl-small">The first copy is made a few seconds after the page opens.</p>'}
     <div class="kl-row"><button data-a="snapnow">Save a copy now</button></div></section>`;
 
+  M.ACTIONS.ktrestore = () => { const i = document.getElementById('kg-fullrestore'); if (i) i.click(); };
   /* ---------- the desk open in two tabs: say so, because each tab can overwrite the other's saves ---------- */
   const twin = document.createElement('div'); twin.id = 'kg-twin'; twin.setAttribute('role', 'status');
   twin.innerHTML = 'The desk is open in another tab too. Each tab can overwrite the other\'s changes, so it\'s safest to use one. <button type="button">Reload this tab</button>';
@@ -14368,10 +14373,15 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
     return `<div class="kt-week" role="table" aria-label="Seven days on one time axis"><div class="kt-wk-axis" role="row" aria-hidden="true"><span></span><span class="kt-wk-bar">${[6, 10, 14, 18, 22, 26].map(h => `<i style="left:${pc(h * 60)}%">${SP().clk(h * 60)}</i>`).join('')}</span><span></span></div>${days.map(dd => { const t = preview(dd), st = studyOf(t);
       return `<div class="kt-wk-row" role="row"><b role="rowheader">${esc(new Date(dd + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }))}</b><span class="kt-wk-bar" role="cell">${t.rows.map(r => `<i data-k="${esc(r.kind || '')}" style="left:${pc(r.s)}%;width:${Math.max(.6, pc(r.e) - pc(r.s))}%" title="${esc(SP().clk(r.s) + '–' + SP().clk(r.e) + ' ' + (r.title || ''))}"></i>`).join('')}</span><span role="cell">${hmLen(total(t))}${st.length ? ` · ${SP().clk(st[0].s)}–${SP().clk(st[st.length - 1].e)}` : ''}</span></div>`; }).join('')}</div>`;
   }
+  // the same calculation as Progress → forecast (StudyPlan.forecast with your logged PCM weeks), named the same way
   function forecastView() {
-    const f = SP().forecast(L, {}), w = f.weeksLow == null ? 'no estimate yet' : `${f.weeksLow}–${f.weeksHigh} weeks`;
-    return `<div class="kt-fc"><p class="kl-eyebrow">FORECAST · NOT A PLAN</p><p><b>${esc(w)}</b> for the remaining syllabus at ${hmLen(f.plannedWeekly || 0)} of PCM a week${f.complete ? '' : ' (incomplete inputs)'}.</p>
-      <p class="kl-small">Provisional inputs, shown so you can see what this rests on:</p><ul class="kt-fc-in">${f.assumptions.map(x => `<li><span class="kt-prov">provisional</span> ${esc(x)}</li>`).join('')}${(f.missing || []).map(x => `<li><span class="kt-prov">missing</span> ${esc(String(x))}</li>`).join('')}<li><span class="kt-prov">provisional</span> ${esc(f.uncertainty)}</li></ul></div>`;
+    const wk = M.weeksHistory ? M.weeksHistory() : [], f = SP().forecast(L, { weeks: wk }), rng = r => r && r.weeksLow != null ? `${r.weeksLow}–${r.weeksHigh} weeks` : 'no estimate';
+    return `<div class="kt-fc"><p class="kl-eyebrow">FORECAST · NOT A PLAN</p>
+      <p><b>Hypothetical pace</b> · ${f.pace.weekly ? `${rng(f.pace)} if your selected capacity of ${hmLen(f.pace.weekly)} PCM a week were kept` : 'no PCM capacity is selected this week'}.</p>
+      <p><b>Forecast from real study</b> · ${f.actual ? `${rng(f.actual)} at your last ${f.actual.weeksUsed} weeks' average of ${hmLen(f.actual.weekly)} PCM` : `not yet: it needs at least two full weeks of logged PCM study (${wk.length} logged so far)`}.</p>
+      ${f.complete ? '' : '<p class="kl-small"><span class="kt-prov">incomplete</span> the ranges cover counted lectures only, so neither is a completion date.</p>'}
+      <p class="kl-small">Inputs, with the provisional ones marked:</p><ul class="kt-fc-in">${f.actual ? '' : '<li><span class="kt-prov">provisional</span> no logged history yet, so only the hypothetical pace applies</li>'}${f.assumptions.map(x => `<li><span class="kt-prov">provisional</span> ${esc(x)}</li>`).join('')}${(f.provisionalCounts || []).map(x => `<li><span class="kt-prov">provisional count</span> ${esc(String(x))}</li>`).join('')}${(f.absent || []).map(x => `<li><span class="kt-prov">missing count</span> ${esc(String(x))}</li>`).join('')}</ul>
+      <p class="kl-small">${esc(f.uncertainty)}. The same numbers appear under Progress → forecast.</p></div>`;
   }
   document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-ktv]'); if (!b) return; tv = b.dataset.ktv; M.render(); setTimeout(() => document.querySelector(`[data-ktv="${tv}"]`)?.focus(), 30); });
   function card() {
@@ -14390,7 +14400,8 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
       <p class="kl-small">The real day still follows when you wake. 8h is the most that fits before bedtime, so it may show less.</p></section>`;
   }
   const base = M.PANELS.countdown;
-  M.PANELS.countdown = () => { let c = ''; try { c = card(); } catch (e) { c = ''; } return c + base(); };
+  M.PANELS.countdown = () => { let c = '', t = ''; try { c = card(); } catch (e) { c = ''; } try { t = M.deskTargetsHTML ? M.deskTargetsHTML() : ''; } catch (e) { t = ''; }
+    return c + base() + (t ? `<section class="kl-card kl-stack kt-targets"><p class="kl-eyebrow">DESK TARGETS · CLASS 12 SCENARIO · KHAZANA · FULL FORECAST</p>${t}</section>` : ''); };
   M.ACTIONS.tmrwhrs = b => { const d = day(), h = +b.dataset.v, s = S(); s.hours = s.hours || {};
     if (h) s.hours[d] = h; else delete s.hours[d];
     save(); M.render(); };
@@ -16653,10 +16664,34 @@ window.KgGuArt = {"ART":{"m11:Sets":{"name":"Venn Mussel","design":"Two overlapp
       ${prev ? `<p class="kl-small">${prev}</p>` : ''}
       ${g.why && g.def !== 'agreed' && g.src ? `<details class="kl-small"><summary>Rationale</summary>${esc(g.why || '')} <i>Source: ${esc(g.src)}.</i></details>` : ''}
       ${g.kind === 'current' && g.now === 'met' ? `<button class="kl-primary" data-a="rearn" data-g="${g.id}">Accept · earned stages are permanent</button>` : ''}
-      ${g.kind === 'proposed' && !g.pending ? `<button class="kl-ghost" data-a="rapprove" data-g="${g.id}">Approve this criterion</button>` : ''}</li>`;
+      ${g.kind === 'proposed' && !g.pending ? `<button class="kl-ghost" data-a="rapprove" data-g="${g.id}">Approve this criterion</button>` : ''}
+      <button class="kl-ghost krk-ev" data-a="rev" data-g="${g.id}">Evidence for ${esc(g.name)} →</button></li>`;
+  }
+  // ---- a milestone followed down to its evidence: the exact criterion, its approval, and every record that meets it or is still needed ----
+  let ev = null;
+  const statusOf = g => g.kind === 'earned' ? (g.refresh ? ['refresh', 'Earned · refresh requested'] : ['earned', 'Earned · permanent'])
+    : g.kind === 'roadmap' ? ['prov', 'Roadmap · requirements pending definition'] : g.kind === 'proposed' ? ['prov', 'Provisional criterion · not counted until you approve it']
+    : g.kind === 'insufficient' ? ['prov', 'Provisional · the data needed to judge it is incomplete'] : g.now === 'met' ? ['met', 'Met · accept it to record it'] : ['missing', 'Missing evidence'];
+  function evView(g, v, st) {
+    const t = g.test || {}, rec = (st.earned || []).find(e => e.gate === g.id), [sk, sl] = statusOf(g);
+    const appr = g.def === 'agreed' ? 'Agreed criterion: counts automatically' : g.def === 'undefined' ? 'Requirements pending definition: cannot count yet' : g.approved ? 'Proposed criterion, approved by you' : g.pending ? 'Proposed criterion: needs a definition before you can approve it' : 'Proposed criterion, not approved: shown as a preview only';
+    const m = typeof t.min === 'object' ? t.min[11] : t.min;
+    const chap = x => { const ok = m ? x.acq === 'obtained' && LV[x.level] >= LV[m] : x.acq === 'obtained';
+      return `<li class="krk-rec krk-rec-${ok ? 'have' : 'need'}"><span class="krk-tag">${m ? (ok ? 'Satisfies' : 'Still needed') : ok ? 'Counts toward it' : 'Not counted yet'}</span><b>${esc(x.name)}</b> <span class="kl-small">· ${esc(x.acq === 'obtained' ? 'obtained, ' + x.level : 'not obtained yet')}${m && !ok ? ` · needs ${esc(m)}` : ''}</span>
+        <span class="krk-links"><button class="kl-ghost" data-qsel="${esc(x.key)}">Chapter</button><button class="kl-ghost" data-qdetail="${esc(x.key)}">Proof and retention</button></span></li>`; };
+    const chapters = t.cls || t.pct != null ? SUBS.map(sb => { const gu = v.subjects[sb] ? v.subjects[sb].gu : []; return gu.length ? `<h4 class="krk-sub">${esc(sb)} · Class 11</h4><ul class="krk-recs">${gu.map(chap).join('')}</ul>` : ''; }).join('') : '';
+    return `<section class="kl-card kl-stack krk-evv" aria-labelledby="krk-evh"><button class="kl-ghost" data-a="revback">← Back to the ladder</button>
+      <p class="kl-eyebrow">RANK ${g.rank} · EVIDENCE</p><h3 id="krk-evh" tabindex="-1">${esc(g.name)}</h3>
+      <dl class="krk-evdl"><dt>Criterion</dt><dd>${esc(g.needs)}</dd><dt>Approval</dt><dd>${esc(appr)}</dd><dt>Status</dt><dd><span class="krk-tag krk-s-${sk}">${esc(sl)}</span>${rec ? ` · recorded ${esc(new Date(rec.at).toLocaleDateString())}` : ''}</dd></dl>
+      ${g.refresh ? `<p class="krk-tag krk-s-refresh">Refresh requested: ${esc(g.refresh)}</p>` : ''}
+      ${g.cat || g.kind === 'insufficient' ? `<p class="kl-small"><span class="krk-tag krk-s-prov">Provisional</span> ${esc(g.why || '')}</p>` : ''}
+      <h4>Records that satisfy it</h4>${g.have && g.have.length ? `<ul class="krk-recs">${g.have.map(x => `<li class="krk-rec krk-rec-have"><span class="krk-tag">Satisfies</span>${esc(x)}</li>`).join('')}</ul>` : '<p class="kl-small">None yet.</p>'}
+      <h4>Still needed</h4>${g.left && g.left.length ? `<ul class="krk-recs">${g.left.map(x => `<li class="krk-rec krk-rec-need"><span class="krk-tag">${/unknown|not frozen|pending/.test(x) ? 'Provisional' : 'Still needed'}</span>${esc(x)}</li>`).join('')}</ul>` : '<p class="kl-small">Nothing further.</p>'}
+      ${chapters ? `<details open><summary><b>Chapter records</b> <span class="kl-small">· each links to its chapter, proof and retention evidence</span></summary>${chapters}</details>` : ''}</section>`;
   }
   M.PANELS.ranks = () => {
     const st = read(), v = K.cultivation(M.L, null, st), lad = ladder(v, ctxOf(st)), ld = land(st.earned, st.immortals);
+    if (ev) { const g = lad.find(x => x.id === ev); if (g) return evView(g, v, st); ev = null; }
     const gu = Object.values(v.subjects).flatMap(s => s.gu), cats = [...new Set(lad.filter(g => g.cat).map(g => g.why))];
     const count = k => lad.filter(g => g.def === k).length, cur = lad.find(g => g.kind === 'current' || g.kind === 'insufficient' && g.active && !lad.some(x => x.kind === 'current'));
     const rankBlock = r => { const rows = lad.filter(g => g.rank === r); return `<div class="krk-rank"><p class="kl-eyebrow">RANK ${r}</p><ol class="krk-stages">${rows.map(stageRow).join('')}</ol></div>`; };
@@ -16674,6 +16709,8 @@ window.KgGuArt = {"ART":{"m11:Sets":{"name":"Venn Mussel","design":"Two overlapp
   };
   M.SECTIONS.progress.push(['ranks', '⛰ Cultivator rank']);
   M.ACTIONS.rpreview = () => { preview = !preview; M.render(); };
+  M.ACTIONS.rev = b => { ev = b.dataset.g; M.render(); setTimeout(() => { const h = document.getElementById('krk-evh'); if (h) { const sec = h.closest('section') || h, bar = document.querySelector('#moon-lab>.kl-tabs'), off = bar && getComputedStyle(bar).position === 'sticky' ? bar.getBoundingClientRect().bottom : 0; scrollTo(0, scrollY + sec.getBoundingClientRect().top - off - 12); h.focus({ preventScroll: true }); } }, 60); };
+  M.ACTIONS.revback = () => { const id = ev; ev = null; M.render(); setTimeout(() => { const b = document.querySelector(`[data-a="rev"][data-g="${CSS.escape(id || '')}"]`); if (b) { b.scrollIntoView({ block: 'center' }); b.focus({ preventScroll: true }); } }, 60); };
   M.ACTIONS.rearn = b => { const st = read(), v = K.cultivation(M.L, null, st), g = gates(v, ctxOf(st)).find(x => x.id === b.dataset.g); if (!g || g.status !== 'met') return; if (!confirm(`Record ${g.name}? Earned stages are permanent.`)) return; st.earned = earn(st.earned, g.id, Date.now(), v.ed.id); st.log = (st.log || []).concat({ at: Date.now(), what: 'earned ' + g.id }); localStorage.setItem(K.STORE, JSON.stringify(st)); M.render(); };
   M.ACTIONS.rapprove = b => { const st = read(), g = LADDER.find(x => x.id === b.dataset.g); if (!g || g.def !== 'proposed' || g.pending) return;
     if (!confirm(`Approve the proposed criterion for ${g.name}?\n\n“${g.needs}”\n\nIt will then count toward your rank. Earned stages stay permanent either way.`)) return;
@@ -16683,6 +16720,9 @@ window.KgGuArt = {"ART":{"m11:Sets":{"name":"Venn Mussel","design":"Two overlapp
     .krk-chip{font:600 11px/1 Georgia,serif;padding:4px 8px;border-radius:999px;border:1px solid currentColor}.krk-def{font-size:11px;opacity:.75}.krk-need{font-size:13px}
     .krk-c-earned{color:#f5d27a}.krk-c-current{color:#9fd8c4}.krk-c-upcoming{color:#cfc3a8}.krk-c-proposed{color:#c9a6ff}.krk-c-roadmap{color:#8f8a9e}.krk-c-insufficient{color:#e7a07a}
     .krk-earned{border-color:#f5d27a}.krk-current{border-color:#9fd8c4;box-shadow:0 0 0 1px #9fd8c4 inset}.krk-roadmap{opacity:.8;border-style:dashed}.krk-proposed{border-style:dashed}
+    .krk-ev{margin-top:6px;font-size:12px}.krk-evdl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}.krk-evdl dt{font-weight:700}.krk-evdl dd{margin:0}
+    .krk-recs{list-style:none;padding:0;margin:4px 0 10px;display:grid;gap:4px}.krk-rec{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;padding:6px 8px;border-left:4px solid #8f8a9e}.krk-rec-have{border-color:#f5d27a}.krk-rec-need{border-color:#e7a07a}
+    .krk-tag{font:700 11px/1.4 var(--kt-sans,sans-serif);text-transform:uppercase;letter-spacing:.05em;padding:0 6px;border:1px solid currentColor;border-radius:2px}.krk-links{margin-left:auto;display:flex;gap:4px}.krk-sub{margin:8px 0 2px}
     .krk-warn{padding:10px 12px;border-radius:10px;border:1px solid #e7a07a;background:rgba(231,160,122,.08)}.krk-legend{display:flex;flex-wrap:wrap;gap:6px}`; document.head.appendChild(rcss);
 })();
 </script>
@@ -17865,7 +17905,7 @@ body.kt-p-settings{--kt-bg:url(quarters/room-plate.webp);--kt-bgs:240%;--kt-bgp:
       else if (p === 'table') { h = document.querySelector('#hb-day-map h2'); if (h) h.tabIndex = -1; }
       else if (B.classList.contains('kqc-full')) { h = document.querySelector('#kqc-gu, #moon-lab .klib-full h2, #moon-lab .klib-full h3'); if (h && h.tabIndex < 0 && !h.hasAttribute('tabindex')) h.tabIndex = -1; }
       if (!h) h = band.querySelector('h1');
-      const keep = () => document.activeElement && document.activeElement.closest && document.activeElement.closest('.klib-back,[data-qrow],.klib-book,.klib-toc');
+      const keep = () => document.activeElement && document.activeElement.closest && document.activeElement.closest('.klib-back,[data-qrow],.klib-book,.klib-toc,.krk-ev,.krk-evv');
       if (h && !keep() && document.activeElement !== h && !(h.contains && h.contains(document.activeElement))) h.focus({ preventScroll: true });
       // a re-render can replace the heading; settle focus once more
       setTimeout(() => { if (!keep() && (document.activeElement === document.body || !document.activeElement)) { const again = h && h.isConnected ? h : pick(); if (again) { if (again.tabIndex < 0 && !again.hasAttribute('tabindex')) again.tabIndex = -1; again.focus({ preventScroll: true }); } } }, 350);
@@ -17965,6 +18005,21 @@ html body.kt-on #kg-main #moon-lab .klib-flag-note{color:#f6c48a!important}
 html body.kt-on #kg-main #moon-lab .klib-off{padding:10px 12px;border:1px solid #e8c77d;background:rgba(232,199,125,.12)!important}
 .klib-about,.klib-gu{margin-top:12px}
 @media(max-width:600px){.klib-books{grid-template-columns:1fr;padding:8px 8px 0;gap:6px}html body.kt-on #kg-main #moon-lab .klib-book{min-height:0;border-radius:3px!important}}
+/* steward's station: a household ledger. Each entry says what it keeps; backup and restore are separate, labelled controls */
+html:root body.kt-p-settings.kt-p-settings #kg-main #moon-lab>.kl-tabs>button:nth-child(n){flex-wrap:wrap!important;white-space:normal!important}
+html body.kt-p-settings #kg-main #moon-lab>.kl-tabs>button::after{flex-basis:100%;display:block;font-size:12px;opacity:.7;font-weight:400;margin-top:1px;white-space:normal}
+@media(max-width:899px){html:root body.kt-p-settings.kt-p-settings #kg-main #moon-lab>.kl-tabs{position:static!important}}
+html body.kt-p-settings #kg-main #moon-lab>.kl-tabs>button[data-v=sync]::after{content:"devices and cloud sync"}
+html body.kt-p-settings #kg-main #moon-lab>.kl-tabs>button[data-v=app]::after{content:"theme, display, motion, install"}
+html body.kt-p-settings #kg-main #moon-lab>.kl-tabs>button[data-v=companions]::after{content:"Kaguya, Iroha and Fang Yuan"}
+html body.kt-p-settings #kg-main #moon-lab>.kl-tabs>button[data-v=doctor]::after{content:"summary to take to an appointment"}
+html body.kt-p-settings #kg-main #moon-lab>.kl-tabs>button[data-v=support]::after{content:"help when things are hard"}
+html body.kt-p-settings #kg-main #moon-lab>.kl-tabs>button[data-v=backup]::after{content:"back up and restore"}
+html body.kt-p-settings #kg-main #moon-lab>.kl-tabs>button[data-v=gentle]::after{content:"easing back after time away"}
+html body.kt-p-settings #kg-main #moon-lab>.kl-card{border-left:3px double #b0473a!important;background-image:repeating-linear-gradient(transparent 0 27px,rgba(242,228,206,.06) 27px 28px)!important}
+.kt-ledger-pair{display:grid!important;grid-template-columns:1fr 1fr;gap:18px}.kt-ledger-pair>div{display:flex;flex-direction:column;gap:8px;align-items:flex-start}.kt-ledger-pair>div+div{border-left:1px solid rgba(242,228,206,.2);padding-left:18px}
+html body.kt-on #kg-main #moon-lab .kt-restore{background:transparent!important;border:2px solid #e8c77d!important;color:#f2e4ce!important;padding:8px 14px!important}
+@media(max-width:600px){.kt-ledger-pair{grid-template-columns:1fr}.kt-ledger-pair>div+div{border-left:0;padding-left:0;border-top:1px solid rgba(242,228,206,.2);padding-top:12px}html body.kt-p-settings #kg-main #moon-lab>.kl-tabs{max-width:none!important}}
 /* courtyard: the chosen exercise in front; pavilion: the conversation gets the page; quiet reading and typing */
 html body.kt-p-practice #kg-main #moon-lab>.kl-tabs{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;gap:6px!important}
 html body.kt-p-practice #kg-main #moon-lab>.kl-tabs>button{flex:0 0 auto!important;min-height:0!important;padding:8px 12px!important}
