@@ -17864,7 +17864,9 @@ body.kt-p-table #kg-main>:not(#habit-desk){display:none!important}
 body.kt-p-table #habit-desk :not(:has(#hb-day-map)):not(#hb-day-map):not(#hb-day-map *){display:none!important}
 /* one entrance: the travel movement carries the whole page; the day's focus, minutes and schedule settle with it, and nothing fades on its own */
 html body.kt-on.kt-on{transition:none!important}html body.kt-p-table #kg-main #habit-desk :is(#hb-day-map,#hb-day-map *){transition:none!important;animation:none!important}
-html body.kt-p-table #kg-main #habit-desk #hb-day-map :is(.hb-block-btns,.hb-done,.hb-caption),html body.kt-p-table #kg-main #habit-desk #hb-day-map .hb-section-heading>:not(div){display:none!important}
+/* each study block keeps its Start timer and Done buttons, the only way to start a planned block from the leaf */
+html body.kt-p-table #kg-main #habit-desk #hb-day-map .hb-timeline li>:is(.hb-block-btns,.hb-done){grid-column:2;justify-self:start;justify-content:flex-start;margin-top:2px}
+html body.kt-p-table #kg-main #habit-desk #hb-day-map .hb-caption,html body.kt-p-table #kg-main #habit-desk #hb-day-map .hb-section-heading>:not(div){display:none!important}
 body.kt-p-table :is(#kg-bar,#kg-dock-launch,#fy-pop,#ame-widget,#iroha-widget,#kg-top,#kg-dock,.kg-dock){display:none!important}
 body.kt-p-table #habit-desk{background:none!important;border:0!important;box-shadow:none!important;padding:0!important}
 html body.kt-p-table #kg-main #habit-desk #hb-day-map{max-width:760px;margin:clamp(20px,7vh,70px) auto 24px;padding:clamp(22px,5vw,48px);background:var(--kt-paper)!important;color:var(--kt-ink)!important;border:0!important;border-radius:2px!important;box-shadow:0 18px 50px rgba(10,6,4,.55)!important}
