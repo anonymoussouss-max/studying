@@ -16427,27 +16427,71 @@ You entered 25</pre></div>
   window.KgCultProof = key => {
     const st = read(), s = st.proof && st.proof.gu === key ? restore(st.proof, Date.now()) : null, need = (st.skills[key] && st.skills[key].status === 'approved') ? st.skills[key].list : null;
     if (!s) return `<div class="kl-stack"><p class="kl-small"><b>Photo proof</b> · closed book: no formula sheet, notes, solutions or help. Constants may be given; methods aren't. You solve on paper or a whiteboard and photograph your working. ${need ? `One question per essential skill (${need.length}).` : 'Needs an approved essential-skill list first, so the result can say which skills you showed.'}</p>${need ? `<button data-a="pstart" data-k="${esc(key)}">Start a photo proof</button>` : ''}</div>`;
-    const now = Date.now(), el = elapsed(s, now), res = chapterResult(s, need), miss = missingNow();
+    const ret = s.kind === 'retention', now = Date.now(), el = elapsed(s, now), res = chapterResult(s, ret ? retDue(s) : need), miss = missingNow();
     const qhtml = s.qs.map((q, i) => { const m = s.marks[q.id], v = m ? decide(m) : '', r = s.reads[q.id] || {}, ap = s.appeals.filter(a => a.q === q.id);
       return `<div class="kl-qitem"><p><b>${i + 1}.</b> ${esc(q.t)}</p><p class="kl-small">Photos: ${s.photos.filter(p => p.q === q.id).map(p => p.saved ? (miss.has(p.id) ? '⚠ evidence missing' : '✓ saved') : 'not saved').join(', ') || 'none yet'}</p>
         ${m ? `<p class="kl-small"><b>${VERDICT[v]}</b> · ${esc(m.by || '')}${m.why ? ': ' + esc(m.why) : ''}</p><details><summary class="kl-small">Iroha's reading (correct it if she misread)</summary><p class="kl-small">${esc(r.fix || r.text || '—')}</p>${(r.unclear || []).map(u => `<p class="kl-small">Unclear: ${esc(u.where || '')} ${u.changesVerdict ? '(could change the result)' : ''}</p>`).join('')}<form data-f="pfix" data-q="${esc(q.id)}" class="kl-row"><input name="text" maxlength="600" placeholder="What you actually wrote" aria-label="Correct the reading"><button>Send correction</button></form></details>
           ${ap.map(a => `<p class="kl-small">Appeal (${esc(a.kind)}): ${esc(a.text)} · ${a.status === 'open' ? 'open, stays pending until settled by a reference, a corrected solution, a teacher or explicit reasoning' : 'closed: ' + esc(a.outcome)}</p>${a.status === 'open' ? `<form data-f="psettle" data-ap="${esc(a.id)}" class="kl-row"><select name="basis" aria-label="Basis"><option value="reference">A reference</option><option value="corrected-solution">A corrected solution</option><option value="teacher">A teacher</option><option value="explicit-reasoning">Explicit reasoning</option></select><select name="outcome" aria-label="Outcome"><option value="upheld">Objection upheld</option><option value="faulty-question">Question was faulty</option><option value="rejected">Original marking stands</option></select><input name="ref" maxlength="200" placeholder="Reference (book, page, link)" aria-label="Reference"><input name="reasoning" required maxlength="800" placeholder="The reasoning that settles it" aria-label="Reasoning"><button class="kl-ghost">Settle</button></form>` : ''}`).join('')}
           ${!ap.some(a => a.status === 'open') ? `<form data-f="pappeal" data-q="${esc(q.id)}" class="kl-row"><select name="kind" aria-label="Appeal type"><option value="alternative">Valid alternative method</option><option value="counterexample">Counterexample</option><option value="reference">Reference contradicts the key</option><option value="faulty-question">Faulty question</option></select><input name="text" required maxlength="600" placeholder="Your objection" aria-label="Objection"><button class="kl-ghost">Appeal</button></form>` : ''}` : ''}</div>`; }).join('');
     const live = s.state === 'solving' || s.state === 'capturing';
-    return `<div class="kl-stack"><p class="kl-eyebrow">PHOTO PROOF · ${esc(s.state.toUpperCase())}</p>
+    return `<div class="kl-stack"><p class="kl-eyebrow">${ret ? 'RETENTION CHECK' : 'PHOTO PROOF'} · ${esc(s.state.toUpperCase())}</p>
       ${s.notSubmitted && live ? '<p class="kl-small">Restored after a reload: this work is <b>not submitted</b> and nothing has been assessed.</p>' : ''}
       <p class="kl-timer">${clock(el)} / ${clock(s.limit)}${s.state === 'capturing' ? ' · paused while you photograph' : ''}${el > s.limit && live ? ' · time is up: photograph and submit' : ''}</p>${qhtml}
       ${live ? `<div class="kl-row">${s.state === 'solving' ? '<button class="kl-ghost" data-a="pcap">📷 Photograph my working (pauses the clock)</button>' : `<label class="kl-ghost">Add photos <input type="file" accept="image/*" capture="environment" multiple data-pphoto hidden></label><select data-pq aria-label="Which question">${s.qs.map((q, i) => `<option value="${esc(q.id)}">Question ${i + 1}</option>`).join('')}</select><button class="kl-ghost" data-a="presume">Back to solving</button>`}</div>
         <form data-f="psubmit" class="kl-stack"><label class="kl-small"><input type="checkbox" name="decl" required> I worked closed-book: no formula sheet, notes, solutions or outside help.</label><button>Submit for reading</button></form>` : ''}
       ${s.state === 'submitted' ? `<p class="kl-small">${s.error ? 'Sending failed (' + esc(s.error) + '). Your photos are saved and nothing was awarded. ' : ''}Submitted. Iroha reads each photo, then marks method, reasoning, execution and checks.</p><button data-a="psend">${s.error ? 'Try again' : 'Send to Iroha'}</button>` : ''}
       ${s.state === 'reading' ? '<p class="kl-small">Iroha is reading your working…</p>' : ''}
-      ${['assessed', 'pending'].includes(s.state) ? `<p class="kl-small"><b>Chapter result: ${res.result === 'pass' ? 'Proof passed — retention pending' : res.result === 'not-yet' ? 'Not yet' : 'Pending'}</b>${res.why ? ' · ' + esc(res.why) : ''}. This is Iroha's provisional marking, not an authoritative verdict; appeal anything you disagree with.</p>${s.state === 'pending' ? '<button class="kl-ghost" data-a="psend">Ask Iroha to read again</button>' : ''}` : ''}
+      ${['assessed', 'pending'].includes(s.state) && ret ? retLine(s, (st.skills[key] || {}).list || []) : ''}${['assessed', 'pending'].includes(s.state) && !ret ? `<p class="kl-small"><b>Chapter result: ${res.result === 'pass' ? 'Proof passed — retention pending' : res.result === 'not-yet' ? 'Not yet' : 'Pending'}</b>${res.why ? ' · ' + esc(res.why) : ''}. This is Iroha's provisional marking, not an authoritative verdict; appeal anything you disagree with.</p>${s.state === 'pending' ? '<button class="kl-ghost" data-a="psend">Ask Iroha to read again</button>' : ''}` : ''}
       <button class="kl-ghost" data-a="pclose">${live ? 'Abandon (photos are kept)' : 'Close'}</button></div>`;
   };
   const upd = (fn, what) => { const st = read(); if (!st.proof) return; st.proof = fn(st.proof);
-    const sk = st.skills[st.proof.gu], res = chapterResult(st.proof, sk && sk.status === 'approved' ? sk.list : null);
-    st.passes = st.passes || {}; if (res.result === 'pass' && !st.passes[st.proof.gu]) st.passes[st.proof.gu] = { at: Date.now(), session: st.proof.id, by: 'photo proof (Iroha, provisional)' };
+    if (st.proof.kind === 'retention') retain(st);
+    else { const sk = st.skills[st.proof.gu], res = chapterResult(st.proof, sk && sk.status === 'approved' ? sk.list : null);
+      st.passes = st.passes || {}; if (res.result === 'pass' && !st.passes[st.proof.gu]) st.passes[st.proof.gu] = { at: Date.now(), session: st.proof.id, by: 'photo proof (Iroha, provisional)' }; }
     save(st, what); return st.proof; };
+  /* -- chapter retention checks. The marking is the agreed proof marking; WHEN a check opens, HOW BIG it is, HOW LONG it runs and
+     what rest days do are PROPOSED (CULTIVATION-REVIEW rev 3), so the check stays off until you approve these exact rules. -- */
+  const RET_RULES = [
+    ['When a check opens', '7 days after the passed proof, due by day 14. (The approved 14-day wait belongs to Course Gu, not chapters.)'],
+    ['How big a check is', 'One fresh, unseen question per due skill, sampling only skills not yet retained: about a third of the chapter, at least 2 and at most 4 (or all that remain).'],
+    ['How long it runs', 'The proof allowance: 8 minutes per question, 15 minutes minimum, inside your Mix-in time.'],
+    ['Rest days', 'Not tracked yet, so Rest, Gentle Return and Done for today do not move the window. The proposal is that they postpone it without debt; that needs a later change.']];
+  const retOk = st => !!(st.approvals && st.approvals.chapterRetention);
+  const retDue = s => { const st = read(), list = (st.skills[s.gu] || {}).list || []; return list.filter(k => (s.due || []).includes(k.id)); };
+  // The actual result, recorded once: one evidence record per demonstrated skill, in the format the cabinet, plates and ranks
+  // already read. Re-marking after an appeal can add a skill, never a duplicate; nothing is removed.
+  function retain(st) {
+    const s = st.proof; if (s.state !== 'assessed') return;
+    const list = (st.skills[s.gu] || {}).list || [], due = new Set(s.due || []), now = Date.now(); st.ev = st.ev || [];
+    const have = new Set(st.ev.map(e => e.id)), shown = new Set((s.result && s.result.shown) || []);
+    for (const q of s.qs) { const m = s.marks[q.id], v = decide(m); if (v === 'pass' || v === 'pass-slip') for (const k of (m.skills || [])) if (due.has(k)) shown.add(k); }
+    for (const k of shown) { const id = 'rc:' + s.id + ':' + k; if (have.has(id)) continue; const sk = list.find(x => x.id === k);
+      st.ev.push({ id, gu: s.gu, skill: k, depth: sk ? sk.depth : undefined, how: 'independent', fresh: true, at: now, kind: 'retention-check', check: s.id }); }
+    s.result = { at: (s.result && s.result.at) || now, shown: [...shown], review: [...due].filter(k => !shown.has(k)) };
+  }
+  const retLine = (s, list) => { const n = ids => ids.map(id => esc((list.find(k => k.id === id) || {}).name || id)).join(', ');
+    if (!s.result) return `<p class="kl-small"><b>Retention check: pending</b> · nothing is recorded until every answer is readable and marked.</p>`;
+    return `<p class="kl-small kret-res"><b>Retention check recorded ${esc(new Date(s.result.at).toISOString().slice(0, 10))}</b> · Demonstrated: ${s.result.shown.length ? n(s.result.shown) : 'none this time'} · Still needs review: ${s.result.review.length ? n(s.result.review) : 'nothing'}. Iroha's provisional marking; appeal anything you disagree with.</p>`; };
+  window.KgRetention = { RULES: RET_RULES, approved: () => retOk(read()), record: retain, // record: exposed for the tests
+    // the chapter's evidence slip in the Gu cabinet: what is retained and when, what is due, and the check itself
+    slip(g) {
+      const r = g.retention; if (!r || !g.skills || !(g.level === 'proof' || g.level === 'proven')) return '';
+      const st = read(), DAYS = d => new Date(d * DAY).toISOString().slice(0, 10), nm = id => (g.skills.find(k => k.id === id) || {}).name || id;
+      const recs = (st.ev || []).filter(e => e.gu === g.key && e.how === 'independent' && e.fresh);
+      const when = id => { const t = recs.filter(e => (e.skills || [e.skill]).includes(id)).map(e => e.at).filter(Number.isFinite).sort((a, b) => a - b)[0]; return t ? ' (' + new Date(t).toISOString().slice(0, 10) + ')' : ''; };
+      const s = st.proof && st.proof.gu === g.key ? st.proof : null, last = (st.proofs || []).filter(x => x.gu === g.key && x.kind === 'retention' && x.result).pop();
+      let body = '';
+      if (s && s.kind === 'retention') body = window.KgCultProof(g.key);
+      else if (s) body = '<p class="kl-small">A photo proof is open for this chapter. Finish or close it under Checklist, skills and proof first.</p>';
+      else if (g.level === 'proven') body = '';
+      else if (!retOk(st)) body = `<div class="kret-need"><p class="kl-small"><b>Before checks can start, these chapter rules need your decision.</b> They are proposed in the cultivation review, not agreed:</p><ol class="kl-small">${RET_RULES.map(([k, v]) => `<li><b>${esc(k)}:</b> ${esc(v)}</li>`).join('')}</ol><p class="kl-small">Marking is already agreed: the closed-book photo rubric, slips pass, invalid reasoning is Not yet, unclear stays Pending, appeals stay open.</p><button class="kl-ghost" data-a="retapprove">Approve these four rules</button></div>`;
+      else if (!r.open) body = `<p class="kl-small">Not due yet: the next check opens ${esc(DAYS(r.opensDay))}.</p>`;
+      else if (r.next.length) body = `<p class="kl-small"><b>Due now:</b> ${r.next.map(id => esc(nm(id))).join(', ')}.</p><button class="kl-primary" data-a="retstart" data-k="${esc(g.key)}" data-due="${esc(r.next.join(','))}">Start retention check (${r.next.length} question${r.next.length > 1 ? 's' : ''})</button>`;
+      else body = '<p class="kl-small">Every skill is covered; one more fresh piece of retention evidence completes the chapter.</p>';
+      return `<div class="kret" id="kret-${esc(g.key)}"><p class="kl-small"><b>Retention</b> · ${esc(r.note)} · window ${esc(DAYS(r.opensDay))} to ${esc(DAYS(r.dueDay))}</p>
+        ${r.covered.length ? `<p class="kl-small">Retained: ${r.covered.map(id => esc(nm(id) + when(id))).join(', ')}</p>` : ''}
+        ${last && !(s && s.kind === 'retention') ? retLine(last, g.skills) : ''}${body}</div>`;
+    } };
   const A = M.ACTIONS, F = M.FORMS;
   A.pstart = async b => {
     const key = b.dataset.k, st = read(), need = st.skills[key] && st.skills[key].status === 'approved' ? st.skills[key].list : null; if (!need) return;
@@ -16461,6 +16505,26 @@ You entered 25</pre></div>
     st.exposure = ex; for (const q of qs) ex[q.bid || q.t] = Object.assign({}, ex[q.bid || q.t], { seen: Date.now(), purpose: 'proof' });
     save(st, 'proof started');
   };
+  let retBusy = false;
+  A.retstart = async b => {
+    if (retBusy) return; const key = b.dataset.k, st = read(), list = st.skills[key] && st.skills[key].status === 'approved' ? st.skills[key].list : null;
+    if (!list || !retOk(st) || st.proof) return;
+    const due = String(b.dataset.due || '').split(',').filter(id => list.some(k => k.id === id)); if (!due.length) return;
+    const name = key.split(':').slice(1).join(':'), ch = (window.KgCult.LINKS[name] || [])[0];
+    if (!ch || !M.getSet) return alert('No question source is mapped for this chapter yet, so a check can\'t be made. Nothing was changed.');
+    retBusy = true;
+    try {
+      const r = await M.getSet([ch], due.length, null, { hard: true });
+      if (!r || r.error || !r.qs) return alert("Couldn't get fresh questions right now. Nothing was changed.");
+      const st2 = read(); if (st2.proof) return;
+      const ex = st2.exposure || {}, qs = r.qs.filter(q => eligible(ex, q.bid || q.t, 'retention')).slice(0, due.length).map((q, i) => ({ id: 'q' + i, t: q.t, bid: q.bid || '', a: q.a, skills: [] }));
+      if (qs.length < due.length) return alert('Not enough unseen questions for this check. Nothing was changed.');
+      st2.proof = Object.assign(newSession({ id: 'rt' + Date.now().toString(36), gu: key, ch, qs, limit: Math.max(15, due.length * 8) * 60000, now: Date.now() }), { kind: 'retention', due });
+      st2.exposure = ex; for (const q of qs) ex[q.bid || q.t] = Object.assign({}, ex[q.bid || q.t], { seen: Date.now(), purpose: 'retention' });
+      save(st2, 'retention check started');
+    } finally { retBusy = false; }
+  };
+  A.retapprove = () => { const st = read(); if (retOk(st)) return; st.approvals = Object.assign({}, st.approvals, { chapterRetention: { at: Date.now(), by: 'you', rules: RET_RULES.map(r => r.join(': ')) } }); save(st, 'chapter retention rules approved'); };
   A.pcap = () => upd(s => step(s, 'capture', Date.now()), 'capture');
   A.presume = () => upd(s => step(s, 'resume', Date.now()), 'resume');
   A.pclose = () => { const st = read(); if (st.proof) { st.proofs = (st.proofs || []).concat(st.proof).slice(-50); st.proof = null; save(st, 'proof closed'); } };
@@ -16493,7 +16557,7 @@ Rules: a right final answer with invalid reasoning gets method 0 or 1. A minor a
     try {
       const imgs = []; for (const p of s.photos.filter(x => x.saved)) { const rec = await evidence.get(p.id); if (rec && rec.blob) imgs.push({ q: p.q, url: await toData(rec.blob) }); }
       if (!imgs.length) throw new Error('no saved photos found on this device');
-      const st = read(), need = st.skills[s.gu].list, all = { reads: {}, marks: {}, ok: true };
+      const st = read(), need = s.kind === 'retention' ? retDue(s) : st.skills[s.gu].list, all = { reads: {}, marks: {}, ok: true };
       const asImg = x => ({ media_type: x.url.slice(5, x.url.indexOf(';')), data: x.url.slice(x.url.indexOf(',') + 1) });
       const ask = async (purpose, text, images) => { window.__kgPurpose = purpose; try { const r = await window.__kgAsk('iroha', text, images, true); if (!r || r.error || !r.reply) throw new Error(r && r.error || 'no reply'); return r.reply; } finally { window.__kgPurpose = ''; } };
       for (const group of proofGroups(imgs)) {
@@ -16983,8 +17047,9 @@ function serpentSVG(o) {
   const ORD = { none: 0, obtained: 1, learning: 1, proof: 2, proven: 3 };
   let pre = null; const levels = () => new Map(allGu(read().v).map(g => [g.key, [g.acq, g.level]]));
   addEventListener('kt:arm', () => { try { pre = levels(); } catch (e) { pre = null; } });
-  addEventListener('moonlab:render', () => { if (!pre || !window.KtMotion) return; const was = pre; pre = null; try { for (const [k, [acq, lv]] of levels()) { const b = was.get(k); if (!b) continue;
-    if (b[0] !== 'obtained' && acq === 'obtained') window.KtMotion.award('ink', 'chap:' + k); else if ((ORD[lv] || 0) >= 2 && (ORD[lv] || 0) > (ORD[b[1]] || 0)) window.KtMotion.award('seal', 'chap:' + k); } } catch (e) {} });
+  addEventListener('moonlab:render', () => { if (!pre || !window.KtMotion) return; const was = pre; pre = null; let got = 0; try { for (const [k, [acq, lv]] of levels()) { const b = was.get(k); if (!b) continue;
+    if (b[0] !== 'obtained' && acq === 'obtained') { window.KtMotion.award('ink', 'chap:' + k); got = 1; } else if ((ORD[lv] || 0) >= 2 && (ORD[lv] || 0) > (ORD[b[1]] || 0)) { window.KtMotion.award('seal', 'chap:' + k); got = 1; } } } catch (e) {}
+    if (got && document.getElementById('kqc-gu')) setTimeout(() => M.render(), 0); });
   function guPanel(g) {
     if (!g) return '<p class="kl-small">Choose a Gu or a chapter in the cabinet or the collection below.</p>';
     const pl = plates(g), bm = g.name === 'Basic Mathematics' && g.acq === 'obtained', nx = nextStep(g), st = stateOf(g), ak = g.acq === 'obtained' && window.KtMotion ? window.KtMotion.take('chap:' + g.key) : '';
@@ -17000,6 +17065,7 @@ function serpentSVG(o) {
       ${bm ? `<p class="kl-small">An illustrative sign diagram for the sample (x − 1)/(x + 2), not a graph: only the side of the gold line matters. At −2 the expression is undefined (open ring, a gap in the body); at 1 it is zero (filled bead).</p>` : ''}
       ${g.skills && g.acq === 'obtained' ? `<ul class="kl-list kqc-sk">${g.skills.map((s, i) => `<li>${pl[i] === 'r' ? '◆ retained' : pl[i] === 'd' ? '◇ shown' : '· not shown yet'} · ${esc(s.name)}</li>`).join('')}</ul>` : ''}
       </div><div class="kl-row" style="flex-wrap:wrap"><button class="kl-ghost" data-qdetail="${esc(g.key)}">Checklist, skills and proof</button><button class="kl-ghost" data-a="cpropose" data-k="${esc(g.key)}">Propose from my logged questions</button></div>
+      ${window.KgRetention ? window.KgRetention.slip(g) : ''}
       <p class="kl-small">Photo checks stay labelled Provisional AI assessment (Iroha). Plates turn gold only through the later retention check; nothing fades.</p></div>`;
   }
   function cabinetView(p) {
@@ -17726,6 +17792,8 @@ body.kt-on :is(#kg-main.kg-page-in,#kg-main.kd-enter){animation:none!important}
 #kt-return{position:fixed;z-index:70;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 20px;border-radius:999px;border:1px solid rgba(242,228,206,.35);background:var(--kt-walnut);color:var(--kt-wood-text);font:600 15px/1.2 var(--kt-sans);text-decoration:none;box-shadow:0 6px 20px rgba(20,12,9,.5);cursor:pointer}
 #kt-return:hover{border-color:var(--kt-wood-text)}#kt-return:focus-visible{outline:3px solid #ffda94;outline-offset:3px}
 body.kt-p-home #kt-return{display:none}
+/* the desk's spoken bubble sits above Return to quarters, never over it */
+html body.kt-on:not(.kt-p-home) #habit-notice{bottom:calc(max(14px,env(safe-area-inset-bottom)) + 62px)}
 /* the quiet session view (shh) keeps only its timer and one way out: Return to quarters */
 body.habit-shh #kt-band{display:none!important}html:root body.habit-shh.kt-on.kt-on.kt-on{background:#140b07!important}
 body.kt-v-session #kt-band{display:none!important}
@@ -17852,6 +17920,7 @@ svg.kt-ink .kt-ink-ol{animation:kt-ink-ol 560ms ease-out both;transform-box:fill
 svg.kt-seal>circle:last-of-type{animation:kt-press 260ms cubic-bezier(.3,.7,.3,1) both;transform-box:fill-box;transform-origin:center}
 .kt-stamp{float:right;margin:0 0 6px 10px;padding:4px 10px;border:2px solid #9c3b2e;color:#9c3b2e!important;font:700 12px/1 var(--kt-sans,sans-serif);letter-spacing:.14em;text-transform:uppercase;transform:rotate(-6deg);border-radius:3px;background:rgba(255,253,247,.7)}
 .kt-stamp.kt-press{animation:kt-stamp 260ms cubic-bezier(.3,.7,.3,1) both}
+.kret{margin-top:10px;padding-top:8px;border-top:1px dashed rgba(156,59,46,.35)}.kret ol{margin:4px 0 8px;padding-left:20px}.kret .kl-qitem{margin:8px 0}
 /* the steward's cloth bookmark */
 html body.kt-p-settings #kg-main #moon-lab>.kl-tabs{position:relative}
 .kt-bookmark{position:absolute;left:0;width:6px;background:linear-gradient(#b0453a,#7e2c24);border-radius:0 2px 2px 0;pointer-events:none;box-shadow:1px 1px 2px rgba(0,0,0,.4)}
