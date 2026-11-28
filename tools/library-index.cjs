@@ -126,14 +126,14 @@ function build(root) {
       expected, valid, modules: modulesOf(lecs, root) });
   }
   for (const w of WIP) {
-    const abs = path.join(root, w.dir), present = fs.existsSync(abs), st = status.find(x => x.course === w.id || x.course === w.dir) || null;
+    const abs = path.join(root, w.dir), present = fs.existsSync(abs), sts = status.filter(x => x.course === w.id || x.course === w.dir), st = sts.find(x => x.status === 'finished') || sts.find(x => x.status === 'failed') || sts[0] || null; // a completed run (finished, or failed on some items) wins over a stale running one
     const expected = w.syllabus ? expectedFromSyllabus(path.join(root, w.syllabus)) : null;
     const vids = present ? walkMp4(abs) : [];
     const lecs = vids.map((r, i) => { const parts = r.split('/'), mod = parts.length > 1 ? pretty(parts[0]) : 'Lectures'; return lectureOf(root, posix(path.join(w.dir, r)), pretty(parts[parts.length - 1]), mod, 'v' + i); });
-    const valid = lecs.filter(l => l.ok).length, verified = !!(expected && valid >= expected && st && st.status === 'finished');
+    const valid = lecs.filter(l => l.ok).length, verified = !!(expected && valid >= expected && st && (st.status === 'finished' || st.status === 'failed')); // a failed run that still left every expected video valid only missed non-video items
     courses.push({ id: w.id, title: w.title, by: w.by, kind: 'planned', status: verified ? 'available' : 'wip', present, download: st ? st.status : present ? 'files present, no status' : 'not started',
       expected, valid, modules: modulesOf(lecs, root),
-      note: verified ? 'Every expected lecture has a valid video.' : !present ? 'Folder not present yet.' : expected ? `${valid} of ${expected} expected lectures have a valid video.` : `${valid} valid videos found; the expected lecture list is not known yet.` });
+      note: verified ? 'Every expected lecture has a valid video.' + (st.status === 'failed' ? ' The download log reported errors on non-video items.' : '') : !present ? 'Folder not present yet.' : expected ? `${valid} of ${expected} expected lectures have a valid video.` : `${valid} valid videos found; the expected lecture list is not known yet.` });
   }
   for (const w of WORKSHOPS) courses.push(workshopOf(root, w));
   return { v: 1, built: new Date().toISOString(), courses };
