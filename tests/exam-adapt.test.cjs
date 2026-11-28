@@ -56,13 +56,20 @@ test('a re-plan still stops exam preparation 30 minutes before the exam', () => 
   assert.ok(rows.filter(r => r.kind === 'study').every(r => r.end <= at('13:30')));
 });
 
-// ---- late start: push bedtime a little, or cut hours ----
-test('lateness rule: bedtime moves as far as needed, but never past 1 AM; only then is study cut', () => {
+test('a saved delay cannot move evening commitments or split the one in progress', () => {
+  const date = SAT + 'T20:45:00';
+  const dayTypes = { [SAT]: { t: 'college', end: 900 } };
+  const base = plan(date, { dayTypes }).fallback(6);
+  const replanned = plan(date, { dayTypes, replanAt: { [SAT]: at('23:05') }, replanPush: { [SAT]: 30 } }).fallback(6);
+  assert.strictEqual(anchors(replanned).join('|'), anchors(base).join('|'));
+});
+
+test('lateness triggers a re-plan without asking to move any commitment', () => {
   const P = plan(`${SAT}T11:00:00`);
   const r = (late, room) => JSON.stringify(P.lateStart(late, room));
   assert.strictEqual(r(5, 80), JSON.stringify({ replan: false, push: 0 }));
-  assert.strictEqual(r(40, 80), JSON.stringify({ replan: true, push: 40 }));
-  assert.strictEqual(r(120, 80), JSON.stringify({ replan: true, push: 80 }));
+  assert.strictEqual(r(40, 80), JSON.stringify({ replan: true, push: 0 }));
+  assert.strictEqual(r(120, 80), JSON.stringify({ replan: true, push: 0 }));
   assert.strictEqual(r(40, 0), JSON.stringify({ replan: true, push: 0 }));
 });
 

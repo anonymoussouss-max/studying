@@ -110,6 +110,21 @@ test('10. meals, the personal commitment, getting ready and sleep survive every 
   assert.ok(f.rows.some(r => r.id === 'lunch' && r.s === 960));
 });
 
+test('the desk keeps fixed clock times when Gentle Return shortens a study block', () => {
+  for (const [reading, now, max] of [[true, 1160, 32], [false, 1160, 42], [false, 1305, 25]]) {
+    const lab = seeded({ sched: { reading, wake: { [MON]: 720 }, gentle: { on: true, max } } });
+    const P = plan(iso(MON, now), lab);
+    const explicit = P.templateDay(lab, MON, 1, now, CTX).rows;
+    const rendered = P.fallback(1);
+    for (const id of ['lunch', 'snacks', 'personal', ...(reading ? ['reading'] : []), 'dinner', 'ready', 'sleep']) {
+      const expected = explicit.find(r => r.id === id);
+      const row = rendered.find(r => r.id === id);
+      assert.deepStrictEqual([row.start + 630, row.end + 630], [expected.s, expected.e], `${id} with reading=${reading}, now=${now}, max=${max}`);
+    }
+    for (let i = 1; i < rendered.length; i++) assert.strictEqual(rendered[i].start, rendered[i - 1].end);
+  }
+});
+
 test('11. Sunday is 90 minutes in total: 60 of the PCM subject furthest below its share, then 30 of German, all optional', () => {
   const P = plan(iso(SUN, 720), seeded());
   assert.strictEqual(P.dayKind(SUN).t, 'normal');

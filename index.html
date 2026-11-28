@@ -863,15 +863,13 @@ body.habit-shh #hb-session-card {text-align:center;}
   // rows before `at` stay as history; fixed blocks (meals, IRL break, college, travel, wind-down, sleep) keep their times;
   // the study still owed (planned minus logged, per subject, in plan order) fills the gaps; what doesn't fit is named on dinner
   const isFixed=r=>(r[2]==='life'||r[2]==='sleep')&&!/^brk/.test(r[0]);
-  const replanFrom=(rows,at,logged={},until=Infinity,push=0)=>{
+  const replanFrom=(rows,at,logged={},until=Infinity)=>{
     const out=[],sub=id=>id.split('-')[0],plan=[],by={};out.origin=rows.origin||0;let t=out.origin;
     for(const r of rows)if(r[2]==='study'){const k=sub(r[0]);if(!by[k])plan.push(by[k]={k,title:r[1],b:r[4],m:0});by[k].m+=r[3];}
     const fixed=[];
     for(const r of rows){const s=t,e=t+r[3];t=e;
-      if(s<at)out.push([r[0],r[2]==='study'?'Earlier block (re-planned)':r[1],r[2]==='study'?'rest':r[2],Math.min(e,at)-s,r[4],'past']);
-      if(e>at&&isFixed(r)){let s2=Math.max(s,at),m2=e-s2; // a moderately late start pushes dinner, wind-down and bedtime later; sleep ends where it did
-        if(push&&/^(meal-1|wind|sleep)$/.test(r[0])){s2+=push;if(r[0]==='sleep')m2-=push;}
-        fixed.push([r[0],r[1],r[2],m2,r[4],s2]);}}
+      if(e>at&&isFixed(r))fixed.push([r[0],r[1],r[2],r[3],r[4],s]);
+      else if(s<at)out.push([r[0],r[2]==='study'?'Earlier block (re-planned)':r[1],r[2]==='study'?'rest':r[2],Math.min(e,at)-s,r[4],'past']);}
     const q=plan.map(p=>({...p,m:Math.max(0,p.m-(logged[p.k]||0))})).filter(p=>p.m>=15);
     t=at;let since=0,n=0;
     for(const f of fixed){
@@ -890,11 +888,10 @@ body.habit-shh #hb-session-card {text-align:center;}
     for(const k in hs)out[k]=Math.max(out[k]||0,hs[k]); // two views of the same study: take the larger
     if(dayKind(d).t==='exam')return {exam:Object.values(out).reduce((a,b)=>a+b,0)};
     return out;};
-  // a late first session (over 10 min) moves dinner, wind-down and bedtime later by the delay, but bedtime never passes 1:00 AM;
-  // `room` = minutes between today's bedtime and 1:00 AM. Only study that still doesn't fit moves to tomorrow.
-  const lateStart=(mins,room=0)=>mins<=10?{replan:false,push:0}:{replan:true,push:Math.max(0,Math.min(Math.round(mins),Math.round(room)))};
+  // A late first session re-plans the study time available around the original commitments.
+  const lateStart=mins=>({replan:mins>10,push:0});
   const fallbackRaw=()=>realDay(!!labData().lateSchedule);
-  const adapted=rows=>{if(rows.info)return rows;const rp=(labData().replanAt||{})[studyDate()];const k=dayKind(studyDate());return rp==null?rows:replanFrom(rows,rp,loggedToday(),k.t==='exam'&&k.at?k.at-630-30:Infinity,k.t==='normal'||k.t==='holiday'?0:(labData().replanPush||{})[studyDate()]||0);}; // free days: bedtime never moves
+  const adapted=rows=>{if(rows.info)return rows;const rp=(labData().replanAt||{})[studyDate()];const k=dayKind(studyDate());return rp==null?rows:replanFrom(rows,rp,loggedToday(),k.t==='exam'&&k.at?k.at-630-30:Infinity);};
   // ---- skills (retention V1): lectures are the source, skills are what gets mixed into practice ----
   const gapD=(a,b)=>Math.round((Date.parse(a+'T12:00:00')-Date.parse(b+'T12:00:00'))/864e5);
   // one skill per lecture that no skill links to yet; running it again adds nothing
@@ -1351,8 +1348,12 @@ body.habit-shh #hb-session-card {text-align:center;}
     return out;}
   // rows for the desk: [id,title,kind,minutes,bucket,meta], starting at the wake time
   function templateRows(L,dayIso,dow,nowClock,ctx){
-    const d=templateDay(L,dayIso,dow,nowClock,ctx),rows=[];const used={};
+    const d=templateDay(L,dayIso,dow,nowClock,ctx),rows=[];const used={};let cursor=d.wake;
     for(const r of d.rows){const len=r.e-r.s;if(len<=0)continue;let id;
+      // The desk reads a continuous list of durations. Keep any time released by
+      // an adapted study block on that list so later appointments retain their clocks.
+      if(r.s>cursor)rows.push(['free-gap-'+cursor,'Free time · nothing owed','rest',r.s-cursor,null]);
+      cursor=r.e;
       if(r.kind==='study'){const base=(r.subj||'study')+'-'+(r.role||'p').toLowerCase()+r.s;id=used[base]?base+'x'+used[base]:base;used[base]=(used[base]||0)+1;}
       else id=r.id;
       rows.push([id,r.title,r.kind,len,r.kind==='study'?BUCK[r.subj]||null:null,{role:r.role||null,subj:r.subj||null,task:r.task||null,entry:!!r.entry,optional:!!r.optional,past:!!r.past,clock:r.s,ext:!!r.ext,edited:!!r.edited}]);}
