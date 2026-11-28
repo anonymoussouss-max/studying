@@ -86,6 +86,17 @@ function expectedFromSyllabus(file) {
   const walk = x => { if (Array.isArray(x)) { if (x.length === 2 && typeof x[0] === 'string' && x[1] && typeof x[1] === 'object' && !Array.isArray(x[1]) && x[1].mp4) { n++; return; } x.forEach(walk); } };
   walk(s); return n || null;
 }
+// the expected lecture slugs, in syllabus order (each [slug, {mp4}] entry is one lecture)
+function expectedSlugs(file) {
+  const s = readJSON(file); if (!s) return null; const out = [];
+  const walk = x => { if (Array.isArray(x)) { if (x.length === 2 && typeof x[0] === 'string' && x[1] && typeof x[1] === 'object' && !Array.isArray(x[1]) && x[1].mp4) { out.push(x[0]); return; } x.forEach(walk); } };
+  walk(s); return out.length ? out : null;
+}
+const slugOfFile = r => String(r).split('/').pop().replace(/\.mp4$/i, '').replace(/^\d+[_-]/, '').toLowerCase();
+// a stable lecture id from the file's path inside the course folder: inserting, removing or reordering other files never changes it
+// the order numbers (01_, 02_) are dropped from every folder and file name, so renumbering after an insertion or a reorder keeps the id; a second file with the same name gets ~2
+const idKey = rel => String(rel).split(/[\\/]/).map(p => p.replace(/\.mp4$/i, '').replace(/^\d+[_-]/, '').toLowerCase()).join('/');
+const stableId = (rel, n) => 'f-' + require('crypto').createHash('sha1').update(idKey(rel) + (n > 1 ? '~' + n : '')).digest('hex').slice(0, 12);
 function walkMp4(abs, rel = '', out = []) {
   for (const f of listDir(abs)) { const a = path.join(abs, f), r = rel ? rel + '/' + f : f; let st; try { st = fs.statSync(a); } catch (e) { continue; }
     if (st.isDirectory()) walkMp4(a, r, out); else if (/\.mp4$/i.test(f)) out.push(r); }
@@ -129,11 +140,16 @@ function build(root) {
     const abs = path.join(root, w.dir), present = fs.existsSync(abs), sts = status.filter(x => x.course === w.id || x.course === w.dir), st = sts.find(x => x.status === 'finished') || sts.find(x => x.status === 'failed') || sts[0] || null; // a completed run (finished, or failed on some items) wins over a stale running one
     const expected = w.syllabus ? expectedFromSyllabus(path.join(root, w.syllabus)) : null;
     const vids = present ? walkMp4(abs) : [];
-    const lecs = vids.map((r, i) => { const parts = r.split('/'), mod = parts.length > 1 ? pretty(parts[0]) : 'Lectures'; return lectureOf(root, posix(path.join(w.dir, r)), pretty(parts[parts.length - 1]), mod, 'v' + i); });
-    const valid = lecs.filter(l => l.ok).length, verified = !!(expected && valid >= expected && st && (st.status === 'finished' || st.status === 'failed')); // a failed run that still left every expected video valid only missed non-video items
+    // ids come from the file path (stable); 'legacy' is the old position id, used once by the Desk to move saved progress
+    const seen = new Map(), lecs = vids.map((r, i) => { const ik = idKey(r), n = (seen.get(ik) || 0) + 1; seen.set(ik, n); const parts = r.split('/'), mod = parts.length > 1 ? pretty(parts[0]) : 'Lectures'; return Object.assign(lectureOf(root, posix(path.join(w.dir, r)), pretty(parts[parts.length - 1]), mod, stableId(r, n)), { legacy: 'v' + i }); });
+    // availability is checked against the expected lesson files, not only their count: every expected slug needs its own valid video
+    const want = w.syllabus ? expectedSlugs(path.join(root, w.syllabus)) : null, pool = new Map();
+    for (const l of lecs) if (l.ok) { const k = slugOfFile(l.video); pool.set(k, (pool.get(k) || 0) + 1); }
+    const unmatched = want ? want.filter(k => { const n = pool.get(String(k).toLowerCase()) || 0; if (n) { pool.set(String(k).toLowerCase(), n - 1); return false; } return true; }) : [];
+    const valid = lecs.filter(l => l.ok).length, verified = !!(expected && valid >= expected && !unmatched.length && st && (st.status === 'finished' || st.status === 'failed')); // a failed run that still left every expected video valid only missed non-video items
     courses.push({ id: w.id, title: w.title, by: w.by, kind: 'planned', status: verified ? 'available' : 'wip', present, download: st ? st.status : present ? 'files present, no status' : 'not started',
       expected, valid, modules: modulesOf(lecs, root),
-      note: verified ? 'Every expected lecture has a valid video.' + (st.status === 'failed' ? ' The download log reported errors on non-video items.' : '') : !present ? 'Folder not present yet.' : expected ? `${valid} of ${expected} expected lectures have a valid video.` : `${valid} valid videos found; the expected lecture list is not known yet.` });
+      note: verified ? 'Every expected lecture has a valid video.' + (st.status === 'failed' ? ' The download log reported errors on non-video items.' : '') : !present ? 'Folder not present yet.' : unmatched.length && valid >= expected ? `${unmatched.length} expected lecture${unmatched.length === 1 ? ' has' : 's have'} no matching video (${unmatched.slice(0, 3).join(', ')}${unmatched.length > 3 ? ', …' : ''}).` : expected ? `${valid} of ${expected} expected lectures have a valid video.` : `${valid} valid videos found; the expected lecture list is not known yet.` });
   }
   for (const w of WORKSHOPS) courses.push(workshopOf(root, w));
   return { v: 1, built: new Date().toISOString(), courses };
@@ -146,4 +162,4 @@ if (require.main === module) {
   console.log(`wrote ${out}: ${idx.courses.length} courses, ${lec} lectures`);
   for (const c of idx.courses) console.log(`  ${c.status.padEnd(9)} ${c.id}: ${c.valid}/${c.expected ?? '?'} valid${c.note ? ' · ' + c.note : ''}`);
 }
-module.exports = { build, expectedFromSyllabus, videoCheck, sidecars, WIP, WORKSHOPS };
+module.exports = { build, expectedFromSyllabus, expectedSlugs, stableId, videoCheck, sidecars, WIP, WORKSHOPS };
