@@ -157,7 +157,8 @@ test('Course Gu: a WIP course cannot be proven; missing evidence is pending; ran
   assert.strictEqual(Object.keys(K.CGU_RANK).length, 29); assert.ok(Object.values(K.CGU_RANK).every(r => Number.isInteger(r) && r >= 1 && r <= 5));
   const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1]; assert.match(src, /Gu rank \$\{r\} · approved by you/); assert.ok(!/awaiting your approval/.test(src), 'no course Gu rank is shown as a proposal');
   const art = {}; vm.runInNewContext(html.match(/<script id="kg-course-gu-art">([\s\S]*?)<\/script>/)[1], { window: art }); const ids = Object.keys(art.KgCourseGuArt);
-  assert.strictEqual(ids.length, 29); assert.deepStrictEqual([...ids].sort(), Object.keys(K.CGU_RANK).sort(), 'one artwork per course, keyed by the stable course id');
+  assert.strictEqual(ids.length, 37); assert.deepStrictEqual([...ids].sort(), [...K.ARRANGE.flatMap(g => g.c.map(x => x[0]))].sort(), 'one artwork per course, keyed by the stable course id');
+  assert.ok(Object.keys(K.CGU_RANK).every(id => ids.includes(id)), 'every approved rank has its artwork; unranked art waits for approval');
   for (const a of Object.values(art.KgCourseGuArt)) assert.ok(!/<script|\son[a-z]+=|href|foreignObject|<image/i.test(a.svg));
 });
 // the 29 ranks you approved on 27 Nov 2026, by stable course id, with the Gu each belongs to
