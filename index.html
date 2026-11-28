@@ -17236,8 +17236,13 @@ function serpentSVG(o) {
   window.KgQuarters.HOME = HOME; window.KgQuarters.homeSVG = p => homeSVG(Object.assign({}, DEF, p), read());
   addEventListener('moonlab:render', () => setTimeout(() => { const full = !!document.querySelector('#moon-lab .kqc, #moon-lab .klib-full'); if (full && !document.body.classList.contains('kqc-full')) scrollTo(0, 0); document.body.classList.toggle('kqc-full', full); applyFilter(); mountHome(); const kb = document.querySelector('.kv-back'); if (kb && document.body.classList.contains('kqp-theme')) kb.textContent = '← Return to quarters'; }, 60));
   setInterval(() => { if (!document.hidden) clockTick(); }, 1000);
+  // last input: a pointer (mouse, touch, pen) or the keyboard
+  addEventListener('pointerdown', () => document.body.classList.add('kq-ptr'), true);
+  addEventListener('keydown', e => { if (!e.ctrlKey && !e.metaKey && !e.altKey) document.body.classList.remove('kq-ptr'); }, true);
   const css = document.createElement('style');
-  css.textContent = `.kq-hit{fill:transparent;cursor:pointer}.kq-ring{fill:none;stroke:#f5d27a;stroke-width:3;opacity:0}.kq-hot:hover .kq-ring,.kq-hot:focus .kq-ring,.kq-hot:focus-visible .kq-ring{opacity:.9}.kq-hot:focus{outline:none}
+  css.textContent = `.kq-hit{fill:transparent;cursor:pointer}.kq-ring{fill:none;stroke:#f5d27a;stroke-width:3;opacity:0}.kq-hot:hover .kq-ring,.kq-hot:focus-visible .kq-ring{opacity:.9}.kq-hot:focus{outline:none}
+    /* after a click or tap the desk may still return focus to the object you came from; it lights only on hover then, and on keyboard focus */
+    body.kq-ptr .kq-hot:focus-visible:not(:hover) .kq-ring,body.kq-ptr .kq-hot:focus-visible:not(:hover) .kqp-lab{opacity:0}
     .kq-lbg{fill:#1c0c09;opacity:.82}.kq-ltx{fill:#f5e9c8;font:600 18px Georgia,serif}.kq-breathe{animation:kq-br 6s ease-in-out infinite}@keyframes kq-br{50%{opacity:.82}}
     .kq-still .kq-breathe{animation:none}@media (prefers-reduced-motion:reduce){.kq-breathe{animation:none}}
     .kq-gu-art{width:100%;max-width:420px;height:auto;display:block;margin:auto;background:#1a120d;border-radius:12px}
@@ -17254,7 +17259,7 @@ function serpentSVG(o) {
     body.kqp-quietv #kv-clock{display:none}body.kqp-quietv .kv-tab{opacity:.8}
     #kg-main>#kg-twin{position:relative;left:auto;bottom:auto;transform:none;margin:0 auto 12px;width:fit-content;z-index:5}body.kqc-full .kqc-grid{grid-template-columns:minmax(0,4fr) minmax(0,6fr)}.kqc-on{outline:1px solid rgba(232,199,125,.5);border-radius:6px}.kqc-sk li{list-style:none}
     .kqp-home{position:absolute;inset:0;width:100%;height:100%;z-index:1;display:block}.kqp-home .kq-ltx{font-size:20px}
-    .kqp-lab{opacity:0;transition:opacity .2s;pointer-events:none}.kq-hot:hover .kqp-lab,.kq-hot:focus .kqp-lab,.kqp-labels .kqp-lab{opacity:1}
+    .kqp-lab{opacity:0;transition:opacity .2s;pointer-events:none}.kq-hot:hover .kqp-lab,.kq-hot:focus-visible .kqp-lab,.kqp-labels .kqp-lab{opacity:1}
     .kqp-front{position:absolute;inset:0;width:100%;height:100%;z-index:4;display:block;pointer-events:none}.kq-stage.kqp-painted{container-type:inline-size}
     .kq-stage.kqp-painted>.kq-bg,.kq-stage.kqp-painted>.kq-port,.kq-stage.kqp-painted>.kq-door,.kq-stage.kqp-painted>.kq-desk,.kq-stage.kqp-painted>.kv-spot,.kq-stage.kqp-painted>.kq-time,.kq-stage.kqp-painted>.kq-start{display:none!important}
     .kqp-id,.kqp-clock,.kqp-guide{position:absolute;z-index:8;font-family:Georgia,serif;color:#f3e3bd;background:rgba(32,17,11,.82);border:1px solid rgba(201,161,74,.4);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.3)}

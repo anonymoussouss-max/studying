@@ -200,3 +200,10 @@ test('chapter states, filters and the drawn Gu: untouched chapters are Unstarted
   assert.match(g, /<button class="kl-primary" data-qgo="today:today">Open today’s lectures<\/button><button data-qstudy="bm:Basic Mathematics">Guided session on this chapter<\/button>/);
   // obtained chapters are creatures, not cocoons
 });
+
+test('returning to quarters by click or tap leaves no object highlighted; keyboard focus still shows its ring', () => {
+  const h = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  assert.ok(!/\.kq-hot:focus \.kq-ring/.test(h) && !/\.kq-hot:focus \.kqp-lab/.test(h), 'plain :focus (set by the desk on return) never lights an object');
+  assert.match(h, /\.kq-hot:hover \.kq-ring,\.kq-hot:focus-visible \.kq-ring\{opacity:\.9\}/);
+  assert.match(h, /body\.kq-ptr \.kq-hot:focus-visible:not\(:hover\) \.kq-ring/);
+});
