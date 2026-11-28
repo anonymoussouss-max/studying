@@ -81,15 +81,15 @@ test('arrangement: 37 courses exactly once in stage order, by id, whatever their
   const ctx = { window: {}, localStorage: { getItem: () => null, setItem() {} } }; ctx.globalThis = ctx; vm.runInNewContext(src, ctx);
   const K = ctx.window.KgCourses, ids = K.ARRANGE.flatMap(g => g.c.map(x => x[0]));
   assert.strictEqual(ids.length, 37); assert.strictEqual(new Set(ids).size, 37);
-  assert.deepStrictEqual([...K.ARRANGE.map(g => g.c.length)], [3, 3, 3, 4, 5, 2, 8, 9], '18 main, 2 optional, 8 recommended, 9 reference');
+  assert.deepStrictEqual([...K.ARRANGE.map(g => g.c.length)], [3, 4, 4, 6, 7, 3, 10], '24 main, 3 optional, 10 reference');
   const { WIP } = require('../tools/library-index.cjs');
-  assert.deepStrictEqual([...[...K.ARRANGE[6].c, ...K.ARRANGE[7].c.slice(1)].map(x => x[0])].sort(), WIP.map(w => w.id).sort(), 'planned courses appear on the recommended and reference shelves');
+  for (const w of WIP) assert.ok(ids.includes(w.id), w.id + ': planned courses keep their place on the path');
   // download order and status never move a course; an unknown course falls into "Other courses"; lecture order is untouched
   const mk = (id, status) => ({ id, title: id, status, kind: status === 'wip' ? 'planned' : 'verified', modules: [{ lectures: [{ id: 'b' }, { id: 'a' }] }] });
   const courses = [...ids].reverse().map((id, i) => mk(id, i % 2 ? 'wip' : 'available')).concat(mk('new-course', 'available'));
   const g = K.arrange(courses);
   assert.deepStrictEqual([...g.flatMap(x => x.items.map(i => i.c.id))], [...ids, 'new-course']);
-  assert.strictEqual(g[8].h, 'Other courses'); assert.strictEqual(g[0].items[0].c.modules[0].lectures[0].id, 'b');
+  assert.strictEqual(g[7].h, 'Other courses'); assert.strictEqual(g[0].items[0].c.modules[0].lectures[0].id, 'b');
 });
 
 function assessK() {
