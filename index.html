@@ -17269,7 +17269,7 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
     { h: 'Stage 4 — Expand into larger systems', c: [['einstein-relativity', 'Einstein and Relativity'], ['extra-galactic-astronomy', 'Extra-Galactic Astronomy'], ['quantum-physics', 'Exploring Quantum Physics'], ['robotic-methodologies', 'Robotic Methodologies']] },
     { h: 'Stage 5 — Move toward your longer-term interests', c: [['cosmology-our-universe', 'Cosmology: Our Universe'], ['phases-of-matter-solid-liquid-gas-and-beyond', 'Phases of Matter: Solid, Liquid, Gas and Beyond'], ['particle-physics', 'Particle Physics'], ['black-holes-astro-101', 'Black Holes: Astro 101'], ['physique-deux-infinis-liens', 'D’un infini à l’autre']] },
     { h: 'Optional branches', note: 'Take these alongside the main path when they help; neither is required.', c: [['our-place-in-the-cosmos', 'Our Place in the Cosmos', 'Alternative perspective alongside Stages 1–2'], ['astrobiology', 'Astrobiology', 'Optional branch after introductory astronomy or Exoplanets']] },
-    { h: 'Recommended next courses', c: [
+    { h: 'Recommended next courses', review: true, c: [
       ["analyze", "Analyzing the Universe", "Inspect NASA X-ray observations with DS9."],
       ["introduction-python-scientific-computing", "Introduction to Python for Scientific Computing", "Build and plot scientific models in Python."],
       ["space-mission-design-and-operations", "Space Mission Design and Operations", "After Basics of Rocket Science and orbital mechanics."],
@@ -17279,7 +17279,7 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
       ["approximation-methods", "Approximation Methods", "After Theory of Angular Momentum and practice solving for eigenstates."],
       ["statistical-thermodynamics", "Statistical Molecular Thermodynamics", "After introductory thermodynamics and quantum energy levels."]
     ] },
-    { h: 'Reference shelf', note: 'Maths, programming and physics to consult when a topic needs more practice.', c: [['physics-101-forces-kinematics', 'Physics 101: Forces and Kinematics'], ['introduction-to-calculus', 'Introduction to Calculus'], ['python', 'Programming for Everybody — Python'], ['mit-18-06sc-linear-algebra', 'Linear Algebra — MIT / Gilbert Strang'], ['differential-equations-engineers', 'Differential Equations for Engineers'], ['vector-calculus-engineers', 'Vector Calculus for Engineers'], ['mit-8-02-electricity-magnetism', 'Electricity and Magnetism — MIT'], ['mit-8-03sc-vibrations-waves', 'Vibrations and Waves — MIT'], ['numerical-methods-engineers', 'Numerical Methods for Engineers']] }
+    { h: 'Reference shelf', support: true, note: 'Maths, programming and physics to consult when a topic needs more practice.', c: [['physics-101-forces-kinematics', 'Physics 101: Forces and Kinematics'], ['introduction-to-calculus', 'Introduction to Calculus'], ['python', 'Programming for Everybody — Python'], ['mit-18-06sc-linear-algebra', 'Linear Algebra — MIT / Gilbert Strang'], ['differential-equations-engineers', 'Differential Equations for Engineers'], ['vector-calculus-engineers', 'Vector Calculus for Engineers'], ['mit-8-02-electricity-magnetism', 'Electricity and Magnetism — MIT'], ['mit-8-03sc-vibrations-waves', 'Vibrations and Waves — MIT'], ['numerical-methods-engineers', 'Numerical Methods for Engineers']] }
   ];
   // groups the indexed courses into the arrangement; a course the arrangement does not name goes to a trailing "Other courses" group
   function arrange(courses) {
@@ -17314,11 +17314,15 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
         let perm = await handle.queryPermission({ mode: 'read' }); if (perm !== 'granted' && interactive) perm = await handle.requestPermission({ mode: 'read' });
         if (perm !== 'granted') { phase = 'reconnect'; return; }
       } else handle = null;
-      index = JSON.parse(await textOf('kaguya-library.json')); phase = 'ready';
+      index = JSON.parse(await textOf('kaguya-library.json')); phase = 'ready'; saveCat(index);
     } catch (e) { index = null; phase = 'error'; err = /fetch|network/i.test(String(e)) ? 'the local library server is not reachable' : /missing|NotFound/i.test(String(e)) ? 'kaguya-library.json was not found in that folder (run tools/library-index.cjs on it first)' : String(e.message || e); }
     if (onCourses() || document.querySelector('[data-kcgu-wait]')) M.render();
   }
 
+  const CAT = 'kg-library-cat-v1';
+  function saveCat(ix) { try { localStorage.setItem(CAT, JSON.stringify({ at: Date.now(), courses: ix.courses.map(c => ({ id: c.id, title: c.title, by: c.by, status: c.status, expected: c.expected,
+    modules: (c.modules || []).map(m => ({ name: m.name, lectures: (m.lectures || []).map(l => ({ id: l.id, name: l.name, ok: l.ok, subs: [], transcripts: [], pdfs: [] })) })) })) })); } catch (e) {} }
+  const cached = () => { try { const x = JSON.parse(localStorage.getItem(CAT) || 'null'); return x && Array.isArray(x.courses) ? x : null; } catch (e) { return null; } };
   // ---- views ----
   const course = id => index && index.courses.find(c => c.id === id);
   const chip = (cls, t) => `<span class="klib-chip klib-${cls}">${esc(t)}</span>`;
@@ -17333,6 +17337,28 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
       <p class="kl-small">Server: <code>node tools/library-server.cjs "C:\\Users\\…\\Downloads\\Coursera"</code>. It listens on this computer only and serves just the files in the index.</p>
       ${s.src ? '<button class="kl-ghost" data-lib="forget">Disconnect the library</button>' : ''}</div></details>`;
   }
+  function shelves(courses) {
+    const byId = new Map(courses.map(c => [String(c.id).toLowerCase(), c])), used = new Set();
+    const out = ARRANGE.map((g, gi) => ({ g, gi, items: g.c.filter(([id]) => !used.has(id) && used.add(id)).map(([id, label, why]) => ({ id, label, why, c: byId.get(id) || null })) }));
+    const rest = courses.filter(c => !used.has(String(c.id).toLowerCase()));
+    if (rest.length) out.push({ g: { h: 'Unplaced courses', review: true, note: 'In the offline index but not on the approved path.' }, gi: out.length, items: rest.map(c => ({ id: c.id, label: c.title, c })) });
+    return out;
+  }
+  function book(x, review, off) {
+    const flag = review ? '<span class="klib-flag">Stage to review</span>' : '';
+    if (!x.c) return `<li><div class="klib-book" aria-disabled="true" data-c="${esc(x.id)}"><b class="klib-bt">${esc(x.label)}</b><span class="klib-st klib-st-wip">WIP</span><span class="kl-small">Planned · not in the offline index yet</span>${flag}</div></li>`;
+    const c = x.c, s = store(), av = availOf(c), L = lecturesOf(c), done = L.filter(l => lecState(s.lec[lk(c.id, l.id)]) === 'completed').length;
+    const pend = (c.modules || []).filter((m, mi) => { const a = s.asm && s.asm[mkey(c, mi)]; return a && !a.passed; }).length;
+    let gu = null; try { gu = courseGu(c, s); } catch (e) {}
+    const st = off ? ['off', 'Library disconnected'] : av === 'available' ? ['ready', 'Ready'] : ['wip', 'WIP'];
+    return `<li><button class="klib-book" data-lib="course" data-c="${esc(c.id)}"${off ? ' aria-disabled="true"' : ''}><b class="klib-bt">${esc(x.label || c.title)}</b>${c.by ? `<span class="kl-small klib-by">${esc(c.by)}</span>` : ''}
+      <span class="klib-st klib-st-${st[0]}">${st[1]}</span><span class="kl-small">${L.length ? `${done}/${L.length} lectures` : 'No lectures on disk yet'}${gu && gu.total ? ` · ${gu.passes.length}/${gu.total} modules passed` : ''}${pend ? ` · ${pend} test${pend > 1 ? 's' : ''} pending` : ''}</span>
+      ${x.why ? `<span class="kl-small klib-why">${esc(x.why)}</span>` : ''}${flag}<span class="klib-bar" aria-hidden="true"><i style="width:${L.length ? Math.round(100 * done / L.length) : 0}%"></i></span></button></li>`;
+  }
+  const shelvesHTML = (courses, off) => shelves(courses).map(({ g, gi, items }) => `<section class="klib-shelf${g.support ? ' klib-support' : ''}" data-libg="1" data-stage="${gi}" aria-labelledby="klib-sh-${gi}"><h3 class="klib-sh" id="klib-sh-${gi}">${esc(g.h)}</h3>${g.note ? `<p class="kl-small">${esc(g.note)}</p>` : ''}${g.review ? '<p class="kl-small klib-flag-note">No stage is documented for these courses yet, so each is flagged for review; their place here is provisional.</p>' : ''}
+    <ol class="klib-books">${items.map(x => book(x, g.review, off)).join('')}</ol></section>`).join('');
+  const aboutHTML = () => `<details class="klib-about"><summary>About course progress, Course Gu and Chapter Gu</summary><p class="kl-small">Course progress is kept here only. Watching never obtains or refines a Chapter Gu, passes a proof or counts as retention. A Course Gu is earned only by passing Iroha's module assessments, and is kept apart from your Chapter Gu and cultivator rank. Scheduling stays optional, inside your existing study allowance.</p>
+    <p class="kl-small">The shelves are a suggested order, not a gate: every course stays open. Ready means the expected lectures were verified on disk; WIP means a download is pending or partial, and its place on the path does not change.</p></details>`;
   function collection() {
     const s = store(), last = s.last && course(s.last.c), lastL = last && lecturesOf(last).find(l => l.id === s.last.l);
     const card = (c, label, why) => { const av = availOf(c), st = courseState(c, s), L = lecturesOf(c), done = L.filter(l => lecState(s.lec[lk(c.id, l.id)]) === 'completed').length, usable = L.filter(l => l.ok).length;
@@ -17340,13 +17366,10 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
         <span class="klib-chips">${chip(st, ST[st])}${chip(av, AV[av])}${(() => { const n = (c.modules || []).filter((m, mi) => { const a = s.asm && s.asm[mkey(c, mi)]; return a && !a.passed; }).length; return n ? chip('wip', n + ' assessment' + (n > 1 ? 's' : '') + ' pending') : ''; })()}</span>
         <span class="kl-small">${L.length ? `${done} of ${L.length} lectures completed` : 'No lectures on disk yet'}${av !== 'available' ? ` · ${usable} usable${c.expected ? ` of ${c.expected} expected` : ''}` : ''}</span>
         <span class="klib-bar"><i style="width:${L.length ? Math.round(100 * done / L.length) : 0}%"></i></span></button>`; };
-    return `<section class="kl-card kl-stack klib"><p class="kl-eyebrow">📜 COURSE LIBRARY · SOUTHERN BORDER</p><h2>Your offline courses</h2>
-      <p class="kl-small">Course progress is kept here only. Watching never obtains or refines a Chapter Gu, passes a proof or counts as retention. Scheduling stays optional, inside your existing study allowance.</p>
+    return `<section class="kl-card kl-stack klib klib-home">
       ${last && lastL ? `<div class="klib-resume"><span>Continue <b>${esc((ARRANGE.flatMap(g => g.c).find(x => x[0] === String(last.id).toLowerCase()) || [0, last.title])[1])}</b> · ${esc(lastL.name)}</span><button class="kl-primary" data-lib="play" data-c="${esc(last.id)}" data-l="${esc(lastL.id)}">Resume</button></div>` : ''}
       <div class="kl-row klib-filter" style="flex-wrap:wrap"><input type="search" data-libq="1" placeholder="Search courses" aria-label="Search courses"></div>
-      <p class="kl-small">A suggested order, not a gate: every course stays open. WIP marks a course still downloading; its place on the path does not change.</p>
-      ${arrange(index.courses).map(g => `<div class="klib-group" data-libg="1"><h3 class="klib-h3">${esc(g.h)}</h3>${g.note ? `<p class="kl-small">${esc(g.note)}</p>` : ''}
-      <div class="klib-grid">${g.items.map(x => card(x.c, x.label, x.why)).join('')}</div></div>`).join('')}${sourceCard(false)}</section>${shelfHTML()}`;
+      ${shelvesHTML(index.courses, false)}${aboutHTML()}${sourceCard(false)}</section><details class="klib-gu"><summary>Course Gu shelf</summary>${shelfHTML()}</details>`;
   }
   function cguPanel(c, s) {
     const g = courseGu(c, s), A = (window.KgCourseGuArt || {})[c.id], r = CGU_RANK[c.id], tierOf = t => TIER_N[t] || t;
@@ -17379,7 +17402,7 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
         <span class="kl-small">${!l.ok ? 'File missing or invalid' : ls === 'completed' ? '✓ Completed' : ls === 'in-progress' ? `${pct(p)}% watched` : ''}${l.subs.length ? ' · CC' : ''}${l.transcripts.length ? ' · transcript' : ''}${l.pdfs.length ? ` · ${l.pdfs.length} PDF` : ''}</span></button></li>`; };
     let n = 0;
     return `<section class="kl-card kl-stack klib klib-full"><div class="kl-row" style="justify-content:space-between;flex-wrap:wrap"><button class="kl-ghost" data-lib="home">← Back to the shelves</button></div>
-      <p class="kl-eyebrow">📜 COURSE${c.by ? ' · ' + esc(c.by.toUpperCase()) : ''}</p><h2>${esc(c.title)}</h2>
+      <p class="kl-eyebrow">📜 COURSE${c.by ? ' · ' + esc(c.by.toUpperCase()) : ''}</p><h2>${esc(labelOf(c))}</h2>
       <p class="klib-chips">${chip(st, ST[st])}${chip(av, AV[av])}</p>${c.note ? `<p class="kl-small">${esc(c.note)}</p>` : ''}
       ${(() => { const cm = r ? c.modules.find(m => m.lectures.some(l => l.id === r.id)) : null, pi = c.modules.findIndex((m, mi) => { const a = s.asm && s.asm[mkey(c, mi)]; return a && !a.passed; }), rs = r && lecState(s.lec[lk(c.id, r.id)]) === 'in-progress';
         return `<nav class="klib-toc" aria-label="Contents"><p class="kl-eyebrow">CONTENTS</p><dl>
@@ -17398,7 +17421,7 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
     const s = store(), L = lecturesOf(c), i = L.findIndex(x => x.id === l.id), prev = L[i - 1], next = L[i + 1], p = s.lec[lk(c.id, l.id)], ls = lecState(p);
     const mine = s.notes.filter(n => n.c === c.id && n.l === l.id);
     return `<section class="kl-card kl-stack klib klib-full klib-player"><div class="kl-row" style="justify-content:space-between;flex-wrap:wrap">
-        <button class="kl-ghost" data-lib="course" data-c="${esc(c.id)}" data-from="${esc(l.id)}">← ${esc(c.title)}</button><span class="kl-small">${esc(l.module)} · lecture ${i + 1} of ${L.length}</span></div>
+        <button class="kl-ghost" data-lib="course" data-c="${esc(c.id)}" data-from="${esc(l.id)}">← ${esc(labelOf(c))}</button><span class="kl-small">${esc(l.module)} · lecture ${i + 1} of ${L.length}</span></div>
       <h2 class="klib-title">${esc(l.name)}</h2>
       <div id="klib-stage" class="klib-stage">${l.ok ? '' : `<p class="klib-miss">This lecture's video is missing or invalid on disk (${esc(l.why || 'missing')}). Its other files are still listed below.</p>`}</div>
       <div class="kl-row klib-ctrl" style="flex-wrap:wrap">${prev ? `<button class="kl-ghost" data-lib="play" data-c="${esc(c.id)}" data-l="${esc(prev.id)}">← Previous</button>` : ''}${next ? `<button class="kl-ghost" data-lib="play" data-c="${esc(c.id)}" data-l="${esc(next.id)}">Next →</button>` : ''}
@@ -17507,8 +17530,11 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
   }
   M.PANELS.courses = () => {
     if (!index && phase === 'idle') { phase = 'loading'; setTimeout(() => load(false), 0); }
-    const s = store(); if (!s.src || phase === 'none') return `<section class="kl-card kl-stack klib"><p class="kl-eyebrow">📜 COURSE LIBRARY · SOUTHERN BORDER</p><h2>Connect your offline courses</h2><p>Your courses stay on your disk. Connect the folder once and the desk remembers it.</p>${sourceCard(true)}</section>`;
+    const s = store(); if ((!s.src || phase === 'none') && cached()) { const cat = cached(); return `<section class="kl-card kl-stack klib klib-home"><p class="klib-off" role="status"><b>Library disconnected</b> · showing the last known catalogue from ${esc(new Date(cat.at).toLocaleString())}.</p>${shelvesHTML(cat.courses, true)}${aboutHTML()}${sourceCard(true)}</section>`; }
+    if (!s.src || phase === 'none') return `<section class="kl-card kl-stack klib"><p class="kl-eyebrow">📜 COURSE LIBRARY · SOUTHERN BORDER</p><h2>Connect your offline courses</h2><p>Your courses stay on your disk. Connect the folder once and the desk remembers it.</p>${sourceCard(true)}</section>`;
     if (phase === 'loading') return `<section class="kl-card klib"><p class="kl-eyebrow">📜 COURSE LIBRARY</p><p>Opening the library…</p></section>`;
+    const cat = cached();
+    if (cat && (phase === 'reconnect' || phase === 'error' || !index)) return `<section class="kl-card kl-stack klib klib-home"><p class="klib-off" role="status"><b>Library disconnected</b> · showing the last known catalogue from ${esc(new Date(cat.at).toLocaleString())}. ${phase === 'reconnect' ? '<button class="kl-primary" data-lib="reconnect">Reconnect the folder</button>' : '<button data-lib="retry">Try again</button>'}${err ? ` <span class="kl-small">(${esc(err)})</span>` : ''}</p>${shelvesHTML(cat.courses, true)}${aboutHTML()}${sourceCard(false)}</section>`;
     if (phase === 'reconnect') return `<section class="kl-card kl-stack klib"><p class="kl-eyebrow">📜 COURSE LIBRARY</p><p>The browser needs your permission again to read the course folder.</p><div class="kl-row"><button class="kl-primary" data-lib="reconnect">Reconnect the folder</button></div>${sourceCard(false)}</section>`;
     if (phase === 'error' || !index) return `<section class="kl-card kl-stack klib"><p class="kl-eyebrow">📜 COURSE LIBRARY</p><p>Couldn't open the library: ${esc(err || 'unknown reason')}.</p><div class="kl-row"><button data-lib="retry">Try again</button></div>${sourceCard(true)}</section>`;
     const c = view.c && course(view.c), l = c && view.l && lecturesOf(c).find(x => x.id === view.l);
@@ -17548,17 +17574,21 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
   addEventListener('moonlab:render', () => setTimeout(() => { if (document.getElementById('klib-stage')) mountPlayer(); else if (cur && !vid.isConnected) { save(true); want = false; } }, 30));
 
   // ---- controls ----
+  let shelfRet = null;
   const go = () => { if (onCourses()) M.render(); else M.go('library', 'courses'); };
   const PM = v => SPECIAL[v] ? v : +v;
   document.addEventListener('click', async e => {
     const t = e.target.closest && e.target.closest('[data-lib]'); if (!t) return; e.preventDefault(); const d = t.dataset;
-    if (d.lib === 'home') { view = { c: '', l: '' }; return go(); }
+    if (t.getAttribute('aria-disabled') === 'true') return;
+    if (d.lib === 'home') { view = { c: '', l: '' }; const r = shelfRet; go(); if (r) setTimeout(() => { scrollTo(0, r.y); const b = document.querySelector(`#moon-lab .klib-book[data-c="${CSS.escape(r.c)}"]`); if (b) b.focus({ preventScroll: true }); }, 90); return; }
     if (d.lib === 'later') { invite = null; return M.render(); }
     if (d.lib === 'asm') { invite = null; const mi = PM(d.m), c = course(d.c);
       if (c && SPECIAL[mi]) { const s = store(), g = courseGu(c, s); s.asm = s.asm || {}; if (!s.asm[mkey(c, mi)] && (mi === 'S' ? g.canS : g.canR)) { s.asm[mkey(c, mi)] = asmBlank(); put(s); } }
       view = { c: d.c, l: '', m: mi }; go(); return requestAnimationFrame(() => scrollTo(0, 0)); }
     if (d.lib === 'asmgen') { const c = course(d.c), s = store(), a = c && s.asm && s.asm[mkey(c, PM(d.m))]; if (!a || a.passed) return; if (a.cur && a.cur.state !== 'ready') { a.cur = null; put(s); } else if (a.cur) return; return generate(c, PM(d.m)); }
     if (d.lib === 'asmgrade') { const c = course(d.c); return c && grade(c, PM(d.m)); }
+    if (d.lib === 'course' && t.classList.contains('klib-book')) { shelfRet = { c: d.c, y: scrollY }; view = { c: d.c, l: '' }; go();
+      return setTimeout(() => { const b = document.querySelector('#moon-lab .klib-toc .kl-primary') || document.querySelector('#moon-lab .klib-full h2'); if (b) { if (b.tagName === 'H2') b.tabIndex = -1; b.focus({ preventScroll: true }); } }, 90); }
     if (d.lib === 'course') { view = { c: d.c, l: '' }; const from = d.from, out = go();
       // back from a lecture: land on that lecture's row, its module open
       if (from) setTimeout(() => { const b = document.querySelector(`#moon-lab .klib-full [data-lib="play"][data-l="${CSS.escape(from)}"]`); if (!b) return; const m = b.closest('details'); if (m) m.open = true; b.closest('li').classList.add('klib-back'); b.scrollIntoView({ block: 'center' }); b.focus({ preventScroll: true }); }, 90);
@@ -17584,7 +17614,7 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
   });
   document.addEventListener('change', e => { const t = e.target; if (t && t.dataset && t.dataset.libsub != null && cur) { t.value === '' ? [...vid.querySelectorAll('track')].forEach(x => x.remove()) : setTrack(+t.value); } });
   document.addEventListener('input', e => { const t = e.target; if (t && t.dataset && t.dataset.libans) { const s = store(), a = s.asm && s.asm[t.dataset.libans]; if (a && a.cur && a.cur.state === 'ready') { a.cur.draft = t.value.slice(0, 8000); put(s); } } });
-  document.addEventListener('input', e => { const t = e.target; if (!t || !t.dataset || !t.dataset.libq) return; const q = t.value.toLowerCase(); for (const b of document.querySelectorAll('#moon-lab .klib-card')) b.hidden = !!q && !b.textContent.toLowerCase().includes(q); for (const g of document.querySelectorAll('#moon-lab .klib-group')) g.hidden = !![...g.querySelectorAll('.klib-card')].every(b => b.hidden); });
+  document.addEventListener('input', e => { const t = e.target; if (!t || !t.dataset || !t.dataset.libq) return; const q = t.value.toLowerCase(); for (const b of document.querySelectorAll('#moon-lab .klib-books>li')) b.hidden = !!q && !b.textContent.toLowerCase().includes(q); for (const g of document.querySelectorAll('#moon-lab .klib-shelf')) g.hidden = !![...g.querySelectorAll('.klib-books>li')].every(b => b.hidden); });
 
   // ---- notes: course notes appear in Library → Notes, beside the lecture notes ----
   const notesPanel = M.PANELS.notes;
@@ -17835,7 +17865,7 @@ body.kt-p-settings{--kt-bg:url(quarters/room-plate.webp);--kt-bgs:240%;--kt-bgp:
       else if (p === 'table') { h = document.querySelector('#hb-day-map h2'); if (h) h.tabIndex = -1; }
       else if (B.classList.contains('kqc-full')) { h = document.querySelector('#kqc-gu, #moon-lab .klib-full h2, #moon-lab .klib-full h3'); if (h && h.tabIndex < 0 && !h.hasAttribute('tabindex')) h.tabIndex = -1; }
       if (!h) h = band.querySelector('h1');
-      const keep = () => document.activeElement && document.activeElement.closest && document.activeElement.closest('.klib-back,[data-qrow]');
+      const keep = () => document.activeElement && document.activeElement.closest && document.activeElement.closest('.klib-back,[data-qrow],.klib-book,.klib-toc');
       if (h && !keep() && document.activeElement !== h && !(h.contains && h.contains(document.activeElement))) h.focus({ preventScroll: true });
       // a re-render can replace the heading; settle focus once more
       setTimeout(() => { if (!keep() && (document.activeElement === document.body || !document.activeElement)) { const again = h && h.isConnected ? h : pick(); if (again) { if (again.tabIndex < 0 && !again.hasAttribute('tabindex')) again.tabIndex = -1; again.focus({ preventScroll: true }); } } }, 350);
@@ -17912,6 +17942,29 @@ html body.kt-p-library #kg-strip{display:none!important}
 html body.kt-p-library #kg-main #moon-lab>.kl-tabs{display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:4px 6px!important;overflow:visible!important;padding:6px 8px!important;min-height:0!important;background:rgba(26,15,10,.85)!important;border-bottom:3px solid #5a3526!important}
 html:root body.kt-p-library.kt-p-library #kg-main #moon-lab>.kl-tabs>button:nth-child(n):nth-child(n){writing-mode:horizontal-tb!important;transform:none!important;min-height:0!important;height:auto!important;width:auto!important;padding:6px 12px!important;font-size:14px!important;border-radius:3px!important;background:transparent!important;border:1px solid rgba(242,228,206,.25)!important;box-shadow:none!important}
 html:root body.kt-p-library.kt-p-library #kg-main #moon-lab>.kl-tabs>button:nth-child(n)[aria-current=page]{background:#5a3526!important;border-color:#e8c77d!important}
+/* Cliffside archive: named stage shelves of walnut volumes with horizontal titles */
+html body.kt-on #kg-main #moon-lab .klib-home{gap:10px}
+.klib-shelf{margin:14px 0 4px}.klib-shelf[hidden]{display:none}
+html body.kt-on #kg-main #moon-lab .klib-sh{font-family:var(--kt-serif)!important;font-weight:400;font-size:1.25em;margin:0 0 6px;color:#f2e4ce!important}
+.klib-books{list-style:none;margin:0;padding:10px 10px 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px;align-items:end;border-bottom:12px solid #4a2f1f;box-shadow:0 6px 0 #2a1a12,0 10px 16px rgba(0,0,0,.45);background:linear-gradient(transparent 70%,rgba(0,0,0,.25))}
+.klib-books>li[hidden]{display:none}
+html body.kt-on #kg-main #moon-lab .klib-book{position:relative;display:flex;flex-direction:column;gap:6px;width:100%;min-height:178px;text-align:left;padding:16px 12px 14px 18px;cursor:pointer;font:inherit;font-family:var(--kt-sans)!important;color:#f2e4ce!important;border:1px solid rgba(0,0,0,.45)!important;border-radius:3px 5px 0 0!important;background:linear-gradient(90deg,rgba(0,0,0,.35) 0 6px,transparent 6px 9px,rgba(255,235,200,.06) 9px 10px,transparent 10px),linear-gradient(#6a4129,#4e3020)!important;box-shadow:inset 0 10px 0 -6px rgba(232,199,125,.35),inset 0 -12px 0 -8px rgba(232,199,125,.3)!important}
+html body.kt-on #kg-main #moon-lab .klib-support .klib-book{background:linear-gradient(90deg,rgba(0,0,0,.35) 0 6px,transparent 6px),linear-gradient(#3e4a3a,#2e382c)!important;min-height:140px}
+html body.kt-on #kg-main #moon-lab .klib-book:is(:hover,:focus-visible){outline:2px solid #e8c77d;outline-offset:2px}
+html body.kt-on #kg-main #moon-lab .klib-book[aria-disabled=true]{cursor:default;opacity:.8}
+html body.kt-on #kg-main #moon-lab .klib-book :is(b,span,small){color:inherit!important}
+.klib-bt{font-family:var(--kt-serif);font-weight:400;font-size:1.05em;line-height:1.25;overflow-wrap:anywhere}
+.klib-by{opacity:.75}.klib-why{opacity:.8;font-style:italic}
+.klib-st{align-self:flex-start;font-size:12px;font-weight:700;letter-spacing:.04em;padding:1px 8px;border-radius:2px;border:1px solid currentColor}
+html body.kt-on #kg-main #moon-lab .klib-book .klib-st-ready{background:#e8f0dc!important;color:#24401c!important}
+html body.kt-on #kg-main #moon-lab .klib-book .klib-st-wip{background:#f6e3b4!important;color:#5a3a00!important}
+html body.kt-on #kg-main #moon-lab .klib-book .klib-st-off{background:#e6dcd2!important;color:#3a2a22!important}
+html body.kt-on #kg-main #moon-lab .klib-book .klib-flag{align-self:flex-start;font-size:12px;border:1px dashed currentColor;padding:0 6px;color:#f6c48a!important}
+html body.kt-on #kg-main #moon-lab .klib-flag-note{color:#f6c48a!important}
+.klib-book .klib-bar{margin-top:auto;height:4px;background:rgba(0,0,0,.35);border-radius:2px;overflow:hidden}.klib-book .klib-bar i{display:block;height:100%;background:#e8c77d}
+html body.kt-on #kg-main #moon-lab .klib-off{padding:10px 12px;border:1px solid #e8c77d;background:rgba(232,199,125,.12)!important}
+.klib-about,.klib-gu{margin-top:12px}
+@media(max-width:600px){.klib-books{grid-template-columns:1fr;padding:8px 8px 0;gap:6px}html body.kt-on #kg-main #moon-lab .klib-book{min-height:0;border-radius:3px!important}}
 /* courtyard: the chosen exercise in front; pavilion: the conversation gets the page; quiet reading and typing */
 html body.kt-p-practice #kg-main #moon-lab>.kl-tabs{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;gap:6px!important}
 html body.kt-p-practice #kg-main #moon-lab>.kl-tabs>button{flex:0 0 auto!important;min-height:0!important;padding:8px 12px!important}
