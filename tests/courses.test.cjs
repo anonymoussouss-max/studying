@@ -44,6 +44,13 @@ test('WIP: a planned course keeps its badge until every expected lecture has a v
   assert.strictEqual(vc.status, 'wip'); assert.strictEqual(vc.present, false); assert.match(vc.note, /not present/);
   fs.copyFileSync(path.join(root, 'python/01_chapter-one/01_intro.mp4'), path.join(root, 'python/01_chapter-one/02_more.mp4'));
   assert.strictEqual(build(root).courses.find(x => x.id === 'python').status, 'wip', 'all files present but the download is still running');
+  fs.writeFileSync(path.join(root, 'offline-physics-status.json'), JSON.stringify([{ course: 'python', status: 'finished' }]));
+  assert.strictEqual(build(root).courses.find(x => x.id === 'python').status, 'available', 'a later finished record wins over a stale running one');
+  fs.writeFileSync(path.join(root, 'offline-physics-status.json'), JSON.stringify([{ course: 'python', status: 'failed' }]));
+  const f = build(root).courses.find(x => x.id === 'python'); assert.strictEqual(f.status, 'available'); assert.match(f.note, /errors on non-video items/);
+  fs.unlinkSync(path.join(root, 'python/01_chapter-one/02_more.mp4'));
+  assert.strictEqual(build(root).courses.find(x => x.id === 'python').status, 'wip', 'a failed run with a missing video stays WIP');
+  fs.copyFileSync(path.join(root, 'python/01_chapter-one/01_intro.mp4'), path.join(root, 'python/01_chapter-one/02_more.mp4'));
   fs.writeFileSync(path.join(root, 'recommended-status.json'), JSON.stringify([{ course: 'python', status: 'finished' }]));
   assert.strictEqual(build(root).courses.find(x => x.id === 'python').status, 'available');
 });
