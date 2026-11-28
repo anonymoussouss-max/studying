@@ -17451,6 +17451,8 @@ ${String(text).slice(0, 16000)}`;
         const at = names.indexOf(m[3]); if (at >= 0 && !A[c.id + '#' + at + ':' + m[3]]) A[c.id + '#' + at + ':' + m[3]] = A[k]; else s.orphans['asm:' + k] = A[k]; delete A[k]; changed = true; } }
     return { changed, moves }; }
   // ---- pure rules (tested) ----
+  // one played interval: added once, to the study day it was played on, unless a running desk timer already counts it
+  const watchTick = (acc, ms, day, timerRunning) => { if (ms > 0 && !timerRunning && day) acc[day] = (acc[day] || 0) + ms; return acc; };
   const srtToVtt = t => 'WEBVTT\n\n' + String(t || '').replace(/^\uFEFF/, '').replace(/\r/g, '').replace(/^\d+\n(?=\d{2}:\d{2})/gm, '').replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
   const lecturesOf = c => (c.modules || []).flatMap(m => m.lectures || []);
   const lecState = p => !p ? 'unstarted' : p.done ? 'completed' : (p.pos || 0) > 5 ? 'in-progress' : 'unstarted';
@@ -17596,7 +17598,7 @@ ${String(text).slice(0, 16000)}`;
     if (rest.length) groups.push({ h: 'Other courses', items: rest });
     return groups.filter(g => g.items.length);
   }
-  window.KgCourses = { shelfHTML: (...a) => shelfHTML(...a), courseGu, WS, WS_FINAL, wsQuestion, CGU_RANK, CGU_RANK_APPROVED, CGU_RANK_DATES, RETAIN_DAYS, modOf, ARRANGE, arrange, TIERS, mkey, moduleDone, ensureDue, applyGrade, asmLabel, asmBlank, parseJSON: t => parseJ(t), KEY, srtToVtt, lecState, courseState, availOf, resumeOf, record, lecturesOf, migrateIds, subjectOf, addWatch, dayAdd, REV_GAPS, REV_CAP, revSync, revRate, revDue, notePrompt, cleanNote };
+  window.KgCourses = { shelfHTML: (...a) => shelfHTML(...a), courseGu, WS, WS_FINAL, wsQuestion, CGU_RANK, CGU_RANK_APPROVED, CGU_RANK_DATES, RETAIN_DAYS, modOf, ARRANGE, arrange, TIERS, mkey, moduleDone, ensureDue, applyGrade, asmLabel, asmBlank, parseJSON: t => parseJ(t), KEY, srtToVtt, lecState, courseState, availOf, resumeOf, record, lecturesOf, migrateIds, subjectOf, addWatch, watchTick, dayAdd, REV_GAPS, REV_CAP, revSync, revRate, revDue, notePrompt, cleanNote };
   if (!M || !M.PANELS) return;
 
   // ---- where the files come from: a folder you chose (File System Access) or the local server ----
@@ -17938,12 +17940,13 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
   vid.addEventListener('play', () => applyBoost(boostOf()));
   let cur = null, want = false, lastSave = 0;
   // played time: wall-clock while the video is actually playing, at most 2 s per tick (so a sleep or a stalled tab never adds time)
-  let playMs = 0, tickAt = 0;
-  const tick = () => { const now = performance.now(); if (tickAt && !vid.paused && !vid.ended && !vid.seeking && vid.readyState > 2) playMs += Math.min(2000, now - tickAt); tickAt = vid.paused ? 0 : now; };
-  // a running desk timer already counts this time, so lecture time is not added on top of it
-  const timerOpen = () => { try { return !!(JSON.parse(localStorage.getItem('ame-habit-v1') || '{}').active); } catch (e) { return false; } };
+  // each interval is judged when it is played: to the study day it was played on, skipped only while a desk timer is RUNNING (a paused timer counts nothing)
+  let playAcc = {}, tickAt = 0, tRun = [0, false];
+  const timerRunning = () => { const now = Date.now(); if (now - tRun[0] < 1000) return tRun[1]; let r = false; try { const a = JSON.parse(localStorage.getItem('ame-habit-v1') || '{}').active; r = !!(a && a.running); } catch (e) {} tRun = [now, r]; return r; };
+  const studyDay = () => window.StudyPlan?.studyDate?.() || dayAdd(new Date().toISOString().slice(0, 10), 0);
+  const tick = () => { const now = performance.now(); if (tickAt && !vid.paused && !vid.ended && !vid.seeking && vid.readyState > 2) watchTick(playAcc, Math.min(2000, now - tickAt), studyDay(), timerRunning()); tickAt = vid.paused ? 0 : now; };
   const save = force => { tick(); if (!cur || !vid.duration || vid.seeking) return; if (!force && Date.now() - lastSave < 5000) return; lastSave = Date.now(); const s = store(); record(s, cur.c, cur.l, vid.currentTime, vid.duration);
-    if (playMs >= 1000) { if (!timerOpen()) addWatch(s, window.StudyPlan?.studyDate?.() || dayAdd(new Date().toISOString().slice(0, 10), 0), subjectOf(course(cur.c)), playMs / 1000); playMs = 0; }
+    for (const d of Object.keys(playAcc)) if (playAcc[d] >= 1000) { addWatch(s, d, subjectOf(course(cur.c)), playAcc[d] / 1000); delete playAcc[d]; }
     const due = checkDue(s, cur.c); put(s); if (due) announce(due); };
   vid.addEventListener('play', () => { tickAt = performance.now(); });
   // a module that has just become complete gets its assessment and Iroha's invitation, once

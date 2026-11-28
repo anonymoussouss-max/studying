@@ -73,7 +73,29 @@ test('the player counts only real playing time, and not while a desk timer is ru
   const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1];
   assert.ok(/Math\.min\(2000, now - tickAt\)/.test(src), 'each tick adds at most 2 s');
   assert.ok(/!vid\.paused && !vid\.ended && !vid\.seeking/.test(src));
-  assert.ok(/if \(!timerOpen\(\)\) addWatch\(/.test(src));
+  assert.ok(/watchTick\(playAcc, Math\.min\(2000, now - tickAt\), studyDay\(\), timerRunning\(\)\)/.test(src), 'each interval is judged when it is played');
+  assert.ok(/r = !!\(a && a\.running\)/.test(src), 'only a running timer covers lecture time; a paused one does not');
+});
+
+test('played time: paused → running → paused timer, seeking, speed changes and the study-day boundary each count once', () => {
+  const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1];
+  const tickSrc = src.match(/const tick = \(\) => \{[^\n]*\};/)[0], wt = src.match(/const watchTick = [^\n]*;/)[0];
+  const env = { clock: 1000, day: '2026-12-07', running: false, vid: { paused: false, ended: false, seeking: false, readyState: 4, playbackRate: 1 } };
+  const run = new Function('env', wt + '\nlet playAcc = {}, tickAt = 0; const performance = { now: () => env.clock }, vid = env.vid, studyDay = () => env.day, timerRunning = () => env.running;\n' + tickSrc + '\nreturn { tick, acc: () => playAcc, set: v => { tickAt = v; } };')(env);
+  const play = (sec, step = 250) => { for (let i = 0; i < sec * 1000 / step; i++) { env.clock += step; run.tick(); } };
+  run.set(env.clock); // the 'play' event
+  play(10);                              // desk timer paused (or none): counts
+  env.running = true; play(20);          // timer running: the timer already counts it
+  env.running = false; play(5);          // paused again: counts, same video, no restart
+  env.vid.seeking = true; play(3); env.vid.seeking = false; // a seek adds nothing
+  env.vid.playbackRate = 2; play(4);     // 2x speed: wall-clock time, not video time
+  env.day = '2026-12-08'; play(6);       // past the study-day boundary: the new day
+  env.vid.paused = true; run.tick(); play(30); // a paused video adds nothing
+  const acc = run.acc();
+  assert.strictEqual(Math.round(acc['2026-12-07']), (10 + 5 + 4) * 1000);
+  assert.strictEqual(Math.round(acc['2026-12-08']), 6000);
+  env.vid.paused = false; run.set(env.clock); env.clock += 60000; run.tick();
+  assert.strictEqual(Math.round(run.acc()['2026-12-08']), 8000, 'a stalled tab adds at most 2 s per tick');
 });
 
 test('volume boost: Off to 4x through a gain and a compressor, saved with the library progress', () => {
