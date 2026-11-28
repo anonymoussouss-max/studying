@@ -4329,7 +4329,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
   }
   const DONE_MSG='You marked today done. To study anyway, tap “Reopen today” on the Gentle return card first.';
   function pause() { const a=h.active;if(!a || a.phase==='closeout')return;if(a.running){a.accruedMs=C.elapsed(a);a.running=false;stopAudio();}else{if(window.__kgDayDone?.()){toast(DONE_MSG);return;}if(sleeping() && (a.kind==='mock' || a.hard)){toast('Sleep guard: end this heavy task, then choose light review.');return;}a.lastStart=Date.now();a.running=true;h.break=null;startAudio();}save();render(); }
-  function end() { const a=h.active;if(!a)return;a.accruedMs=C.elapsed(a);a.running=false;a.phase='closeout';h.break=null;stopAudio();save();view='start';h.shh=false;render();$('hb-session-card').scrollIntoView({behavior:'smooth'}); }
+  function end() { const a=h.active;if(!a)return;a.accruedMs=C.elapsed(a);a.running=false;a.phase='closeout';h.break=null;stopAudio();save();view='start';h.shh=false;delete h.shhAway;render();$('hb-session-card').scrollIntoView({behavior:'smooth'}); }
   function takeBreak() { if(h.active?.phase==='closeout') {toast('Save your close-out first; then take a break.');return;}if(h.active?.running){h.active.accruedMs=C.elapsed(h.active);h.active.running=false;}stopAudio();window.DeskMusic?.stop();const i=(h.breakCount || 0)%breakPrompts.length;h.breakCount=(h.breakCount || 0)+1;h.break={endsAt:Date.now()+5*60000,prompt:breakPrompts[i]};save();view='start';render(); }
   function celebrate() { const n=totals().chain;if(![7,30,100].includes(n)||h.milestones.includes(n))return;h.milestones.push(n);save();say(`${n} days of showing up! clip it, frame it, keep it. 🌙`,true);window.__irohaSay?.('I saw that. Quietly impressed.',{face:'approve'}); }
   function drop() {
@@ -4359,7 +4359,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     minimum:()=>{const f=$('hb-start');f.elements.minutes.value=5;f.elements.kind.value='review';f.elements.hard.checked=false;f.elements.phone.focus();toast('Five minutes is enough. Check the phone ritual and press play.');},
     comeback:()=>{if(h.active)return;const f=$('hb-start');f.elements.minutes.value=10;f.elements.kind.value='review';f.elements.hard.checked=false;f.dataset.comeback='1';f.elements.phone.focus();toast('Ten easy minutes. Check the phone ritual and press play.');},
     sound:()=>{const store=window.DeskStore;if(!store?.getState().hydrated){toast('The desk is still loading.');return;}store.getState().toggleSound();startAudio();if(view==='start' && !h.active || view==='settings')render();},
-    shh:()=>{if(!h.active){toast('Start a session to enter the timer-only shh view.');return;}h.shh=!h.shh;save();render();if(h.shh)root.scrollIntoView();},
+    shh:()=>{if(!h.active){toast('Start a session to enter the timer-only shh view.');return;}h.shh=!h.shh;delete h.shhAway;save();render();if(h.shh)root.scrollIntoView();},
     pause,end,break:takeBreak,
     'end-break':()=>{h.break=null;save();render();toast('Welcome back. Resume when you’re ready.');},
     rest:markRest,
@@ -4383,7 +4383,7 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
       else if(f.id==='hb-closeout') {
         const a=h.active; if(!a)throw new Error('No session to save.');
         const s=C.complete(h,a,{...v,recall:[v.recall1,v.recall2,v.recall3]});
-        h.sessions.push(s);h.active=null;h.shh=false;
+        h.sessions.push(s);h.active=null;h.shh=false;delete h.shhAway;
         const nextSuggestion=C.nextTask(h,C.add(today(),1));
         h.next={...nextSuggestion,task:String(v.next||'').trim()||nextSuggestion.task,date:C.add(today(),1),reason:'Chosen in your last close-out'};
         const surprise=s.minutes>=5?drop():null;
@@ -4458,7 +4458,9 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
     // independent session from the Study tab: just a timer, no method and no recall at the end
     startFree(v){if(h.active)throw new Error('Finish your current session first.');const topic=String(v.topic||'').trim()||'Independent study';
       window.__ktWant='session';window.MoonLab?.go('today');document.body.classList.add('kg-session');view='start';
-      begin({phone:true,free:true,subject:v.subject||'Mixed',task:topic,topic,kind:'study',minutes:v.minutes||'',energy:settings().energy});$('hb-session-card')?.scrollIntoView({behavior:'smooth',block:'start'});return !!h.active;},hasActive(){return !!h.active;},pauseActive(){if(!h.active||!h.active.running)return true;pause();return !h.active.running;},resumeActive(){if(!h.active||h.active.running||h.active.phase==='closeout')return false;pause();return !!h.active.running;},shiftMistakes(n){if(!n)return;for(const m of h.mistakes)if(m&&m.stage<4&&m.due)m.due=C.add(m.due,n);save();},setTheme(t){h.settings.theme=t;save();render();},refresh(){if(!document.activeElement?.closest('#habit-desk form'))render();},
+      begin({phone:true,free:true,subject:v.subject||'Mixed',task:topic,topic,kind:'study',minutes:v.minutes||'',energy:settings().energy});$('hb-session-card')?.scrollIntoView({behavior:'smooth',block:'start'});return !!h.active;},hasActive(){return !!h.active;},
+    // leaving the practice place mid-session: the shh view steps aside so the quarters and other places can be used; the timer keeps running or stays paused
+    away(on){if(!h.active)return false;if(on){if(h.shh){h.shh=false;h.shhAway=true;save();render();}}else if(h.shhAway){delete h.shhAway;if(h.active.phase!=='closeout')h.shh=true;save();render();}return true;},pauseActive(){if(!h.active||!h.active.running)return true;pause();return !h.active.running;},resumeActive(){if(!h.active||h.active.running||h.active.phase==='closeout')return false;pause();return !!h.active.running;},shiftMistakes(n){if(!n)return;for(const m of h.mistakes)if(m&&m.stage<4&&m.due)m.due=C.add(m.due,n);save();},setTheme(t){h.settings.theme=t;save();render();},refresh(){if(!document.activeElement?.closest('#habit-desk form'))render();},
     minutes:iso=>C.minutes(h,days(),iso),
     history:(d,iso)=>C.history(h,d,iso),
     counted:(iso,d)=>{const status=C.history(h,{...days(),[iso]:d || days()[iso]},iso).statuses[iso];return status==='study'||status==='rest';},
@@ -7271,16 +7273,18 @@ window.KG_RECALL = {
     }
     writing = '';
     if (r && r.reply) {
-      if (kind === 'episode') L.story.push({ d, title, text: r.reply.trim() }); else L.letters.push({ d, kind, who, text: r.reply.trim() });
+      if (kind === 'episode') L.story.push({ d, title, text: r.reply.trim() }); else L.letters.push({ d, kind, who, text: r.reply.trim(), unread: true });
       save();
     } else I("Couldn't reach the backend just now. Try again in a minute.", { face: 'stern' });
     M.render();
   }
+  // opening the letters in the pavilion reads every unread one
+  M.lettersRead = () => { let n = 0; for (const x of L.letters) if (x.unread) { delete x.unread; n++; } if (n) save(); return n; };
   M.PANELS.letters = () => {
     const d = today(), dow = new Date(d + 'T12:00:00').getDay(), sunday = dow === 0 || (dow === 6 && nowMin() >= 18 * 60);
     const w0 = window.HabitCore.monday(d), haveLetter = L.letters.some(x => x.kind === 'letter' && x.d >= w0), haveDiary = L.letters.some(x => x.kind === 'diary' && x.d === d);
     const unlocked = episodesUnlocked(), next = L.story.length < unlocked;
-    const item = x => `<article class="kl-letter"><p class="kl-eyebrow">${esc(x.d)} · ${x.kind === 'letter' ? "KAGUYA'S SUNDAY LETTER" : x.kind === 'note' ? "IROHA'S WEEKLY NOTE" : "KAGUYA'S DIARY"}</p><p>${esc(x.text)}</p></article>`;
+    const item = x => `<article class="kl-letter"${x.unread ? ' data-unread="1"' : ''}><p class="kl-eyebrow">${esc(x.d)} · ${x.kind === 'letter' ? "KAGUYA'S SUNDAY LETTER" : x.kind === 'note' ? "IROHA'S WEEKLY NOTE" : "KAGUYA'S DIARY"}</p><p>${esc(x.text)}</p></article>`;
     return `<section class="kl-card"><div class="kl-row">
         <button data-a="write" data-v="letter" ${!sunday || haveLetter || writing ? 'disabled' : ''}>💌 This week's letter</button>
         <button data-a="write" data-v="note" ${!sunday || writing ? 'disabled' : ''}>Iroha's weekly note</button>
@@ -17722,8 +17726,8 @@ body.kt-on :is(#kg-main.kg-page-in,#kg-main.kd-enter){animation:none!important}
 #kt-return{position:fixed;z-index:70;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 20px;border-radius:999px;border:1px solid rgba(242,228,206,.35);background:var(--kt-walnut);color:var(--kt-wood-text);font:600 15px/1.2 var(--kt-sans);text-decoration:none;box-shadow:0 6px 20px rgba(20,12,9,.5);cursor:pointer}
 #kt-return:hover{border-color:var(--kt-wood-text)}#kt-return:focus-visible{outline:3px solid #ffda94;outline-offset:3px}
 body.kt-p-home #kt-return{display:none}
-/* the quiet session view (shh) stays exactly as it was: nothing of travel shows until you leave it */
-body.habit-shh :is(#kt-return,#kt-band){display:none!important}html:root body.habit-shh.kt-on.kt-on.kt-on{background:#140b07!important}
+/* the quiet session view (shh) keeps only its timer and one way out: Return to quarters */
+body.habit-shh #kt-band{display:none!important}html:root body.habit-shh.kt-on.kt-on.kt-on{background:#140b07!important}
 body.kt-v-session #kt-band{display:none!important}
 body.kt-on:not(.kt-p-home) #kg-main{padding-bottom:88px}
 /* painted backdrop for each place */
@@ -17750,6 +17754,8 @@ body.kt-on .klib-player .klib-video{width:100%;max-width:none}
 /* Writing Table: the daily leaf only, a close-up sheet on the desk */
 body.kt-p-table #kg-main>:not(#habit-desk){display:none!important}
 body.kt-p-table #habit-desk :not(:has(#hb-day-map)):not(#hb-day-map):not(#hb-day-map *){display:none!important}
+/* one entrance: the travel movement carries the whole page; the day's focus, minutes and schedule settle with it, and nothing fades on its own */
+html body.kt-on.kt-on{transition:none!important}html body.kt-p-table #kg-main #habit-desk :is(#hb-day-map,#hb-day-map *){transition:none!important;animation:none!important}
 html body.kt-p-table #kg-main #habit-desk #hb-day-map :is(.hb-block-btns,.hb-done,.hb-caption),html body.kt-p-table #kg-main #habit-desk #hb-day-map .hb-section-heading>:not(div){display:none!important}
 body.kt-p-table :is(#kg-bar,#kg-dock-launch,#fy-pop,#ame-widget,#iroha-widget,#kg-top,#kg-dock,.kg-dock){display:none!important}
 body.kt-p-table #habit-desk{background:none!important;border:0!important;box-shadow:none!important;padding:0!important}
@@ -17787,6 +17793,8 @@ body.kt-p-plan{--kt-bg:url(quarters/destinations.webp);--kt-bgs:300% 200%;--kt-b
 /* Practice courtyard: stations around an open court */
 body.kt-p-practice{--kt-bg:url(quarters/destinations.webp);--kt-bgs:300% 200%;--kt-bgp:0% 100%}html body.kt-p-practice #kg-main #moon-lab>.kl-tabs{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))!important;gap:10px!important;padding:14px!important;border:1px dashed rgba(242,228,206,.25)!important;border-radius:18px!important;background:rgba(48,32,28,.55)!important}html body.kt-p-practice #kg-main #moon-lab>.kl-tabs>button{min-height:64px!important;text-align:left!important;padding:10px 12px!important;border-radius:10px!important;border:1px solid rgba(242,228,206,.22)!important;background:rgba(25,18,15,.75)!important;color:var(--kt-wood-text)!important}html body.kt-p-practice #kg-main #moon-lab>.kl-tabs>button::before{content:"◇"!important;margin-right:8px!important;color:#e8c77d!important}html body.kt-p-practice #kg-main #moon-lab>.kl-tabs>button[aria-current=page]{border-color:#e8c77d!important;background:rgba(232,199,125,.14)!important}
 .kt-bench{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+/* the guided session on screen is its own quiet workspace: no station tabs, and no bench card offering to return to it */
+html body.kt-on.kg-flow-on #kg-main #moon-lab>:is(#kt-bench,.kl-tabs){display:none!important}
 /* Observatory ascent: records climb the steps */
 body.kt-p-progress{--kt-bg:url(quarters/destinations.webp);--kt-bgs:300% 200%;--kt-bgp:50% 100%}html body.kt-p-progress #kg-main #moon-lab>.kl-tabs{display:flex!important;flex-wrap:wrap!important;align-items:flex-end!important;gap:4px!important;padding:30px 6px 6px!important}html body.kt-p-progress #kg-main #moon-lab>.kl-tabs>button{position:relative!important;bottom:calc(var(--kt-i,0) * 3px)!important;padding:9px 12px!important;border:1px solid rgba(203,186,164,.35)!important;border-bottom:4px solid #6f6152!important;border-radius:3px!important;background:rgba(60,55,50,.85)!important;color:var(--kt-wood-text)!important}html body.kt-p-progress #kg-main #moon-lab>.kl-tabs>button[aria-current=page]{background:#e8c77d!important;color:#2a160c!important;border-bottom-color:#8b6a2e!important}
 /* Waterside tea pavilion: low seats at the tea table */
@@ -17959,7 +17967,8 @@ html body.kt-p-settings #kg-main #moon-lab>.kl-tabs{position:relative}
     home: () => move($('kg-scene'), { transform: 'scale(1.045)', opacity: .6 }, 300)
   };
   let trip = 0; // each journey has a number; a landing from an earlier one never takes focus
-  function travel(p) { trip++; cancelMotion(); (MOVE[p] || MOVE.home)(); }
+  let movedAt = 0;
+  function travel(p) { trip++; cancelMotion(); movedAt = performance.now(); (MOVE[p] || MOVE.home)(); }
   // inside a place: 160–220 ms. A course opens like a hinged cover; a lecture or an assessment opens at once.
   function inner(p, from, deep) {
     if (p === 'library' && deep === 'course' && !from) { cancelMotion(); move(document.querySelector('#moon-lab .klib-full'), { transform: 'perspective(1200px) rotateY(-62deg)', opacity: .4, transformOrigin: '0 50%' }, 220); }
@@ -17987,6 +17996,7 @@ html body.kt-p-settings #kg-main #moon-lab>.kl-tabs{position:relative}
       const pick = () => { const x = p === 'home' ? $('kt-home-h') : p === 'table' ? document.querySelector('#hb-day-map h2') : B.classList.contains('kqc-full') ? document.querySelector('#kqc-gu, #moon-lab .klib-full h2, #moon-lab .klib-full h3') : null; return x || band.querySelector('h1'); };
       let h = null;
       if (p === 'home') h = $('kt-home-h');
+      else if (p === 'practice' && (h = ['#moon-lab [data-flow="attempt"]', '#moon-lab [data-flow="warm"]', '#moon-lab textarea[data-flow]', '#hb-session-card [data-action="pause"]', '#hb-session-card button'].map(q => [...document.querySelectorAll(q)].find(x => x.getClientRects().length && !x.disabled)).find(Boolean))) {}
       else if (p === 'table') { h = document.querySelector('#hb-day-map h2'); if (h) h.tabIndex = -1; }
       else if (B.classList.contains('kqc-full')) { h = document.querySelector('#kqc-gu, #moon-lab .klib-full h2, #moon-lab .klib-full h3'); if (h && h.tabIndex < 0 && !h.hasAttribute('tabindex')) h.tabIndex = -1; }
       if (!h) h = band.querySelector('h1');
@@ -18010,7 +18020,7 @@ html body.kt-p-settings #kg-main #moon-lab>.kl-tabs{position:relative}
     if (key === curKey && !force) return;
     const moved = p !== cur, prev = curKey, left = cur; cur = p; curKey = key;
     if (!booted) { booted = true; return; }
-    if (moved) { if (p !== 'home') { entered[p] = via || entered[p] || 'object'; } via = ''; travel(p); focusHeading(p); if (p === 'home' && left) land(left); return; }
+    if (moved) { window.HabitDesk?.away?.(p !== 'practice'); if (p !== 'home') { entered[p] = via || entered[p] || 'object'; } via = ''; travel(p); focusHeading(p); if (p === 'home' && left) land(left); return; }
     // moving in close inside a place
     if (deep && !prev.endsWith('|' + deep)) { inner(p, prev.split('|')[1] || '', deep); focusHeading(p); }
   }
@@ -18035,13 +18045,15 @@ html body.kt-p-settings #kg-main #moon-lab>.kl-tabs{position:relative}
     if (d.section === 'study' && d.tab && lastStudyTab && d.tab !== lastStudyTab && d.tab !== 'cultivation' && lastStudyTab !== 'cultivation') setTimeout(() => move(document.querySelector('#moon-lab>.kl-tabs ~ :not(#kt-bench)'), { transform: 'translateY(10px) scale(.97)', opacity: .5, transformOrigin: '50% 100%' }, 200), 90);
     if (d.section === 'study' && d.tab) lastStudyTab = d.tab;
     setTimeout(bookmark, 90); setTimeout(letters, 90); });
-  // the tea pavilion: a new letter is drawn from its envelope once; everything already there rests
-  let seen = null;
+  // the tea pavilion: an unread letter is drawn from its envelope when you first open it; reread, it rests.
+  // Read or unread belongs to the letter itself (the letters panel keeps it); nothing about travel is stored.
   function letters() {
-    if (placeOf() !== 'company') return; const all = [...document.querySelectorAll('#moon-lab article.kl-letter')];
-    const key = a => a.textContent.slice(0, 80);
-    if (!seen) { seen = new Set(all.map(key)); return; }
-    for (const a of all) if (!seen.has(key(a))) { seen.add(key(a)); move(a, { clipPath: 'inset(0 0 100% 0)', transform: 'translateY(26px)' }, 220); }
+    if (placeOf() !== 'company' || !document.querySelector('#moon-lab [data-a="write"]')) return; // only while the letters are on the table
+    const fresh = [...document.querySelectorAll('#moon-lab article.kl-letter[data-unread]')]; if (!fresh.length) return;
+    M.lettersRead && M.lettersRead();
+    // after the blind has lifted: never a third moving layer during travel
+    const mine = trip, after = Math.max(0, 360 - (performance.now() - movedAt));
+    setTimeout(() => { if (mine === trip) for (const a of fresh) if (a.isConnected) move(a, { clipPath: 'inset(0 0 100% 0)', transform: 'translateY(26px)' }, 220); }, after);
   }
   // earning a Gu: set by the award event itself, shown once where the Gu is next drawn. Never stored, so a reload,
   // a sync, a restored backup or an ordinary visit shows the current state at once.
