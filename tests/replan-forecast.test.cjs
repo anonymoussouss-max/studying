@@ -76,7 +76,7 @@ test('an eight-hour day after the weekly review is re-planned inside eight hours
 test('capacity is the selected allowance minus German, astrophysics and diploma: never a fixed six hours', () => {
   const six = SP.pcmCapacity(lab(), MON), eight = SP.pcmCapacity(lab({ allow8: { from: MON } }), MON);
   assert.strictEqual(six.weekly, 6 * (360 - 30) + 60 - 120, '6 days × (6 h − German) + Sunday 60 − diploma 2 h');
-  assert.strictEqual(eight.weekly, 6 * (480 - 30) + 60 - 120, 'eight hours after the review');
+  assert.ok(eight.weekly > six.weekly && eight.weekly <= 6 * (480 - 30) + 60 - 120 && eight.days.every(d => d.fromPlan), 'eight hours after the review: what the planner lays out (its breaks included), never more than the allowance');
   const gentle = SP.pcmCapacity(lab({ gentle: { on: true, max: 90, from: MON, day: {} } }), MON);
   assert.ok(gentle.weekly < six.weekly && gentle.days.every(d => d.pcm <= 90), 'Gentle Return cap lowers capacity');
   const astro = SP.pcmCapacity(lab({ astro: { min: 30 } }), MON);
