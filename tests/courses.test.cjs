@@ -76,12 +76,12 @@ test('progress: positions, completion at 92%, course states; completion is never
   assert.doesNotMatch(src, /kg-cult-v1|KgCult\.|KgRank\.|KgProof\./);
 });
 
-test('arrangement: 37 courses exactly once in stage order, by id, whatever their download status', () => {
+test('arrangement: 37 courses plus one workshop exactly once in stage order, by id, whatever their download status', () => {
   const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1];
   const ctx = { window: {}, localStorage: { getItem: () => null, setItem() {} } }; ctx.globalThis = ctx; vm.runInNewContext(src, ctx);
-  const K = ctx.window.KgCourses, ids = K.ARRANGE.flatMap(g => g.c.map(x => x[0]));
-  assert.strictEqual(ids.length, 37); assert.strictEqual(new Set(ids).size, 37);
-  assert.deepStrictEqual([...K.ARRANGE.map(g => g.c.length)], [3, 4, 4, 6, 7, 3, 10], '24 main, 3 optional, 10 reference');
+  const K = ctx.window.KgCourses, ids = K.ARRANGE.flatMap(g => g.c.map(x => x[0])), courseIds = K.ARRANGE.flatMap(g => g.c.filter(x => x[3] !== 'workshop').map(x => x[0]));
+  assert.strictEqual(ids.length, 38); assert.strictEqual(new Set(ids).size, 38); assert.strictEqual(courseIds.length, 37);
+  assert.deepStrictEqual([...K.ARRANGE.map(g => g.c.length)], [3, 4, 4, 6, 7, 4, 10], '24 main, 3 optional + 1 workshop, 10 reference');
   const { WIP } = require('../tools/library-index.cjs');
   for (const w of WIP) assert.ok(ids.includes(w.id), w.id + ': planned courses keep their place on the path');
   // download order and status never move a course; an unknown course falls into "Other courses"; lecture order is untouched
@@ -157,7 +157,7 @@ test('Course Gu: a WIP course cannot be proven; missing evidence is pending; ran
   assert.strictEqual(Object.keys(K.CGU_RANK).length, 37); assert.ok(Object.values(K.CGU_RANK).every(r => Number.isInteger(r) && r >= 1 && r <= 5));
   const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1]; assert.match(src, /Gu rank \$\{r\} · approved by you/); assert.ok(!/awaiting your approval/.test(src), 'no course Gu rank is shown as a proposal');
   const art = {}; vm.runInNewContext(html.match(/<script id="kg-course-gu-art">([\s\S]*?)<\/script>/)[1], { window: art }); const ids = Object.keys(art.KgCourseGuArt);
-  assert.strictEqual(ids.length, 37); assert.deepStrictEqual([...ids].sort(), [...K.ARRANGE.flatMap(g => g.c.map(x => x[0]))].sort(), 'one artwork per course, keyed by the stable course id');
+  assert.strictEqual(ids.length, 37); assert.deepStrictEqual([...ids].sort(), [...K.ARRANGE.flatMap(g => g.c.filter(x => x[3] !== 'workshop').map(x => x[0]))].sort(), 'one artwork per course, keyed by the stable course id');
   assert.ok(Object.keys(K.CGU_RANK).every(id => ids.includes(id)), 'every approved rank has its artwork; unranked art waits for approval');
   for (const a of Object.values(art.KgCourseGuArt)) assert.ok(!/<script|\son[a-z]+=|href|foreignObject|<image/i.test(a.svg));
 });

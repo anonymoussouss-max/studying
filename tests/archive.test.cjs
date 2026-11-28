@@ -33,7 +33,7 @@ test('approved placement of the eight former review courses (28 Nov 2026)', () =
     'spacecraft-dynamics-kinetics': ['Stage 4', 'robotic-methodologies'], 'statistical-thermodynamics': ['Stage 5', 'phases-of-matter-solid-liquid-gas-and-beyond'], 'approximation-methods': ['Stage 5', 'particle-physics'],
     'bayesian-statistics': ['Reference shelf', 'numerical-methods-engineers'], 'introduction-python-scientific-computing': ['Optional branches', 'astrobiology'] };
   for (const [id, w] of Object.entries(want)) assert.deepStrictEqual(where(id), w, id);
-  const ids = ARRANGE.flatMap(g => g.c.map(c => c[0])); assert.strictEqual(ids.length, 37); assert.strictEqual(new Set(ids).size, 37);
+  const ids = ARRANGE.flatMap(g => g.c.filter(c => c[3] !== 'workshop').map(c => c[0])); assert.strictEqual(ids.length, 37); assert.strictEqual(new Set(ids).size, 37);
   assert.ok(!ARRANGE.some(g => g.review), 'nothing left to review');
 });
 
