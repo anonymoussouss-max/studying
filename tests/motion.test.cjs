@@ -11,7 +11,8 @@ test('travel between places takes 280–360 ms; local moves 160–220 ms', () =>
   assert.ok(local.length >= 5); for (const ms of local) assert.ok(ms >= 160 && ms <= 220, 'local ' + ms);
 });
 test('a new movement, Back or another destination cancels the last; reduced motion plays nothing', () => {
-  assert.ok(src.includes("function travel(p) { cancelMotion();"));
+  assert.ok(src.includes("function travel(p) { trip++; cancelMotion();"));
+  assert.ok(src.includes("if (mine !== trip || placeOf() !== 'home') return;"), 'a landing from an earlier trip never takes focus');
   assert.ok(src.includes("addEventListener('popstate', cancelMotion);"));
   assert.ok(src.includes("if (!el || !el.animate || still()) return null;"), 'every movement goes through play(), which is a no-op when still');
   assert.ok(!/setTimeout\([^)]*(location|M\.go|save)/.test(block('function play(', 'const to =')), 'nothing waits for an animation');
