@@ -9372,7 +9372,8 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
   // for a full backup: every attached file, PDFs and photos included
   M.notesDB = {
     dump: async () => { const keys = await idb('readonly', s => s.getAllKeys()), vals = await idb('readonly', s => s.getAll()); return (keys || []).map((k, i) => [k, vals[i]]); },
-    load: async pairs => idb('readwrite', s => { for (const [k, v] of pairs) s.put(v, k); return null; })
+    load: async pairs => idb('readwrite', s => { for (const [k, v] of pairs) s.put(v, k); return null; }),
+    replace: async pairs => idb('readwrite', s => { s.clear(); for (const [k, v] of pairs) s.put(v, k); return null; })
   };
 
   const label = e => [e.subj, e.ch ? chName(e.ch) : '', e.topic].filter(Boolean).join(' · ');
@@ -11247,31 +11248,40 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
   let snaps = [];
   const refresh = () => tx('readonly', s => s.getAll()).then(all => { snaps = (all || []).map(x => ({ id: x.id, d: x.d, at: x.at, kb: x.kb, kind: x.kind })).sort((a, b) => b.at - a.at); if (M.SECTIONS && document.body.dataset.tab === 'backup') M.softRender?.(); }).catch(() => {});
   async function snapshot(kind = 'daily') {
-    const data = {}; let size = 0;
-    for (const k of KEYS) { const v = localStorage.getItem(k); if (v != null) { data[k] = v; size += v.length; } }
-    const d = M.today(), id = kind === 'daily' ? 'day-' + d : kind + '-' + Date.now();
-    await tx('readwrite', s => s.put({ id, d, at: Date.now(), kind, kb: Math.ceil(size / 1024), data }));
+    // a daily copy holds the study records; a "before restore" copy holds everything a restore can replace: every backup key, attached files and lecture study notes
+    const full = kind !== 'daily', keys = full ? BK_KEYS : KEYS, data = {}; let size = 0;
+    for (const k of keys) { const v = localStorage.getItem(k); if (v != null) { data[k] = v; size += v.length; } }
+    const d = M.today(), id = kind === 'daily' ? 'day-' + d : kind + '-' + Date.now(), rec = { id, d, at: Date.now(), kind, kb: Math.ceil(size / 1024), data, keys };
+    if (full) { rec.files = (await M.notesDB?.dump?.()) || []; rec.lnotes = (await window.KgLectureNotes?.dump?.()) || []; }
+    await tx('readwrite', s => s.put(rec));
     // keep 7 daily copies and the 3 newest "before restore" copies
     const all = await tx('readonly', s => s.getAll());
     const drop = [...all.filter(x => x.kind === 'daily').sort((a, b) => b.at - a.at).slice(7), ...all.filter(x => x.kind !== 'daily').sort((a, b) => b.at - a.at).slice(3)];
     if (drop.length) await tx('readwrite', s => { drop.forEach(x => s.delete(x.id)); return null; });
-    await refresh();
+    await refresh(); return id;
   }
+  // put a copy back: its keys (absent ones removed), and for a full copy its attached files and lecture notes, each store in one transaction
+  async function applySnap(s) {
+    for (const k of s.keys || KEYS) { if (k in s.data) localStorage.setItem(k, s.data[k]); else localStorage.removeItem(k); }
+    if (s.files) await M.notesDB?.replace?.(s.files);
+    if (s.lnotes) await window.KgLectureNotes?.replace?.(s.lnotes);
+  }
+  M.applySnap = applySnap;
+  // make the recovery copy and read it back; if either fails, nothing is written
+  async function recoveryCopy() { try { const id = await snapshot('before-restore'), s = await tx('readonly', st => st.get(id)); return s && s.data ? s : null; } catch (e) { return null; } }
   function daily() { if (localStorage.getItem('kg-snap-day') === M.today()) return; snapshot('daily').then(() => { try { localStorage.setItem('kg-snap-day', M.today()); } catch (e) {} }).catch(() => {}); }
   setTimeout(daily, 8000); setInterval(daily, 30 * 60000); refresh();
   async function restoreSnap(id) {
     const s = await tx('readonly', st => st.get(id)); if (!s) return;
     // check the copy before touching anything: the study record must be there and every part must be readable
-    const okCopy = (() => { try { if (!s.data || typeof JSON.parse(s.data['kg-lab-v1'] || 'null') !== 'object' || !s.data['kg-lab-v1']) return false; for (const k of Object.keys(s.data)) JSON.parse(s.data[k]); return true; } catch (e) { return false; } })();
-    if (!okCopy) { alert("That copy looks damaged, so nothing was changed."); return; }
-    if (!confirm(`Replace your study records on this device with the copy from ${new Date(s.at).toLocaleString()}? Attached lecture files aren't part of it and stay as they are. What's here now is saved as a copy first, so you can undo this.`)) return;
-    await snapshot('before-restore');
-    // write everything, or nothing: if a write fails halfway (storage full), put back what was there
-    const prev = {}; for (const k of KEYS) prev[k] = localStorage.getItem(k);
-    try { for (const k of KEYS) { if (k in s.data) localStorage.setItem(k, s.data[k]); else localStorage.removeItem(k); } }
-    catch (e) { for (const k of KEYS) { try { if (prev[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, prev[k]); } catch (e2) {} } alert("The restore couldn't finish (the browser's storage may be full), so everything was put back as it was."); return; }
+    if (!s.data || recBad(s.data, true)) { alert("That copy looks damaged, so nothing was changed."); return; }
+    if (!confirm(`Replace your study records on this device with the copy from ${new Date(s.at).toLocaleString()}? ${s.files ? 'It also puts back the attached lecture files and lecture study notes it holds.' : "Attached lecture files and lecture study notes aren't part of it and stay as they are."} What's here now is saved as a copy first, so you can undo this.`)) return;
+    const back = await recoveryCopy(); if (!back) { alert("The recovery copy couldn't be made (the browser's storage may be full), so nothing was changed."); return; }
+    // write everything, or nothing: if a write fails halfway, the recovery copy goes back
+    try { await applySnap(s); }
+    catch (e) { try { await applySnap(back); } catch (e2) {} alert("The restore couldn't finish (the browser's storage may be full), so everything was put back as it was."); return; }
     // the page saves itself on the way out; stop it overwriting the copy just restored
-    const orig = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (KEYS.includes(k)) return; return orig.call(this, k, v); };
+    const ks = s.keys || KEYS, orig = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (ks.includes(k)) return; return orig.call(this, k, v); };
     location.reload();
   }
   M.ACTIONS.snaprestore = b => restoreSnap(b.dataset.v);
@@ -11308,12 +11318,20 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
   // It also reads the older formats: the v1 full backup and the habit desk's records-only backup.
   const BK_KEYS = [...new Set([...KEYS, 'ame-mute-v1', 'kg-bond-v1', 'kg-need-log', 'kg-chat-meta', 'kg-drafts', 'kg-plain', 'kg-cult-v1', 'kg-tomb-v1'])];
   const sha = async s => { try { const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(h)].map(x => x.toString(16).padStart(2, '0')).join(''); } catch (e) { return ''; } };
+  // records that must parse to an object (never null); kg-lab-v1 must also be present
+  const REC = ['kg-lab-v1', 'ame-habit-v1', 'desk-needy-v1', 'kg-library-v1', 'kg-cult-v1', 'kg-quarters-v1', 'ame-journal-v1', 'kg-tomb-v1'];
+  const recBad = (data, needLab) => { if (!data || typeof data !== 'object') return 'the record list'; if (needLab && !data['kg-lab-v1']) return 'kg-lab-v1';
+    for (const k of Object.keys(data)) if (typeof data[k] !== 'string') return k;
+    for (const k of REC) if (k in data) { let v; try { v = JSON.parse(data[k]); } catch (e) { return k; } if (!v || typeof v !== 'object' || (k === 'kg-lab-v1' && Array.isArray(v))) return k; }
+    return ''; };
+  const lnotesBad = a => a != null && (!Array.isArray(a) || a.some(x => !Array.isArray(x) || typeof x[0] !== 'string' || !x[1] || typeof x[1].md !== 'string'));
   // bkCheck: pure archive check. Returns the format, the files that fail their checksum or are absent, and whether records parse.
   // tombs: ids of files you deleted (a tombstone). They're skipped, never reported missing, never restored.
   const bkCheck = async (b, tombs = {}) => {
-    if (b && b.app === 'ame-desk' && b.version === 1 && b.storage && typeof b.storage === 'object') return { ok: true, format: 'habit-v1', data: b.storage, files: [], bad: [], partialFormat: true };
+    if (b && b.app === 'ame-desk' && b.version === 1 && b.storage && typeof b.storage === 'object') { const rh = recBad(b.storage, false); return rh ? { ok: false, why: `A record inside this backup (${rh}) is damaged.` } : { ok: true, format: 'habit-v1', data: b.storage, files: [], bad: [], partialFormat: true }; }
     if (!b || !/^kaguya-desk-full-v[12]$/.test(b.format) || !b.data || typeof b.data !== 'object' || !Array.isArray(b.files)) return { ok: false, why: "That file isn't a Kaguya Desk backup, or it's damaged." };
-    try { if (typeof JSON.parse(b.data['kg-lab-v1']) !== 'object') throw 0; } catch (e) { return { ok: false, why: 'The study record inside this backup is damaged.' }; }
+    const rb = recBad(b.data, true); if (rb) return { ok: false, why: rb === 'kg-lab-v1' ? 'The study record inside this backup is damaged.' : `A record inside this backup (${rb}) is damaged.` };
+    if (lnotesBad(b.lectureNotes)) return { ok: false, why: 'The lecture study notes inside this backup are damaged.' };
     const bad = [];
     if (b.format === 'kaguya-desk-full-v2') {
       const have = new Map(b.files.map(([k, v]) => [k, v])); let own = {}; try { own = JSON.parse(b.data['kg-tomb-v1'] || '{}') || {}; } catch (e) {}
@@ -11321,10 +11339,11 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
         if (tombs[m.id] || own[m.id]) continue;
         const v = have.get(m.id), u = v && v.blob && v.blob.dataUrl;
         if (!v) bad.push({ id: m.id, name: m.name, why: 'missing' });
+        else if (m.sha && !u) bad.push({ id: m.id, name: m.name, why: 'missing bytes' });
         else if (u && m.sha && (await sha(u)) !== m.sha) bad.push({ id: m.id, name: m.name, why: 'damaged' });
       }
     }
-    return { ok: true, format: b.format === 'kaguya-desk-full-v2' ? 'full-v2' : 'full-v1', data: b.data, files: b.files, bad, partialFormat: b.format !== 'kaguya-desk-full-v2' };
+    return { ok: true, format: b.format === 'kaguya-desk-full-v2' ? 'full-v2' : 'full-v1', data: b.data, files: b.files, lnotes: Array.isArray(b.lectureNotes) ? b.lectureNotes : null, bad, partialFormat: b.format !== 'kaguya-desk-full-v2' };
   };
   M.bkCheck = bkCheck;
   async function fullBackup() {
@@ -11336,7 +11355,8 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
       else manifest.push({ id: k, name: c.name || '', size: 0, sha: '' });
       files.push([k, c]);
     }
-    const text = JSON.stringify({ format: 'kaguya-desk-full-v2', at: Date.now(), keys: BK_KEYS, data, files, manifest });
+    const lectureNotes = (await window.KgLectureNotes?.dump?.()) || [];
+    const text = JSON.stringify({ format: 'kaguya-desk-full-v2', at: Date.now(), keys: BK_KEYS, data, files, manifest, lectureNotes });
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = 'kaguya-desk-complete-' + M.today() + '.json'; document.body.appendChild(a); a.click(); a.remove();
     try { localStorage.setItem('kg-full-backup', String(Date.now())); } catch (e) {}
     M.render(); return text.length;
@@ -11352,10 +11372,9 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
       if (!confirm(`This backup failed its integrity check, so a complete restore was refused and nothing has changed:\n${list}\n\nPartial recovery restores everything readable and marks those files as missing evidence. Choose partial recovery?`)) return;
       partial = true;
     }
-    const scope = r.format === 'habit-v1' ? 'It holds study records only, no attached notes; the attached notes on this device are kept.' : r.format === 'full-v1' ? 'It is an older backup: records it does not contain are kept as they are on this device.' : 'It replaces your study records and attached notes on this device.';
+    const scope = (r.format === 'habit-v1' ? 'It holds study records only, no attached notes; the attached notes on this device are kept.' : r.format === 'full-v1' ? 'It is an older backup: records it does not contain are kept as they are on this device.' : 'It replaces your study records and attached notes on this device.') + (r.lnotes ? ` It also replaces your lecture study notes (${r.lnotes.length} in the backup).` : ' Your lecture study notes on this device are kept.');
     if (!confirm(`Restore the ${partial ? 'readable parts of the ' : ''}backup from ${b.at || b.exportedAt ? new Date(b.at || b.exportedAt).toLocaleString() : 'an unknown date'}? ${scope} What's here now is saved as a recovery copy first.`)) return;
-    await snapshot('before-restore');
-    const prev = {}; for (const k of BK_KEYS) prev[k] = localStorage.getItem(k);
+    const back = await recoveryCopy(); if (!back) { alert("The recovery copy couldn't be made (the browser's storage may be full), so nothing was changed."); return; }
     try {
       // only a v2 backup lists every key, so only a v2 restore removes keys it doesn't contain
       for (const k of BK_KEYS) { if (k in r.data) localStorage.setItem(k, r.data[k]); else if (r.format === 'full-v2') localStorage.removeItem(k); }
@@ -11364,8 +11383,9 @@ body.kg-mode-quiet #kg-mode [data-mode="quiet"]{background:#24395a;color:#cfe6ff
       const skip = new Set(r.bad.map(x => x.id).concat(Object.keys(tombAll))), pairs = [];
       for (const [k, v] of r.files) { if (skip.has(k)) continue; const c = Object.assign({}, v); if (c.blob && c.blob.dataUrl) { const bl = await fromData(c.blob.dataUrl); c.blob = new File([bl], c.blob.name || 'notes.pdf', { type: bl.type }); } pairs.push([k, c]); }
       if (pairs.length) await M.notesDB?.load?.(pairs); // one IndexedDB transaction: all files or none
+      if (r.lnotes) await window.KgLectureNotes?.replace?.(r.lnotes); // one transaction: all lecture notes or none
       if (partial) localStorage.setItem('kg-restore-missing', JSON.stringify({ at: Date.now(), files: r.bad })); else localStorage.removeItem('kg-restore-missing');
-    } catch (e) { for (const k of BK_KEYS) { try { if (prev[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, prev[k]); } catch (e2) {} } alert("The restore couldn't finish, so your study records were put back as they were."); return; }
+    } catch (e) { try { await applySnap(back); } catch (e2) {} alert("The restore couldn't finish, so your study records, attached files and lecture notes were put back as they were (the recovery copy is also kept in Backup)."); return; }
     const orig = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (BK_KEYS.includes(k)) return; return orig.call(this, k, v); };
     location.reload();
   }
@@ -17920,6 +17940,8 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
   const ndb = (mode, fn) => new Promise((ok, no) => { const r = indexedDB.open('kg-lecture-notes', 1); r.onupgradeneeded = () => r.result.createObjectStore('n'); r.onerror = () => no(r.error);
     r.onsuccess = () => { const d = r.result, t = d.transaction('n', mode), q = fn(t.objectStore('n')); t.oncomplete = () => { d.close(); ok(q && q.result); }; t.onerror = () => { d.close(); no(t.error); }; }; });
   const noteGet = k => ndb('readonly', st => st.get(k)).catch(() => null);
+  window.KgLectureNotes = { dump: async () => { const ks = await ndb('readonly', st => st.getAllKeys()), vs = await ndb('readonly', st => st.getAll()); return (ks || []).map((k, i) => [k, vs[i]]); },
+    replace: pairs => ndb('readwrite', st => { st.clear(); for (const [k, v] of pairs) st.put(v, k); return null; }).then(() => { noteKeys = new Set(pairs.map(x => x[0])); }) };
   const notePut = (k, v) => ndb('readwrite', st => st.put(v, k)).then(() => { noteKeys && noteKeys.add(k); });
   let noteKeys = null; const loadNoteKeys = () => ndb('readonly', st => st.getAllKeys()).then(a => { noteKeys = new Set(a || []); }, () => { noteKeys = new Set(); });
   const hasText = l => !!(l.transcripts.length || l.subs.length);

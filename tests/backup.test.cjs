@@ -29,3 +29,25 @@ test('the backup covers the habit record and the smaller keys; restore paths are
   assert.match(html, /else if \(r\.format === 'full-v2'\) localStorage\.removeItem\(k\);/, 'older files never delete keys they did not contain');
   assert.match(html, /Evidence missing:<\/b> the last restore was a partial recovery/);
 });
+
+test('review fixes: a null or wrong-shaped record, a manifested file without bytes and damaged lecture notes are all caught', async () => {
+  const base = { format: 'kaguya-desk-full-v2', at: 1, files: [], manifest: [] };
+  assert.strictEqual((await bkCheck({ ...base, data: { 'kg-lab-v1': 'null' } })).ok, false, 'a null study record is refused');
+  assert.strictEqual((await bkCheck({ ...base, data: { 'kg-lab-v1': '[]' } })).ok, false);
+  assert.strictEqual((await bkCheck({ ...base, data: { 'kg-lab-v1': lab, 'kg-cult-v1': 'null' } })).ok, false, 'a null cultivation record is refused');
+  assert.strictEqual((await bkCheck({ ...base, data: { 'kg-lab-v1': lab, 'ame-habit-v1': 5 } })).ok, false, 'non-string values are refused');
+  assert.strictEqual((await bkCheck({ app: 'ame-desk', version: 1, storage: { 'kg-lab-v1': 'null' } })).ok, false, 'the records-only format is checked too');
+  const photo = { ...base, data: { 'kg-lab-v1': lab }, files: [['p1', { name: 'proof.jpg', blob: { name: 'proof.jpg' } }]], manifest: [{ id: 'p1', name: 'proof.jpg', size: 900, sha: 'abc' }] };
+  assert.deepStrictEqual((await bkCheck(photo)).bad.map(x => x.why), ['missing bytes'], 'a proof photo listed with bytes but carrying none is named');
+  assert.strictEqual((await bkCheck({ ...base, data: { 'kg-lab-v1': lab }, lectureNotes: [['c/l', { md: 5 }]] })).ok, false);
+  const ok = await bkCheck({ ...base, data: { 'kg-lab-v1': lab }, lectureNotes: [['c/l', { md: 'Key ideas:\n- x', edited: true }]] });
+  assert.ok(ok.ok && ok.lnotes.length === 1);
+  assert.strictEqual((await bkCheck({ format: 'kaguya-desk-full-v1', data: { 'kg-lab-v1': lab }, files: [] })).lnotes, null, 'an older backup without notes keeps the notes on this device');
+});
+test('review fixes: the recovery copy covers every key, file and lecture note a restore can replace, and a failed restore puts it back', () => {
+  assert.match(html, /const full = kind !== 'daily', keys = full \? BK_KEYS : KEYS/);
+  assert.match(html, /rec\.files = \(await M\.notesDB\?\.dump\?\.\(\)\) \|\| \[\]; rec\.lnotes = \(await window\.KgLectureNotes\?\.dump\?\.\(\)\) \|\| \[\];/);
+  assert.match(html, /const back = await recoveryCopy\(\); if \(!back\) \{ alert\("The recovery copy couldn't be made/, 'no recovery copy, no restore');
+  assert.match(html, /catch \(e\) \{ try \{ await applySnap\(back\); \}/, 'a failed restore puts the recovery copy back');
+  assert.match(html, /lectureNotes = \(await window\.KgLectureNotes\?\.dump\?\.\(\)\) \|\| \[\];/, 'full backups carry lecture study notes');
+});
