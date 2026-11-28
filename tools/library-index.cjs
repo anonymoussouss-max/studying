@@ -23,7 +23,19 @@ const WIP = [
   {"id": "bayesian-statistics", "title": "Bayesian Statistics: From Concept to Data Analysis", "by": "UC Santa Cruz", "dir": "bayesian-statistics", "syllabus": "bayesian-statistics-syllabus-parsed.json"},
   {"id": "spacecraft-dynamics-kinetics", "title": "Kinetics: Studying Spacecraft Motion", "by": "University of Colorado Boulder", "dir": "spacecraft-dynamics-kinetics", "syllabus": "spacecraft-dynamics-kinetics-syllabus-parsed.json"},
   {"id": "approximation-methods", "title": "Approximation Methods", "by": "University of Colorado Boulder", "dir": "approximation-methods", "syllabus": "approximation-methods-syllabus-parsed.json"},
-  {"id": "statistical-thermodynamics", "title": "Statistical Molecular Thermodynamics", "by": "University of Minnesota", "dir": "statistical-thermodynamics", "syllabus": "statistical-thermodynamics-syllabus-parsed.json"}
+  {"id": "statistical-thermodynamics", "title": "Statistical Molecular Thermodynamics", "by": "University of Minnesota", "dir": "statistical-thermodynamics", "syllabus": "statistical-thermodynamics-syllabus-parsed.json"},
+  // the "Further physics and engineering" shelf (28 Nov 2026); status from offline-physics-status.json / offline-physics-extra-status.json
+  { id: 'matrix-algebra-engineers', title: 'Matrix Algebra for Engineers', by: 'HKUST', dir: 'matrix-algebra-engineers', syllabus: 'matrix-algebra-engineers-syllabus-parsed.json' },
+  { id: 'oscillators-waves', title: 'Oscillators and Waves', by: '', dir: 'oscillators-waves', syllabus: 'oscillators-waves-syllabus-parsed.json' },
+  { id: 'complex-analysis', title: 'Introduction to Complex Analysis', by: 'Wesleyan University', dir: 'complex-analysis', syllabus: 'complex-analysis-syllabus-parsed.json' },
+  { id: 'computers-waves-simulations', title: 'Computers, Waves, Simulations', by: 'LMU Munich', dir: 'computers-waves-simulations', syllabus: 'computers-waves-simulations-syllabus-parsed.json' },
+  { id: 'analytical-mechanics-spacecraft-dynamics', title: 'Analytical Mechanics for Spacecraft Dynamics', by: 'University of Colorado Boulder', dir: 'analytical-mechanics-spacecraft-dynamics', syllabus: 'analytical-mechanics-spacecraft-dynamics-syllabus-parsed.json' },
+  { id: 'general-relativity-i', title: 'General Relativity I', by: '', dir: 'general-relativity-i', syllabus: 'general-relativity-i-syllabus-parsed.json' },
+  { id: 'statistical-mechanics', title: 'Statistical Mechanics: Algorithms and Computations', by: 'École normale supérieure', dir: 'statistical-mechanics', syllabus: 'statistical-mechanics-syllabus-parsed.json' },
+  { id: 'nonlinear-spacecraft-attitude-control', title: 'Nonlinear Spacecraft Attitude Control', by: 'University of Colorado Boulder', dir: 'nonlinear-spacecraft-attitude-control', syllabus: 'nonlinear-spacecraft-attitude-control-syllabus-parsed.json' },
+  { id: 'dsp1', title: 'Digital Signal Processing 1', by: 'EPFL', dir: 'dsp1', syllabus: 'dsp1-syllabus-parsed.json' },
+  { id: 'astronomy-technology', title: 'Astronomy and Technology', by: '', dir: 'astronomy-technology', syllabus: 'astronomy-technology-syllabus-parsed.json' },
+  { id: 'general-relativity-ii', title: 'General Relativity II', by: '', dir: 'general-relativity-ii', syllabus: 'general-relativity-ii-syllabus-parsed.json' }
 ];
 // Hands-on workshops: notebooks, data and a browser-readable lesson site instead of lectures. They carry no videos,
 // so video completion, assessments and Course Gu never apply. Paths are relative to the workshop folder.
@@ -100,7 +112,7 @@ function workshopOf(root, w) {
 function build(root) {
   dirCache.clear();
   const cat = readJSON(path.join(root, 'course-catalogue.json')) || [], ver = readJSON(path.join(root, 'verification.json')) || [], cov = readJSON(path.join(root, 'lecture-coverage.json')) || [];
-  const status = [].concat(readJSON(path.join(root, 'expanded-status.json')) || [], readJSON(path.join(root, 'recommended-status.json')) || [], readJSON(path.join(root, 'additional-status.json')) || [], readJSON(path.join(root, 'download-status.json')) || []);
+  const status = [].concat(readJSON(path.join(root, 'expanded-status.json')) || [], readJSON(path.join(root, 'recommended-status.json')) || [], readJSON(path.join(root, 'additional-status.json')) || [], readJSON(path.join(root, 'download-status.json')) || [], readJSON(path.join(root, 'offline-physics-status.json')) || [], readJSON(path.join(root, 'offline-physics-extra-status.json')) || []);
   const courses = [];
   const lectureOf = (root, rel, name, module, id) => { const v = videoCheck(path.join(root, rel)), sc = sidecars(root, rel);
     return { id, name, module, video: rel, ok: v.ok, size: v.size, why: v.ok ? undefined : v.why, subs: sc.subs, transcripts: sc.transcripts, pdfs: sc.pdfs }; };
