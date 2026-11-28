@@ -16388,18 +16388,18 @@ You entered 25</pre></div>
   // Bank completion: the original entry is fulfilled by its own independent success or by a successful fresh replacement. No new obligation.
   const bankDone = (entry, results) => results.some(r => r.how === 'independent' && r.ok && (r.entry === entry.id || (r.replaces === entry.id && replacementOk(r.kind, 'bank', entry.family))));
 
-  /* -- retention: 7–14 days after the proof, inside the existing older-material allowance; rest days postpone without debt. -- */
+  /* -- retention: opens 7 calendar days after the proof; day 14 is a target, not a deadline (a later return keeps the check open
+     and every earned record). One fresh question per due skill, 1–4 a sitting. Rest days do not move the dates. -- */
   function retention(o) {
     const day = d => Math.floor(d / DAY), p = day(o.proofAt), today = day(o.now);
-    const paused = (o.pausedDays || []).filter(d => d >= p && d <= today).length; // Rest, Gentle Return, Done for today
-    const opens = p + 7 + paused, due = p + 14 + paused, need = o.need || [];
+    const opens = p + 7, due = p + 14, need = o.need || [];
     const ev = (o.evidence || []).filter(e => e.how === 'independent' && e.fresh && day(e.at) > p); // a later day, fresh and independent
     const covered = need.filter(k => ev.some(e => (e.skills || [e.skill]).includes(k.id))), uncovered = need.filter(k => !covered.includes(k));
     const items = new Set(ev.filter(e => (e.skills || [e.skill]).some(x => need.some(k => k.id === x))).map(e => e.id));
     const proven = need.length > 0 && !uncovered.length && items.size >= 2; // one later correct answer is never enough
-    const size = Math.min(uncovered.length, 4, Math.max(2, Math.ceil(need.length / 3)));
-    return { opensDay: opens, dueDay: due, open: today >= opens, proven, covered: covered.map(k => k.id), uncovered: uncovered.map(k => k.id), next: today >= opens && !proven ? uncovered.slice(0, size).map(k => k.id) : [], evidenceItems: items.size,
-      note: `${covered.length} of ${need.length} skills retained${paused ? `; postponed ${paused} day${paused > 1 ? 's' : ''} for rest, without debt` : ''}` };
+    const size = Math.min(uncovered.length, 4), late = today > due && !proven;
+    return { opensDay: opens, dueDay: due, open: today >= opens, late, proven, covered: covered.map(k => k.id), uncovered: uncovered.map(k => k.id), next: today >= opens && !proven ? uncovered.slice(0, size).map(k => k.id) : [], evidenceItems: items.size,
+      note: `${covered.length} of ${need.length} skills retained${late ? '; past the day-14 target, still open, nothing earned is lost' : ''}` };
   }
   window.KgProof = { newSession, elapsed, step, restore, decide, chapterResult, parseMarks, appeal, resolve, eligible, replacementOk, bankDone, retention, RUBRIC, BASES, STATES };
 
@@ -16452,11 +16452,14 @@ You entered 25</pre></div>
   /* -- chapter retention checks. The marking is the agreed proof marking; WHEN a check opens, HOW BIG it is, HOW LONG it runs and
      what rest days do are PROPOSED (CULTIVATION-REVIEW rev 3), so the check stays off until you approve these exact rules. -- */
   const RET_RULES = [
-    ['When a check opens', '7 days after the passed proof, due by day 14. (The approved 14-day wait belongs to Course Gu, not chapters.)'],
-    ['How big a check is', 'One fresh, unseen question per due skill, sampling only skills not yet retained: about a third of the chapter, at least 2 and at most 4 (or all that remain).'],
-    ['How long it runs', 'The proof allowance: 8 minutes per question, 15 minutes minimum, inside your Mix-in time.'],
-    ['Rest days', 'Not tracked yet, so Rest, Gentle Return and Done for today do not move the window. The proposal is that they postpone it without debt; that needs a later change.']];
-  const retOk = st => !!(st.approvals && st.approvals.chapterRetention);
+    ['Timing', 'The check opens 7 calendar days after the passed chapter proof. Day 14 is a target, not a deadline: on day 15 or later the check stays available and every earned record is kept. (Course Gu keep their separately approved 14-day schedule.)'],
+    ['Questions', 'One fresh question per due skill, 1 to 4 questions a sitting. If only one skill remains, it can be taken on its own. If more than four are due, the slip shows which skills this sitting covers and the rest stay available.'],
+    ['Time', '8 minutes per question, inside Mix-in time: 8, 16, 24 or 32 minutes, shown before you start.'],
+    ['Rest days', 'Calendar dates stay simple and never move. On Rest, Gentle Return or Done for today the check is voluntary and left out of that day\'s required workload; it is still there when you return.']];
+  const retOk = st => { const a = st.approvals && st.approvals.chapterRetention; return !!(a && Array.isArray(a.rules) && a.rules.join('\n') === RET_RULES.map(r => r.join(': ')).join('\n')); };
+  const retMin = n => n * 8;
+  // Rest, Gentle Return or Done for today: the check stays voluntary, outside that day's required workload
+  const quietDay = () => { try { const SP = window.StudyPlan, d = SP.studyDate(); if (SP.dayKind(d).t === 'rest') return 'a Rest day'; const G = SP.gentleOf(SP.schedOf(M.L), d); return G ? (G.stopped ? 'Done for today' : 'Gentle Return') : ''; } catch (e) { return ''; } };
   const retDue = s => { const st = read(), list = (st.skills[s.gu] || {}).list || []; return list.filter(k => (s.due || []).includes(k.id)); };
   // The actual result, recorded once: one evidence record per demonstrated skill, in the format the cabinet, plates and ranks
   // already read. Re-marking after an appeal can add a skill, never a duplicate; nothing is removed.
@@ -16484,11 +16487,15 @@ You entered 25</pre></div>
       if (s && s.kind === 'retention') body = window.KgCultProof(g.key);
       else if (s) body = '<p class="kl-small">A photo proof is open for this chapter. Finish or close it under Checklist, skills and proof first.</p>';
       else if (g.level === 'proven') body = '';
-      else if (!retOk(st)) body = `<div class="kret-need"><p class="kl-small"><b>Before checks can start, these chapter rules need your decision.</b> They are proposed in the cultivation review, not agreed:</p><ol class="kl-small">${RET_RULES.map(([k, v]) => `<li><b>${esc(k)}:</b> ${esc(v)}</li>`).join('')}</ol><p class="kl-small">Marking is already agreed: the closed-book photo rubric, slips pass, invalid reasoning is Not yet, unclear stays Pending, appeals stay open.</p><button class="kl-ghost" data-a="retapprove">Approve these four rules</button></div>`;
+      else if (!retOk(st)) body = `<div class="kret-need"><p class="kl-small"><b>Before checks can start, these chapter rules need your decision.</b> Revised proposal, not yet approved:</p><ol class="kl-small">${RET_RULES.map(([k, v]) => `<li><b>${esc(k)}:</b> ${esc(v)}</li>`).join('')}</ol><p class="kl-small">Marking is already agreed: the closed-book photo rubric, slips pass, invalid reasoning is Not yet, unclear stays Pending, appeals stay open.</p><button class="kl-ghost" data-a="retapprove">Approve these four rules</button></div>`;
       else if (!r.open) body = `<p class="kl-small">Not due yet: the next check opens ${esc(DAYS(r.opensDay))}.</p>`;
-      else if (r.next.length) body = `<p class="kl-small"><b>Due now:</b> ${r.next.map(id => esc(nm(id))).join(', ')}.</p><button class="kl-primary" data-a="retstart" data-k="${esc(g.key)}" data-due="${esc(r.next.join(','))}">Start retention check (${r.next.length} question${r.next.length > 1 ? 's' : ''})</button>`;
+      else if (r.next.length) { const n = r.next.length, rest = r.uncovered.filter(id => !r.next.includes(id)), q = quietDay();
+        body = `<p class="kl-small"><b>${rest.length ? 'This sitting covers' : 'Due now'}:</b> ${r.next.map(id => esc(nm(id))).join(', ')}.${rest.length ? ` Still available for a later sitting: ${rest.map(id => esc(nm(id))).join(', ')}.` : ''}</p>
+        ${r.late ? `<p class="kl-small">The day-14 target (${esc(DAYS(r.dueDay))}) has passed. The check is still open and everything already earned is kept.</p>` : ''}
+        ${q ? `<p class="kl-small">Today is ${esc(q)}: this check is voluntary and not part of today's required workload. It will still be here when you return.</p>` : ''}
+        <button class="kl-primary" data-a="retstart" data-k="${esc(g.key)}" data-due="${esc(r.next.join(','))}">Start retention check · ${n === 1 ? 'one fresh question' : n + ' fresh questions'} · ${retMin(n)} minutes</button>`; }
       else body = '<p class="kl-small">Every skill is covered; one more fresh piece of retention evidence completes the chapter.</p>';
-      return `<div class="kret" id="kret-${esc(g.key)}"><p class="kl-small"><b>Retention</b> · ${esc(r.note)} · window ${esc(DAYS(r.opensDay))} to ${esc(DAYS(r.dueDay))}</p>
+      return `<div class="kret" id="kret-${esc(g.key)}"><p class="kl-small"><b>Retention</b> · ${esc(r.note)} · opens ${esc(DAYS(r.opensDay))}, target ${esc(DAYS(r.dueDay))}</p>
         ${r.covered.length ? `<p class="kl-small">Retained: ${r.covered.map(id => esc(nm(id) + when(id))).join(', ')}</p>` : ''}
         ${last && !(s && s.kind === 'retention') ? retLine(last, g.skills) : ''}${body}</div>`;
     } };
@@ -16519,7 +16526,7 @@ You entered 25</pre></div>
       const st2 = read(); if (st2.proof) return;
       const ex = st2.exposure || {}, qs = r.qs.filter(q => eligible(ex, q.bid || q.t, 'retention')).slice(0, due.length).map((q, i) => ({ id: 'q' + i, t: q.t, bid: q.bid || '', a: q.a, skills: [] }));
       if (qs.length < due.length) return alert('Not enough unseen questions for this check. Nothing was changed.');
-      st2.proof = Object.assign(newSession({ id: 'rt' + Date.now().toString(36), gu: key, ch, qs, limit: Math.max(15, due.length * 8) * 60000, now: Date.now() }), { kind: 'retention', due });
+      st2.proof = Object.assign(newSession({ id: 'rt' + Date.now().toString(36), gu: key, ch, qs, limit: retMin(due.length) * 60000, now: Date.now() }), { kind: 'retention', due });
       st2.exposure = ex; for (const q of qs) ex[q.bid || q.t] = Object.assign({}, ex[q.bid || q.t], { seen: Date.now(), purpose: 'retention' });
       save(st2, 'retention check started');
     } finally { retBusy = false; }

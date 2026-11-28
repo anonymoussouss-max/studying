@@ -77,12 +77,13 @@ test('appeals: model agreement never closes one; a faulty question is voided and
   assert.strictEqual(r2.s.appeals[0].history.length, 2);
   const res = P.chapterResult(r2.s, need); assert.strictEqual(res.result, 'pending'); assert.ok(/skill B/.test(res.why), 'a voided question needs a replacement, it does not fail the skill');
 });
-test('retention: opens 7 days after the proof, rest days postpone it without debt, one later answer is never enough', () => {
+test('retention: opens 7 calendar days after the proof, day 14 is a target (still open later), one later answer is never enough', () => {
   const base = { proofAt: T0, need, evidence: [] };
   assert.strictEqual(P.retention(Object.assign({}, base, { now: T0 + 6 * DAY })).open, false);
   const r7 = P.retention(Object.assign({}, base, { now: T0 + 7 * DAY })); assert.strictEqual(r7.open, true); assert.deepStrictEqual(J(r7.next), ['a', 'b']);
-  const d0 = Math.floor(T0 / DAY), rest = P.retention(Object.assign({}, base, { now: T0 + 7 * DAY, pausedDays: [d0 + 2, d0 + 3] }));
-  assert.strictEqual(rest.open, false); assert.ok(/without debt/.test(rest.note));
+  const late = P.retention(Object.assign({}, base, { now: T0 + 15 * DAY }));
+  assert.strictEqual(late.open, true); assert.strictEqual(late.late, true); assert.deepStrictEqual(J(late.next), ['a', 'b']); assert.ok(/still open/.test(late.note));
+  assert.strictEqual(P.retention(Object.assign({}, base, { now: T0 + 14 * DAY })).late, false, 'day 14 itself is on target');
   const one = P.retention(Object.assign({}, base, { now: T0 + 9 * DAY, evidence: [{ id: 'e1', skills: ['a', 'b'], how: 'independent', fresh: true, at: T0 + 8 * DAY }] }));
   assert.strictEqual(one.proven, false); assert.strictEqual(one.covered.length, 2);
   const two = P.retention(Object.assign({}, base, { now: T0 + 9 * DAY, evidence: [{ id: 'e1', skills: ['a', 'b'], how: 'independent', fresh: true, at: T0 + 8 * DAY }, { id: 'e2', skill: 'b', how: 'independent', fresh: true, at: T0 + 9 * DAY }] }));
@@ -92,7 +93,7 @@ test('retention evidence must be later, fresh and independent; integrated questi
   const ev = [{ id: 'same-day', skill: 'a', how: 'independent', fresh: true, at: T0 + 1000 }, { id: 'help', skill: 'a', how: 'assisted', fresh: true, at: T0 + 8 * DAY }, { id: 'seen', skill: 'a', how: 'independent', fresh: false, at: T0 + 8 * DAY }];
   assert.strictEqual(P.retention({ proofAt: T0, now: T0 + 9 * DAY, need, evidence: ev }).covered.length, 0);
   const big = Array.from({ length: 9 }, (_, i) => ({ id: 's' + i, name: 'S' + i }));
-  assert.strictEqual(P.retention({ proofAt: T0, now: T0 + 8 * DAY, need: big, evidence: [] }).next.length, 3, 'a large chapter is checked a few skills at a time');
+  assert.strictEqual(P.retention({ proofAt: T0, now: T0 + 8 * DAY, need: big, evidence: [] }).next.length, 4, 'a large chapter is checked at most four skills a sitting');
 });
 test('exposure is per question: practising a method keeps other questions eligible; a seen solution makes that question training', () => {
   const ex = { q1: { seen: 1, solution: 1 }, q2: { attempted: 1 } };
