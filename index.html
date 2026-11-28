@@ -17270,7 +17270,10 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
   const CGU_N = { none: 'Undiscovered', obtained: 'Obtained', refining: 'Refining', proven: 'Proven', retained: 'Retained' };
   // Gu ranks (1–5) approved by you on 27 Nov 2026. Descriptive only: independent of assessment tier, earned stage and the JEE cultivator rank
   const CGU_RANK_APPROVED = '27 Nov 2026';
-  const CGU_RANK = { 'an-introduction-to-astronomy': 1, 'basics-of-rocket-science': 2, 'understanding-modern-physics-2-quantum-mechanics-and-atoms': 3, 'astro': 1, 'basis-flight-mechanics': 2, 'foundations-quantum-mechanics': 4, 'exoplanets': 3, 'spacecraft-dynamics-kinematics': 4, 'quantum-mechanics': 4, 'einstein-relativity': 2, 'extra-galactic-astronomy': 3, 'quantum-physics': 5, 'robotic-methodologies': 3, 'cosmology-our-universe': 3, 'phases-of-matter-solid-liquid-gas-and-beyond': 4, 'particle-physics': 3, 'black-holes-astro-101': 2, 'physique-deux-infinis-liens': 2, 'our-place-in-the-cosmos': 1, 'astrobiology': 2, 'physics-101-forces-kinematics': 2, 'introduction-to-calculus': 2, 'python': 1, 'mit-18-06sc-linear-algebra': 4, 'differential-equations-engineers': 3, 'vector-calculus-engineers': 3, 'mit-8-02-electricity-magnetism': 4, 'mit-8-03sc-vibrations-waves': 4, 'numerical-methods-engineers': 4 };
+  const CGU_RANK = { 'an-introduction-to-astronomy': 1, 'basics-of-rocket-science': 2, 'understanding-modern-physics-2-quantum-mechanics-and-atoms': 3, 'astro': 1, 'basis-flight-mechanics': 2, 'foundations-quantum-mechanics': 4, 'exoplanets': 3, 'spacecraft-dynamics-kinematics': 4, 'quantum-mechanics': 4, 'einstein-relativity': 2, 'extra-galactic-astronomy': 3, 'quantum-physics': 5, 'robotic-methodologies': 3, 'cosmology-our-universe': 3, 'phases-of-matter-solid-liquid-gas-and-beyond': 4, 'particle-physics': 3, 'black-holes-astro-101': 2, 'physique-deux-infinis-liens': 2, 'our-place-in-the-cosmos': 1, 'astrobiology': 2, 'physics-101-forces-kinematics': 2, 'introduction-to-calculus': 2, 'python': 1, 'mit-18-06sc-linear-algebra': 4, 'differential-equations-engineers': 3, 'vector-calculus-engineers': 3, 'mit-8-02-electricity-magnetism': 4, 'mit-8-03sc-vibrations-waves': 4, 'numerical-methods-engineers': 4,
+    // approved by you on 28 Nov 2026, as packaged with their artwork
+    'introduction-python-scientific-computing': 2, 'analyze': 3, 'bayesian-statistics': 3, 'space-mission-design-and-operations': 4, 'spacecraft-dynamics-kinetics': 4, 'statistical-thermodynamics': 4, 'theory-of-angular-momentum': 5, 'approximation-methods': 5 }
+  const CGU_RANK_DATES = { 'introduction-python-scientific-computing': '28 Nov 2026', 'analyze': '28 Nov 2026', 'bayesian-statistics': '28 Nov 2026', 'space-mission-design-and-operations': '28 Nov 2026', 'spacecraft-dynamics-kinetics': '28 Nov 2026', 'statistical-thermodynamics': '28 Nov 2026', 'theory-of-angular-momentum': '28 Nov 2026', 'approximation-methods': '28 Nov 2026' };;
   function cguSVG(c, g, id) {
     const A = (window.KgCourseGuArt || {})[c.id];
     if (!A || g.stage === 'none') return `<svg viewBox="0 0 110 105" class="kcgu-art" role="img" aria-label="Undiscovered course Gu"><ellipse cx="55" cy="54" rx="26" ry="34" fill="none" stroke="#9c8a6e" stroke-width="1.5" stroke-dasharray="3 5" opacity=".6"/></svg>`;
@@ -17322,7 +17325,7 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
     if (rest.length) groups.push({ h: 'Other courses', items: rest });
     return groups.filter(g => g.items.length);
   }
-  window.KgCourses = { shelfHTML: (...a) => shelfHTML(...a), courseGu, CGU_RANK, CGU_RANK_APPROVED, RETAIN_DAYS, modOf, ARRANGE, arrange, TIERS, mkey, moduleDone, ensureDue, applyGrade, asmLabel, asmBlank, parseJSON: t => parseJ(t), KEY, srtToVtt, lecState, courseState, availOf, resumeOf, record, lecturesOf };
+  window.KgCourses = { shelfHTML: (...a) => shelfHTML(...a), courseGu, CGU_RANK, CGU_RANK_APPROVED, CGU_RANK_DATES, RETAIN_DAYS, modOf, ARRANGE, arrange, TIERS, mkey, moduleDone, ensureDue, applyGrade, asmLabel, asmBlank, parseJSON: t => parseJ(t), KEY, srtToVtt, lecState, courseState, availOf, resumeOf, record, lecturesOf };
   if (!M || !M.PANELS) return;
 
   // ---- where the files come from: a folder you chose (File System Access) or the local server ----
@@ -17409,7 +17412,7 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
     return `<div class="kcgu-panel"><div class="kcgu-big">${cguSVG(c, g, 'cv')}</div><div class="kl-stack">
       <p class="kl-eyebrow">COURSE GU · ${esc(CGU_N[g.stage].toUpperCase())}</p><h3>${esc(g.stage !== 'none' && A ? A.gu : labelOf(c) + ' Gu')}</h3>
       ${g.stage !== 'none' && A ? `<p class="kl-small">${esc(A.design)}</p>` : ''}
-      <p class="kl-small">${r ? `Gu rank ${r} · approved by you (${CGU_RANK_APPROVED})` : 'Gu rank not set'}</p>
+      <p class="kl-small">${r ? `Gu rank ${r} · approved by you (${CGU_RANK_DATES[c.id] || CGU_RANK_APPROVED})` : 'Gu rank not set'}</p>
       <p class="kl-small"><b>Evidence</b></p><ul class="kl-list kl-small">
         ${g.passes.map(p => `<li>✓ ${esc(p.name)} · module passed — ${tierOf(p.tier)} · ${new Date(p.at).toISOString().slice(0, 10)}</li>`).join('') || '<li>No module assessment passed yet.</li>'}
         <li>${g.synth.state === 'passed' ? `✓ Course synthesis passed — ${tierOf(g.synth.tier)} · ${new Date(g.synth.at).toISOString().slice(0, 10)}` : 'Course synthesis: pending'}</li>

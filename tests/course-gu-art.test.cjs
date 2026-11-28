@@ -19,7 +19,11 @@ test('new art uses the shared gradient id the renderer prefixes per instance, an
     assert.ok(!/<script|\son\w+=|href=/i.test(s), id);
   }
 });
-test('the eight proposed ranks are not active until approved', () => {
-  const r = html.slice(html.indexOf('const CGU_RANK = {'), html.indexOf('};', html.indexOf('const CGU_RANK = {')));
-  for (const id of Object.keys(EIGHT)) assert.ok(!r.includes(`'${id}':`), id);
+test('the eight ranks approved 28 Nov 2026, as packaged, each dated', () => {
+  const r = html.slice(html.indexOf('const CGU_RANK = {'), html.indexOf('};', html.indexOf('const CGU_RANK = {')) + 1);
+  const CGU_RANK = new Function('return ' + r.slice(r.indexOf('{')))();
+  const want = { 'introduction-python-scientific-computing': 2, analyze: 3, 'bayesian-statistics': 3, 'space-mission-design-and-operations': 4, 'spacecraft-dynamics-kinetics': 4, 'statistical-thermodynamics': 4, 'theory-of-angular-momentum': 5, 'approximation-methods': 5 };
+  for (const [id, n] of Object.entries(want)) { assert.strictEqual(CGU_RANK[id], n, EIGHT[id]); assert.ok(html.includes(`'${id}': '28 Nov 2026'`), id); }
+  assert.strictEqual(Object.keys(CGU_RANK).length, 37);
+  assert.ok(html.includes('approved by you (${CGU_RANK_DATES[c.id] || CGU_RANK_APPROVED})'));
 });
