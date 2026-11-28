@@ -29,7 +29,7 @@ test('artwork is inert and looks-only: no scripts or links; unearned Gu keep the
   const q = grab('kg-cult-quarters-script'), f = q.slice(q.indexOf('function guSVG'));
   assert.ok(f.indexOf("if (st === 'unstarted')") < f.indexOf('KgGuArt') && f.indexOf("if (st === 'studying')") < f.indexOf('KgGuArt'), 'unearned states return before any design is used');
   assert.match(q, /g\.name === 'Basic Mathematics' \? `<g transform="translate\(\$\{x\} \$\{y\}\) scale\(\.74\)">\$\{serpentSVG/, 'cabinet nook');
-  assert.match(q, /const art = bm \? `<svg viewBox="-130 -70 260 130" class="kq-gu-art"[^\n]*serpentSVG/, 'detail view');
+  assert.match(q, /const art = bm \? `<svg viewBox="-130 -70 260 130" class="kq-gu-art[^"]*"[^\n]*serpentSVG/, 'detail view');
   assert.ok(!/setItem|KgCult\.(earn|readStore)|earned\s*=/.test(grab('kg-gu-art-script')));
 });
 test('the Immortal Gu preview is labelled proposed and awards or unlocks nothing', () => {
