@@ -15,7 +15,7 @@ test('one heading: the old library headings are gone, the explanation sits in de
   assert.ok(html.includes('html body.kt-p-library #kg-strip{display:none!important}'));
 });
 test('disconnected library keeps the last known catalogue; nothing but titles, ids and statuses is cached', () => {
-  assert.ok(html.includes("const CAT = 'kg-library-cat-v1';") && html.includes('phase = \'ready\'; saveCat(index);'));
+  assert.ok(html.includes("const CAT = 'kg-library-cat-v1';") && html.includes('phase = \'ready\'; adopt(index); saveCat(index);'));
   assert.ok(html.includes('<b>Library disconnected</b> · showing the last known catalogue'));
   const save = html.slice(html.indexOf('function saveCat'), html.indexOf('const cached ='));
   assert.ok(!/src|base|url|cookie|session/i.test(save.replace('saveCat', '')), 'no source address or credentials in the cache');

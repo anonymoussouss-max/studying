@@ -17433,6 +17433,21 @@ Recall questions:
 TRANSCRIPT:
 ${String(text).slice(0, 16000)}`;
   const cleanNote = t => { const x = String(t || ''), i = x.search(/Key ideas\s*:/i); return i < 0 ? '' : x.slice(i).trim().slice(0, 6000); };
+  // ---- identity migration (run when a catalogue loads) ----
+  function migrateIds(s, courses) { s.mig = s.mig || {}; s.orphans = s.orphans || {}; const moves = []; let changed = false;
+    for (const c of courses || []) { const L = (c.modules || []).flatMap(m => m.lectures || []), map = {};
+      for (const l of L) if (l.legacy && l.legacy !== l.id) map[l.legacy] = l.id;
+      if (Object.keys(map).length && !s.mig[c.id]) { const pre = c.id + '/', ids = new Set(L.map(l => l.id)), mv = k => { const l = k.slice(pre.length); return map[l] ? pre + map[l] : null; };
+        for (const bag of ['lec', 'rev']) for (const k of Object.keys(s[bag] || {})) { if (!k.startsWith(pre) || ids.has(k.slice(pre.length))) continue; const to = mv(k);
+          if (to && !(to in s[bag])) { s[bag][to] = s[bag][k]; moves.push([k, to]); } else s.orphans[bag + ':' + k] = s[bag][k]; delete s[bag][k]; }
+        for (const n of s.notes || []) if (n.c === c.id && map[n.l]) n.l = map[n.l];
+        if (s.last && s.last.c === c.id && map[s.last.l]) s.last.l = map[s.last.l];
+        s.mig[c.id] = 1; changed = true; }
+      // module assessments: keys hold the module position and name; a module that moved is found again by its name
+      const A = s.asm || {}, names = (c.modules || []).map(m => m.name);
+      for (const k of Object.keys(A)) { const m = /^(.*)#(\d+):(.*)$/.exec(k); if (!m || m[1] !== c.id || names[+m[2]] === m[3]) continue;
+        const at = names.indexOf(m[3]); if (at >= 0 && !A[c.id + '#' + at + ':' + m[3]]) A[c.id + '#' + at + ':' + m[3]] = A[k]; else s.orphans['asm:' + k] = A[k]; delete A[k]; changed = true; } }
+    return { changed, moves }; }
   // ---- pure rules (tested) ----
   const srtToVtt = t => 'WEBVTT\n\n' + String(t || '').replace(/^\uFEFF/, '').replace(/\r/g, '').replace(/^\d+\n(?=\d{2}:\d{2})/gm, '').replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
   const lecturesOf = c => (c.modules || []).flatMap(m => m.lectures || []);
@@ -17508,9 +17523,10 @@ ${String(text).slice(0, 16000)}`;
     const sa = A[mkey(c, 'S')], ra = A[mkey(c, 'R')], sp = passOf(sa), rp = passOf(ra), all = mods.length > 0 && passes.length === mods.length, complete = c.status === 'available';
     const synth = { state: sp ? 'passed' : sa ? 'pending' : 'not due', tier: sa && sa.passed, at: sp && sp.at };
     const opens = sp ? sp.at + RETAIN_DAYS * 864e5 : null, ret = { state: rp ? 'passed' : ra ? 'pending' : sp ? ((now || Date.now()) >= opens ? 'due' : 'opens later') : 'not due', tier: ra && ra.passed, at: rp && rp.at, opens };
-    const proven = all && complete && !!sp, stage = proven && rp ? 'retained' : proven ? 'proven' : passes.length >= 2 ? 'refining' : passes.length ? 'obtained' : 'none';
+    const proven = all && !!sp, stage = proven && rp ? 'retained' : proven ? 'proven' : passes.length >= 2 ? 'refining' : passes.length ? 'obtained' : 'none'; // a passed synthesis needed a complete course; a file that later goes missing never takes an earned stage away
     const pending = [];
-    if (!complete && ws) pending.push('some workshop files are missing from the library folder');
+    if (!complete && proven) pending.push('earned stages are kept; some files are missing or not verified right now, which only affects playback');
+    else if (!complete && ws) pending.push('some workshop files are missing from the library folder');
     else if (!complete) pending.push(c.status === 'wip' ? 'the course download is not verified complete (WIP), so whole-course proof is not possible yet' : 'some lecture files are missing or invalid');
     if (!all) pending.push(ws ? `${passes.length} of ${mods.length} notebook checkpoints passed` : `${mods.length - passes.length} of ${mods.length} module assessment${mods.length === 1 ? '' : 's'} not passed yet`);
     if (!sp) pending.push(ws ? (all && complete ? 'the workshop synthesis' : 'the workshop synthesis (opens after all seven notebook checkpoints pass)') : all && complete ? 'the course synthesis assessment' : 'the course synthesis assessment (opens after every module is passed)');
@@ -17578,7 +17594,7 @@ ${String(text).slice(0, 16000)}`;
     if (rest.length) groups.push({ h: 'Other courses', items: rest });
     return groups.filter(g => g.items.length);
   }
-  window.KgCourses = { shelfHTML: (...a) => shelfHTML(...a), courseGu, WS, WS_FINAL, wsQuestion, CGU_RANK, CGU_RANK_APPROVED, CGU_RANK_DATES, RETAIN_DAYS, modOf, ARRANGE, arrange, TIERS, mkey, moduleDone, ensureDue, applyGrade, asmLabel, asmBlank, parseJSON: t => parseJ(t), KEY, srtToVtt, lecState, courseState, availOf, resumeOf, record, lecturesOf, subjectOf, addWatch, dayAdd, REV_GAPS, REV_CAP, revSync, revRate, revDue, notePrompt, cleanNote };
+  window.KgCourses = { shelfHTML: (...a) => shelfHTML(...a), courseGu, WS, WS_FINAL, wsQuestion, CGU_RANK, CGU_RANK_APPROVED, CGU_RANK_DATES, RETAIN_DAYS, modOf, ARRANGE, arrange, TIERS, mkey, moduleDone, ensureDue, applyGrade, asmLabel, asmBlank, parseJSON: t => parseJ(t), KEY, srtToVtt, lecState, courseState, availOf, resumeOf, record, lecturesOf, migrateIds, subjectOf, addWatch, dayAdd, REV_GAPS, REV_CAP, revSync, revRate, revDue, notePrompt, cleanNote };
   if (!M || !M.PANELS) return;
 
   // ---- where the files come from: a folder you chose (File System Access) or the local server ----
@@ -17603,7 +17619,7 @@ ${String(text).slice(0, 16000)}`;
         let perm = await handle.queryPermission({ mode: 'read' }); if (perm !== 'granted' && interactive) perm = await handle.requestPermission({ mode: 'read' });
         if (perm !== 'granted') { phase = 'reconnect'; return; }
       } else handle = null;
-      index = JSON.parse(await textOf('kaguya-library.json')); phase = 'ready'; saveCat(index); loadedAt = Date.now();
+      index = JSON.parse(await textOf('kaguya-library.json')); phase = 'ready'; adopt(index); saveCat(index); loadedAt = Date.now();
     } catch (e) { index = null; phase = 'error'; loadedAt = Date.now(); err = /fetch|network/i.test(String(e)) ? 'the local library server is not reachable' : /missing|NotFound/i.test(String(e)) ? 'kaguya-library.json was not found in that folder (run tools/library-index.cjs on it first)' : String(e.message || e); }
     if (onCourses() || document.querySelector('[data-kcgu-wait]')) M.render();
   }
@@ -17612,7 +17628,7 @@ ${String(text).slice(0, 16000)}`;
   async function recheck() {
     if (checking || view.l || !store().src || (store().src.kind !== 'url' && !handle) || Date.now() - loadedAt < 15000 || !(phase === 'ready' || phase === 'error')) return;
     checking = true; const before = phase === 'ready' ? sig(index) : '';
-    try { const ix = JSON.parse(await textOf('kaguya-library.json')); index = ix; phase = 'ready'; err = ''; saveCat(ix); if (sig(ix) !== before && onCourses()) M.render(); }
+    try { const ix = JSON.parse(await textOf('kaguya-library.json')); index = ix; phase = 'ready'; err = ''; adopt(ix); saveCat(ix); if (sig(ix) !== before && onCourses()) M.render(); }
     catch (e) { if (phase === 'ready') { index = null; phase = 'error'; err = 'the local library server is not reachable'; if (onCourses()) M.render(); } }
     finally { loadedAt = Date.now(); checking = false; }
   }
@@ -17959,6 +17975,9 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
   const ndb = (mode, fn) => new Promise((ok, no) => { const r = indexedDB.open('kg-lecture-notes', 1); r.onupgradeneeded = () => r.result.createObjectStore('n'); r.onerror = () => no(r.error);
     r.onsuccess = () => { const d = r.result, t = d.transaction('n', mode), q = fn(t.objectStore('n')); t.oncomplete = () => { d.close(); ok(q && q.result); }; t.onerror = () => { d.close(); no(t.error); }; }; });
   const noteGet = k => ndb('readonly', st => st.get(k)).catch(() => null);
+  // saved progress follows stable lecture ids; lecture notes under an old id move with it (never overwriting a note already there)
+  function adopt(ix) { try { const s = store(), r = migrateIds(s, ix && ix.courses); if (r.changed) put(s);
+    for (const [a, b] of r.moves) ndb('readwrite', st => { const g = st.get(a); g.onsuccess = () => { const v = g.result; if (!v) return; const q = st.get(b); q.onsuccess = () => { if (!q.result) { st.put(v, b); st.delete(a); } }; }; return null; }).then(loadNoteKeys, () => {}); } catch (e) {} } // a note already at the new id is never overwritten; the old one then stays under its old key
   window.KgLectureNotes = { dump: async () => { const ks = await ndb('readonly', st => st.getAllKeys()), vs = await ndb('readonly', st => st.getAll()); return (ks || []).map((k, i) => [k, vs[i]]); },
     replace: pairs => ndb('readwrite', st => { st.clear(); for (const [k, v] of pairs) st.put(v, k); return null; }).then(() => { noteKeys = new Set(pairs.map(x => x[0])); }) };
   const notePut = (k, v) => ndb('readwrite', st => st.put(v, k)).then(() => { noteKeys && noteKeys.add(k); });
