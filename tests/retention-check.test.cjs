@@ -21,8 +21,9 @@ function desk({ approved = false } = {}) {
   st.proofs = [{ id: 'pf-old', gu: KEY, state: 'assessed', qs: [], marks: {} }];
   st.ev.push({ id: 'old-1', gu: KEY, skill: 's1', depth: 'developed', how: 'independent', at: t0 - 2 * DAY });
   st.earned = [{ gate: 'r1-initial', at: t0 - 3 * DAY, by: 'you' }];
-  if (approved) st.approvals = { chapterRetention: { at: t0, by: 'you' } };
+  if (approved) st.approvals = { chapterRetention: { at: t0, by: 'you', rules: approved === 'stale' ? ['an older wording'] : null } };
   localStorage.setItem(K.STORE, JSON.stringify(st));
+  if (approved === true) { const s2 = K.readStore(localStorage); s2.approvals.chapterRetention.rules = win.KgRetention.RULES.map(r => r.join(': ')); localStorage.setItem(K.STORE, JSON.stringify(s2)); }
   return { win, M, K, alerts, read: () => K.readStore(localStorage), write: s => localStorage.setItem(K.STORE, JSON.stringify(s)), t0 };
 }
 const J = x => JSON.parse(JSON.stringify(x));
@@ -33,8 +34,9 @@ test('a check cannot start until the four proposed chapter rules are approved; a
   await d.M.ACTIONS.retstart({ dataset: { k: KEY, due: 's1,s2' } });
   assert.ok(!d.read().proof, 'nothing opens before approval');
   d.M.ACTIONS.retapprove(); const a = d.read().approvals.chapterRetention;
-  assert.strictEqual(a.by, 'you'); assert.strictEqual(a.rules.length, 4); assert.match(a.rules[0], /7 days after the passed proof, due by day 14/);
-  assert.match(a.rules[0], /14-day wait belongs to Course Gu/);
+  assert.strictEqual(a.by, 'you'); assert.strictEqual(a.rules.length, 4); assert.match(a.rules[0], /7 calendar days after the passed chapter proof\. Day 14 is a target/);
+  assert.match(a.rules[0], /Course Gu keep their separately approved 14-day schedule/); assert.match(a.rules[2], /8, 16, 24 or 32 minutes/);
+  assert.ok(d.win.KgRetention.approved());
 });
 
 test('double-clicking Start opens one check with the due skills, 8 minutes a question (15 minimum)', async () => {
@@ -80,4 +82,19 @@ test('a retention check never writes a chapter proof pass, and the slip names wh
 
 test('the "one task. phone away" bubble sits above Return to quarters during a session', () => {
   assert.match(html, /body\.kt-on:not\(\.kt-p-home\) #habit-notice\{bottom:calc\(max\(14px,env\(safe-area-inset-bottom\)\) \+ 62px\)\}/);
+});
+
+test('an approval given for different rule wording does not switch checks on', async () => {
+  const d = desk({ approved: 'stale' }); assert.strictEqual(d.win.KgRetention.approved(), false);
+  await d.M.ACTIONS.retstart({ dataset: { k: KEY, due: 's1' } }); assert.ok(!d.read().proof);
+});
+
+test('sizing: one question per due skill, 1 to 4 a sitting; a single remaining skill is a one-question, 8-minute check', async () => {
+  const d = desk({ approved: true }), P = d.win.KgProof, now = Date.now(), t0 = now - 8 * DAY;
+  const six = Array.from({ length: 6 }, (_, i) => ({ id: 'k' + i, name: 'K' + i }));
+  assert.deepStrictEqual(J(P.retention({ proofAt: t0, now, need: six, evidence: [] }).next), ['k0', 'k1', 'k2', 'k3'], 'more than four due: four this sitting');
+  const one = P.retention({ proofAt: t0, now, need: skills.slice(0, 2), evidence: [{ id: 'e', gu: KEY, skill: 's1', how: 'independent', fresh: true, at: now }] });
+  assert.deepStrictEqual(J(one.next), ['s2']);
+  await d.M.ACTIONS.retstart({ dataset: { k: KEY, due: 's2' } }); const s = d.read().proof;
+  assert.strictEqual(s.qs.length, 1); assert.strictEqual(s.limit, 8 * 60000);
 });
