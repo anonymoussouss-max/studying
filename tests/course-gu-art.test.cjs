@@ -7,10 +7,9 @@ const src = html.slice(html.indexOf('const ARRANGE = ['));
 const ARRANGE = new Function('return ' + src.slice(src.indexOf('['), src.indexOf('];') + 1))();
 const EIGHT = { analyze: 'Photon Lynx', 'space-mission-design-and-operations': 'Waystation Tern', 'theory-of-angular-momentum': 'Axis Crown Stag', 'spacecraft-dynamics-kinetics': 'Flywheel Tortoise',
   'statistical-thermodynamics': 'Ember Brood Toad', 'approximation-methods': 'Ripplewing Moth', 'introduction-python-scientific-computing': 'Lattice Newt', 'bayesian-statistics': 'Posterior Cuttle' };
-test('all 37 courses on the path have art, keyed by stable id', () => {
-  const ids = ARRANGE.flatMap(g => g.c.filter(c => c[3] !== 'workshop').map(c => c[0]));
-  assert.strictEqual(ids.length, 37); assert.strictEqual(Object.keys(ART).length, 37);
-  assert.ok(!ART['astronomical-data-in-python'], 'the workshop has no Course Gu');
+test('all 49 courses and the workshop on the path have art, keyed by stable id', () => {
+  const ids = ARRANGE.flatMap(g => g.c.map(c => c[0]));
+  assert.strictEqual(ids.length, 49); assert.strictEqual(Object.keys(ART).length, 49);
   for (const id of ids) assert.ok(ART[id] && ART[id].gu && ART[id].svg.startsWith('<desc>'), id);
   for (const [id, gu] of Object.entries(EIGHT)) assert.strictEqual(ART[id].gu, gu, id);
 });
@@ -25,6 +24,6 @@ test('the eight ranks approved 28 Nov 2026, as packaged, each dated', () => {
   const CGU_RANK = new Function('return ' + r.slice(r.indexOf('{')))();
   const want = { 'introduction-python-scientific-computing': 2, analyze: 3, 'bayesian-statistics': 3, 'space-mission-design-and-operations': 4, 'spacecraft-dynamics-kinetics': 4, 'statistical-thermodynamics': 4, 'theory-of-angular-momentum': 5, 'approximation-methods': 5 };
   for (const [id, n] of Object.entries(want)) { assert.strictEqual(CGU_RANK[id], n, EIGHT[id]); assert.ok(html.includes(`'${id}': '28 Nov 2026'`), id); }
-  assert.strictEqual(Object.keys(CGU_RANK).length, 37);
+  assert.strictEqual(Object.keys(CGU_RANK).length, 49);
   assert.ok(html.includes('approved by you (${CGU_RANK_DATES[c.id] || CGU_RANK_APPROVED})'));
 });

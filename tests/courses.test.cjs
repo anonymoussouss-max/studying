@@ -76,12 +76,12 @@ test('progress: positions, completion at 92%, course states; completion is never
   assert.doesNotMatch(src, /kg-cult-v1|KgCult\.|KgRank\.|KgProof\./);
 });
 
-test('arrangement: 37 courses plus one workshop exactly once in stage order, by id, whatever their download status', () => {
+test('arrangement: 48 courses plus one workshop exactly once in stage order, by id, whatever their download status', () => {
   const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1];
   const ctx = { window: {}, localStorage: { getItem: () => null, setItem() {} } }; ctx.globalThis = ctx; vm.runInNewContext(src, ctx);
   const K = ctx.window.KgCourses, ids = K.ARRANGE.flatMap(g => g.c.map(x => x[0])), courseIds = K.ARRANGE.flatMap(g => g.c.filter(x => x[3] !== 'workshop').map(x => x[0]));
-  assert.strictEqual(ids.length, 38); assert.strictEqual(new Set(ids).size, 38); assert.strictEqual(courseIds.length, 37);
-  assert.deepStrictEqual([...K.ARRANGE.map(g => g.c.length)], [3, 4, 4, 6, 7, 4, 10], '24 main, 3 optional + 1 workshop, 10 reference');
+  assert.strictEqual(ids.length, 49); assert.strictEqual(new Set(ids).size, 49); assert.strictEqual(courseIds.length, 48);
+  assert.deepStrictEqual([...K.ARRANGE.map(g => g.c.length)], [3, 4, 4, 6, 7, 11, 4, 10], '24 main, 11 further, 3 optional + 1 workshop, 10 reference');
   const { WIP } = require('../tools/library-index.cjs');
   for (const w of WIP) assert.ok(ids.includes(w.id), w.id + ': planned courses keep their place on the path');
   // download order and status never move a course; an unknown course falls into "Other courses"; lecture order is untouched
@@ -89,7 +89,7 @@ test('arrangement: 37 courses plus one workshop exactly once in stage order, by 
   const courses = [...ids].reverse().map((id, i) => mk(id, i % 2 ? 'wip' : 'available')).concat(mk('new-course', 'available'));
   const g = K.arrange(courses);
   assert.deepStrictEqual([...g.flatMap(x => x.items.map(i => i.c.id))], [...ids, 'new-course']);
-  assert.strictEqual(g[7].h, 'Other courses'); assert.strictEqual(g[0].items[0].c.modules[0].lectures[0].id, 'b');
+  assert.strictEqual(g[8].h, 'Other courses'); assert.strictEqual(g[0].items[0].c.modules[0].lectures[0].id, 'b');
 });
 
 function assessK() {
@@ -154,10 +154,10 @@ test('Course Gu: a WIP course cannot be proven; missing evidence is pending; ran
   const K = assessK(), c = C2('wip'), s = { lec: {}, notes: [], asm: {} };
   for (const mi of [0, 1]) { const a = K.asmBlank(); a.cur = { id: 'q' }; K.applyGrade(a, 'q', 'pass'); s.asm[K.mkey(c, mi)] = a; }
   const g = K.courseGu(c, s); assert.strictEqual(g.stage, 'refining'); assert.strictEqual(g.canS, false); assert.match(g.pending.join(' '), /WIP/);
-  assert.strictEqual(Object.keys(K.CGU_RANK).length, 37); assert.ok(Object.values(K.CGU_RANK).every(r => Number.isInteger(r) && r >= 1 && r <= 5));
+  assert.strictEqual(Object.keys(K.CGU_RANK).length, 49); assert.ok(Object.values(K.CGU_RANK).every(r => Number.isInteger(r) && r >= 1 && r <= 5));
   const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1]; assert.match(src, /Gu rank \$\{r\} · approved by you/); assert.ok(!/awaiting your approval/.test(src), 'no course Gu rank is shown as a proposal');
   const art = {}; vm.runInNewContext(html.match(/<script id="kg-course-gu-art">([\s\S]*?)<\/script>/)[1], { window: art }); const ids = Object.keys(art.KgCourseGuArt);
-  assert.strictEqual(ids.length, 37); assert.deepStrictEqual([...ids].sort(), [...K.ARRANGE.flatMap(g => g.c.filter(x => x[3] !== 'workshop').map(x => x[0]))].sort(), 'one artwork per course, keyed by the stable course id');
+  assert.strictEqual(ids.length, 49); assert.deepStrictEqual([...ids].sort(), [...K.ARRANGE.flatMap(g => g.c.map(x => x[0]))].sort(), 'one artwork per course, keyed by the stable course id');
   assert.ok(Object.keys(K.CGU_RANK).every(id => ids.includes(id)), 'every approved rank has its artwork; unranked art waits for approval');
   for (const a of Object.values(art.KgCourseGuArt)) assert.ok(!/<script|\son[a-z]+=|href|foreignObject|<image/i.test(a.svg));
 });
