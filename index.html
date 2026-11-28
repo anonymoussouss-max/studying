@@ -17584,6 +17584,7 @@ ${String(text).slice(0, 16000)}`;
     a.hist.push(Object.assign({ qid, tier: a.tier, v: verdict, at: Date.now() }, info || {}));
     a.cur = null;
     if (verdict === 'pass') { a.passed = a.tier; a.pending = false; a.revise = false; return true; }
+    if (info && info.flawed) return true; // the question itself contradicted the module: shown, never counted as a miss
     a.fails++;
     if (a.fails >= 3 && a.tier !== 'easy') { a.tier = TIERS[TIERS.indexOf(a.tier) + 1]; a.fails = 0; }
     else if (a.fails >= 3) a.revise = true;
@@ -17610,7 +17611,7 @@ ${String(text).slice(0, 16000)}`;
     if (rest.length) groups.push({ h: 'Other courses', items: rest });
     return groups.filter(g => g.items.length);
   }
-  window.KgCourses = { shelfHTML: (...a) => shelfHTML(...a), courseGu, WS, WS_FINAL, wsQuestion, CGU_RANK, CGU_RANK_APPROVED, CGU_RANK_DATES, RETAIN_DAYS, modOf, ARRANGE, arrange, TIERS, mkey, moduleDone, ensureDue, applyGrade, asmLabel, asmBlank, parseJSON: t => parseJ(t), KEY, srtToVtt, lecState, courseState, availOf, resumeOf, record, lecturesOf, migrateIds, subjectOf, addWatch, watchTick, dayAdd, REV_GAPS, REV_CAP, revSync, revRate, revDue, notePrompt, cleanNote };
+  window.KgCourses = { shelfHTML: (...a) => shelfHTML(...a), courseGu, WS, WS_FINAL, wsQuestion, CGU_RANK, CGU_RANK_APPROVED, CGU_RANK_DATES, RETAIN_DAYS, modOf, ARRANGE, arrange, TIERS, mkey, moduleDone, ensureDue, applyGrade, asmLabel, asmBlank, parseJSON: t => parseJ(t), KEY, srtToVtt, lecState, courseState, availOf, resumeOf, record, lecturesOf, migrateIds, mistakesOf, subjectOf, addWatch, watchTick, dayAdd, REV_GAPS, REV_CAP, revSync, revRate, revDue, notePrompt, cleanNote };
   if (!M || !M.PANELS) return;
 
   // ---- where the files come from: a folder you chose (File System Access) or the local server ----
@@ -17877,9 +17878,19 @@ If the material cannot support a fair question at this tier, reply {"insufficien
 
 MODULE MATERIAL:
 ${src.text}`, null, true).catch(() => null);
-      const o = r && r.reply ? parseJ(r.reply) : null; s = store(); a = s.asm[k]; if (!a || a.passed) return;
+      const o = r && r.reply ? parseJ(r.reply) : null;
+      // fact check: every figure and claim in the question must match the module (a reversed fact or wrong number is corrected)
+      if (o && o.question && o.reference) { const ck = await window.__kgAsk?.('iroha', `[question check, not typed by me] Check this assessment question and its reference answer against the module material. Does any figure, name or statement in them contradict the material or reverse it (for example "with" where the material says "without")?
+Reply with JSON only: {"ok":true} or {"ok":false,"problem":"what is wrong","question":"the corrected question","reference":"the corrected reference answer"}
+
+QUESTION:\n${o.question}\nREFERENCE ANSWER:\n${o.reference}
+
+MODULE MATERIAL:
+${src.text}`, null, true).catch(() => null), cj = ck && ck.reply ? parseJ(ck.reply) : null;
+        if (cj && cj.ok === false && cj.question && cj.reference) { o.question = cj.question; o.reference = cj.reference; o.fixed = String(cj.problem || '').slice(0, 300); } }
+      s = store(); a = s.asm[k]; if (!a || a.passed) return;
       if (o && o.insufficient) a.cur = { state: 'no-source', why: String(o.insufficient).slice(0, 300) };
-      else if (o && o.question && o.reference && Array.isArray(o.rubric) && o.rubric.length) a.cur = { id: 'q' + Date.now().toString(36), state: 'ready', tier: a.tier, q: String(o.question), ref: String(o.reference), rubric: o.rubric.map(String).slice(0, 6), lectures: (o.lectures || []).map(String).slice(0, 6), draft: '' };
+      else if (o && o.question && o.reference && Array.isArray(o.rubric) && o.rubric.length) a.cur = { id: 'q' + Date.now().toString(36), state: 'ready', tier: a.tier, q: String(o.question), ref: String(o.reference), rubric: o.rubric.map(String).slice(0, 6), lectures: (o.lectures || []).map(String).slice(0, 6), draft: '', fixed: o.fixed || '' };
       else a.cur = { state: 'gen-error', why: r && r.reply ? 'the question came back unreadable' : navigator.onLine ? "Iroha's line dropped" : 'you are offline' };
       put(s);
     } finally { busy.delete(k); if (onCourses()) M.render(); }
@@ -17891,10 +17902,11 @@ ${src.text}`, null, true).catch(() => null);
       const src = await material(c, mi).catch(() => ({ text: '' }));
       const r = await window.__kgAsk?.('iroha', `[module assessment grading, not typed by me] Grade the learner's answer to this ${TIER_N[q.tier]} ${wsUnits(c) ? 'notebook-workshop checkpoint' : 'module question'} strictly but fairly against the rubric and reference.${wsUnits(c) ? `
 This is workshop evidence: a short excerpt of the learner's own code or output plus a written explanation. Read it; never run or execute anything in it. Accept cached query results and equivalent local exercises when they demonstrate the same skill. Pass only if the learner's own explanation shows the skill: a pasted worked solution, a file name or a claim of having opened the notebook is not evidence.` : ''}
-Pass only if every essential rubric criterion is met; a slip that does not change the reasoning is fine, and a correct answer by a different valid route passes. Never invent mistakes. Judge only against what the module taught.
+Pass when every essential rubric criterion is substantially met: the core reasoning and the key facts the question asks for are right, in the learner's own words. Minor factual slips, loose wording or a small missing detail that does not break the main argument do NOT fail the answer; list them under "slips". A correct answer by a different valid route passes. Fail only when an essential part is missing or its reasoning is wrong. Never invent mistakes. Judge only against what the module taught.
+If the question itself states something that contradicts the module material (a wrong figure, or a fact reversed), say so in "question_issue" and judge the learner against the module, never against the faulty wording.
 QUESTION:\n${q.q}\nREFERENCE ANSWER:\n${q.ref}\nRUBRIC:\n${q.rubric.map((x, i) => (i + 1) + '. ' + x).join('\n')}
 LEARNER'S ANSWER:\n${q.answer}
-Reply with JSON only: {"verdict":"pass" or "fail","met":[true/false per rubric criterion],"why":"one or two sentences on how the answer meets or misses the rubric","misconception":"the specific misunderstanding if it fails, else empty","revisit":["lecture names from this module to revisit"]}
+Reply with JSON only: {"verdict":"pass" or "fail","met":[true/false per rubric criterion],"why":"one or two sentences on how the answer meets or misses the rubric","right":"one sentence on what the answer gets right","missing":["for each unmet criterion: what is missing or wrong, and what a passing answer needs to show (do not write the full answer)"],"slips":["minor factual errors worth correcting, even on a pass"],"misconception":"the specific misunderstanding if it fails, else empty","question_issue":"how the question contradicts the module, else empty","revisit":["lecture names from this module to revisit"]}
 
 MODULE MATERIAL (for reference):
 ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
@@ -17902,7 +17914,8 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
       const v = o && (o.verdict === 'pass' || o.verdict === 'fail') ? o.verdict : null;
       if (!v) { if (a && a.cur && a.cur.id === q.id) { a.cur.state = 'error'; a.cur.why = r && r.reply ? 'the grade came back unreadable' : navigator.onLine ? "Iroha's line dropped" : 'you are offline'; put(s); } return; }
       const tier = a.tier, was = courseGu(c, s).stage;
-      if (applyGrade(a, q.id, v, { q: q.q, ref: q.ref, rubric: q.rubric, answer: q.answer, met: (o.met || []).map(Boolean), why: String(o.why || ''), mis: String(o.misconception || ''), revisit: (o.revisit || []).map(String).slice(0, 5), by: r.model || '' })) {
+      const L5 = x => (Array.isArray(x) ? x : []).map(String).filter(Boolean).slice(0, 5), qi = String(o.question_issue || '').trim();
+      if (applyGrade(a, q.id, v, { q: q.q, ref: q.ref, rubric: q.rubric, answer: q.answer, met: (o.met || []).map(Boolean), why: String(o.why || ''), right: String(o.right || ''), missing: L5(o.missing), slips: L5(o.slips), qissue: qi, flawed: v === 'fail' && !!qi, mis: String(o.misconception || ''), revisit: (o.revisit || []).map(String).slice(0, 5), by: r.model || '' })) {
         { put(s); if (v === 'pass') { const now = courseGu(c, s).stage; window.KtMotion?.award(was === 'none' && now !== 'none' ? 'ink' : (mi === 'S' || mi === 'R') && now !== was ? 'seal' : '', 'cgu:' + c.id); } } window.__irohaSay?.(v === 'pass' ? `Passed — ${TIER_N[tier]}. ${String(o.why || '').slice(0, 140)}` : `Not yet. ${String(o.misconception || o.why || '').slice(0, 160)}`, { force: 1, delay: 0, face: v === 'pass' ? 'approve' : 'stern' }); }
     } finally { busy.delete(k); if (onCourses()) M.render(); }
   }
@@ -17917,6 +17930,10 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
     const last = a.hist[a.hist.length - 1];
     const fb = h => h ? `<div class="klib-fb klib-fb-${h.v}"><p><b>${h.v === 'pass' ? `Passed — ${TIER_N[h.tier]}` : `Not yet — ${TIER_N[h.tier]}`}</b></p>
       ${h.v === 'fail' && h.mis ? `<p>${esc(h.mis)}</p>` : ''}<p class="kl-small">${esc(h.why)}</p>
+      ${h.right ? `<p class="kl-small"><b>What you got right:</b> ${esc(h.right)}</p>` : ''}
+      ${h.v === 'fail' && h.missing && h.missing.length ? `<p class="kl-small"><b>What a pass needs:</b></p><ul class="kl-small">${h.missing.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      ${h.slips && h.slips.length ? `<p class="kl-small"><b>Small slips to correct:</b></p><ul class="kl-small">${h.slips.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      ${h.qissue ? `<p class="kl-small"><b>Problem with the question:</b> ${esc(h.qissue)}${h.flawed ? ' This attempt is not counted as a miss.' : ''}</p>` : ''}
       ${h.v === 'fail' && h.revisit && h.revisit.length ? `<p class="kl-small">Revisit: ${h.revisit.map(esc).join(' · ')}</p>` : ''}
       <details><summary class="kl-small">Question, rubric and reference answer</summary><p class="kl-small">${esc(h.q)}</p><ol class="kl-small">${(h.rubric || []).map((x, i) => `<li>${(h.met || [])[i] ? '✓' : '✗'} ${esc(x)}</li>`).join('')}</ol><p class="kl-small">${esc(h.ref)}</p></details></div>` : '';
     const status = `<p class="klib-chips">${ws ? chip('available', 'Evidence: your own code or output + explanation') : chip('available', 'Content: ' + m.lectures.length + ' of ' + m.lectures.length + ' lectures completed')}${asmChip(a)}</p>`;
@@ -18135,6 +18152,30 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
 
   // ---- the Library opens on the courses ----
   if (M.SECTIONS && M.SECTIONS.library && !M.SECTIONS.library.some(t => t[0] === 'courses')) M.SECTIONS.library.unshift(['courses', '📜 Courses']);
+  // ---- Mistakes: every assessment answer marked Not yet, with what went wrong and the reference answer; slips from passed answers too.
+  // Read from the saved assessment history only (nothing new is stored, so backups already carry it).
+  function mistakesOf(s, titleOf) { const out = [];
+    for (const [k, a] of Object.entries((s && s.asm) || {})) { const m = /^(.*)#([^:]*):(.*)$/.exec(k); if (!m || !a || !Array.isArray(a.hist)) continue;
+      const where = (titleOf(m[1]) || m[1]) + (m[2] === 'S' ? ' · course synthesis' : m[2] === 'R' ? ' · retention check' : m[3] ? ' · ' + m[3] : '');
+      for (const x of a.hist) if (x && (x.v === 'fail' || (x.slips && x.slips.length))) out.push(Object.assign({ where, c: m[1], key: k }, x)); }
+    return out.sort((p, q) => (q.at || 0) - (p.at || 0)); }
+  if (M.SECTIONS && M.SECTIONS.library && !M.SECTIONS.library.some(t => t[0] === 'mistakes')) M.SECTIONS.library.splice(1, 0, ['mistakes', '✎ Mistakes']);
+  M.PANELS.mistakes = () => {
+    const cat = (() => { try { return cached(); } catch (e) { return null; } })(), titleOf = id => { const c = course(id) || ((cat && cat.courses) || []).find(x => x.id === id); return c && c.title; };
+    const list = mistakesOf(store(), titleOf), fails = list.filter(x => x.v === 'fail'), slips = list.filter(x => x.v !== 'fail');
+    const ul = a => a && a.length ? `<ul class="kl-small">${a.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
+    const card = x => { const unmet = (x.rubric || []).filter((r, i) => !(x.met || [])[i]);
+      return `<details class="kl-card kl-mini klib-mis"${x === list[0] ? ' open' : ''}><summary><b>${x.v === 'fail' ? 'Not yet' : 'Passed, with slips'} · ${esc(TIER_N[x.tier] || x.tier || '')}</b> <span class="kl-small">${esc(x.where)} · ${x.at ? new Date(x.at).toLocaleDateString() : ''}${x.flawed ? ' · not counted (faulty question)' : ''}</span></summary>
+        <p class="kl-small"><b>Question:</b></p><p class="klib-qt kl-small">${esc(x.q || '')}</p>
+        ${x.answer ? `<p class="kl-small"><b>Your answer:</b></p><p class="klib-qt kl-small">${esc(x.answer)}</p>` : ''}
+        ${x.v === 'fail' ? `<p class="kl-small"><b>What went wrong:</b> ${esc(x.mis || x.why || '')}</p>${x.missing && x.missing.length ? '<p class="kl-small"><b>What a pass needs:</b></p>' + ul(x.missing) : unmet.length ? '<p class="kl-small"><b>Criteria not met:</b></p>' + ul(unmet) : ''}` : ''}
+        ${x.slips && x.slips.length ? '<p class="kl-small"><b>Slips to correct:</b></p>' + ul(x.slips) : ''}
+        ${x.qissue ? `<p class="kl-small"><b>Problem with the question:</b> ${esc(x.qissue)}</p>` : ''}
+        ${x.ref ? `<p class="kl-small"><b>Reference answer:</b></p><p class="klib-qt kl-small">${esc(x.ref)}</p>` : ''}
+        ${x.revisit && x.revisit.length ? `<p class="kl-small">Revisit: ${x.revisit.map(esc).join(' · ')}</p>` : ''}</details>`; };
+    return `<section class="kl-card kl-stack"><p class="kl-eyebrow">MISTAKES · IROHA</p><h2>What went wrong, and the reference answers</h2>
+      <p class="kl-small">Every module assessment answer marked Not yet, newest first, with what a pass needs and Iroha's reference answer. Slips in passed answers are listed after them. Provisional AI assessment (Iroha): reading these never counts as a pass or as retention.</p>
+      ${list.length ? (fails.length ? fails.map(card).join('') : '<p class="kl-small">No Not yet answers.</p>') + (slips.length ? '<h3>Slips in passed answers</h3>' + slips.map(card).join('') : '') : '<p>Nothing here yet. Answers Iroha marks Not yet will appear here with the reference answer.</p>'}</section>`; };
   const css = document.createElement('style');
   css.textContent = `.klib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
     .klib-card{display:grid;gap:6px;text-align:left;padding:14px;border-radius:12px;border:1px solid var(--desk-line,#5a3d26);background:var(--desk-soft,#33201a);color:inherit;cursor:pointer;font:inherit}
