@@ -489,7 +489,7 @@
 #ame-journal article { border-top:1px solid #2f2960; padding:12px 0; }
 #ame-journal h3 { font-size:13px; font-weight:700; }
 #ame-journal p { white-space:pre-wrap; }
-@media (prefers-reduced-motion:reduce) { #ame-gif { animation:none!important; transition:none!important; } }
+@media (prefers-reduced-motion:reduce) { #ame-gif, #ame-bubble, #iroha-bubble { animation:none!important; transition:none!important; } html body.kg-simple { transition:none!important; } }
 
 </style>
 <style>
@@ -4214,8 +4214,11 @@ Reply to ${other} directly and by name, in your own voice. Say what you really t
       <div class="hb-actions"><button type="submit" class="hb-primary">Press play · start</button>${button('Just 5 minutes','minimum')}${button('I can’t get started','rescue')}${button(desk().sound?'Sound: on':'Sound: off','sound')}</div>
       <p id="hb-form-error" role="alert"></p></form>`;
   }
+  // subject · topic · task, without repeating a part another part already says (many starts pass the topic as the task too)
+  function sessionLabel(a) { const parts = [a.subject, a.topic, a.task].map(x => String(x || '').trim()).filter(Boolean), low = parts.map(x => x.toLowerCase());
+    return parts.filter((x, i) => !low.some((y, j) => j !== i && (y === low[i] ? j < i : y.includes(low[i])))).join(' · '); }
   function activeView(a) {
-    return `<p>${esc(a.subject)} · ${esc(a.topic)} · ${esc(a.task)}</p><div class="hb-timer" id="hb-clock" role="timer" aria-label="Session time remaining">${clock(a.open?C.elapsed(a):a.targetMs-C.elapsed(a))}</div><p id="hb-timer-caption" class="hb-caption">${a.running?'Focused minutes accumulate while this timer runs.':'Paused. Your work is saved.'}</p>
+    return `<p class="hb-session-label">${esc(sessionLabel(a))}</p><div class="hb-timer" id="hb-clock" role="timer" aria-label="Session time remaining">${clock(a.open?C.elapsed(a):a.targetMs-C.elapsed(a))}</div><p id="hb-timer-caption" class="hb-caption">${a.running?'Focused minutes accumulate while this timer runs.':'Paused. Your work is saved.'}</p>
       ${a.phase!=='closeout'?`<details class="hb-parking"><summary>Something pulling your attention? Park it here.</summary><form id="hb-distraction"><label>Deal with it after this session<input name="thought" maxlength="240" required placeholder="e.g. Look up headphones later"></label><button type="submit">Park & return</button></form><ul>${(a.distractions || []).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`:''}
       ${a.phase==='closeout'?closeoutForm(a):`<div class="hb-actions">${button(a.running?'Pause':'Resume','pause','class="hb-primary"')}${button(a.noRecall?'End session':'End & recall','end')}${button('5-minute break','break')}</div><p class="hb-caption">End ritual: a win, a mood, and three things remembered without peeking. A timed session never silently saves a full block.</p>`}`;
   }
