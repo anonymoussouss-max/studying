@@ -1052,9 +1052,19 @@ body.habit-shh #hb-session-card {text-align:center;}
     study.sort((a,b)=>a.s-b.s);
     // blockers (exam attendance and travel, food breaks you asked for) cut study, they never move anchors
     const cuts=[];
-    const queue=(o.blockers||[]).slice();
-    for(let qi=0;qi<queue.length;qi++){const b=queue[qi],s=Math.max(W+30,b.s),e=Math.min(T_READY,b.e);if(e-s<5)continue;
-      if(!b.meal)for(let k=seg.length-1;k>=0;k--){const x=seg[k];if(x.kind!=='life'||!/^(lunch|snacks|dinner)/.test(x.id)||x.e<=s||x.s>=e)continue;seg.splice(k,1);queue.push({s:e,e:e+(x.e-x.s),id:x.id,title:x.title,meal:true});}
+    // fixed rows (meals, personal commitment, reading, getting ready, exams) keep their exact clock times. Exams go in first;
+    // a food break that would overlap a fixed row moves to the nearest free time next to it (just before, else just after).
+    const isFixed=x=>x.kind==='life'&&!x.brk&&x.id!=='piano'&&!/^food-/.test(x.id||'');
+    const queue=(o.blockers||[]).filter(b=>!/^food-/.test(b.id||'')).concat((o.blockers||[]).filter(b=>/^food-/.test(b.id||'')));
+    for(let qi=0;qi<queue.length;qi++){let b=queue[qi];
+      if(/^food-/.test(b.id||'')){const len=b.e-b.s,fx=seg.filter(isFixed),hit=y=>fx.some(x=>x.s<y+len&&x.e>y);
+        if(hit(b.s)){const f0=fx.filter(x=>x.s<b.e&&x.e>b.s).sort((p,q)=>p.s-q.s)[0];
+          let t1=f0.s-len;while(t1>=W+30&&hit(t1)){const nx=fx.filter(x=>x.s<t1+len&&x.e>t1).reduce((m,x)=>Math.min(m,x.s),t1+len)-len;t1=nx<t1?nx:t1-5;}
+          let t2=f0.e;while(t2+len<=T_READY&&hit(t2)){const nx=fx.filter(x=>x.s<t2+len&&x.e>t2).reduce((m,x)=>Math.max(m,x.e),t2);t2=nx>t2?nx:t2+5;}
+          const c1=t1>=W+30?t1:null,c2=t2+len<=T_READY?t2:null;let at=c1==null?c2:c2==null?c1:(b.s-c1<=c2-b.s?c1:c2);
+          if(at==null)continue;b=Object.assign({},b,{s:at,e:at+len,title:b.title+' · moved from '+clk(b.s)+' (fixed time)'});}}
+      const s=Math.max(W+30,b.s),e=Math.min(T_READY,b.e);if(e-s<5)continue;
+      if(!b.meal&&!/^food-/.test(b.id||''))for(let k=seg.length-1;k>=0;k--){const x=seg[k];if(x.kind!=='life'||!/^(lunch|snacks|dinner)/.test(x.id)||x.e<=s||x.s>=e)continue;seg.splice(k,1);queue.push({s:e,e:e+(x.e-x.s),id:x.id,title:x.title,meal:true});}
       for(let k=study.length-1;k>=0;k--){const x=study[k];if(x.e<=s||x.s>=e)continue;cuts.push({role:x.role,m:Math.min(x.e,e)-Math.max(x.s,s)});
         if(x.s<s&&x.e>e){study.splice(k+1,0,Object.assign({},x,{s:e}));x.e=s;}else if(x.s<s)x.e=s;else if(x.e>e)x.s=e;else study.splice(k,1);}
       for(let k=seg.length-1;k>=0;k--){const x=seg[k];if(x.kind==='life'&&!x.brk)continue;if(x.e<=s||x.s>=e)continue;if(x.s<s&&x.e>e){seg.splice(k+1,0,Object.assign({},x,{s:e,id:x.id+'b'}));x.e=s;}else if(x.s<s)x.e=s;else if(x.e>e)x.s=e;else seg.splice(k,1);}
@@ -1069,7 +1079,16 @@ body.habit-shh #hb-session-card {text-align:center;}
       if(!(at!=null&&fits(at))){const g=freeAfter(all.filter(y=>y.kind!=='rest'),lastStudy,len,T_READY);at=g?g.s:null;}
       if(at!=null)seg.push({s:at,e:at+len,kind:'life',id:'piano',title:'Piano'});}
     const all=seg.concat(study.map(x=>Object.assign({kind:'study'},x))).sort((a,b)=>a.s-b.s),out=[];let t=W;
-    for(const x of all){if(x.s>t)out.push({s:t,e:x.s,kind:'rest',id:'free-'+t,title:t>=lastStudy?'Free time · nothing owed':'Free time'});if(x.e<=t)continue;out.push(Object.assign({},x,{s:Math.max(x.s,t)}));t=Math.max(t,x.e);}
+    for(const x of all){if(x.s>t)out.push({s:t,e:x.s,kind:'rest',id:'free-'+t,title:t>=lastStudy?'Free time · nothing owed':'Free time'});
+      if(x.s<t&&isFixed(x)){
+        // a fixed row is never cropped: a flexible row before it gives way (any remainder continues after it);
+        // two fixed rows that overlap both keep their times, and the later one names the clash
+        const p=out[out.length-1];let rem=null;
+        if(p&&!isFixed(p)&&p.e>x.s){if(p.e>x.e)rem=Object.assign({},p,{s:x.e});p.e=x.s;if(p.e-p.s<5)out.pop();}
+        const q=out.filter(y=>isFixed(y)&&y.e>x.s).pop();
+        out.push(q?Object.assign({},x,{conflict:true,title:x.title+' · overlaps '+q.title}):Object.assign({},x));
+        if(rem&&rem.e-rem.s>=5){out.push(rem);t=Math.max(rem.e,x.e);}else t=Math.max(t,x.e);continue;}
+      if(x.e<=t)continue;out.push(Object.assign({},x,{s:Math.max(x.s,t)}));t=Math.max(t,x.e);}
     if(t<T_BED)out.push({s:t,e:T_BED,kind:'rest',id:'free-'+t,title:'Free time · nothing owed'});
     out.push({s:T_BED,e:W+1440,kind:'sleep',id:'sleep',title:'Sleep · protected'});
     out.cuts=cuts;return out;
