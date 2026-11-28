@@ -1226,7 +1226,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     let W=W0!=null?W0:(PLAN_WAKE[chosen]||720);
     const plan=resolve(chosen,W);
     const examDays=[],prep=S.exams.find(x=>x&&x.from&&x.end&&x.from<=dayIso&&dayIso<=x.end);
-    for(const x of S.exams)for(const d of (x&&x.days)||[])if(d&&d.d===dayIso){const at=+d.at,len=Math.max(180,+d.len||180),tr=Math.max(0,+d.travel||45);if(at>0)examDays.push({s:at-tr,e:at+len+tr,id:'exam-'+at,title:`${x.name||'Diploma exam'} · travel, exam and breaks`});}
+    for(const x of S.exams)for(const d of (x&&x.days)||[])if(d&&d.d===dayIso){const at=+d.at,len=Math.max(180,+d.len||180),tr=(d.travel!=null&&d.travel!==''&&isFinite(+d.travel)?Math.max(0,+d.travel):45);if(at>0)examDays.push({s:at-tr,e:at+len+tr,id:'exam-'+at,title:`${x.name||'Diploma exam'} · travel, exam and breaks`});}
     const food=((S.food||{})[dayIso]||[]).filter(f=>f&&+f.at>0).map((f,i)=>({s:+f.at,e:+f.at+Math.max(10,Math.min(45,+f.len||20)),id:'food-'+i,title:'Food break'}));
     const GR=gentleOf(S,dayIso),hrs=GR?0:dayHours(S,dayIso),rd=S.reading!==false,opt=p=>({astro:astroMinutes(S,dayIso),reading:rd,extend:!rd&&(GR?true:hrs?hrs>=7:!!(S.extend||{})[dayIso])&&!['sunday','gentle','reduced','stop'].includes(p),german:GR&&!(GR.cap&&GR.picks.includes('german'))?0:prep?(S.germanExam==='pause'?0:S.germanExam==='light'?15:S.german):S.german,pianoAt:(S.piano||{})[dayIso],pianoLen:S.pianoLen,budget:hrs?(hrs<6?hrs*60:undefined):WEEK_BUDGET[(S.weekSize||{})[mondayOf(dayIso)]]||undefined,blockers:examDays.concat(food),edits:((S.edits||{})[dayIso]||[])});
     // switching plan mid-day keeps everything before the switch as it was and re-plans only what is left
@@ -1403,8 +1403,10 @@ body.habit-shh #hb-session-card {text-align:center;}
       let all,src;if(off){all=0;src='day off';}else if(GR){all=GR.stopped||!GR.cap?0:dow===0?Math.min(90,GR.cap):GR.cap;src=GR.stopped?'Done for today':'Gentle Return'+(GR.cap?' cap':' (no maximum set)');}
       else if(dow===0){all=90;src='Sunday';}
       else{const h=dayHours(S,d)||6;all=h*60;src=h+' h';}
-      const ger=off||!all?0:dow===0?Math.min(30,all):Math.min(all,+S.german||0),ast=dow===0||!all?0:Math.min(all-ger,astroMinutes(S,d)),pcm=Math.max(0,all-ger-ast);
-      days.push({d,src,all,german:ger,astro:ast,pcm});week+=pcm;}
+      const ger=off||!all?0:dow===0?Math.min(30,all):Math.min(all,+S.german||0),ast=dow===0||!all?0:Math.min(all-ger,astroMinutes(S,d));let pcm=Math.max(0,all-ger-ast);
+      // a date the planner can lay out counts the PCM it actually schedules (Stop for today, exam days, reading and fixed times included)
+      let fromPlan=false;if(!off)try{const t=templateDay(L,d,dow,0,{used:0,loggedAny:true});if(t&&Array.isArray(t.rows)){pcm=t.rows.filter(r=>r.kind==='study'&&/^(maths|physics|chem)$/.test(r.subj)).reduce((n,r)=>n+Math.max(0,r.e-r.s),0);fromPlan=true;}}catch(e){}
+      days.push({d,src:fromPlan?src+' · from the day plan':src,all,german:ger,astro:ast,pcm,fromPlan});week+=pcm;}
     const dip=+((S.diploma.heavy||{})[mondayOf(from)])||+S.diploma.week||0;
     return {days,diploma:dip,weekly:Math.max(0,week-dip)};}
   // recorded lecture sources (chapter, lecture numbers, listed durations, source track). Recorded only, not used in the calculation.
@@ -1419,7 +1421,7 @@ body.habit-shh #hb-session-card {text-align:center;}
     return ['minutes per lecture (low–high; defaults unless marked "your logs"): '+row('lecture','lecture')+'; '+row('reattempt','class re-attempts')+'; '+row('homework','homework (Maths: TAH/KCLS + KTK)')+'; '+row('retries','extra retries of missed questions'),
       'playback speed: not set, so lectures count at their listed length; DPP and module practice: not confirmed, not counted',
       'plus 10–25% for older-topic practice and tests',
-      'capacity: the allowance selected this week ('+[...new Set(cap.days.filter(x=>x.all).map(x=>x.src))].join(', ')+') minus German, astrophysics and '+cap.diploma+' min diploma = '+planned+' min PCM a week',
+      'capacity: the PCM minutes this week'+"'"+'s day plans schedule ('+[...new Set(cap.days.filter(x=>x.all).map(x=>x.src))].join(', ')+'; German, astrophysics, breaks, reading and fixed times already left out) minus '+cap.diploma+' min diploma = '+planned+' min PCM a week',
       'Sunday is 60 min PCM + 30 min German; nothing else is added',
       'Class 11 counts confirmed 26 Nov 2026; Class 12 counts are Lakshya JEE planner proxies (chapter by chapter) until the Lakshya JEE 2028 chapter plan exists, so the completion date stays pending; recorded runtimes replace the estimate only for chapters whose batch, chapter, teacher and core count all match']
       .concat(TRACKS.map(t=>t.chapter+' source ('+t.track+'): '+t.lectures+' numbered lectures; '+t.durations.map(d=>'lectures '+d.from+'–'+d.to+' total '+hms(d.secs)+' at 1×').join(', ')+(t.partial?'; lectures '+t.unverified.join(', ')+' not yet verified, so the total is partial':'; complete')+' (recorded, not used in the calculation)'));
@@ -9038,7 +9040,7 @@ Format: first line exactly "VERDICT: VALID" or "VERDICT: NOT VALID". Then your r
     kgmeds: v => { const s = String(v.at || '').trim(); if (!s) { delete L.medsAt; return redo(); } const c = readClock(s); if (c == null || c < 1080 || c > 1525) return toast('pick a time between 6 PM and 1:25 AM 🌙'); L.medsAt = c - 630; redo(`reminder at ${clk(c)} 🌙`); },
     kgdexam: v => { if (!v.from || !v.end || v.end < v.from) return toast('the last exam has to be on or after the start 🌙'); S().exams.push({ id: 'ex' + Date.now().toString(36), name: String(v.name || 'Diploma exams').slice(0, 60), from: v.from, end: v.end, days: [] }); S().germanExam = ['light', 'pause', 'normal'].includes(v.g) ? v.g : 'light'; audit('exam period', v.from + ' to ' + v.end); redo('exam period saved. diploma comes first from that date 🌙'); },
     kgdexamday: v => { const at = readClock(v.at); if (!v.d || at == null) return; let x = S().exams.find(e => e.from <= v.d && v.d <= e.end); if (!x) { x = { id: 'ex' + Date.now().toString(36), name: 'Diploma exams', from: M.add(v.d, -10), end: v.d, days: [] }; S().exams.push(x); }
-      x.days = (x.days || []).filter(dd => dd.d !== v.d).concat([{ d: v.d, at, len: Math.max(180, +v.len || 180), travel: Math.max(0, +v.travel || 45) }]); audit('exam day', v.d + ' ' + clk(at)); redo('exam time reserved, with travel and breaks 🌙'); },
+      x.days = (x.days || []).filter(dd => dd.d !== v.d).concat([{ d: v.d, at, len: Math.max(180, +v.len || 180), travel: (v.travel!=null&&v.travel!==''&&isFinite(+v.travel)?Math.max(0,+v.travel):45) }]); audit('exam day', v.d + ' ' + clk(at)); redo('exam time reserved, with travel and breaks 🌙'); },
     kgd12: v => { const y = String(v.y || ''); if (!SP().L12.years[y]) return; if (SP().applyScenario12(syl(), y)) { audit('Class 12 proxy scenario', y); redo('Class 12 proxy switched to the ' + y + ' planners. Progress kept by chapter 🌙'); } },
     kgdsyl: v => { const sy = syl(); for (const [id, c] of Object.entries(sy.courses)) { c.done = c.done || [];
         (c.chapters || []).forEach((x, k) => { const n = v['n_' + id + '_' + k], dn = v['d_' + id + '_' + k]; if (n !== undefined && n !== '') x[1] = Math.max(1, Math.min(400, +n)); if (dn !== undefined && dn !== '') c.done[k] = Math.max(0, Math.min(x[1] || 400, +dn)); });
@@ -13986,7 +13988,7 @@ html[data-desk-theme] body #kg-main .kg-act small{color:var(--desk-muted)}
     diploma: o => { const m = Math.round(+o.week / 15) * 15; need(m >= 0 && m <= 600, 'diploma week 0 to 10 h'); const sc = S(), mon = SP().schedCtx(today()).monday; if (o.default) sc.diploma.week = m; else sc.diploma.heavy[mon] = m; L().sched = sc; return `diploma this week ${m} min`; },
     exam: o => { need(o.from && o.end && o.end >= o.from, 'exam period needs from and end dates'); const sc = S(); sc.exams.push({ id: 'ex' + Date.now().toString(36), name: String(o.name || 'Diploma exams').slice(0, 60), from: dayOf(o.from), end: dayOf(o.end), days: [] }); if (['light', 'pause', 'normal'].includes(o.german)) sc.germanExam = o.german; L().sched = sc; return `exam period ${o.from} to ${o.end}`; },
     examday: o => { const d = dayOf(o.date || o.d), at = clockOf(o.at, 'exam'), sc = S(); let x = sc.exams.find(e => e.from <= d && d <= e.end); if (!x) { x = { id: 'ex' + Date.now().toString(36), name: 'Diploma exams', from: M.add(d, -10), end: d, days: [] }; sc.exams.push(x); }
-      x.days = (x.days || []).filter(y => y.d !== d).concat([{ d, at, len: Math.max(180, +o.len || 180), travel: Math.max(0, +o.travel || 45) }]); L().sched = sc; return `exam ${d} at ${clk(at)}`; },
+      x.days = (x.days || []).filter(y => y.d !== d).concat([{ d, at, len: Math.max(180, +o.len || 180), travel: (o.travel!=null&&o.travel!==''&&isFinite(+o.travel)?Math.max(0,+o.travel):45) }]); L().sched = sc; return `exam ${d} at ${clk(at)}`; },
     block: o => { const d = dayOf(o.date), { r, from } = findRow(d, String(o.block || o.id || o.from || '')), s = clockOf(o.start, 'start'), e = clockOf(o.end, 'end'); need(e - s >= 5, 'end must be after start');
       const sc = S(); sc.edits[d] = (sc.edits[d] || []).filter(x => x.from !== from).concat([{ from, s, e }]); L().sched = sc; M.save(); // the planner reads the saved copy
       const after = SP().fallback(new Date(d + "T12:00:00").getDay()).find(x => 630 + x.start === s && x.kind === r.kind);
