@@ -110,6 +110,21 @@ test('10. meals, the personal commitment, getting ready and sleep survive every 
   assert.ok(f.rows.some(r => r.id === 'lunch' && r.s === 960));
 });
 
+test('the desk keeps fixed clock times when Gentle Return shortens a study block', () => {
+  for (const [reading, now, max] of [[true, 1160, 32], [false, 1160, 42], [false, 1305, 25]]) {
+    const lab = seeded({ sched: { reading, wake: { [MON]: 720 }, gentle: { on: true, max } } });
+    const P = plan(iso(MON, now), lab);
+    const explicit = P.templateDay(lab, MON, 1, now, CTX).rows;
+    const rendered = P.fallback(1);
+    for (const id of ['lunch', 'snacks', 'personal', ...(reading ? ['reading'] : []), 'dinner', 'ready', 'sleep']) {
+      const expected = explicit.find(r => r.id === id);
+      const row = rendered.find(r => r.id === id);
+      assert.deepStrictEqual([row.start + 630, row.end + 630], [expected.s, expected.e], `${id} with reading=${reading}, now=${now}, max=${max}`);
+    }
+    for (let i = 1; i < rendered.length; i++) assert.strictEqual(rendered[i].start, rendered[i - 1].end);
+  }
+});
+
 test('11. Sunday is 90 minutes in total: 60 of the PCM subject furthest below its share, then 30 of German, all optional', () => {
   const P = plan(iso(SUN, 720), seeded());
   assert.strictEqual(P.dayKind(SUN).t, 'normal');
@@ -254,4 +269,26 @@ test('progress wording is shared, and zero minutes never "counts" on a study day
   const off = plan(iso(MON, 720), seeded({ dayTypes: { [MON]: { t: 'rest' } } })).dayProgress(0);
   assert.ok(off.rest && !off.counts);
   function plan_(now, sched = {}) { return plan(iso(MON, now), seeded({ sched: Object.assign({ reading: false, wake: { [MON]: 720 } }, sched), planLog: { [MON]: sched.plan ? 0 : 6 } })); }
+});
+
+test('one clock for every view: fixed commitments keep their configured times in every adaptation; nothing overlaps or goes missing', () => {
+  const FIX = { personal: [1230, 1260], dinner: [1400, 1430], ready: [1520, 1530] };
+  const cases = [
+    ['normal day', { sched: { reading: true, wake: { [MON]: 720 } } }, 1100],
+    ['Gentle Return (block shortened, 12 min freed)', { sched: { reading: true, wake: { [MON]: 720 }, gentle: { on: true, max: 48 } } }, 1160],
+    ['late wake-up', { sched: { reading: true, wake: { [MON]: 900 } } }, 1000],
+    ['Re-plan at 8:45 PM', { sched: { reading: true, wake: { [MON]: 720 } }, replanAt: { [MON]: 1245 - 630 } }, 1245],
+    ['old save with a stored delay', { sched: { reading: true, wake: { [MON]: 720 } }, replanAt: { [MON]: 500 }, replanPush: { [MON]: 40 } }, 1150],
+  ];
+  for (const [name, extra, now] of cases) {
+    const lab = seeded(extra), P = plan(iso(MON, now), lab), explicit = P.templateDay(lab, MON, 1, now, CTX).rows, rendered = P.fallback(1);
+    for (const [id, [s, e]] of Object.entries(FIX)) {
+      const r = rendered.filter(x => x.id === id); assert.strictEqual(r.length, 1, `${name}: ${id} is one row`);
+      assert.deepStrictEqual([r[0].start + 630, r[0].end + 630], [s, e], `${name}: ${id} at its configured time`);
+      const t = explicit.find(x => x.id === id); if (t) assert.deepStrictEqual([t.s, t.e], [s, e], `${name}: the planner agrees for ${id}`);
+    }
+    for (let i = 1; i < rendered.length; i++) assert.ok(rendered[i].start >= rendered[i - 1].end || rendered[i].kind === 'conflict' || rendered[i - 1].kind === 'conflict', `${name}: no overlap at ${rendered[i].id}`);
+    for (let i = 1; i < rendered.length; i++) assert.ok(rendered[i].start <= rendered[i - 1].end, `${name}: no unexplained gap before ${rendered[i].id}`);
+  }
+  assert.strictEqual(plan(iso(MON, 1150), seeded({ replanPush: { [MON]: 40 } })).oldDelay(), true, 'a stored delay from an old save is reported, not applied');
 });
