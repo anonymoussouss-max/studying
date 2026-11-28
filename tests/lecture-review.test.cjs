@@ -75,3 +75,11 @@ test('the player counts only real playing time, and not while a desk timer is ru
   assert.ok(/!vid\.paused && !vid\.ended && !vid\.seeking/.test(src));
   assert.ok(/if \(!timerOpen\(\)\) addWatch\(/.test(src));
 });
+
+test('volume boost: Off to 4x through a gain and a compressor, saved with the library progress', () => {
+  const src = html.match(/<script id="kg-courses-script">([\s\S]*?)<\/script>/)[1];
+  assert.ok(/const BOOSTS = \[1, 1\.5, 2, 3, 4\]/.test(src));
+  assert.ok(/vid\.crossOrigin = 'anonymous'/.test(src), 'the audio can only be boosted when the video is loaded with CORS');
+  assert.ok(/src\.connect\(gainN\); gainN\.connect\(compN\); compN\.connect\(actx\.destination\)/.test(src));
+  assert.ok(/s\.boost = BOOSTS\.includes\(b\) \? b : 1; put\(s\)/.test(src));
+});

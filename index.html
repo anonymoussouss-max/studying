@@ -17733,6 +17733,7 @@ ${String(text).slice(0, 16000)}`;
       <h2 class="klib-title">${esc(l.name)}</h2>
       <div id="klib-stage" class="klib-stage">${l.ok ? '' : `<p class="klib-miss">This lecture's video is missing or invalid on disk (${esc(l.why || 'missing')}). Its other files are still listed below.</p>`}</div>
       <div class="kl-row klib-ctrl" style="flex-wrap:wrap">${prev ? `<button class="kl-ghost" data-lib="play" data-c="${esc(c.id)}" data-l="${esc(prev.id)}">← Previous</button>` : ''}${next ? `<button class="kl-ghost" data-lib="play" data-c="${esc(c.id)}" data-l="${esc(next.id)}">Next →</button>` : ''}
+        <label class="kl-small">Volume boost <select data-libboost="1">${BOOSTS.map(b => `<option value="${b}"${b === boostOf() ? ' selected' : ''}>${b === 1 ? 'Off' : b + '×'}</option>`).join('')}</select></label>
         ${l.subs.length ? `<label class="kl-small">Subtitles <select data-libsub="1"><option value="">Off</option>${l.subs.map((x, k) => `<option value="${k}"${k === 0 && x.lang === 'en' ? ' selected' : ''}>${esc(x.lang)}</option>`).join('')}</select></label>` : '<span class="kl-small">No subtitles on disk</span>'}
         <button class="kl-ghost" data-lib="done" data-c="${esc(c.id)}" data-l="${esc(l.id)}" aria-pressed="${ls === 'completed'}">${ls === 'completed' ? '✓ Completed' : 'Mark completed'}</button></div>
       <div class="kl-row" style="flex-wrap:wrap">${l.transcripts.map((x, k) => `<button class="kl-ghost" data-lib="transcript" data-k="${k}">Transcript (${esc(x.lang)})</button>`).slice(0, 3).join('')}${l.pdfs.map(x => `<button class="kl-ghost" data-lib="file" data-p="${esc(x.path)}">PDF · ${esc(x.name)}</button>`).join('')}</div>
@@ -17871,7 +17872,13 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
   };
 
   // ---- the player: one <video>, kept outside re-renders so playback survives them ----
-  const vid = document.createElement('video'); vid.className = 'klib-video'; vid.controls = true; vid.preload = 'metadata'; vid.playsInline = true;
+  const vid = document.createElement('video'); vid.className = 'klib-video'; vid.controls = true; vid.preload = 'metadata'; vid.playsInline = true; vid.crossOrigin = 'anonymous'; // the local server sends CORS headers, so the volume boost can read the audio
+  // volume boost: the video's audio goes through a gain (up to 4x) and a compressor that keeps the loud parts from clipping
+  const BOOSTS = [1, 1.5, 2, 3, 4]; let actx = null, gainN = null, compN = null;
+  const boostOf = () => { const b = +store().boost; return BOOSTS.includes(b) ? b : 1; };
+  function applyBoost(b) { if (b <= 1 && !gainN) return; try { if (!actx) { actx = new (window.AudioContext || window.webkitAudioContext)(); const src = actx.createMediaElementSource(vid); gainN = actx.createGain(); compN = actx.createDynamicsCompressor(); compN.knee.value = 10; compN.ratio.value = 6; compN.attack.value = 0.004; compN.release.value = 0.25; src.connect(gainN); gainN.connect(compN); compN.connect(actx.destination); }
+      gainN.gain.value = b; compN.threshold.value = b > 1 ? -14 : 0; if (actx.state === 'suspended') actx.resume().catch(() => {}); } catch (e) {} }
+  vid.addEventListener('play', () => applyBoost(boostOf()));
   let cur = null, want = false, lastSave = 0;
   // played time: wall-clock while the video is actually playing, at most 2 s per tick (so a sleep or a stalled tab never adds time)
   let playMs = 0, tickAt = 0;
@@ -18033,7 +18040,7 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
       a.cur.answer = t.slice(0, 8000); a.cur.state = 'grading'; put(s); return grade(c, mi); }
     if (f.dataset.libf === 'note') { const t = String(f.t.value || '').trim(); if (!t || !view.c) return; const s = store(); s.notes.push({ id: 'cn' + Date.now().toString(36), c: view.c, l: view.l, t: t.slice(0, 4000), at: Date.now(), pos: cur && cur.l === view.l ? Math.round(vid.currentTime) : null }); put(s); M.render(); }
   });
-  document.addEventListener('change', e => { const t = e.target; if (t && t.dataset && t.dataset.libsub != null && cur) { t.value === '' ? [...vid.querySelectorAll('track')].forEach(x => x.remove()) : setTrack(+t.value); } });
+  document.addEventListener('change', e => { const t = e.target; if (t && t.dataset && t.dataset.libboost != null) { const s = store(), b = +t.value; s.boost = BOOSTS.includes(b) ? b : 1; put(s); return applyBoost(s.boost); } if (t && t.dataset && t.dataset.libsub != null && cur) { t.value === '' ? [...vid.querySelectorAll('track')].forEach(x => x.remove()) : setTrack(+t.value); } });
   document.addEventListener('input', e => { const t = e.target; if (t && t.dataset && t.dataset.libans) { const s = store(), a = s.asm && s.asm[t.dataset.libans]; if (a && a.cur && a.cur.state === 'ready') { a.cur.draft = t.value.slice(0, 8000); put(s); } } });
   document.addEventListener('input', e => { const t = e.target; if (!t || !t.dataset || !t.dataset.libq) return; const q = t.value.toLowerCase(); for (const b of document.querySelectorAll('#moon-lab .klib-books>li')) b.hidden = !!q && !b.textContent.toLowerCase().includes(q); for (const g of document.querySelectorAll('#moon-lab .klib-shelf')) g.hidden = !![...g.querySelectorAll('.klib-books>li')].every(b => b.hidden); });
 
