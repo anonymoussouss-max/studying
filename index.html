@@ -6610,7 +6610,11 @@ window.KG_RECALL = {
     const b = block();
     return `<section class="kl-card kl-quiet"><p class="kl-eyebrow">STUDY BLOCK RUNNING</p><h3>The prize shelf is quiet until ${esc(b ? b.title : 'this block')} ends.</h3><p class="kl-small">Your five skills, stickers, bond, rank and the map are all still here after the block.</p><button class="kl-ghost" data-a="peek">Open anyway for 10 minutes</button></section>`;
   }
+  // a full-screen video inside the page would be detached by a redraw, which ends full screen; wait until it ends
+  let fsWait = false;
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && fsWait) { fsWait = false; render(); } });
   function render() {
+    const fs = document.fullscreenElement; if (fs && root.contains(fs)) { fsWait = true; return; }
     histCache = null;
     const tabs = TABS();
     if (!tabs.some(t => t[0] === tab)) tab = tabs[0] ? tabs[0][0] : 'chapters';
