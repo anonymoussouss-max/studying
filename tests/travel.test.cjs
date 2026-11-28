@@ -16,7 +16,8 @@ test('one way home: the old strips are retired, the return control shows everywh
 });
 test('the writing table holds only the daily leaf; sessions open at the writing bench', () => {
   assert.match(css, /body\.kt-p-table #kg-main>:not\(#habit-desk\)\{display:none!important\}/);
-  assert.match(css, /#hb-day-map :is\(\.hb-block-btns,\.hb-done,\.hb-caption\)/);
+  assert.match(css, /#hb-day-map \.hb-caption,/); assert.ok(!/#hb-day-map :is\(\.hb-block-btns/.test(css), "the leaf keeps each study block's Start timer and Done buttons");
+  assert.match(css, /#hb-day-map \.hb-timeline li>:is\(\.hb-block-btns,\.hb-done\)\{grid-column:2/);
   assert.strictEqual((html.match(/window\.__ktWant='session';window\.MoonLab\?\.go\('today'\)/g) || []).length, 3);
   assert.match(html, /const h = sec === 'today' \? \(\/\^\(quarters\|session\|today\)\$\/\.test\(want\) \? want : want \? 'today' : 'quarters'\) : sec;/);
   assert.match(html, /history\[booted \? 'pushState' : 'replaceState'\]/, 'travel adds history entries so Back and Forward work');
