@@ -17441,12 +17441,12 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
   // ---- where the files come from: a folder you chose (File System Access) or the local server ----
   const idb = (mode, fn) => new Promise((ok, no) => { const r = indexedDB.open('kg-library', 1); r.onupgradeneeded = () => r.result.createObjectStore('h');
     r.onsuccess = () => { const t = r.result.transaction('h', mode), q = fn(t.objectStore('h')); t.oncomplete = () => { r.result.close(); ok(q && q.result); }; t.onerror = () => no(t.error); }; r.onerror = () => no(r.error); });
-  let index = null, phase = 'idle', err = '', handle = null, view = { c: '', l: '' }, made = [];
+  let index = null, phase = 'idle', err = '', handle = null, view = { c: '', l: '' }, made = [], loadedAt = 0, checking = false;
   const segs = p => String(p).split('/').filter(Boolean);
   async function fileOf(p) { let d = handle; const s = segs(p); for (const x of s.slice(0, -1)) d = await d.getDirectoryHandle(x); return (await d.getFileHandle(s[s.length - 1])).getFile(); }
   const base = () => { const s = store().src; return s && s.kind === 'url' ? s.base.replace(/\/+$/, '') + '/' : ''; };
   const urlOf = p => base() + segs(p).map(encodeURIComponent).join('/');
-  async function textOf(p) { if (handle) return (await fileOf(p)).text(); const r = await fetch(urlOf(p)); if (!r.ok) throw new Error(r.status === 404 ? 'file missing' : 'HTTP ' + r.status); return r.text(); }
+  async function textOf(p) { if (handle) return (await fileOf(p)).text(); const r = await fetch(urlOf(p), p === 'kaguya-library.json' ? { cache: 'no-store' } : undefined); if (!r.ok) throw new Error(r.status === 404 ? 'file missing' : 'HTTP ' + r.status); return r.text(); }
   async function mediaURL(p) { if (!handle) return urlOf(p); const u = URL.createObjectURL(await fileOf(p)); made.push(u); return u; }
   const freeURLs = () => { made.forEach(u => URL.revokeObjectURL(u)); made = []; };
   const onCourses = () => document.body.classList.contains('kg-sec-library') && !!document.querySelector('#moon-lab .klib');
@@ -17460,11 +17460,19 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
         let perm = await handle.queryPermission({ mode: 'read' }); if (perm !== 'granted' && interactive) perm = await handle.requestPermission({ mode: 'read' });
         if (perm !== 'granted') { phase = 'reconnect'; return; }
       } else handle = null;
-      index = JSON.parse(await textOf('kaguya-library.json')); phase = 'ready'; saveCat(index);
-    } catch (e) { index = null; phase = 'error'; err = /fetch|network/i.test(String(e)) ? 'the local library server is not reachable' : /missing|NotFound/i.test(String(e)) ? 'kaguya-library.json was not found in that folder (run tools/library-index.cjs on it first)' : String(e.message || e); }
+      index = JSON.parse(await textOf('kaguya-library.json')); phase = 'ready'; saveCat(index); loadedAt = Date.now();
+    } catch (e) { index = null; phase = 'error'; loadedAt = Date.now(); err = /fetch|network/i.test(String(e)) ? 'the local library server is not reachable' : /missing|NotFound/i.test(String(e)) ? 'kaguya-library.json was not found in that folder (run tools/library-index.cjs on it first)' : String(e.message || e); }
     if (onCourses() || document.querySelector('[data-kcgu-wait]')) M.render();
   }
 
+  const sig = ix => JSON.stringify(((ix && ix.courses) || []).map(c => [c.id, c.status, c.valid, c.expected, c.note]));
+  async function recheck() {
+    if (checking || view.l || !store().src || (store().src.kind !== 'url' && !handle) || Date.now() - loadedAt < 15000 || !(phase === 'ready' || phase === 'error')) return;
+    checking = true; const before = phase === 'ready' ? sig(index) : '';
+    try { const ix = JSON.parse(await textOf('kaguya-library.json')); index = ix; phase = 'ready'; err = ''; saveCat(ix); if (sig(ix) !== before && onCourses()) M.render(); }
+    catch (e) { if (phase === 'ready') { index = null; phase = 'error'; err = 'the local library server is not reachable'; if (onCourses()) M.render(); } }
+    finally { loadedAt = Date.now(); checking = false; }
+  }
   const CAT = 'kg-library-cat-v1';
   function saveCat(ix) { try { localStorage.setItem(CAT, JSON.stringify({ at: Date.now(), courses: ix.courses.map(c => ({ id: c.id, title: c.title, by: c.by, status: c.status, expected: c.expected,
     modules: (c.modules || []).map(m => ({ name: m.name, lectures: (m.lectures || []).map(l => ({ id: l.id, name: l.name, ok: l.ok, subs: [], transcripts: [], pdfs: [] })) })) })) })); } catch (e) {} }
@@ -17492,13 +17500,13 @@ window.KgCourseGuArt = {"an-introduction-to-astronomy":{"gu":"Meridian Owl","des
   }
   function book(x, review, off) {
     const flag = review ? '<span class="klib-flag">Stage to review</span>' : '';
-    if (!x.c) return `<li><div class="klib-book" aria-disabled="true" data-c="${esc(x.id)}"><b class="klib-bt">${esc(x.label)}</b><span class="klib-st klib-st-wip">WIP</span><span class="kl-small">Planned · not in the offline index yet</span>${flag}</div></li>`;
+    if (!x.c) return `<li><div class="klib-book" aria-disabled="true" data-c="${esc(x.id)}"><b class="klib-bt">${esc(x.label)}</b><span class="klib-st klib-st-off">Unknown</span><span class="kl-small">Download status not established yet</span>${flag}</div></li>`;
     const c = x.c, s = store(), av = availOf(c), L = lecturesOf(c), done = L.filter(l => lecState(s.lec[lk(c.id, l.id)]) === 'completed').length;
     const pend = (c.modules || []).filter((m, mi) => { const a = s.asm && s.asm[mkey(c, mi)]; return a && !a.passed; }).length;
     let gu = null; try { gu = courseGu(c, s); } catch (e) {}
-    const st = off ? ['off', 'Library disconnected'] : av === 'available' ? ['ready', 'Ready'] : ['wip', 'WIP'];
+    const st = !c.status ? ['off', 'Unknown'] : av === 'available' ? ['ready', 'Ready'] : ['wip', 'WIP']; // offline: the last verified status, not a repeated notice
     return `<li><button class="klib-book" data-lib="course" data-c="${esc(c.id)}"${off ? ' aria-disabled="true"' : ''}><b class="klib-bt">${esc(x.label || c.title)}</b>${c.by ? `<span class="kl-small klib-by">${esc(c.by)}</span>` : ''}
-      <span class="klib-st klib-st-${st[0]}">${st[1]}</span><span class="kl-small">${L.length ? `${done}/${L.length} lectures` : 'No lectures on disk yet'}${gu && gu.total ? ` · ${gu.passes.length}/${gu.total} modules passed` : ''}${pend ? ` · ${pend} test${pend > 1 ? 's' : ''} pending` : ''}</span>
+      <span class="klib-st klib-st-${st[0]}">${st[1]}</span><span class="kl-small">${off ? 'last verified · ' : ''}${L.length ? `${done}/${L.length} lectures` : 'No lectures on disk yet'}${gu && gu.total ? ` · ${gu.passes.length}/${gu.total} modules passed` : ''}${pend ? ` · ${pend} test${pend > 1 ? 's' : ''} pending` : ''}</span>
       ${x.why ? `<span class="kl-small klib-why">${esc(x.why)}</span>` : ''}${flag}<span class="klib-bar" aria-hidden="true"><i style="width:${L.length ? Math.round(100 * done / L.length) : 0}%"></i></span></button></li>`;
   }
   const shelvesHTML = (courses, off) => shelves(courses).map(({ g, gi, items }) => `<section class="klib-shelf${g.support ? ' klib-support' : ''}" data-libg="1" data-stage="${gi}" aria-labelledby="klib-sh-${gi}"><h3 class="klib-sh" id="klib-sh-${gi}">${esc(g.h)}</h3>${g.note ? `<p class="kl-small">${esc(g.note)}</p>` : ''}${g.review ? '<p class="kl-small klib-flag-note">No stage is documented for these courses yet, so each is flagged for review; their place here is provisional.</p>' : ''}
@@ -17676,7 +17684,7 @@ ${String(src.text || '').slice(0, 12000)}`, null, true).catch(() => null);
     return head + status + misses + revise + body + foot;
   }
   M.PANELS.courses = () => {
-    if (!index && phase === 'idle') { phase = 'loading'; setTimeout(() => load(false), 0); }
+    if (!index && phase === 'idle') { phase = 'loading'; setTimeout(() => load(false), 0); } else setTimeout(recheck, 0);
     const s = store(); if ((!s.src || phase === 'none') && cached()) { const cat = cached(); return `<section class="kl-card kl-stack klib klib-home"><p class="klib-off" role="status"><b>Library disconnected</b> · showing the last known catalogue from ${esc(new Date(cat.at).toLocaleString())}.</p>${shelvesHTML(cat.courses, true)}${aboutHTML()}${sourceCard(true)}</section>`; }
     if (!s.src || phase === 'none') return `<section class="kl-card kl-stack klib"><p class="kl-eyebrow">📜 COURSE LIBRARY · SOUTHERN BORDER</p><h2>Connect your offline courses</h2><p>Your courses stay on your disk. Connect the folder once and the desk remembers it.</p>${sourceCard(true)}</section>`;
     if (phase === 'loading') return `<section class="kl-card klib"><p class="kl-eyebrow">📜 COURSE LIBRARY</p><p>Opening the library…</p></section>`;

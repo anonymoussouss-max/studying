@@ -5,8 +5,8 @@ test('stage shelves follow ARRANGE; stage-less courses are flagged; reference is
   assert.ok(!html.includes("h: 'Recommended next courses'"), 'the eight review courses now sit in approved stages');
   assert.ok(html.includes("{ h: 'Reference shelf', support: true,"));
   assert.ok(html.includes('const out = ARRANGE.map((g, gi) =>'), 'shelves in approved order');
-  assert.ok(html.includes("Planned · not in the offline index yet"), 'a planned course keeps its place while pending');
-  assert.ok(html.includes("['ready', 'Ready'] : ['wip', 'WIP']") && html.includes("['off', 'Library disconnected']"));
+  assert.ok(html.includes('Download status not established yet'), 'a planned course keeps its place, marked Unknown until a status is established');
+  assert.ok(html.includes("['ready', 'Ready'] : ['wip', 'WIP']") && html.includes('<b>Library disconnected</b>'));
   for (const q of ['Understanding Modern Physics II: Quantum Mechanics and Atoms', 'Foundations of Quantum Mechanics', 'Quantum Mechanics — University of Colorado Boulder', 'Exploring Quantum Physics']) assert.ok(html.includes(`'${q}'`), q);
 });
 test('one heading: the old library headings are gone, the explanation sits in details', () => {
@@ -35,4 +35,11 @@ test('approved placement of the eight former review courses (28 Nov 2026)', () =
   for (const [id, w] of Object.entries(want)) assert.deepStrictEqual(where(id), w, id);
   const ids = ARRANGE.flatMap(g => g.c.map(c => c[0])); assert.strictEqual(ids.length, 37); assert.strictEqual(new Set(ids).size, 37);
   assert.ok(!ARRANGE.some(g => g.review), 'nothing left to review');
+});
+
+test('stale WIP: the index is re-read on revisiting the archive, never from a browser cache; offline keeps each last verified status', () => {
+  assert.match(html, /p === 'kaguya-library\.json' \? \{ cache: 'no-store' \}/, 'the index is never served from the HTTP cache');
+  assert.match(html, /async function recheck\(\)/); assert.match(html, /else setTimeout\(recheck, 0\);/, 'every visit to the shelves or a course page rechecks quietly');
+  assert.match(html, /const st = !c\.status \? \['off', 'Unknown'\] : av === 'available' \? \['ready', 'Ready'\] : \['wip', 'WIP'\];/, 'books show Ready / WIP / Unknown, also when disconnected');
+  assert.ok(!/\['off', 'Library disconnected'\]/.test(html), 'Library disconnected is shown once, not on every book');
 });
