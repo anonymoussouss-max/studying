@@ -270,3 +270,25 @@ test('progress wording is shared, and zero minutes never "counts" on a study day
   assert.ok(off.rest && !off.counts);
   function plan_(now, sched = {}) { return plan(iso(MON, now), seeded({ sched: Object.assign({ reading: false, wake: { [MON]: 720 } }, sched), planLog: { [MON]: sched.plan ? 0 : 6 } })); }
 });
+
+test('one clock for every view: fixed commitments keep their configured times in every adaptation; nothing overlaps or goes missing', () => {
+  const FIX = { personal: [1230, 1260], dinner: [1400, 1430], ready: [1520, 1530] };
+  const cases = [
+    ['normal day', { sched: { reading: true, wake: { [MON]: 720 } } }, 1100],
+    ['Gentle Return (block shortened, 12 min freed)', { sched: { reading: true, wake: { [MON]: 720 }, gentle: { on: true, max: 48 } } }, 1160],
+    ['late wake-up', { sched: { reading: true, wake: { [MON]: 900 } } }, 1000],
+    ['Re-plan at 8:45 PM', { sched: { reading: true, wake: { [MON]: 720 } }, replanAt: { [MON]: 1245 - 630 } }, 1245],
+    ['old save with a stored delay', { sched: { reading: true, wake: { [MON]: 720 } }, replanAt: { [MON]: 500 }, replanPush: { [MON]: 40 } }, 1150],
+  ];
+  for (const [name, extra, now] of cases) {
+    const lab = seeded(extra), P = plan(iso(MON, now), lab), explicit = P.templateDay(lab, MON, 1, now, CTX).rows, rendered = P.fallback(1);
+    for (const [id, [s, e]] of Object.entries(FIX)) {
+      const r = rendered.filter(x => x.id === id); assert.strictEqual(r.length, 1, `${name}: ${id} is one row`);
+      assert.deepStrictEqual([r[0].start + 630, r[0].end + 630], [s, e], `${name}: ${id} at its configured time`);
+      const t = explicit.find(x => x.id === id); if (t) assert.deepStrictEqual([t.s, t.e], [s, e], `${name}: the planner agrees for ${id}`);
+    }
+    for (let i = 1; i < rendered.length; i++) assert.ok(rendered[i].start >= rendered[i - 1].end || rendered[i].kind === 'conflict' || rendered[i - 1].kind === 'conflict', `${name}: no overlap at ${rendered[i].id}`);
+    for (let i = 1; i < rendered.length; i++) assert.ok(rendered[i].start <= rendered[i - 1].end, `${name}: no unexplained gap before ${rendered[i].id}`);
+  }
+  assert.strictEqual(plan(iso(MON, 1150), seeded({ replanPush: { [MON]: 40 } })).oldDelay(), true, 'a stored delay from an old save is reported, not applied');
+});
